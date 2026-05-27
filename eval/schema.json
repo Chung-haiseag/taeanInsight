@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://insight.taeannews.co.kr/eval/schema.json",
+  "title": "Taean LLM Evaluation Dataset Item",
+  "description": "태안 AI 인텔리전스 커먼즈 플랫폼 LLM 벤치마크용 평가셋 단일 문항 스키마 (PRD v1.4 §6 REQ-INFRA-001)",
+  "type": "object",
+  "required": ["id", "domain", "difficulty", "question", "expected_keywords", "reference_answer", "source", "evaluation_method"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(TOUR|ENV|RE|GEN)-[0-9]{3}$",
+      "description": "도메인 코드(TOUR/ENV/RE/GEN) + 3자리 번호"
+    },
+    "domain": {
+      "type": "string",
+      "enum": ["tourism", "environment", "realestate", "general"],
+      "description": "문항 도메인 — 각 125문항 목표 (총 500)"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"],
+      "description": "easy 30% / medium 50% / hard 20% 분포 권장"
+    },
+    "question": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "LLM에 그대로 전달될 한국어 질문"
+    },
+    "expected_keywords": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1,
+      "description": "keyword_match 채점 시 답변에 포함되어야 하는 핵심 키워드. semantic/factual 채점에서는 부가 정보로 활용"
+    },
+    "reference_answer": {
+      "type": "string",
+      "minLength": 5,
+      "description": "사람이 작성한 정답 예시 (semantic 채점 시 임베딩 비교 기준, 환각률 측정 기준)"
+    },
+    "source": {
+      "type": "string",
+      "description": "정답 근거 출처 (URL·문서명·기관명). 검증 가능해야 환각률 측정 가능"
+    },
+    "evaluation_method": {
+      "type": "string",
+      "enum": ["keyword_match", "exact", "semantic", "factual"],
+      "description": "자동 채점 방식 — keyword_match(키워드 포함 검사) / exact(정확 일치) / semantic(임베딩 유사도 ≥0.85) / factual(사실 검증)"
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "세부 태그 — 분석·필터링용 (예: 'anmyeon', 'sunset', 'beach')"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": ["verified", "needs_verification", "draft"],
+      "default": "draft",
+      "description": "정답·출처 검증 상태. needs_verification은 태안신문 편집부 검증 대기"
+    }
+  }
+}
