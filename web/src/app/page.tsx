@@ -19,6 +19,12 @@ export default function HomePage() {
         </p>
         <div className="flex flex-wrap justify-center gap-3 pt-4">
           <Link
+            href="/me/onboarding"
+            className="bg-accent text-background px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            내 관심사 설정하기
+          </Link>
+          <Link
             href="/reports"
             className="bg-brand text-background px-6 py-3 rounded-lg font-semibold hover:bg-brand-dark transition-colors"
           >

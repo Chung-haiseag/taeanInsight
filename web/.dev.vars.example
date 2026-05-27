@@ -5,6 +5,12 @@
 # 백엔드 API
 NEXT_PUBLIC_API_BASE_URL=https://api.insight.taeannews.co.kr
 
+# Mock 모드 (백엔드 미연결 시 화면 검증용)
+NEXT_PUBLIC_USE_MOCK=true
+
+# Web Push VAPID 공개키 (서버에서 발급)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+
 # 인증 (NextAuth 등 도입 시)
 # AUTH_SECRET=
 # AUTH_TAEAN_SSO_CLIENT_ID=

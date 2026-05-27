@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/query", label: "AI 질의" },
   { href: "/dashboard", label: "B2B 대시보드" },
   { href: "/citizen", label: "시민기자" },
+  { href: "/me", label: "내 페이지" },
 ];
 
 export function SiteHeader() {
