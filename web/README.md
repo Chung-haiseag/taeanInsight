@@ -60,16 +60,49 @@ import { AILabelBadge } from "@/components/ai-label-badge";
 
 각 배지는 `title`·`aria-label`로 의미를 명확히 안내.
 
-## 로컬 실행 (의존성 설치 전 검토)
+## 로컬 실행
 
 ```bash
 cd web
 npm install
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3000 (Next.js 개발 모드)
 npm run typecheck
 npm run lint
-npm run build
+npm run build        # 표준 Next.js 빌드
 ```
+
+## Cloudflare Pages 배포 (PRD v1.6 확정)
+
+```bash
+# 로컬에서 Cloudflare 어댑터 빌드 미리 검증
+npm run build:cf
+
+# Wrangler로 로컬 프리뷰 (Edge runtime 모사)
+npm run preview:cf
+
+# 수동 배포 (CI 미사용 시)
+npx wrangler login
+npm run deploy:cf
+```
+
+권장 운영 방식: **GitHub 연동 자동 배포**
+1. Cloudflare 대시보드 → Pages → Create project → Connect to Git
+2. 저장소: `Chung-haiseag/taeanInsight`, Root: `web/`
+3. Framework: Next.js, Build command: `npx @cloudflare/next-on-pages@1`
+4. Output: `.vercel/output/static`, Node: `20`
+5. 환경변수는 Pages → Settings → Environment variables (Secret) 에 등록
+
+자세한 DNS·SSL 절차: `docs/infrastructure/dns-setup-guide.md`
+
+### Edge runtime 주의
+
+Cloudflare Pages는 Edge runtime만 지원합니다. 동적 라우트·API 라우트에서는 상단에 다음 명시:
+
+```ts
+export const runtime = "edge";
+```
+
+순수 정적 페이지는 명시 불필요.
 
 ## 보안 헤더
 

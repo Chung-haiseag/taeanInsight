@@ -2,9 +2,11 @@
 
 다음 내용을 복사해 `taeannews.co.kr` 도메인 관리자에게 메일·메신저로 전달하세요.
 
+**전제**: 배포는 Cloudflare Pages로 진행 (PRD v1.6 확정).
+
 ---
 
-## 메일 본문 (Vercel 권장 시)
+## 메일 본문 (Cloudflare Pages 배포)
 
 ```
 제목: [태안신문] insight.taeannews.co.kr 서브도메인 DNS 추가 요청
@@ -17,28 +19,23 @@
 ▣ 요청 사항
 - 도메인: taeannews.co.kr
 - 추가할 서브도메인: insight.taeannews.co.kr
+- 배포 플랫폼: Cloudflare Pages (무제한 무료 트래픽)
 - 기존 사이트(taeannews.co.kr) 영향: 없음 (별도 서브도메인)
 
-▣ DNS 레코드 추가 (택 1)
-
-  (권장) CNAME 방식
+▣ DNS 레코드 추가
     Type:   CNAME
     Name:   insight
-    Value:  cname.vercel-dns.com.
-    TTL:    3600
+    Value:  taean-insight.pages.dev.
+    TTL:    3600 (또는 자동)
 
-  (대안) A 레코드 방식 — 등록기관이 CNAME 미지원 시
-    Type:   A
-    Name:   insight
-    Value:  76.76.21.21
-    TTL:    3600
+  * Value 값(`taean-insight.pages.dev`)은 Cloudflare Pages 프로젝트
+    생성 후 정확한 값을 다시 확인해 알려드리겠습니다.
 
 ▣ HTTPS·SSL
-  Vercel이 Let's Encrypt 기반 SSL을 자동 발급·갱신합니다.
-  추가 작업 불필요.
+  Cloudflare가 SSL을 자동 발급·갱신합니다 (Universal SSL).
+  도메인 등록기관 측 추가 작업 불필요.
 
 ▣ 완료 후 검증
-  다음 명령으로 정상 동작 확인 가능합니다.
     dig insight.taeannews.co.kr +short
     curl -I https://insight.taeannews.co.kr
 
@@ -47,7 +44,7 @@
 
 ▣ 문의
   설정 완료 후 디지털전환 총괄에게 회신 주시면
-  바로 배포 작업 진행하겠습니다.
+  Cloudflare 측 Custom domain 등록을 마무리하겠습니다.
 
 ▣ 참고 문서
   본 저장소의 docs/infrastructure/dns-setup-guide.md 에
@@ -59,7 +56,7 @@
 
 ---
 
-## 메일 본문 (자체 서버 / NCloud 사용 시)
+## 메일 본문 (자체 서버 / NCloud 대안 — 한국 데이터 보관 필요 시)
 
 ```
 제목: [태안신문] insight.taeannews.co.kr 서브도메인 DNS 추가 요청
@@ -71,6 +68,7 @@
 ▣ 요청 사항
 - 도메인: taeannews.co.kr
 - 추가할 서브도메인: insight.taeannews.co.kr
+- 호스팅: NCloud (또는 자체 서버 — 한국 데이터 보관)
 - 기존 사이트 영향: 없음
 
 ▣ DNS 레코드 추가
@@ -101,7 +99,7 @@
 
   Type: CNAME
   Name: insight
-  Value: cname.vercel-dns.com.
+  Value: taean-insight.pages.dev.
 
 기존 taeannews.co.kr 사이트에는 영향 없습니다.
 완료되면 알려주세요. 감사합니다!
@@ -116,7 +114,7 @@ DNS 설정 완료했습니다.
 
 - 도메인: insight.taeannews.co.kr
 - 적용 시각: YYYY-MM-DD HH:MM
-- 레코드: CNAME → cname.vercel-dns.com.
+- 레코드: CNAME → taean-insight.pages.dev.
 
 dig 확인 결과:
 [dig insight.taeannews.co.kr +short 결과 붙여넣기]

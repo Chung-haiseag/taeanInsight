@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cf": "npx @cloudflare/next-on-pages@1",
+    "preview:cf": "npm run build:cf && npx wrangler pages dev .vercel/output/static --compatibility-flag=nodejs_compat",
+    "deploy:cf": "npm run build:cf && npx wrangler pages deploy .vercel/output/static --project-name=taean-insight",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -19,16 +22,21 @@
     "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.0",
+    "@cloudflare/workers-types": "^4.20240620.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^9.0.0",
     "eslint-config-next": "^14.2.0",
+    "eslint-plugin-next-on-pages": "^1.13.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "vercel": "^32.0.0",
+    "vitest": "^2.0.0",
+    "wrangler": "^3.60.0"
   },
   "engines": {
     "node": ">=20.0.0"

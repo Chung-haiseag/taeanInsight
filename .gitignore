@@ -29,6 +29,11 @@ node_modules/
 out/
 next-env.d.ts
 
+# Cloudflare Pages / Wrangler
+.vercel/
+.wrangler/
+.dev.vars
+
 # Python
 __pycache__/
 *.py[cod]

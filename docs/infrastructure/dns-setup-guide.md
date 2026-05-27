@@ -1,15 +1,15 @@
 # `insight.taeannews.co.kr` DNS·HTTPS 설정 가이드
 
 **대상**: `taeannews.co.kr` 도메인 관리자
-**작성**: 2026-05-27
-**관련**: PRD v1.5 §6 REQ-PLATFORM-001 · TaskMaster #8
+**작성**: 2026-05-27 (v1.6 Cloudflare Pages 확정)
+**관련**: PRD v1.6 §6 REQ-PLATFORM-001 · TaskMaster #8
 **예상 소요**: 30분 (DNS 변경) + 10분~24시간 (전파 대기) + 5분 (인증서 발급)
 
 ---
 
 ## 한 줄 요약
 
-`taeannews.co.kr` 의 서브도메인으로 `insight.taeannews.co.kr` 을 추가하여, AI 인사이트 서비스를 별도 운영합니다. 본 가이드의 절차를 따르면 **추가 비용 없이** SSL까지 완료됩니다.
+`taeannews.co.kr` 의 서브도메인으로 `insight.taeannews.co.kr` 을 추가하여, **Cloudflare Pages** 에 배포된 AI 인사이트 서비스로 연결합니다. SSL은 Cloudflare가 자동 발급·갱신하며, **추가 비용 없습니다**.
 
 ---
 
@@ -19,139 +19,99 @@
 |---|---|---|
 | 역할 | 무료 뉴스·커뮤니티 허브 | AI 예측·유료 서비스 |
 | 운영 주체 | 엔디소프트 CMS | Next.js (별도 코드베이스) |
-| 영향 | **변경 없음** (기존 그대로) | 신규 추가 |
-
-기존 사이트는 그대로 유지되며 **다운타임 0**으로 진행 가능합니다.
-
----
-
-## 배포 옵션 결정 (관리자 선택)
-
-DNS 레코드는 어디에 호스팅할지에 따라 달라집니다. 한 옵션을 고른 뒤 § 3로 이동하세요.
-
-### Option A. Vercel (권장)
-
-- **장점**: Next.js 공식 호스팅, 무료 티어로 시작 가능, SSL 자동, 글로벌 CDN
-- **비용**: 트래픽 100GB/월까지 무료, 초과 시 Pro $20/월
-- **DNS 작업**: A 레코드 1개 또는 CNAME 1개
-- **SSL**: Vercel이 자동 발급·갱신
-
-### Option B. Cloudflare Pages
-
-- **장점**: 무제한 무료 트래픽, Cloudflare CDN
-- **비용**: 무료 (대용량까지)
-- **DNS 작업**: CNAME 1개
-- **SSL**: Cloudflare가 자동 발급·갱신
-
-### Option C. NCloud / AWS / 자체 서버
-
-- **장점**: 한국 데이터 보관, 공공기관 연계 용이
-- **비용**: 월 5~10만원 (서버 + 트래픽)
-- **DNS 작업**: A 레코드 (서버 공인 IP)
-- **SSL**: Let's Encrypt + certbot 직접 설치 (§ 5 참고)
-
-→ **권장**: 초기에는 **Vercel** 또는 **Cloudflare Pages**로 시작. 트래픽·규제 요구가 명확해지는 Phase 3 베타 시점에 NCloud 이전 재검토.
+| 호스팅 | (기존 그대로) | **Cloudflare Pages** |
+| 영향 | **변경 없음** (다운타임 0) | 신규 추가 |
 
 ---
 
-## DNS 레코드 설정 (Option A·B 공통)
+## 왜 Cloudflare Pages인가? (PRD v1.6 결정 근거)
 
-`taeannews.co.kr` 도메인 등록기관(가비아·후이즈·카페24·아이네임즈 등)의 DNS 관리 화면에 접속합니다.
+- **무제한 무료 트래픽** — 사업 운영비 월 30만원 목표 정합성 최상
+- **자동 SSL** — Let's Encrypt 기반 자동 발급·갱신
+- **글로벌 CDN** — Cloudflare 전 세계 엣지에서 캐싱
+- **Workers·R2 연계** — 향후 백엔드·스토리지 확장 용이
+- **DDoS 보호** — 기본 제공
 
-### Vercel을 선택한 경우
+대안 (필요 시):
+- **NCloud / 자체 서버** — 한국 데이터 보관·공공기관 연계 시. 월 5~10만원
 
-다음 두 레코드 중 **하나만** 추가:
+---
 
-**(권장) CNAME 방식**
-```
-Type:   CNAME
-Name:   insight
-Value:  cname.vercel-dns.com.
-TTL:    3600
-```
+## DNS 레코드 설정
 
-또는 **A 레코드 방식** (CNAME이 안 되는 일부 등록기관):
-```
-Type:   A
-Name:   insight
-Value:  76.76.21.21          (Vercel 공식 anycast IP)
-TTL:    3600
-```
-
-### Cloudflare Pages를 선택한 경우
+`taeannews.co.kr` 도메인 등록기관(가비아·후이즈·카페24·아이네임즈 등)의 DNS 관리 화면에서 다음 레코드 1개를 추가합니다.
 
 ```
 Type:   CNAME
 Name:   insight
-Value:  <project-name>.pages.dev.
-TTL:    3600
-Proxy:  Proxied (Cloudflare 사용 시)
+Value:  taean-insight.pages.dev.
+TTL:    3600  (또는 자동)
 ```
 
-### NCloud / AWS / 자체 서버를 선택한 경우
-
-```
-Type:   A
-Name:   insight
-Value:  <서버의 공인 IP 주소>
-TTL:    3600
-```
+> `taean-insight.pages.dev` 는 Cloudflare Pages 프로젝트 생성 시 부여되는 기본 도메인입니다. 정확한 값은 Cloudflare Pages 대시보드에서 확인 후 알려드리겠습니다.
 
 > **Name 필드 입력 주의**: 일부 한국 등록기관은 `insight` 만 입력하고, 일부는 `insight.taeannews.co.kr.` 전체를 입력합니다. 등록기관 UI 안내를 따라주세요.
 
 ---
 
+## Cloudflare Pages 측 작업 (개발팀이 수행)
+
+1. Cloudflare 계정 생성 (https://dash.cloudflare.com — 무료)
+2. Pages → Create a project → Connect to Git (GitHub: `Chung-haiseag/taeanInsight`)
+3. 빌드 설정:
+   - Framework preset: `Next.js`
+   - Build command: `npx @cloudflare/next-on-pages@1`
+   - Build output directory: `.vercel/output/static`
+   - Root directory: `web/`
+   - Node version: `20`
+4. 환경변수: (이후 백엔드 연동 시 추가)
+5. 첫 빌드·배포 후 자동 부여되는 `<project>.pages.dev` 도메인 확인
+6. Custom domains → `insight.taeannews.co.kr` 추가
+7. Cloudflare가 자동으로 SSL 발급 (Universal SSL)
+
+---
+
 ## DNS 전파 확인
 
-DNS 변경 후 보통 10분~1시간 (최대 24시간) 내에 전파됩니다. 다음 명령으로 확인:
+DNS 변경 후 보통 10분~1시간 (최대 24시간) 내에 전파됩니다.
 
 ```bash
-# 도메인 조회 (어디서나 실행 가능)
+# 도메인 조회
 dig insight.taeannews.co.kr +short
 nslookup insight.taeannews.co.kr
 
-# 또는 웹 도구 사용
-# https://www.whatsmydns.net/#A/insight.taeannews.co.kr
+# 웹 도구
+# https://www.whatsmydns.net/#CNAME/insight.taeannews.co.kr
 ```
 
-정상 응답 예시 (Vercel):
+정상 응답 예시:
 ```
-76.76.21.21
+taean-insight.pages.dev.
+104.21.x.x   (Cloudflare anycast)
+172.67.x.x   (Cloudflare anycast)
 ```
 
-> 본 저장소의 `docs/infrastructure/dns-verification.sh` 를 실행하면 자동 검증됩니다.
+본 저장소의 `docs/infrastructure/dns-verification.sh` 를 실행하면 자동 검증됩니다.
 
 ---
 
 ## HTTPS·SSL 인증서
 
-### Vercel / Cloudflare Pages 사용 시
+**작업 불필요.** Cloudflare가 자동 발급·갱신합니다.
 
-**작업 불필요.** Vercel·Cloudflare가 Let's Encrypt 기반 SSL을 **자동 발급·갱신**합니다. DNS 전파 완료 후 약 5분~1시간 내에 자동으로 HTTPS 적용됩니다.
+- DNS 전파 완료 후 약 5~15분 내 SSL 자동 활성화
+- Universal SSL (무료) 기본 적용
+- 90일마다 자동 갱신
 
-### 자체 서버 사용 시
-
-Let's Encrypt + certbot으로 무료 발급:
-
-```bash
-# 서버에 SSH 접속 후
-sudo apt-get update
-sudo apt-get install certbot python3-certbot-nginx
-sudo certbot --nginx -d insight.taeannews.co.kr
-
-# 90일마다 자동 갱신
-sudo systemctl enable certbot.timer
-sudo systemctl start certbot.timer
-```
-
-### 인증서 검증
-
+확인:
 ```bash
 curl -I https://insight.taeannews.co.kr
-# HTTP/2 200 또는 404가 나오면 SSL은 정상 (200 = 페이지 있음, 404 = SSL은 되나 콘텐츠 없음)
+# HTTP/2 200 또는 404가 나오면 SSL은 정상
 
-# 인증서 상세 확인
-echo | openssl s_client -servername insight.taeannews.co.kr -connect insight.taeannews.co.kr:443 2>/dev/null | openssl x509 -noout -dates -issuer
+# 인증서 상세
+echo | openssl s_client -servername insight.taeannews.co.kr \
+  -connect insight.taeannews.co.kr:443 2>/dev/null \
+  | openssl x509 -noout -dates -issuer
 ```
 
 ---
@@ -165,35 +125,46 @@ echo | openssl s_client -servername insight.taeannews.co.kr -connect insight.tae
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
 
-배포 후 https://securityheaders.com 에서 `insight.taeannews.co.kr` 조회하면 등급 확인 가능 (A 이상 목표).
+배포 후 https://securityheaders.com 에서 `insight.taeannews.co.kr` 조회 → A 등급 이상 목표.
+
+---
+
+## Cloudflare 추가 권장 설정 (Pages 대시보드)
+
+- **SSL/TLS mode**: `Full (strict)` — Pages는 기본 만족
+- **Always Use HTTPS**: ON
+- **Automatic HTTPS Rewrites**: ON
+- **Brotli 압축**: ON
+- **HTTP/3 (QUIC)**: ON
+- **Email obfuscation**: 필요 시
 
 ---
 
 ## SSO 도메인 정책 (PRD §6 REQ-PLATFORM-003)
 
-기존 `taeannews.co.kr` 과의 SSO를 위해 다음 정책을 향후 적용:
+기존 `taeannews.co.kr` 과의 SSO를 위해 향후 적용:
 
 - 쿠키 도메인: `.taeannews.co.kr` (두 도메인에서 공유)
 - CORS: `taeannews.co.kr` 출처 허용
 - CSP: 두 도메인 상호 참조 허용
 
-→ 본 DNS 단계에서는 **별도 작업 불필요**. 백엔드 인증 통합 시 (TaskMaster #21) 코드에서 처리.
+→ DNS 단계에서는 **별도 작업 불필요**. 백엔드 인증 통합 시 (TaskMaster #21) 코드에서 처리.
 
 ---
 
 ## 단계별 체크리스트
 
-도메인 관리자가 다음 순서로 진행:
-
-- [ ] **사전 결정**: 배포 옵션 A/B/C 중 선택
-- [ ] **DNS 레코드 추가**: `insight` 서브도메인 CNAME 또는 A
+- [ ] **개발팀**: Cloudflare 계정 생성 + Pages 프로젝트 연결
+- [ ] **개발팀**: 첫 빌드 성공 + `.pages.dev` 도메인 확인 후 도메인 관리자에게 통보
+- [ ] **도메인 관리자**: 위 CNAME 레코드 추가
 - [ ] **저장 후 10~60분 대기**
-- [ ] **DNS 전파 확인**: `dig insight.taeannews.co.kr` 으로 정상 응답
-- [ ] **(자체 서버만) SSL 발급**: certbot 실행
-- [ ] **HTTPS 접속 확인**: `curl -I https://insight.taeannews.co.kr` 200/404 응답
+- [ ] **DNS 전파 확인**: `dig insight.taeannews.co.kr +short` 정상 응답
+- [ ] **개발팀**: Cloudflare Pages Custom domain 추가
+- [ ] **SSL 자동 발급 대기 (~15분)**
+- [ ] **HTTPS 접속 확인**: `curl -I https://insight.taeannews.co.kr`
 - [ ] **보안 헤더 점검**: securityheaders.com 에서 A 등급 이상
-- [ ] **본 가이드 마지막 § 검증 스크립트 실행**: `bash docs/infrastructure/dns-verification.sh`
-- [ ] **개발팀에 완료 통보**: 이메일·슬랙으로 알림
+- [ ] **자동 검증 실행**: `bash docs/infrastructure/dns-verification.sh`
+- [ ] **완료 통보**: 디지털전환 총괄에게 알림
 
 ---
 
@@ -205,11 +176,14 @@ echo | openssl s_client -servername insight.taeannews.co.kr -connect insight.tae
 ### Q. 24시간 지났는데도 전파 안 됨
 → `dig @8.8.8.8 insight.taeannews.co.kr` (구글 DNS로 강제 조회). 그래도 안 나오면 등록기관 고객센터 문의.
 
-### Q. SSL 인증서 발급 실패 (자체 서버)
-→ 80번 포트가 열려 있는지 확인. certbot은 도메인 소유 증명을 위해 80 포트로 챌린지 진행.
+### Q. Cloudflare에서 "Custom domain pending" 상태가 오래 유지됨
+→ Cloudflare는 도메인 소유 증명을 위해 DNS 응답을 확인. DNS 전파가 완전히 끝난 후 Pages 대시보드에서 `Retry` 버튼.
 
-### Q. Vercel에서 "Domain not configured" 에러
-→ Vercel 대시보드 → Project → Settings → Domains 에서 `insight.taeannews.co.kr` 을 직접 추가해야 함.
+### Q. SSL이 활성화 안 됨 ("SSL Pending")
+→ DNS 전파 후 최대 15분 대기. 그래도 안 되면 Pages → Custom domains → 도메인 삭제 후 재등록.
+
+### Q. Edge Functions·서버 컴포넌트 동작 안 함
+→ Cloudflare Pages는 Edge runtime만 지원. Next.js `route.ts`·`page.tsx` 상단에 `export const runtime = "edge"` 추가 또는 정적 export.
 
 ### Q. 보안 헤더 등급이 낮음
 → HSTS preload 등록(https://hstspreload.org)으로 A+ 가능. 단, 등록 후 되돌리기 어려우니 충분히 안정화된 후 신청.
@@ -223,3 +197,4 @@ echo | openssl s_client -servername insight.taeannews.co.kr -connect insight.tae
   - 가비아: 1599-3640
   - 후이즈: 1577-2607
   - 카페24: 1588-3284
+- Cloudflare 지원: https://dash.cloudflare.com → 우측 하단 채팅
