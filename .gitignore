@@ -23,3 +23,20 @@ node_modules/
 
 # OS specific
 .DS_Store
+
+# Next.js build output
+.next/
+out/
+next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Eval artifacts
+eval/evaluator/report.json
+eval/verification/checklist_completed.md
+eval/verification/verification_log.json

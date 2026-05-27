@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS 변수로 사용자 글자 크기·고대비 옵션 동적 제어 (REQ-PLATFORM-001 접근성) */
+:root {
+  --font-size-base: 1rem;        /* 기본 (16px) */
+  --line-height-base: 1.6;
+}
+
+:root[data-font-size="large"] {
+  --font-size-base: 1.125rem;    /* 18px */
+}
+
+:root[data-font-size="xlarge"] {
+  --font-size-base: 1.25rem;     /* 20px */
+}
+
+:root[data-theme="highcontrast"] {
+  --tw-bg-opacity: 1;
+  background-color: #FFFFFF;
+  color: #000000;
+}
+
+/* 스킵 링크 (스크린 리더·키보드 사용자) */
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  background: #1F2A44;
+  color: #FAF9F6;
+  padding: 0.75rem 1rem;
+  z-index: 100;
+  border-radius: 0 0 0.5rem 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* 포커스 가시성 강화 — WCAG 2.4.7 */
+:focus-visible {
+  outline: 3px solid #B8860B;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* 모션 줄임 선호 사용자 (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+body {
+  font-family: theme("fontFamily.sans");
+  background-color: theme("colors.background.DEFAULT");
+  color: theme("colors.foreground.DEFAULT");
+}
