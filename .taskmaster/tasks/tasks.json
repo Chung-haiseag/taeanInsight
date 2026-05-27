@@ -2,14 +2,14 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Setup Hybrid LLM API Endpoints",
         "description": "Configure Hybrid external LLM API setup using Anthropic Claude Batch API for offline jobs and Together AI Solar Mini for real-time queries. Note: The ~4,000,000 KRW saved from local GPU hardware is reallocated.",
-        "details": "Procure API keys for Anthropic and Together AI. Set up environment variables and securely integrate their respective Python SDKs into the backend. The hybrid approach mitigates downtime and scales without local hardware constraints.",
-        "testStrategy": "Verify API accessibility via simple curl commands or SDK test scripts. Run dummy payloads to ensure proper authentication and network stability.",
-        "priority": "high",
+        "status": "done",
         "dependencies": [],
-        "status": "pending",
+        "priority": "high",
+        "details": "Procure API keys for Anthropic and Together AI. Set up environment variables and securely integrate their respective TypeScript SDKs into the backend (backend/src/llm/). A hybrid routing layer handles intent-based channel selection and circuit-breaking. The hybrid approach mitigates downtime and scales without local hardware constraints.",
+        "testStrategy": "Verify API accessibility via simple curl commands or SDK test scripts. Run tests/llm_router.test.ts to validate routing, circuit breaking, and cost logging. Run dummy payloads to ensure proper authentication and network stability.",
         "subtasks": [
           {
             "id": 1,
@@ -28,7 +28,7 @@
             "dependencies": [
               1
             ],
-            "details": "Update the local, staging, and production `.env` templates to include `ANTHROPIC_API_KEY` and `TOGETHER_API_KEY`. Ensure CI/CD pipelines have access to these secrets.",
+            "details": "Update the local, staging, and production .env templates to include ANTHROPIC_API_KEY and TOGETHER_API_KEY. Ensure CI/CD pipelines have access to these secrets.",
             "status": "pending",
             "testStrategy": "Check that the backend configuration loader successfully reads the new API keys and validates their existence on startup.",
             "parentId": "undefined"
@@ -36,34 +36,62 @@
           {
             "id": 3,
             "title": "Integrate Anthropic and Together AI SDKs",
-            "description": "Install the official Python SDKs and build basic connection clients.",
+            "description": "Implement SDK wrappers in TypeScript (backend/src/llm/anthropic.ts and together.ts) with types and mock fallbacks.",
             "dependencies": [
               2
             ],
-            "details": "Install the `anthropic` and `together` Python packages. Build a basic connection script to verify connectivity to the Claude Batch API and Solar Mini endpoints.",
-            "status": "pending",
+            "details": "Defined LlmClient, LlmRequest, LlmResponse interfaces in types.ts. Implemented anthropic.ts for Claude Haiku Batch and together.ts for Solar Mini real-time channels. Includes mock.ts for local testing without API keys.",
+            "status": "done",
             "testStrategy": "Run a test script utilizing both SDKs to verify standard text generation responses and confirm no library conflicts.",
             "parentId": "undefined"
           },
           {
             "id": 4,
             "title": "Implement Fallback and Retry Logic",
-            "description": "Create robust error handling for network timeouts and external API rate limits.",
+            "description": "Implement circuit breaker and robust error handling for network timeouts and external API rate limits.",
             "dependencies": [
               3
             ],
-            "details": "Use a library like `tenacity` to implement exponential backoff logic for 429 Rate Limit and 5xx network errors from the external providers to ensure high availability.",
-            "status": "pending",
+            "details": "Implemented circuit breaker guards in hybrid_router.ts. Defined CircuitOpenError and VendorError in types.ts to handle failures and prevent system overload during provider outages.",
+            "status": "done",
             "testStrategy": "Mock a 429 Rate Limit response and ensure the retry logic backs off appropriately and retries correctly without dropping the request immediately.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Develop Hybrid Intent-Based Router",
+            "description": "Build HybridLlmRouter to automatically decide channels based on intent and log costs.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Created hybrid_router.ts routing intent=prediction/factcheck to batch and generation/other to realtime. Implemented router.route({messages, intent?, channel?}, priority='normal') API. Wrote 9 unit tests in tests/llm_router.test.ts verifying channel decision, blocking, and cost accumulation.",
+            "status": "done",
+            "testStrategy": "Run the 9 unit tests in tests/llm_router.test.ts to ensure 100 percent pass rate for routing logic and cost tracking.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Swap Mock Clients for Real API Configurations",
+            "description": "Replace the mock client implementation with the actual API clients once keys are procured.",
+            "dependencies": [
+              1,
+              2,
+              5
+            ],
+            "details": "Once the actual API keys are available in the environment variables, swap out the mock.ts implementation in the backend to start sending real payloads to Anthropic and Together AI.",
+            "status": "pending",
+            "testStrategy": "Trigger a real request via the router and verify that actual vendor costs are logged and a valid non-mocked LLM response is returned.",
             "parentId": "undefined"
           }
         ],
         "complexity": 6,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down the local environment setup steps and detail the AWS Terraform fallback resources."
+        "expansionPrompt": "Break down the local environment setup steps and detail the AWS Terraform fallback resources.",
+        "updatedAt": "2026-05-27T12:07:44.633Z"
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "LLM Benchmark & Selection",
         "description": "Benchmark Together AI Solar Mini, Anthropic Claude Haiku, and Llama-3.1-8B (reference) models for Korean language performance.",
         "details": "Evaluate external API endpoints. Run benchmarks focusing on Korean contextual understanding, hallucination rates, and API inference speed (target < 8s for 1k tokens). Select the highest-performing model configuration that balances accuracy and token cost.",
@@ -115,7 +143,7 @@
         "expansionPrompt": "Detail the deployment configuration for Solar and Llama models and the benchmark script requirements."
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "API Performance & Cost Benchmarking",
         "description": "Benchmark token usage, response times, and cost efficiency for the selected external APIs.",
         "details": "Since external APIs eliminate the need for VRAM quantization, focus on optimizing prompt length, batching overhead, and calculating token consumption costs. Ensure response times meet the <8s constraint and token costs align with the projected budget.",
@@ -167,7 +195,7 @@
         "expansionPrompt": "Provide steps for running AutoAWQ on a 14B model and verifying VRAM usage."
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Build Korean Custom Evaluation Dataset",
         "description": "Create a 500-question evaluation dataset covering Taean tourism, environment, real estate, and general domains (125 questions each). Currently, an initial 50-question subset and the evaluation framework are established. Target 500 questions by Phase 1 deadline (June 30).",
         "status": "in-progress",
@@ -240,7 +268,7 @@
         "expansionPrompt": "Create subtasks for sourcing local tourism/weather data and structuring the JSONL QA pairs."
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Caching Key Normalization PoC",
         "description": "Develop a proof of concept for normalizing natural language queries to maximize cache hit rates. The initial PoC has been completed, with future validation planned using real traffic logs (Phase 2C).",
         "status": "done",
@@ -305,7 +333,7 @@
         "updatedAt": "2026-05-27T05:35:14.430Z"
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Cost Simulation Model Setup",
         "description": "Validate the 'under 300,000 KRW/month' operational cost target using simulated traffic.",
         "details": "Build a spreadsheet or script combining anticipated Anthropic Batch + Together AI token costs, external API costs, and infrastructure costs. Assume 12,000 MAU, a 75% cache hit rate, and max 200 req/sec peak.",
@@ -345,7 +373,7 @@
         "expansionPrompt": "Define the input variables and the simulation logic for the Monte-carlo test."
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "Citizen Reporter DB Schema & Application Form",
         "description": "Design the database schema and implement an application form for recruiting 12 citizen reporters.",
         "status": "done",
@@ -395,7 +423,7 @@
         "updatedAt": "2026-05-27T05:35:14.432Z"
       },
       {
-        "id": 8,
+        "id": "8",
         "title": "Domain, DNS, and HTTPS Setup",
         "description": "Register and configure insight.taeannews.co.kr with DNS and TLS 1.3 using Cloudflare. Cloudflare Workers deployment is complete (taean-insight.chs9182.workers.dev). Currently waiting on external DNS/SSL setup via custom domain registration.",
         "status": "in-progress",
@@ -411,7 +439,8 @@
             "dependencies": [],
             "details": "Created three artifacts in `docs/infrastructure/`: 1) `dns-setup-guide.md` covering deployment options and checklists, 2) `dns-verification.sh` for 6-step automated verification, and 3) `email-to-domain-admin.md` with templates for Vercel, self-hosted, and KakaoTalk summary.",
             "status": "done",
-            "testStrategy": "Verify the presence and correctness of the three generated files in the repository."
+            "testStrategy": "Verify the presence and correctness of the three generated files in the repository.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -422,7 +451,8 @@
             ],
             "details": "Cloudflare Workers deployment completed, assigning the domain `taean-insight.chs9182.workers.dev`. Successfully updated `docs/infrastructure/dns-setup-guide.md` and updated the CNAME value in `email-to-domain-admin.md` to point to the new worker domain.",
             "status": "done",
-            "testStrategy": "Verify the worker domain is accessible online and confirm the CNAME target is updated in the documentation files."
+            "testStrategy": "Verify the worker domain is accessible online and confirm the CNAME target is updated in the documentation files.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -433,7 +463,8 @@
             ],
             "details": "Send the updated email template from `email-to-domain-admin.md` to the taeannews.co.kr domain administrator. The email will request the addition of a CNAME record for `insight.taeannews.co.kr` pointing to the destination `taean-insight.chs9182.workers.dev.`.",
             "status": "pending",
-            "testStrategy": "Confirm with the domain administrator that the email has been received and the CNAME record has been added to their DNS settings."
+            "testStrategy": "Confirm with the domain administrator that the email has been received and the CNAME record has been added to their DNS settings.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -444,12 +475,16 @@
             ],
             "details": "After the domain administrator configures the CNAME record, register the custom domain (`insight.taeannews.co.kr`) in the Cloudflare dashboard. Wait 5-15 minutes for DNS propagation and automatic SSL provisioning. Execute `docs/infrastructure/dns-verification.sh` to check DNS records, global propagation, HTTP to HTTPS redirection, SSL certificate validity, and security headers. Once the script passes all 6 stages successfully, mark the parent task as done.",
             "status": "pending",
-            "testStrategy": "Run `docs/infrastructure/dns-verification.sh`. All checks must output success. Additionally verify SSL configuration using SSL Labs to ensure an A+ grade."
+            "testStrategy": "Run `docs/infrastructure/dns-verification.sh`. All checks must output success. Additionally verify SSL configuration using SSL Labs to ensure an A+ grade.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 3,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Outline the specific DNS records needed and the Certbot auto-renewal cron setup."
       },
       {
-        "id": 9,
+        "id": "9",
         "title": "Initialize Backend API Framework",
         "description": "Setup FastAPI or NestJS project with basic routing, JWT/OAuth2 boilerplate, and OpenAPI (Swagger) documentation.",
         "details": "Setup project structure following modular monolith architecture. Add CORS, basic security headers, structured JSON logging, and setup Swagger for API contract generation.",
@@ -511,7 +546,7 @@
         "expansionPrompt": "Detail the directory structure for a modular monolith and the boilerplate configurations for FastAPI/NestJS."
       },
       {
-        "id": 10,
+        "id": "10",
         "title": "Taeannews 20-year Archive Scraper & OCR",
         "description": "Crawl, OCR, and clean 20 years of historical local news articles from the existing CMS.",
         "details": "Develop a scheduled crawler to fetch article texts, publish dates, and metadata. Utilize OCR for older image-based archives. Clean the text, remove boilerplates, and store it in the `documents` table.",
@@ -575,7 +610,7 @@
         "expansionPrompt": "Define the crawler scheduler, OCR tool selection, and text normalization heuristics."
       },
       {
-        "id": 11,
+        "id": "11",
         "title": "Public API Ingestion Pipeline",
         "description": "Develop ETL jobs to fetch and normalize data from TourAPI, KMA (Weather), MOF (Ocean), and KOSIS.",
         "details": "Implement daily chron jobs to ingest public data. Map disparate JSON/XML schemas to a unified standard. Add fallback logic to use the last known good data if the external API is down.",
@@ -639,7 +674,7 @@
         "expansionPrompt": "Break down the integration steps for each public API and define the unified internal data schema."
       },
       {
-        "id": 12,
+        "id": "12",
         "title": "Setup PGVector & Text Embedding Pipeline",
         "description": "Implement BGE-M3-Korean embedding model and index data in Postgres with PGVector.",
         "details": "Chunk the extracted documents (Taeannews + Public API). Generate 1024-d vectors using the chosen embedding model. Create HNSW indexes on `document_embeddings` table to ensure < 200ms top-k retrieval.",
@@ -691,7 +726,7 @@
         "expansionPrompt": "Detail the text chunking strategy and the SQL commands for setting up PGVector with HNSW indexes."
       },
       {
-        "id": 13,
+        "id": "13",
         "title": "Lite Knowledge Graph Extraction",
         "description": "Extract entities (Places, People, Events) and relationships into a Lite Knowledge Graph.",
         "details": "Use NLP NER (Named Entity Recognition) to identify key entities within the Taean domain. Load these nodes and edges into Neo4j or NetworkX to supplement RAG with relational context.",
@@ -755,7 +790,7 @@
         "expansionPrompt": "Specify the NER model to be used for Korean entities and outline the Graph node/edge definitions."
       },
       {
-        "id": 14,
+        "id": "14",
         "title": "Develop Hybrid Router: LLM Client Abstraction Layer",
         "description": "Build a client abstraction layer to route offline/batch tasks to Anthropic Batch API and real-time interactions to Together AI Solar Mini.",
         "details": "Implement a routing manager in Python/FastAPI. Send pre-generation or asynchronous batch queries to Anthropic Claude Batch API to leverage the 50% discount. Route synchronous user queries directly to Together AI for low-latency responses.",
@@ -806,7 +841,7 @@
         "expansionPrompt": "Provide the docker-compose YAML structure with GPU passthrough and vLLM startup arguments."
       },
       {
-        "id": 15,
+        "id": "15",
         "title": "Develop LangGraph Lite Router Agent",
         "description": "Implement a lightweight intent router to classify user queries and forward them to specialized agents.",
         "details": "Construct a LangGraph pipeline. The Router classifies queries into 'prediction', 'generation', 'factcheck', or 'other'. It enforces cache checks before invoking LLMs. Target classification accuracy >= 85%.",
@@ -858,7 +893,7 @@
         "expansionPrompt": "Detail the nodes and edges of the LangGraph router and the zero-shot classification prompt."
       },
       {
-        "id": 16,
+        "id": "16",
         "title": "Develop Prediction & Generation Expert Agents",
         "description": "Implement the core RAG-based AI agents for answering queries and generating content.",
         "details": "Prediction Agent focuses on tourism/environment forecasting using PGVector & KG context. Generation Agent handles summarization, rewriting, and title generation for citizen reporters. Enforce prompt engineering to minimize token usage (avg <= 2 LLM calls per query).",
@@ -925,7 +960,7 @@
         "expansionPrompt": "Outline the system prompts for both agents and how they query the Vector DB and Knowledge Graph."
       },
       {
-        "id": 17,
+        "id": "17",
         "title": "Redis Caching Layer Implementation",
         "description": "Implement semantic query caching with Redis to hit the 75% cache hit rate target.",
         "details": "Integrate Redis to store LLM responses using the normalized keys from Task 5. Implement TTL policies (e.g., Weekly reports: 7 days, General QA: 24h, Market Data: 6h).",
@@ -977,7 +1012,7 @@
         "expansionPrompt": "Define the Redis connection pooling and the decorator/middleware logic for semantic cache retrieval."
       },
       {
-        "id": 18,
+        "id": "18",
         "title": "Daily Pre-generation Batch Job",
         "description": "Build a cron job to pre-generate answers for the top 200 daily popular queries during off-peak hours.",
         "details": "Implement a Temporal or Cron based scheduler that runs daily at 02:00 AM. It fetches the most searched intents, passes them to the LangGraph agents, and populates the Redis cache directly.",
@@ -1029,59 +1064,60 @@
         "expansionPrompt": "Detail the cron schedule logic and how it interfaces with the LangGraph agents and Redis."
       },
       {
-        "id": 19,
+        "id": "19",
         "title": "Cost Monitoring & Circuit Breaker",
-        "description": "Implement middleware to track AI API usage costs and enforce circuit breakers.",
-        "details": "Track token usage, external API calls, and batch processing costs in the `cost_events` table. Build middleware that shuts off non-essential LLM generation if costs reach 100% of the 300,000 KRW budget. Send Slack alerts at 70%, 90%, and 100%.",
-        "testStrategy": "Mock high cost metrics in the DB. Verify Slack webhook alerts fire correctly and that the API rejects non-cached queries with a graceful fallback message when at 100% budget.",
-        "priority": "high",
+        "description": "Implement middleware to track AI API usage costs and enforce circuit breakers. Implemented via Cloudflare Workers + Hono + TypeScript with in-memory PoC storage (Phase 2C to decide on D1 or Postgres+Hyperdrive).",
+        "status": "done",
         "dependencies": [
           "9"
         ],
-        "status": "pending",
+        "priority": "high",
+        "details": "Track token usage, external API calls, and batch processing costs. Built a 3-tier circuit breaker middleware (0-100% allow all, 100-110% allow critical only, 110%+ block all) based on a 300,000 KRW budget. Pricing applies Anthropic Claude Haiku Batch (50% off), Together AI Solar Mini ($0.20/1M), Kakao (12 KRW/req), and Free Public APIs. Send Slack/Console alerts at 70%, 90%, and 100%.",
+        "testStrategy": "Run the 18 unit tests defined in `tests/cost.test.ts` to verify pricing calculations, cost recording, threshold aggregations, and the 3-tier circuit breaker logic.",
         "subtasks": [
           {
             "id": 1,
-            "title": "Design and implement cost_events schema and logging service",
-            "description": "Create the database schema for the cost_events table and build a service to asynchronously log tokens and API calls.",
+            "title": "Implement cost recorder and pricing models in Cloudflare Workers",
+            "description": "Create the cost recording service and configure pricing constants for various AI and external API models.",
             "dependencies": [],
-            "details": "Create a migration for the `cost_events` table with fields: id, resource_type (enum: token, external_api, batch_api), cost_amount_krw, description, and created_at. Implement a reusable logging service to insert events without blocking the main request cycle.",
-            "status": "pending",
-            "testStrategy": "Write unit tests to insert mock events for each resource type and verify that total cost queries aggregate the KRW amounts correctly over a given time period.",
+            "details": "Developed `src/cost/recorder.ts` and `src/cost/pricing.ts` in the Hono + TypeScript backend. Implemented in-memory PoC storage to log all LLM and external API calls. Configured pricing structures for Anthropic Claude Haiku Batch, Together AI Solar Mini, Kakao API, and Public APIs.",
+            "status": "done",
+            "testStrategy": "Verify cost calculations using the 18 unit tests in `tests/cost.test.ts` to ensure each resource type applies the correct pricing metric.",
             "parentId": "undefined"
           },
           {
             "id": 2,
-            "title": "Implement budget calculation and Slack alert webhooks",
-            "description": "Develop a service that calculates current budget utilization and sends Slack alerts at predefined threshold levels.",
+            "title": "Implement budget aggregator and scheduled alerts",
+            "description": "Develop a scheduled service that aggregates current budget utilization and dispatches threshold alerts.",
             "dependencies": [
               1
             ],
-            "details": "Create a function to calculate the sum of `cost_amount_krw` for the current billing cycle against the 300,000 KRW limit. Integrate a Slack webhook to send warning messages at 70%, 90%, and 100% utilization. Store alert states (e.g., in Redis or the DB) to prevent duplicate notifications.",
-            "status": "pending",
-            "testStrategy": "Mock the aggregated DB cost to simulate crossing the 70%, 90%, and 100% thresholds. Verify that the Slack webhook is triggered exactly once per threshold.",
+            "details": "Created `src/cost/aggregator.ts` and `src/cost/scheduled.ts`. Set up an hourly cron job to calculate monthly cumulative costs against the 300,000 KRW limit. Integrated Slack and console alerts triggered at 70%, 90%, and 100% thresholds, including state management to prevent duplicate alert dispatch.",
+            "status": "done",
+            "testStrategy": "Mock aggregated monthly costs at 69%, 71%, 91%, and 101% to verify correct alert generation and verify duplicate prevention logic using unit tests.",
             "parentId": "undefined"
           },
           {
             "id": 3,
-            "title": "Build API circuit breaker middleware",
-            "description": "Implement request interception middleware to shut off non-essential LLM generation when the budget is 100% exhausted.",
+            "title": "Build 3-tier API circuit breaker middleware",
+            "description": "Implement request interception middleware in Hono to dynamically block API calls based on specific budget exhaustion tiers.",
             "dependencies": [
               1,
               2
             ],
-            "details": "Develop API middleware that checks the current budget status before forwarding requests to the LLM generation service. If the budget is at 100%, block the request and return a graceful fallback message (e.g., HTTP 429). Ensure that requests hitting the Redis cache bypass this block.",
-            "status": "pending",
-            "testStrategy": "Force the system into a 100% budget exhausted state. Send a new LLM request and assert it fails with the correct fallback message. Send a request for a cached query and assert it succeeds.",
+            "details": "Developed `src/cost/circuit_breaker.ts` middleware. Implemented the 3-tier shutdown logic: 0~100% budget allows all requests, 100~110% limits access to 'critical' endpoints only, and >110% entirely shuts off API calls. Wired the middleware into `src/index.ts`.",
+            "status": "done",
+            "testStrategy": "Test the middleware's decision engine in `tests/cost.test.ts` by simulating different utilization levels and asserting the rejection of non-essential queries over 100%, and all queries over 110%.",
             "parentId": "undefined"
           }
         ],
         "complexity": 6,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Define the cost_events schema and the middleware logic that intercepts requests based on budget limits."
+        "expansionPrompt": "Define the cost_events schema and the middleware logic that intercepts requests based on budget limits.",
+        "updatedAt": "2026-05-27T12:04:04.049Z"
       },
       {
-        "id": 20,
+        "id": "20",
         "title": "Next.js Frontend & Accessibility System",
         "description": "Bootstrap Next.js 14 (App Router) and build a WCAG 2.1 AA compliant UI design system.",
         "status": "in-progress",
@@ -1099,7 +1135,8 @@
             ],
             "details": "Implement generic UI elements: Buttons, Inputs, Cards, and Dialogs via shadcn. Ensure these components respond properly to the implemented high-contrast mode from the accessibility-provider, guaranteeing all text-to-background contrast ratios strictly exceed 4.5:1 (or 3:1 for large text).",
             "status": "pending",
-            "testStrategy": "Use Chrome DevTools and axe-core to measure contrast ratios in both standard and high-contrast modes across all generic components."
+            "testStrategy": "Use Chrome DevTools and axe-core to measure contrast ratios in both standard and high-contrast modes across all generic components.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1111,7 +1148,8 @@
             ],
             "details": "Verify that the implemented skip links and focus-visible utilities work seamlessly across the 5 newly created pages (Home, Report, Query, Dashboard, Citizen Journalist). Review page layouts to ensure proper usage of <nav>, <main>, <aside>, and <header> tags, adding explicit role attributes where standard semantics fall short.",
             "status": "pending",
-            "testStrategy": "Perform keyboard-only navigation across the 5 core pages. Verify there are no keyboard traps, all interactive elements are reachable, and run automated axe-core a11y tests."
+            "testStrategy": "Perform keyboard-only navigation across the 5 core pages. Verify there are no keyboard traps, all interactive elements are reachable, and run automated axe-core a11y tests.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1122,7 +1160,8 @@
             ],
             "details": "Following the successful deployment to Cloudflare Workers via @opennextjs/cloudflare (replacing @cloudflare/next-on-pages to bypass internal Vercel CLI calls), map the insight.taeannews.co.kr domain to the worker. Ensure the 5 live routes resolve correctly on the custom domain, maintaining the observed ~24ms startup times, and prepare the project structure for actual page implementation and backend API integration.",
             "status": "pending",
-            "testStrategy": "Access insight.taeannews.co.kr and verify all 5 core routes (/ /reports /query /dashboard /citizen) load correctly over HTTPS and function seamlessly on Cloudflare's edge environment."
+            "testStrategy": "Access insight.taeannews.co.kr and verify all 5 core routes (/ /reports /query /dashboard /citizen) load correctly over HTTPS and function seamlessly on Cloudflare's edge environment.",
+            "parentId": "undefined"
           },
           {
             "id": 1,
@@ -1146,10 +1185,13 @@
             "testStrategy": "Perform manual testing using VoiceOver/NVDA to confirm the ARIA state changes are audibly announced when the font size or contrast is dynamically adjusted.",
             "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Specify the required generic components and the ARIA implementations for the 3-tier font size toggles."
       },
       {
-        "id": 21,
+        "id": "21",
         "title": "OAuth2 SSO & Toss Payments Integration",
         "description": "Implement Single Sign-On with existing CMS and Toss Payments for subscriptions.",
         "details": "Implement JWT-based authentication bridging `taeannews.co.kr`. Integrate Toss Payments SDK for processing B2C/B2B subscriptions, storing billing keys, and handling webhooks for renewals securely.",
@@ -1215,7 +1257,7 @@
         "expansionPrompt": "Break down the auth bridging logic with the legacy CMS and the payment state machine."
       },
       {
-        "id": 22,
+        "id": "22",
         "title": "Weekly Insight Report Pipeline",
         "description": "Develop the batch generator and UI for the weekly predictive insight reports.",
         "details": "Create a batch job running Thursday nights to generate HTML and PDF reports summarizing tourism, weather, and real estate. Restrict PDF downloads to Premium users via API middleware. Include email/push notification pipelines.",
@@ -1281,7 +1323,7 @@
         "expansionPrompt": "Detail the HTML-to-PDF tool to be used and the cron-based notification triggers."
       },
       {
-        "id": 23,
+        "id": "23",
         "title": "AI Query Agent UI",
         "description": "Build the user interface for the natural language query agent.",
         "details": "Implement a chat-like interface displaying suggested queries. Integrate the backend `/api/v1/query`. Display AI sources, metadata labels (`[AI Assisted]`), and handle graceful degradation when caching fails.",
@@ -1334,7 +1376,7 @@
         "expansionPrompt": "Outline the state management for the chat interface and how server-sent events (SSE) will be handled."
       },
       {
-        "id": 24,
+        "id": "24",
         "title": "B2B Basic Dashboard UI & Charts",
         "description": "Develop the B2B dashboard for tourism, real estate, and environment metrics using charting libraries.",
         "details": "Integrate Recharts or Apache ECharts into Next.js. Fetch data from `/api/v1/dashboards/b2b`. Implement region (Eup/Myeon) and time period filters. Build CSV export functionality.",
@@ -1388,7 +1430,7 @@
         "expansionPrompt": "Specify the Recharts/ECharts configuration for the core metrics and the data fetching hooks."
       },
       {
-        "id": 25,
+        "id": "25",
         "title": "Citizen Co-Pilot Web Editor",
         "description": "Integrate TipTap/ProseMirror to create an AI-assisted text editor for citizen reporters.",
         "details": "Build a custom rich text editor. Add floating UI buttons for AI actions (Summarize, Polish, Factcheck, Titles). Display AI suggestions in a side-by-side comparative view.",
@@ -1453,7 +1495,7 @@
         "expansionPrompt": "Detail how TipTap extensions will be used for AI suggestions and diff tracking."
       },
       {
-        "id": 26,
+        "id": "26",
         "title": "Human-In-The-Loop (HITL) Workflow",
         "description": "Implement the review/approval workflow for citizen articles before publishing.",
         "details": "Create an admin/editor dashboard. Enforce DB constraints where `published_at` cannot be set if `hitl_reviewer_id` is null. Guarantee `[AI 보조]` metadata tags persist through the review pipeline.",
@@ -1505,60 +1547,74 @@
         "expansionPrompt": "Define the approval states (draft, pending, approved, rejected) and the API authorization rules."
       },
       {
-        "id": 27,
+        "id": "27",
         "title": "AI Ethics & Governance Middleware",
-        "description": "Implement mandatory PII masking, 7-category sensitive topic blocking (keyword + ML dual-verification), and policy-driven source enforcement.",
-        "status": "pending",
+        "description": "Implemented mandatory PII masking, 7-category sensitive topic blocking (keyword + ML dual-verification), and policy-driven source enforcement. Completed and integrated into a single unified entry point fulfilling PRD v1.8 §6 REQ-GOV-001 principles.",
+        "status": "done",
         "dependencies": [
           "15",
           "26"
         ],
         "priority": "high",
-        "details": "Build regex/NLP-based PII redaction middleware (AES-256 for DB). Integrate a two-tier (keyword matching + ML) classifier to detect 7 sensitive topics. Enforce handling policies via a JSON configuration file: route Elections/Religion to Editor-in-Chief, route Crime/Medical to 2-step fact-checking, and route Political Figures/Real Estate/Minorities to HITL with auto-attached disclaimers.",
-        "testStrategy": "Submit queries containing phone numbers and ID patterns to verify redaction. Submit prompts across all 7 sensitive categories to verify the dual-verification classifier triggers correctly and enforces the specific routing and disclaimer policies defined in the JSON configuration.",
+        "details": "Developed the complete AI Ethics & Governance Middleware in `backend/src/governance/`. Implemented regex/NLP-based PII redaction for 6 types (RRN, phone, email, credit card, address, passport) in `pii.ts`. Integrated a classifier for 7 sensitive topics (elections, crime, medical, religion, political figures, real estate speculation, minorities) in `sensitive_topics.ts`. Handled AI content labeling, copyright, and HITL quality assurance via `AiLabel` enum and source/HITL guards in `ai_label.ts`. Consolidated these operations into a single `applyGovernance` entry point in `middleware.ts` to strictly enforce PRD v1.8 §6 REQ-GOV-001.",
+        "testStrategy": "Execute the comprehensive 24-unit test suite in `tests/governance.test.ts`. This suite includes 6 PII masking tests, 5 sensitive topic classification tests, 5 publish/HITL guard tests, 3 label formatting tests, and 5 full-flow integration tests.",
         "subtasks": [
           {
             "id": 1,
-            "title": "Implement Korean PII Masking and DB Encryption",
-            "description": "Develop middleware using regex and NLP to detect and redact Korean PII such as Resident Registration Numbers and phone numbers.",
+            "title": "Implement Extended Korean PII Masking",
+            "description": "Develop middleware module `pii.ts` using regex and NLP to detect and redact an expanded list of Korean PII types.",
             "dependencies": [],
-            "details": "Create validation patterns for Korean RRNs (6 digits - 7 digits) and standard mobile phone numbers. Implement AES-256 encryption for storing the original PII in the DB, ensuring only masked text is passed to the LLM.",
-            "status": "pending",
-            "testStrategy": "Submit test queries containing simulated Korean RRNs and phone numbers to confirm they are redacted before processing.",
+            "details": "Created validation and masking patterns for 6 distinct PII types: Resident Registration Numbers (RRNs), mobile phone numbers, emails, credit cards, addresses, and passports. Ensured that original PII is securely filtered out and not passed to the LLM.",
+            "status": "done",
+            "testStrategy": "Run the 6 dedicated PII unit tests in `tests/governance.test.ts` to confirm complete redaction of all supported personal information types.",
             "parentId": "undefined"
           },
           {
             "id": 2,
-            "title": "Develop 2-Tier Sensitive Topic Classifier",
-            "description": "Integrate a two-tier detection system (keyword matching + ML classifier) to identify 7 specific sensitive topic categories.",
+            "title": "Develop 7-Category Sensitive Topic Classifier",
+            "description": "Implement the `sensitive_topics.ts` module to identify and flag content across 7 specific sensitive categories.",
             "dependencies": [
               1
             ],
-            "details": "Implement a dual-verification classifier for 4 basic categories (Elections, Crime, Medical, Religion) and 3 extended categories (Political figures, Real estate speculation advice, Minority issues). Create a JSON configuration file to centrally manage category detection rules and handling policies.",
-            "status": "pending",
-            "testStrategy": "Run a comprehensive test dataset containing examples from all 7 sensitive categories and benign prompts. Verify the two-tier system correctly flags each prompt and outputs the correct category ID based on the JSON config.",
+            "details": "Implemented the dual-verification logic for elections, crime, medical, religion, political figures, real estate speculation, and minority issues. Configured strict detection rules to manage category detection accurately.",
+            "status": "done",
+            "testStrategy": "Run the 5 sensitive topic unit tests in `tests/governance.test.ts` to verify the classifier accurately flags prompts and maps them to the correct category.",
             "parentId": "undefined"
           },
           {
             "id": 3,
-            "title": "Implement Category-Specific Policy Routing and Enforcement",
-            "description": "Build the enforcement mechanism that reads the JSON configuration and routes flagged content according to the 3 distinct policy rules.",
+            "title": "Implement AI Labeling and HITL Publishing Guards",
+            "description": "Develop `ai_label.ts` to manage source/HITL guards, formatting, and the `AiLabel` enum to enforce editorial policies.",
             "dependencies": [
-              1,
               2
             ],
-            "details": "Implement routing logic based on classification: (1) Elections/Religion: strictly block AI-only publishing and route to the Editor-in-Chief for direct writing. (2) Crime/Medical: block AI-only publishing and mandate a 2-step fact-checking workflow. (3) Political figures/Real estate/Minorities: require standard HITL review and automatically attach bias, discrimination, and disclaimer clauses to the text.",
-            "status": "pending",
-            "testStrategy": "Simulate API requests triggering each of the 3 policy types. Verify successful bypass of auto-publish, correct queue routing (Editor-in-Chief vs. 2-step fact-check), and automated appending of disclaimers.",
+            "details": "Implemented the `AiLabel` enum, source/HITL guards, and `formatLabelBadge` logic. This ensures that PRD v1.8 §6 REQ-GOV-001 principles around AI content labeling, copyright/citation, and HITL quality assurance are strictly enforced.",
+            "status": "done",
+            "testStrategy": "Run the 5 publish guard tests and 3 label tests in `tests/governance.test.ts` to confirm proper formatting, accurate disclaimers, and reliable blockage of purely AI-generated sensitive content.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Integrate Unified Governance Middleware",
+            "description": "Develop `middleware.ts` as a unified entry point and write the comprehensive test suite for full integration verification.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Created the `applyGovernance` function in `middleware.ts` which combines PII masking, sensitive topic classification, and HITL labeling guards into a single operation. Established the full `tests/governance.test.ts` integration suite.",
+            "status": "done",
+            "testStrategy": "Run the 5 integration tests in `tests/governance.test.ts` to verify seamless end-to-end operation across PII filtering, category mapping, and final policy routing.",
             "parentId": "undefined"
           }
         ],
         "complexity": 7,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Specify the regex patterns for Korean PII and the classification rules for sensitive topics."
+        "expansionPrompt": "Specify the regex patterns for Korean PII and the classification rules for sensitive topics.",
+        "updatedAt": "2026-05-27T12:11:03.309Z"
       },
       {
-        "id": 28,
+        "id": "28",
         "title": "Citizen Reporter LMS Module",
         "description": "Develop a lightweight Learning Management System for the 6-session training program.",
         "details": "Create video embedding, document viewing, and basic quiz functionalities within the citizen reporter portal to track completion of the required curriculum.",
@@ -1611,7 +1667,7 @@
         "expansionPrompt": "Outline the database schema for user progress and the UI components for video/document viewing."
       },
       {
-        "id": 29,
+        "id": "29",
         "title": "Contributor Settlement Dashboard",
         "description": "Build an admin interface and automated system to track citizen reporter publications, calculate payouts, execute transfers, and provide reporter-facing settlement UI.",
         "status": "pending",
@@ -1702,7 +1758,7 @@
         "expansionPrompt": "Define the SQL aggregation queries required to calculate monthly payouts per user."
       },
       {
-        "id": 30,
+        "id": "30",
         "title": "Internal Alpha Testing & Bug Fixes",
         "description": "Conduct comprehensive internal testing of all P0 requirements.",
         "details": "Involve developers, QA, and the editorial team. Test SSO, subscription logic, LangGraph query accuracy, and HITL pipelines. Triage and resolve P0/P1 bugs.",
@@ -1760,7 +1816,7 @@
         "expansionPrompt": "List the core critical paths (SSO, Chat, Payment) that require automated Playwright scripts."
       },
       {
-        "id": 31,
+        "id": "31",
         "title": "External Beta Platform Setup",
         "description": "Deploy the platform to a staging environment and onboard 100 external beta testers.",
         "status": "pending",
@@ -1823,7 +1879,7 @@
         "expansionPrompt": "Outline the database schema for invite codes and the configuration for the staging environment."
       },
       {
-        "id": 32,
+        "id": "32",
         "title": "Citizen Reporter Pilot Execution",
         "description": "Onboard the 12 selected citizen reporters for a pilot run of the Co-Pilot editor.",
         "details": "Monitor the real-world usage of the AI Co-Pilot. Ensure each reporter successfully publishes at least 2 articles using the HITL process.",
@@ -1863,7 +1919,7 @@
         "expansionPrompt": "Define the metrics to be tracked during the pilot and the structure for qualitative interviews."
       },
       {
-        "id": 33,
+        "id": "33",
         "title": "B2B Pre-sales & CRM Integration",
         "description": "Implement tools for managing B2B leads (pensions, restaurants) and tracking LOIs.",
         "details": "Setup a lightweight CRM page or integrate with Airtable/Google Sheets via API to track the 30 B2B pre-sales contacts and grant 14-day free trial accesses.",
@@ -1902,7 +1958,7 @@
         "expansionPrompt": "Detail the API webhooks required to sync Next.js auth states with Airtable for trial tracking."
       },
       {
-        "id": 34,
+        "id": "34",
         "title": "Beta Feedback Integration & Refactoring",
         "description": "Address UX bottlenecks, AI prompt regressions, and performance issues discovered during beta.",
         "details": "Refine LangGraph prompts based on hallucination feedback. Adjust Redis cache TTLs if hit rates are below 75%. Fix responsive UI issues on mobile devices.",
@@ -1950,7 +2006,7 @@
         "expansionPrompt": "Specify how regression testing will be handled when updating LangGraph prompts."
       },
       {
-        "id": 35,
+        "id": "35",
         "title": "Performance & Load Testing",
         "description": "Ensure the system meets processing requirements (200 req/sec peak) and inference targets.",
         "details": "Use K6 or JMeter to simulate 200 concurrent users hitting cached routes and 10 concurrent hitting the external LLM APIs. Tune database connection pooling and Node.js limits.",
@@ -2001,7 +2057,7 @@
         "expansionPrompt": "Provide the K6 script requirements for simulating 200 concurrent users against cached and uncached endpoints."
       },
       {
-        "id": 36,
+        "id": "36",
         "title": "Security & Accessibility Audits",
         "description": "Perform final audits for OWASP Top 10 vulnerabilities, KISA privacy laws, and WCAG AA.",
         "details": "Run static analysis tools, check PII encryption standards, and ensure the terms of service/privacy policy reflect AI data usage restrictions. Engage (주)NC2 experts for a final a11y review.",
@@ -2050,7 +2106,7 @@
         "expansionPrompt": "List the specific SAST tools to be used and the manual accessibility checklist."
       },
       {
-        "id": 37,
+        "id": "37",
         "title": "Launch Cross-Promotion on Legacy Site",
         "description": "Deploy integration banners and recommendation cards on taeannews.co.kr.",
         "details": "Modify the NDSoft CMS templates of taeannews.co.kr to insert dynamic HTML snippets that load related insight reports at the bottom of free articles.",
@@ -2090,7 +2146,7 @@
         "expansionPrompt": "Detail the JavaScript snippet to be injected into the legacy CMS and how it shares auth state."
       },
       {
-        "id": 38,
+        "id": "38",
         "title": "Analytics & KPI Tracking Setup",
         "description": "Integrate Google Analytics 4, Toss Payments reporting, and Custom Admin Dashboards.",
         "details": "Set up GA4 events for conversions, free-trial starts, and article reads. Configure the admin panel to track MRR, MAU, Churn rate, and operational costs against the 300,000 KRW threshold.",
@@ -2141,7 +2197,7 @@
         "expansionPrompt": "List the specific GA4 custom events and parameters needed for measuring conversions and AI usage."
       },
       {
-        "id": 39,
+        "id": "39",
         "title": "Final Release Checks & Production Deployment",
         "description": "Execute the production deployment runbook and switch DNS to live.",
         "details": "Deploy final Docker images. Execute zero-downtime database migrations. Ensure backup systems (daily pg_dump to S3) are active. Monitor logs meticulously for the first 24 hours.",
@@ -2207,7 +2263,7 @@
         "expansionPrompt": "Create a step-by-step production runbook including the zero-downtime database migration process."
       },
       {
-        "id": 40,
+        "id": "40",
         "title": "Documentation & 2027 Roadmap Handoff",
         "description": "Finalize SOPs, OpenAPI docs, and project reports for the regional newspaper committee.",
         "details": "Document the entire architecture, API endpoints (Swagger/Redoc), and operational runbooks. Draft the 2026 performance report and baseline the 2027 technical roadmap (PWA & advanced caching).",
@@ -2258,7 +2314,7 @@
         "expansionPrompt": "Outline the required sections for the architecture document and the standard operating procedures."
       },
       {
-        "id": 41,
+        "id": "41",
         "title": "Phase 3 Beta Closing & KPI Redefinition",
         "description": "Analyze external beta metrics to redefine the 120 paid customers KPI and update the final business report for the regional newspaper committee.",
         "details": "Extract analytics data from the 100 external beta users, specifically focusing on: (1) Free-to-premium actual conversion rates, (2) Average Revenue Per User (ARPU) separated by B2B and B2C segments, and (3) Churn cohort trends. Conduct a review session with the Project Manager and Digital Transformation Lead before 2026-11-30. Based on the data, formally redefine the initial 120 paid customers KPI into one of three models: (a) MRR single KPI, (b) Weighted KPI (B2B=5 points, B2C=1 point), or (c) Maintain the original business plan. Document the empirical rationale and finalize the Business Result Report required for the regional newspaper development committee.",
@@ -2272,7 +2328,7 @@
         "subtasks": []
       },
       {
-        "id": 42,
+        "id": "42",
         "title": "Prepare Citizen Journalist Recruitment Materials (v1.5 Schedule Update)",
         "description": "Draft recruitment notices, application forms, evaluation criteria, interview questions, and a 6-session training curriculum for the rescheduled mid-July citizen journalist program.",
         "details": "This task focuses on the preparatory work required for the citizen journalist recruitment, which has been delayed from May to mid-July 2026 to ensure the platform is sufficiently functional for new recruits. Deliverables must be completed by 2026-06-30. 1. Recruitment Notice: Write promotional copy, outline eligibility requirements, and clearly state the updated timeline. 2. Application Form: Create a structured Google Form (or custom platform form) to capture applicant details. 3. Evaluation Criteria: Develop a comprehensive scoring matrix that ensures regional balance across Eup and Myeon districts, age diversity, reporting motivation, and baseline literacy/writing skills. 4. Interview Questionnaire: Prepare standardized behavioral and scenario-based interview questions. 5. Training Curriculum: Draft an outline for a 6-session educational program covering journalism ethics, basic reporting, and practical usage of the new publishing platform.",
@@ -2283,7 +2339,7 @@
         "subtasks": []
       },
       {
-        "id": 43,
+        "id": "43",
         "title": "Execute Citizen Journalist Recruitment and Selection",
         "description": "Conduct a two-week application and one-week interview process to select 12 diverse citizen journalists for a shortened three-month program.",
         "details": "Execute the recruitment campaign scheduled from 2026-07-15 to 2026-07-31. Step 1: Publish recruitment notices on the main taeannews.co.kr website, the new insight platform, and official SNS channels using materials prepared in Task #42. Step 2: Manage the 2-week application intake phase, actively monitoring submission rates. Step 3: Conduct a 1-week interview and portfolio evaluation phase. The AI Co-Pilot Web Editor (Task #25) must be showcased in its beta state during interviews to assess candidates' adaptability to AI tools. Step 4: Finalize the selection of exactly 12 journalists. The final cohort must guarantee regional balance (distributing slots across Anmyeon, Sowon, Geunheung, and Taean eup/myeon) and age diversity (spanning 20s, 30s, 40s, 50s, and 60s). Crucially, because the activity period has been shortened to an intensive 3-month window (September to November), interviewers must explicitly verify and document each candidate's ability to successfully balance the reporting workload with their primary occupation.",
@@ -2302,8 +2358,8 @@
         "description": "Develop a customized /me dashboard, onboarding wizard, and backend infrastructure to deliver tailored content, web push notifications, and B2G shared spaces based on user segments. Updated to reflect PRD v1.8: dynamic widget visibility control, segment-specific dashboard tones (welcoming vs. tool), L1 frontend-based personalization to preserve cache rates, and a 3-tier content visibility policy (Critical, Community, Personal).",
         "status": "pending",
         "dependencies": [
-          20,
-          21
+          "20",
+          "21"
         ],
         "priority": "high",
         "details": "This implementation encompasses core deliverables for PRD v1.8: 1) DB Migrations: Create '004_user_preferences' ('user_preferences', 'user_favorites', 'notification_subscriptions', 'b2g_organizations', 'b2g_memberships') and '005_content_visibility_tier' (adding 'visibility_tier' to 'citizen_articles' and 'ai_content_logs'). 2) Onboarding Wizard UI: Next.js components for multi-selecting interest regions (Eup/Myeon), 6 fields of interest, and notification channels. 3) Dashboard Page (/me): Implement a single route automatically toggling 7 widgets ('welcome_banner', 'kpi_cards', 'favorites_list', 'personalized_report', 'team_workspace', 'b2g_department_space', 'usage_panel') based on user segment. 4) Dashboard Tones: Apply 'welcoming' tone for B2C, 'tool' tone for B2B/B2G, and a top toggle for B2C Premium to switch tones. Adjust mobile default sorting per segment. 5) Personalization Engine v1.0 (L1): Backend returns common cached data; frontend handles filtering/reordering to maintain 75% cache hit rates. 6) Content Visibility Policy: Implement 3-tier logic—Critical (top banner + Web Push for all), Community (small exposure if mismatched), Personal (exposure only on interest match). 7) Web Push: Service Worker for push opt-in and dispatching (Critical tier triggers). 8) Limit Middleware: Enforce subscription-tier limits.",
@@ -2316,7 +2372,8 @@
             "dependencies": [],
             "details": "Create `004_user_preferences.sql` covering preferences, favorites, and B2G tables. Create `005_content_visibility_tier.sql` to append a `visibility_tier` column to `citizen_articles` and `ai_content_logs`.",
             "status": "pending",
-            "testStrategy": "Run migrations and verify schema structure, table creation, and existence of the visibility_tier column in target tables."
+            "testStrategy": "Run migrations and verify schema structure, table creation, and existence of the visibility_tier column in target tables.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2325,7 +2382,8 @@
             "dependencies": [],
             "details": "Build the flow for users to multi-select Eup/Myeon interest regions, 6 fields of interest, and notification channels. Ensure state is correctly mapped to the preference schema payload.",
             "status": "pending",
-            "testStrategy": "Conduct E2E tests for the onboarding flow ensuring preference payloads are correctly sent and persisted in the database."
+            "testStrategy": "Conduct E2E tests for the onboarding flow ensuring preference payloads are correctly sent and persisted in the database.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2334,7 +2392,8 @@
             "dependencies": [],
             "details": "Create a Server Component that conditionally renders `welcome_banner`, `kpi_cards`, `favorites_list`, `personalized_report`, `team_workspace`, `b2g_department_space`, and `usage_panel` based on the user's SSO segment. Implement custom mobile sorting per segment.",
             "status": "pending",
-            "testStrategy": "Mock SSO tokens for all segments and verify exactly which widgets are displayed or hidden according to the PRD widget matrix."
+            "testStrategy": "Mock SSO tokens for all segments and verify exactly which widgets are displayed or hidden according to the PRD widget matrix.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -2345,7 +2404,8 @@
             ],
             "details": "Implement UI variations for greeting/favorites (welcoming tone) vs KPIs/charts (tool tone). Add a top-level toggle in the B2C Premium dashboard layout allowing users to switch dynamically between these two visual tones.",
             "status": "pending",
-            "testStrategy": "Verify B2C renders welcoming mode, B2B/B2G renders tool mode, and clicking the toggle in a mocked B2C Premium session successfully switches modes without page reload."
+            "testStrategy": "Verify B2C renders welcoming mode, B2B/B2G renders tool mode, and clicking the toggle in a mocked B2C Premium session successfully switches modes without page reload.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -2356,7 +2416,8 @@
             ],
             "details": "To achieve a 75% cache retention rate, fetch general cached report/article data from the backend. Apply the user's L1 explicit selections locally via a frontend utility to filter and reorder the content before rendering.",
             "status": "pending",
-            "testStrategy": "Intercept network requests to ensure common data is fetched from cache, and write unit tests for the frontend utility that asserts correct filtering behavior based on mock user preferences."
+            "testStrategy": "Intercept network requests to ensure common data is fetched from cache, and write unit tests for the frontend utility that asserts correct filtering behavior based on mock user preferences.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -2368,7 +2429,8 @@
             ],
             "details": "Integrate the PRD v1.8 visibility tier logic: 'Critical' shows as a top banner for all users regardless of interest, 'Community' shows as a smaller fallback component if interests mismatch, and 'Personal' is strictly filtered to only show on explicit interest match.",
             "status": "pending",
-            "testStrategy": "Render components using mock datasets covering all 3 tiers and user interest combinations. Assert CSS classes/sizes for Community fallbacks and banner presence for Critical items."
+            "testStrategy": "Render components using mock datasets covering all 3 tiers and user interest combinations. Assert CSS classes/sizes for Community fallbacks and banner presence for Critical items.",
+            "parentId": "undefined"
           },
           {
             "id": 7,
@@ -2379,7 +2441,8 @@
             ],
             "details": "Implement a Service Worker to manage push subscriptions. Integrate with the backend to dispatch web push notifications, ensuring 'Critical' visibility tier content automatically triggers a web push to all opted-in users.",
             "status": "pending",
-            "testStrategy": "Test Web Push opt-in using a browser automation tool to accept permissions. Simulate a 'Critical' content publish event and verify the push payload dispatch."
+            "testStrategy": "Test Web Push opt-in using a browser automation tool to accept permissions. Simulate a 'Critical' content publish event and verify the push payload dispatch.",
+            "parentId": "undefined"
           },
           {
             "id": 8,
@@ -2391,7 +2454,8 @@
             ],
             "details": "Implement the B2G shared workspace UI module with stringent data isolation per organization. Integrate hooks to trigger automated report generation specific to the department's requirements based on PRD specs.",
             "status": "pending",
-            "testStrategy": "Verify B2G shared workspace data isolation between different mock organizations. Ensure unauthorized users cannot access department-specific reports or views."
+            "testStrategy": "Verify B2G shared workspace data isolation between different mock organizations. Ensure unauthorized users cannot access department-specific reports or views.",
+            "parentId": "undefined"
           },
           {
             "id": 9,
@@ -2402,22 +2466,20 @@
             ],
             "details": "Create middleware to enforce operational bounds such as maximum favorite counts, team member invite limits (e.g., 5 for B2B Basic), and specific region limits based on the user's active segment.",
             "status": "pending",
-            "testStrategy": "Write unit tests simulating limit breaches (e.g., attempting to invite a 6th member on a 5-member plan) to ensure appropriate 403 or 422 HTTP error responses."
+            "testStrategy": "Write unit tests simulating limit breaches (e.g., attempting to invite a 6th member on a 5-member plan) to ensure appropriate 403 or 422 HTTP error responses.",
+            "parentId": "undefined"
           }
         ]
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-05-27T05:43:17.994Z",
-      "taskCount": 43,
-      "completedCount": 2,
+      "lastModified": "2026-05-27T12:11:03.309Z",
+      "taskCount": 44,
+      "completedCount": 5,
       "tags": [
         "master"
-      ],
-      "created": "2026-05-27T05:45:53.740Z",
-      "description": "Tasks for master context",
-      "updated": "2026-05-27T09:22:57.223Z"
+      ]
     }
   }
 }

@@ -1309,11 +1309,14 @@ CREATE INDEX idx_cost_events_month ON cost_events(date_trunc('month', event_at))
 - Recharts 또는 Apache ECharts (차트)
 - TipTap (시민기자 에디터)
 
-**백엔드:**
-- NestJS (TypeScript) 또는 FastAPI (Python) — 팀 역량에 따라 선택, 본 PRD는 FastAPI 권장 (LangGraph·LLM 통합 용이성)
-- Postgres 15+ + PGVector 확장
-- Redis 7+
-- LangGraph (Lite 구성)
+**백엔드 (v1.8 결정):**
+- **Hono + TypeScript on Cloudflare Workers** (Edge runtime, 콜드 스타트 ~24ms)
+- 이유: 프론트와 언어 통일, Cloudflare 무료 한도 활용, OpenNext 어댑터와 일관, 자립 인프라 기조
+- 영구 저장소: 초기 인메모리 PoC → Cloudflare D1 또는 외부 Postgres(+Hyperdrive) 중 선택 (Phase 2C 결정)
+- 캐시: Cloudflare KV
+- 배치: Cloudflare Queues + Workers cron
+- LLM 오케스트레이션: LangGraph 가벼운 구성 (Lite Router + 2 Expert Agent) — Phase 1 벤치마크 후 확정
+- 필요 시 RAG 인프라(PGVector)는 별도 Postgres 인스턴스로 분리
 
 **AI/ML:**
 - vLLM 또는 TGI (추론 서버)

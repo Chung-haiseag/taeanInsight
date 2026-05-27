@@ -1,0 +1,33 @@
+// 태안 인사이트 백엔드 API 엔트리포인트
+// Hono on Cloudflare Workers + Cron 트리거
+// PRD v1.8 §8 기술 아키텍처
+
+import { Hono } from "hono";
+
+import type { Env } from "./types";
+import { costRouter } from "./cost/router";
+
+const app = new Hono<{ Bindings: Env }>();
+
+app.get("/", (c) => c.json({ name: "taean-insight-api", version: "0.1.0" }));
+
+app.get("/health", (c) =>
+  c.json({
+    ok: true,
+    env: c.env.ENVIRONMENT,
+    timestamp: new Date().toISOString(),
+  }),
+);
+
+app.route("/api/cost", costRouter);
+
+// HTTP 요청 핸들러 + Scheduled 핸들러
+export default {
+  fetch: app.fetch,
+
+  // 매시간 cron — 비용 집계 + 임계값 알림
+  async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const { runHourlyAggregation } = await import("./cost/scheduled");
+    await runHourlyAggregation(env);
+  },
+};

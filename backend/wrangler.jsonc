@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "taean-insight-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "MONTHLY_COST_LIMIT_KRW": "300000",
+    "ALERT_THRESHOLDS": "0.7,0.9,1.0",
+    "ENVIRONMENT": "development"
+  },
+  // 향후 추가 바인딩:
+  // - D1 (Postgres 대신 Cloudflare D1로 이전 검토) 또는 Hyperdrive(외부 Postgres 연결)
+  // - KV: 캐시·세션
+  // - Queues: 배치 큐
+  // - Secrets: ANTHROPIC_API_KEY, TOGETHER_API_KEY, SLACK_WEBHOOK_URL
+  "triggers": {
+    // 매시간 비용 누적 집계 + 임계값 체크
+    "crons": ["0 * * * *"]
+  }
+}
