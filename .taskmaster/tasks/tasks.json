@@ -395,7 +395,7 @@
         "updatedAt": "2026-05-27T05:35:14.432Z"
       },
       {
-        "id": "8",
+        "id": 8,
         "title": "Domain, DNS, and HTTPS Setup",
         "description": "Register and configure insight.taeannews.co.kr with DNS and TLS 1.3 using Cloudflare. Cloudflare Workers deployment is complete (taean-insight.chs9182.workers.dev). Currently waiting on external DNS/SSL setup via custom domain registration.",
         "status": "in-progress",
@@ -2295,6 +2295,116 @@
         ],
         "priority": "high",
         "subtasks": []
+      },
+      {
+        "id": "44",
+        "title": "Implement Hyper-Personalized Member Page (/me) and Onboarding System",
+        "description": "Develop a customized /me dashboard, onboarding wizard, and backend infrastructure to deliver tailored content, web push notifications, and B2G shared spaces based on user segments. Updated to reflect PRD v1.8: dynamic widget visibility control, segment-specific dashboard tones (welcoming vs. tool), L1 frontend-based personalization to preserve cache rates, and a 3-tier content visibility policy (Critical, Community, Personal).",
+        "status": "pending",
+        "dependencies": [
+          20,
+          21
+        ],
+        "priority": "high",
+        "details": "This implementation encompasses core deliverables for PRD v1.8: 1) DB Migrations: Create '004_user_preferences' ('user_preferences', 'user_favorites', 'notification_subscriptions', 'b2g_organizations', 'b2g_memberships') and '005_content_visibility_tier' (adding 'visibility_tier' to 'citizen_articles' and 'ai_content_logs'). 2) Onboarding Wizard UI: Next.js components for multi-selecting interest regions (Eup/Myeon), 6 fields of interest, and notification channels. 3) Dashboard Page (/me): Implement a single route automatically toggling 7 widgets ('welcome_banner', 'kpi_cards', 'favorites_list', 'personalized_report', 'team_workspace', 'b2g_department_space', 'usage_panel') based on user segment. 4) Dashboard Tones: Apply 'welcoming' tone for B2C, 'tool' tone for B2B/B2G, and a top toggle for B2C Premium to switch tones. Adjust mobile default sorting per segment. 5) Personalization Engine v1.0 (L1): Backend returns common cached data; frontend handles filtering/reordering to maintain 75% cache hit rates. 6) Content Visibility Policy: Implement 3-tier logic—Critical (top banner + Web Push for all), Community (small exposure if mismatched), Personal (exposure only on interest match). 7) Web Push: Service Worker for push opt-in and dispatching (Critical tier triggers). 8) Limit Middleware: Enforce subscription-tier limits.",
+        "testStrategy": "1) Run DB migrations 004 and 005; verify schema structure, foreign keys, and new 'visibility_tier' columns. 2) Conduct E2E tests for the onboarding flow ensuring L1 preference payloads persist. 3) Mock SSO tokens to verify the single /me route accurately toggles the 7 widgets per segment, and test the B2C Premium tone toggle. 4) Verify frontend personalization filtering accurately processes common backend cached data. 5) Test 3-tier content visibility logic: assert Critical items show as banners/push, Community items render small on mismatch, Personal items hide on mismatch. 6) Write unit tests for segment limit middleware (e.g., inviting a 6th member on a 5-member plan). 7) Test Web Push opt-in and B2G shared workspace data isolation.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create DB Migrations 004 and 005",
+            "description": "Create migration scripts for user preferences and content visibility tiers based on PRD v1.8.",
+            "dependencies": [],
+            "details": "Create `004_user_preferences.sql` covering preferences, favorites, and B2G tables. Create `005_content_visibility_tier.sql` to append a `visibility_tier` column to `citizen_articles` and `ai_content_logs`.",
+            "status": "pending",
+            "testStrategy": "Run migrations and verify schema structure, table creation, and existence of the visibility_tier column in target tables."
+          },
+          {
+            "id": 2,
+            "title": "Build Onboarding Wizard UI",
+            "description": "Develop Next.js client components for L1 explicit preference selection during user sign-up.",
+            "dependencies": [],
+            "details": "Build the flow for users to multi-select Eup/Myeon interest regions, 6 fields of interest, and notification channels. Ensure state is correctly mapped to the preference schema payload.",
+            "status": "pending",
+            "testStrategy": "Conduct E2E tests for the onboarding flow ensuring preference payloads are correctly sent and persisted in the database."
+          },
+          {
+            "id": 3,
+            "title": "Implement Single /me Dashboard Route & Widget Control",
+            "description": "Develop the single /me route with segment-specific visibility for 7 core dashboard widgets.",
+            "dependencies": [],
+            "details": "Create a Server Component that conditionally renders `welcome_banner`, `kpi_cards`, `favorites_list`, `personalized_report`, `team_workspace`, `b2g_department_space`, and `usage_panel` based on the user's SSO segment. Implement custom mobile sorting per segment.",
+            "status": "pending",
+            "testStrategy": "Mock SSO tokens for all segments and verify exactly which widgets are displayed or hidden according to the PRD widget matrix."
+          },
+          {
+            "id": 4,
+            "title": "Implement Dashboard Tone Policy and Premium Toggle",
+            "description": "Apply welcoming tone for B2C, tool tone for B2B/B2G, and build a toggle for B2C Premium users.",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement UI variations for greeting/favorites (welcoming tone) vs KPIs/charts (tool tone). Add a top-level toggle in the B2C Premium dashboard layout allowing users to switch dynamically between these two visual tones.",
+            "status": "pending",
+            "testStrategy": "Verify B2C renders welcoming mode, B2B/B2G renders tool mode, and clicking the toggle in a mocked B2C Premium session successfully switches modes without page reload."
+          },
+          {
+            "id": 5,
+            "title": "Frontend L1 Personalization Engine",
+            "description": "Implement frontend filtering and reordering over common backend cached data to maintain high cache hit rates.",
+            "dependencies": [
+              3
+            ],
+            "details": "To achieve a 75% cache retention rate, fetch general cached report/article data from the backend. Apply the user's L1 explicit selections locally via a frontend utility to filter and reorder the content before rendering.",
+            "status": "pending",
+            "testStrategy": "Intercept network requests to ensure common data is fetched from cache, and write unit tests for the frontend utility that asserts correct filtering behavior based on mock user preferences."
+          },
+          {
+            "id": 6,
+            "title": "3-Tier Content Visibility Logic (Critical/Community/Personal)",
+            "description": "Enforce rendering rules for the 3 distinct content tiers based on user preferences and content priority.",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Integrate the PRD v1.8 visibility tier logic: 'Critical' shows as a top banner for all users regardless of interest, 'Community' shows as a smaller fallback component if interests mismatch, and 'Personal' is strictly filtered to only show on explicit interest match.",
+            "status": "pending",
+            "testStrategy": "Render components using mock datasets covering all 3 tiers and user interest combinations. Assert CSS classes/sizes for Community fallbacks and banner presence for Critical items."
+          },
+          {
+            "id": 7,
+            "title": "Implement Web Push and Critical Notifications",
+            "description": "Build a Service Worker for push opt-in and dispatching, especially for Critical tier notifications.",
+            "dependencies": [
+              6
+            ],
+            "details": "Implement a Service Worker to manage push subscriptions. Integrate with the backend to dispatch web push notifications, ensuring 'Critical' visibility tier content automatically triggers a web push to all opted-in users.",
+            "status": "pending",
+            "testStrategy": "Test Web Push opt-in using a browser automation tool to accept permissions. Simulate a 'Critical' content publish event and verify the push payload dispatch."
+          },
+          {
+            "id": 8,
+            "title": "B2G Features & Shared Workspace Integration",
+            "description": "Create department shared workspace UI and automated report generation triggers for B2G users.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Implement the B2G shared workspace UI module with stringent data isolation per organization. Integrate hooks to trigger automated report generation specific to the department's requirements based on PRD specs.",
+            "status": "pending",
+            "testStrategy": "Verify B2G shared workspace data isolation between different mock organizations. Ensure unauthorized users cannot access department-specific reports or views."
+          },
+          {
+            "id": 9,
+            "title": "Subscription Segment Limit Middleware",
+            "description": "Enforce usage limits based on subscription tiers via Next.js middleware and Server Actions.",
+            "dependencies": [
+              3
+            ],
+            "details": "Create middleware to enforce operational bounds such as maximum favorite counts, team member invite limits (e.g., 5 for B2B Basic), and specific region limits based on the user's active segment.",
+            "status": "pending",
+            "testStrategy": "Write unit tests simulating limit breaches (e.g., attempting to invite a 6th member on a 5-member plan) to ensure appropriate 403 or 422 HTTP error responses."
+          }
+        ]
       }
     ],
     "metadata": {
@@ -2306,7 +2416,8 @@
         "master"
       ],
       "created": "2026-05-27T05:45:53.740Z",
-      "description": "Tasks for master context"
+      "description": "Tasks for master context",
+      "updated": "2026-05-27T09:22:57.223Z"
     }
   }
 }

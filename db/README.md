@@ -8,12 +8,14 @@
 001_init_users_and_subscriptions.sql
 002_citizen_reporters.sql
 003_ai_content_logs_and_cost_events.sql
+004_personalization_and_b2g.sql              # PRD v1.7 신규
+005_content_visibility_tier.sql               # PRD v1.8 신규 (Critical/Community/Personal)
 ```
 
 향후 추가 예정:
-- `004_documents_and_embeddings.sql` (PGVector RAG — REQ-DATA-001)
-- `005_weekly_reports.sql` (주간 인사이트 — REQ-PRODUCT-001)
-- `006_dashboards_and_b2b.sql` (B2B 대시보드 데이터 — REQ-PRODUCT-003)
+- `006_documents_and_embeddings.sql` (PGVector RAG — REQ-DATA-001)
+- `007_weekly_reports.sql` (주간 인사이트 — REQ-PRODUCT-001, visibility_tier 컬럼 포함)
+- `008_dashboards_and_b2b.sql` (B2B 대시보드 데이터 — REQ-PRODUCT-003)
 
 ## 적용 방법
 
@@ -52,6 +54,16 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 | `ai_content_logs` | AI 라벨·HITL 감사 추적 | REQ-GOV-001 |
 | `cost_events` | 월 30만원 모니터링 | REQ-COST-001 |
 | `sensitive_topic_rules` | 민감 주제 7종 (v1.4) | Q6 |
+| `user_preferences` | 초개인화 관심 지역·분야·알림 채널 (v1.7) | REQ-PRODUCT-005 |
+| `user_favorites` | 장소·이벤트·리포트 즐겨찾기 (v1.7) | REQ-PRODUCT-005 |
+| `notification_subscriptions` | Web Push·이메일·카카오 알림 구독 (v1.7) | REQ-PRODUCT-005 |
+| `notification_events` | 알림 발송 이력·재시도 (v1.7) | REQ-PRODUCT-005 |
+| `segment_limits` | 세그먼트별 한도 시드 (v1.7) | REQ-PRODUCT-005 |
+| `b2g_organizations` | 공공기관 조직 정보 (v1.7) | REQ-PRODUCT-005 |
+| `b2g_memberships` | 사용자-조직 매핑 (v1.7) | REQ-PRODUCT-005 |
+| `visibility_tier_examples` | 콘텐츠 등급 가이드 시드 (v1.8) | REQ-PRODUCT-005 / REQ-CITIZEN-001 |
+| (확장 컬럼) `citizen_articles.visibility_tier` | Critical/Community/Personal (v1.8) | REQ-PRODUCT-005 |
+| (확장 컬럼) `ai_content_logs.visibility_tier` | 감사 추적용 (v1.8) | REQ-GOV-001 / REQ-PRODUCT-005 |
 
 ## 설계 노트
 

@@ -1,7 +1,7 @@
 # PRD: 태안 AI 인텔리전스 커먼즈 플랫폼 (Taean AI Intelligence Commons Platform)
 
 **작성자:** 태안신문 디지털전환 TF · 주관사 (주)엔씨투
-**버전:** 1.6 (2026-05-27 프론트엔드 배포 플랫폼 Cloudflare Pages 확정)
+**버전:** 1.8 (2026-05-27 초개인화 페이지 상세 설계 4종 확정)
 **최종 수정일:** 2026-05-27
 **상태:** **Approved** (모든 핵심 의사결정 완료)
 **핵심 결정사항 (2026-05-26 ~ 27):**
@@ -14,7 +14,17 @@
 - **시민기자 정산 (v1.4):** 월간 정산 (매월 말 자동 집계·이체)
 - **민감 주제 차단 (v1.4):** 기본 4종(선거·범죄·의료·종교) + 확장 3종(정치적 인물·부동산 투기 자문·소수자 이슈)
 - **시민기자 일정 재조정 (v1.5):** 모집·선발을 사업계획서 원안 5월(M1)에서 **7월 중순**으로 연기 → 교육 7월 말~8월, 활동 9~11월(3개월). 발행량 목표 1인당 월 4~6편 × 3개월 = **12~18편/인** (원안 16~24편 대비 감소). 시민기자 관련 사전 준비 작업은 6월 말까지 완료해야 함
-- **프론트엔드 배포 (v1.6):** **Cloudflare Pages** 확정. 무제한 무료 트래픽으로 사업 운영비(월 30만원 목표) 정합성 최상. `@cloudflare/next-on-pages` 어댑터로 Next.js 14 App Router 배포. SSL 자동 발급, 글로벌 Cloudflare CDN
+- **프론트엔드 배포 (v1.6 → v1.7 보강):** **Cloudflare Workers + Static Assets** 확정 (`@opennextjs/cloudflare` 어댑터). 무제한 무료 트래픽으로 사업 운영비(월 30만원 목표) 정합성 최상. SSL 자동 발급, 글로벌 Cloudflare CDN. 라이브: `taean-insight.chs9182.workers.dev`
+- **초개인화 페이지 + B2G 세그먼트 (v1.7):** 모든 승인 회원(B2C·B2B·**B2G**)에게 `insight.taeannews.co.kr` 내 **초개인화 페이지(`/me`)** 제공. 사용자가 직접 선택한 관심 지역(읍·면)·관심 분야(관광·환경·부동산·정책)·즐겨찾기 기반 맞춤 콘텐츠·알림. B2G(군청·읍면사무소·교육청·공공기관)는 신규 세그먼트로 정식 등록, 가격·기능은 Phase 3 베타 후 확정
+- **초개인화 상세 설계 (v1.8):**
+  - **(1) 첫 화면 톤**: 세그먼트별 자동 전환 — B2C는 "환영" 톤(따뜻한 메시지·즐겨찾기·다음 주말 미리보기), B2B·B2G는 "도구" 톤(대시보드·숫자·차트). B2C Premium은 상단 토글로 두 톤 전환 가능
+  - **(2) 개인화 깊이**: **v1.0은 L1(명시적 선택)만** — 사용자가 직접 입력한 관심 지역·분야·즐겨찾기 기반. L2(행동 학습 추천)는 2027 로드맵, L3(AI 임베딩 예측)는 2028+ 검토. **이유**: 캐싱 75% 유지(운영비 30만원 보호) + 프라이버시 단순화
+  - **(3) 세그먼트 차이**: 단일 `/me` 라우트 + **위젯 가시성 제어** 방식 — 세그먼트에 따라 위젯 켜고/꺼짐. 모바일 기본 정렬만 세그먼트별 다르게
+  - **(4) 콘텐츠 등급 분류**: 모든 발행물을 3등급으로 분류
+    - **Critical (공동체 필수)**: 적조·태풍·대형 사고 등 — **관심사 무관 모든 사용자에게 노출** (필터 버블 방지, 지역신문 정체성 보호)
+    - **Community (공동체 권장)**: 군수 인터뷰·군의회 의결 등 — 관심 분야 아니어도 작게 노출
+    - **Personal (개인 맞춤)**: 안면도 펜션 추천·미세먼지 예보 등 — 관심사 일치 시만 노출
+    - 등급은 편집부·시민기자가 발행 시 선택, AI 보조 분류 가능 (HITL 검토 단계에서 확정)
 **TaskMaster 최적화:** Yes
 **원본 자료:** `태안신문_2026_사업계획서.pdf` (지역신문발전위원회 사업계획서)
 **사업명:** 태안 AI 인텔리전스 커먼즈 플랫폼 구축 사업
@@ -151,8 +161,9 @@
 | **관광객·잠재 방문자** | 외부 거주, 만리포·천리포·안면도 방문 계획 | 기상·관광객 변동 예측, 맛집·해넘이 정보 | 계절성, 월 1~3회 | MAU 4,500명 |
 | **이주민·귀촌 검토자** | 30~50대, 외지 거주, 부동산·정착 조사 | 토지거래·시세·정주 여건 분석 | 월 2~4회 | MAU 1,500명 |
 | **태안군 거주민 (일반)** | 5.9만 인구, 고령자 39.7% | 지역 뉴스, 생활 정보, 환경 알림 | 주 2~5회 | MAU 5,000명 |
-| **B2B 관광사업체·소상공인** | 펜션·식당·체험업체 | 관광객 예측 대시보드, 광고 집행 | 주 1~3회 | 60개 유료 |
-| **B2B 공공·연구기관·기업** | 군청·연구소·환경 분야 기업 | 데이터·API 라이선스, 맞춤 분석 | 월 4회+ | 30개 유료 |
+| **B2B 관광사업체·소상공인** | 펜션·식당·체험업체 | 관광객 예측 대시보드, 광고 집행, **내 상권 초개인화 페이지** | 주 1~3회 | 60개 유료 |
+| **B2B 연구기관·기업** | 연구소·환경 분야 기업 | 데이터·API 라이선스, 맞춤 분석, **연구 도메인 초개인화 페이지** | 월 4회+ | 20개 유료 |
+| **B2G 공공기관 (신규)** | 군청·읍면사무소·교육청·도청 | 정책 의사결정 데이터, 지역 동향 보고서, **담당 부서 초개인화 페이지** | 월 2~8회 | 10개 유료 |
 | **AI 증강 시민기자** | 20~60대, 읍·면 균형(안면·소원·근흥·태안 등) | AI Co-Pilot, 원고료, 인센티브 | 주 1~2회 발행 | 12명 |
 
 ### 4.2 상세 사용자 페르소나
@@ -700,6 +711,75 @@ CREATE INDEX ON document_embeddings USING hnsw (embedding vector_cosine_ops);
 
 ---
 
+#### REQ-PRODUCT-005: 초개인화 회원 페이지 `/me` (v1.7 신규)
+**설명:** 승인된 모든 회원(B2C·B2B·B2G)이 자신의 관심 지역·분야·즐겨찾기를 기반으로 맞춤 콘텐츠·알림을 받는 통합 회원 페이지. 결제·플랜 정보, 사용량, AI 질의 이력, 저장한 리포트도 한 화면에서 관리.
+
+**수용 기준 (v1.8 상세 설계 반영):**
+- [ ] 라우트: `insight.taeannews.co.kr/me` — 미인증 시 SSO 로그인 리다이렉트
+- [ ] **온보딩 흐름** (최초 로그인 시): 관심 지역(읍·면 다중 선택, 세그먼트별 한도 적용) → 관심 분야(관광·환경·부동산·정책·산업·문화) → 알림 수신 방법(이메일·웹푸시·카카오 알림톡 중 다중) 입력 후 저장
+- [ ] **(1) 세그먼트별 첫 화면 톤 자동 전환 (v1.8)**:
+  - **B2C: "환영" 톤** — 인사말 + 즐겨찾기 명소 카드 + 다음 주말 미리보기 + 추천 명소
+  - **B2B·B2G: "도구" 톤** — 대시보드 헤더 + 핵심 KPI 4종 + 트렌드 차트
+  - **B2C Premium 토글**: 화면 상단에 "도구 모드로 보기" 토글, 사용자 선택 저장
+- [ ] **(2) 개인화 깊이 L1만 v1.0 (v1.8)**:
+  - 사용자 명시 선택만 활용 (관심 지역·분야·즐겨찾기)
+  - 백엔드는 공통 캐시된 데이터 반환 + **프론트엔드에서 필터·재정렬** (캐싱 75% 보호)
+  - 행동 학습(L2)·AI 임베딩 추천(L3)은 2027~2028 로드맵
+- [ ] **(3) 단일 `/me` 라우트 + 위젯 가시성 제어 (v1.8)**:
+  - 같은 페이지 골격, 세그먼트에 따라 위젯이 자동 표시/숨김
+  - 위젯 종류:
+    - `welcome_banner` (B2C 노출, B2B/B2G 미노출)
+    - `kpi_cards` (B2B/B2G 노출 상단, B2C는 하단)
+    - `favorites_list` (전 세그먼트, B2C는 명소 위주, B2B는 상권 위주, B2G는 정책 자료 위주)
+    - `personalized_report` (B2C Premium 이상)
+    - `team_workspace` (B2B 기본 이상)
+    - `b2g_department_space` (B2G만)
+    - `usage_panel` (전 세그먼트)
+  - 모바일에서는 세그먼트별 기본 위젯 정렬 다르게
+- [ ] **(4) 콘텐츠 등급 3종 (Critical/Community/Personal) 노출 정책 (v1.8)**:
+  - **Critical**: 사용자 관심사 무관 모든 사용자에게 상단 배너로 노출 (적조·태풍·대형 사고)
+  - **Community**: 관심 분야 일치 안 해도 본문 하단에 작게 노출 (군수 인터뷰·군의회 의결)
+  - **Personal**: 사용자 관심 지역·분야 일치 시만 노출 (펜션 추천·미세먼지 예보)
+  - 등급 선택은 발행자(편집부·시민기자)가 발행 시 입력 — REQ-CITIZEN-001 HITL 워크플로에 포함
+  - AI 보조 분류 가능: AI가 등급 추천 → 편집자 최종 확정
+- [ ] **세그먼트별 차등 한도** (DB `segment_limits` 시드 데이터):
+  - B2C Basic: 지역 2·분야 2·즐겨찾기 10
+  - B2C Premium: 지역 5·분야 4·즐겨찾기 50·맞춤 PDF
+  - B2B 기본/프리미엄: + 팀원 초대(3/10명) + 상권 위젯
+  - B2G: + 부서 공유 공간 + 보고서 자동 생성 + 부서원 20명까지
+- [ ] **푸시 알림 옵트인** — 관심 지역의 Critical·Personal 콘텐츠 자동 발송 (HITL 검증). **W3C 표준 Web Push 직접 구현** (Firebase·FCM 미사용 — v1.7 결정). Cloudflare Workers의 `web-push` 라이브러리로 발송, VAPID 키는 환경변수로 관리
+- [ ] 개인 설정은 언제든 변경 가능, 변경 이력은 감사 로그에 기록
+- [ ] **개인정보**: 관심사 데이터는 사용자 본인만 조회 가능, 추천 서비스 외 활용 금지 (PRD §7.2 보안)
+
+**기술 명세 (요약):**
+```typescript
+interface UserPreferences {
+  userId: string;
+  segment: "b2c_basic" | "b2c_premium" | "b2b_basic" | "b2b_premium" | "b2g";
+  regions: string[];          // 읍·면 코드 배열 (세그먼트별 한도 적용)
+  categories: ("tourism" | "environment" | "realestate" | "policy" | "industry" | "culture")[];
+  notificationChannels: ("email" | "webpush" | "kakao")[];
+  favorites: Array<{ kind: "place" | "event" | "report"; refId: string }>;
+  updatedAt: string;
+}
+```
+
+**태스크 분해:**
+- 데이터 모델·마이그레이션 (`user_preferences`·`user_favorites`·`notification_subscriptions`): Medium (5h)
+- 온보딩 위저드 UI: Medium (8h)
+- `/me` 대시보드 페이지 (세그먼트별 분기 렌더링): Large (12h)
+- 개인화 추천 알고리즘 (관심 지역·분야 기반 콘텐츠 필터링): Medium (8h)
+- 푸시 알림 옵트인 + Web Push 통합: Medium (6h)
+- B2G 부서 공유 공간 + 보고서 자동 생성: Large (10h)
+- 권한·세그먼트별 한도 미들웨어: Small (4h)
+- 통합 테스트(세그먼트별 시나리오 5종): Medium (6h)
+
+**의존성:** REQ-PLATFORM-001 (`/me` 라우트), REQ-PLATFORM-002 (인증·세그먼트 정보), REQ-PRODUCT-001 (개인화 리포트 재구성)
+
+**우선순위:** Must Have (P0) — B2C Premium 차별화 가치 + B2G 진입 핵심
+
+---
+
 #### REQ-CITIZEN-001: AI 증강 시민기자단 운영 시스템
 **설명:** 12명 시민기자의 모집·교육·집필·검토·정산·평가 전 과정을 지원하는 운영 시스템.
 
@@ -707,7 +787,7 @@ CREATE INDEX ON document_embeddings USING hnsw (embedding vector_cosine_ops);
 - [ ] 시민기자 신청·선발(읍·면 균형, 연령 다양성) 폼
 - [ ] 6회 교육 프로그램 LMS(영상·자료·과제·퀴즈)
 - [ ] AI Co-Pilot 통합 웹 에디터 — Story 4 참조
-- [ ] HITL 검토 워크플로(작성→AI 검증→에디터 검토→발행)
+- [ ] HITL 검토 워크플로(작성→AI 검증→에디터 검토→**콘텐츠 등급 확정**(Critical/Community/Personal, v1.8)→발행)
 - [ ] 발행 건수·원고료 자동 집계, 우수 기자 인센티브 시상
 - [ ] **월간 정산 (v1.4)**: 매월 25일 23:59 집계, 말일 계산, 익월 5영업일 이내 이체. 시민기자 마이페이지에서 정산 내역·이체 상태 실시간 확인
 
@@ -1142,6 +1222,70 @@ CREATE TABLE citizen_articles (
   published_at TIMESTAMP,
   fee_krw INT,                           -- 5만~10만원
   created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 콘텐츠 가시성 등급 (v1.8 신규)
+-- 모든 발행 콘텐츠(report·article·qa·widget)에 부여
+CREATE TYPE content_visibility_tier AS ENUM (
+  'critical',     -- 관심사 무관 모든 사용자 노출 (적조·태풍·대형 사고)
+  'community',    -- 관심 분야 불일치 시도 작게 노출 (군수·군의회)
+  'personal'      -- 관심사 일치 시만 노출 (펜션 추천·일상 정보)
+);
+
+-- 초개인화 사용자 설정 (v1.7 신규)
+CREATE TABLE user_preferences (
+  user_id        UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  segment        VARCHAR(20) NOT NULL,           -- 'b2c_basic' | 'b2c_premium' | 'b2b_basic' | 'b2b_premium' | 'b2g'
+  regions        TEXT[] NOT NULL DEFAULT '{}',   -- 읍·면 코드 배열
+  categories     TEXT[] NOT NULL DEFAULT '{}',   -- tourism | environment | realestate | policy | industry | culture
+  notification_channels TEXT[] NOT NULL DEFAULT '{}',   -- email | webpush | kakao
+  onboarded_at   TIMESTAMP,
+  updated_at     TIMESTAMP DEFAULT NOW()
+);
+
+-- 즐겨찾기 (장소·이벤트·리포트)
+CREATE TABLE user_favorites (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID REFERENCES users(id) ON DELETE CASCADE,
+  kind         VARCHAR(20) NOT NULL,             -- 'place' | 'event' | 'report'
+  ref_id       VARCHAR(100) NOT NULL,            -- 외래 식별자 (place_id 등)
+  metadata     JSONB,
+  created_at   TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, kind, ref_id)
+);
+
+CREATE INDEX idx_user_favorites_user ON user_favorites(user_id);
+
+-- 푸시 구독 (Web Push 엔드포인트)
+CREATE TABLE notification_subscriptions (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+  channel       VARCHAR(20) NOT NULL,            -- 'webpush' | 'email' | 'kakao'
+  endpoint      TEXT NOT NULL,                    -- Web Push endpoint URL or email or kakao_uid
+  p256dh_key    TEXT,                             -- Web Push only
+  auth_key      TEXT,                             -- Web Push only
+  enabled       BOOLEAN DEFAULT TRUE,
+  created_at    TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, channel, endpoint)
+);
+
+CREATE INDEX idx_notif_subs_user_enabled ON notification_subscriptions(user_id) WHERE enabled = TRUE;
+
+-- B2G 부서 공유 공간 (v1.7 신규)
+CREATE TABLE b2g_organizations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            VARCHAR(100) NOT NULL,         -- '태안군청 관광과' 등
+  org_type        VARCHAR(30) NOT NULL,          -- 'county' | 'eup_myeon' | 'education' | 'research'
+  contract_at     DATE,
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE b2g_memberships (
+  user_id      UUID REFERENCES users(id) ON DELETE CASCADE,
+  org_id       UUID REFERENCES b2g_organizations(id) ON DELETE CASCADE,
+  role         VARCHAR(20) NOT NULL DEFAULT 'member',   -- 'admin' | 'member'
+  joined_at    TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (user_id, org_id)
 );
 
 -- 비용 이벤트 (모니터링)
