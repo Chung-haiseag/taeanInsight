@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    typedRoutes: true,
-  },
+  // typedRoutes는 페이지 구조 안정화 후 다시 활성화 (현재 부트스트랩 단계에선 비활성)
   async headers() {
     return [
       {

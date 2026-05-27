@@ -71,38 +71,41 @@ npm run lint
 npm run build        # 표준 Next.js 빌드
 ```
 
-## Cloudflare Pages 배포 (PRD v1.6 확정)
+## Cloudflare 배포 (PRD v1.6 + OpenNext)
+
+배포 어댑터: **`@opennextjs/cloudflare`** (Vercel CLI 의존성 0, Cloudflare 공식 권장).
 
 ```bash
-# 로컬에서 Cloudflare 어댑터 빌드 미리 검증
+# 로컬 빌드 (.open-next/ 생성)
 npm run build:cf
 
-# Wrangler로 로컬 프리뷰 (Edge runtime 모사)
+# 로컬 프리뷰 (wrangler dev로 Worker 시뮬레이션)
 npm run preview:cf
 
-# 수동 배포 (CI 미사용 시)
+# 수동 배포
 npx wrangler login
 npm run deploy:cf
 ```
 
 권장 운영 방식: **GitHub 연동 자동 배포**
-1. Cloudflare 대시보드 → Pages → Create project → Connect to Git
+1. Cloudflare 대시보드 → Workers & Pages → Create → Connect Git
 2. 저장소: `Chung-haiseag/taeanInsight`, Root: `web/`
-3. Framework: Next.js, Build command: `npx @cloudflare/next-on-pages@1`
-4. Output: `.vercel/output/static`, Node: `20`
-5. 환경변수는 Pages → Settings → Environment variables (Secret) 에 등록
+3. Build command: `npx opennextjs-cloudflare build`
+4. Deploy command: `npx wrangler deploy`
+5. Node: `20`
+6. 환경변수는 Worker → Settings → Variables 에서 추가 (Secret으로)
 
 자세한 DNS·SSL 절차: `docs/infrastructure/dns-setup-guide.md`
 
 ### Edge runtime 주의
 
-Cloudflare Pages는 Edge runtime만 지원합니다. 동적 라우트·API 라우트에서는 상단에 다음 명시:
+Cloudflare Workers는 Edge runtime입니다. 동적 라우트·API 라우트에서 필요 시 상단에 명시:
 
 ```ts
 export const runtime = "edge";
 ```
 
-순수 정적 페이지는 명시 불필요.
+순수 정적 페이지는 명시 불필요. OpenNext가 자동 처리.
 
 ## 보안 헤더
 

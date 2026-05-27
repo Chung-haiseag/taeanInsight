@@ -44,30 +44,38 @@
 ```
 Type:   CNAME
 Name:   insight
-Value:  taean-insight.pages.dev.
+Value:  taean-insight.chs9182.workers.dev.
 TTL:    3600  (또는 자동)
 ```
 
-> `taean-insight.pages.dev` 는 Cloudflare Pages 프로젝트 생성 시 부여되는 기본 도메인입니다. 정확한 값은 Cloudflare Pages 대시보드에서 확인 후 알려드리겠습니다.
+> Value 값은 2026-05-27 Cloudflare Workers 첫 배포 완료 후 부여된 실제 도메인입니다. 라이브 확인: https://taean-insight.chs9182.workers.dev
 
 > **Name 필드 입력 주의**: 일부 한국 등록기관은 `insight` 만 입력하고, 일부는 `insight.taeannews.co.kr.` 전체를 입력합니다. 등록기관 UI 안내를 따라주세요.
 
 ---
 
-## Cloudflare Pages 측 작업 (개발팀이 수행)
+## Cloudflare 측 작업 (개발팀이 수행)
 
-1. Cloudflare 계정 생성 (https://dash.cloudflare.com — 무료)
-2. Pages → Create a project → Connect to Git (GitHub: `Chung-haiseag/taeanInsight`)
-3. 빌드 설정:
-   - Framework preset: `Next.js`
-   - Build command: `npx @cloudflare/next-on-pages@1`
-   - Build output directory: `.vercel/output/static`
-   - Root directory: `web/`
-   - Node version: `20`
-4. 환경변수: (이후 백엔드 연동 시 추가)
-5. 첫 빌드·배포 후 자동 부여되는 `<project>.pages.dev` 도메인 확인
-6. Custom domains → `insight.taeannews.co.kr` 추가
-7. Cloudflare가 자동으로 SSL 발급 (Universal SSL)
+**배포 어댑터**: `@opennextjs/cloudflare` (Workers + Static Assets, Vercel CLI 의존성 0).
+
+CLI 배포 (권장 — 첫 배포 안정성):
+```bash
+cd web
+npm install
+npx wrangler login
+npm run deploy:cf
+# 또는: npx opennextjs-cloudflare build && npx wrangler deploy
+```
+
+또는 GitHub 자동 배포:
+1. Cloudflare 대시보드 → Workers & Pages → Create → Connect Git
+2. 저장소: `Chung-haiseag/taeanInsight`, Root: `web/`
+3. Build command: `npx opennextjs-cloudflare build`
+4. Deploy command: `npx wrangler deploy`
+5. Node 20+
+6. 배포 후 자동 부여되는 `<worker>.workers.dev` 도메인 확인
+7. Custom domains → `insight.taeannews.co.kr` 추가 (Workers에서도 Pages처럼 Custom domain 지원)
+8. Cloudflare가 자동으로 SSL 발급 (Universal SSL)
 
 ---
 

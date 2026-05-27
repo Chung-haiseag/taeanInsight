@@ -25,7 +25,7 @@
 ▣ DNS 레코드 추가
     Type:   CNAME
     Name:   insight
-    Value:  taean-insight.pages.dev.
+    Value:  taean-insight.chs9182.workers.dev.
     TTL:    3600 (또는 자동)
 
   * Value 값(`taean-insight.pages.dev`)은 Cloudflare Pages 프로젝트
@@ -99,7 +99,7 @@
 
   Type: CNAME
   Name: insight
-  Value: taean-insight.pages.dev.
+  Value: taean-insight.chs9182.workers.dev.
 
 기존 taeannews.co.kr 사이트에는 영향 없습니다.
 완료되면 알려주세요. 감사합니다!
@@ -114,7 +114,7 @@ DNS 설정 완료했습니다.
 
 - 도메인: insight.taeannews.co.kr
 - 적용 시각: YYYY-MM-DD HH:MM
-- 레코드: CNAME → taean-insight.pages.dev.
+- 레코드: CNAME → taean-insight.chs9182.workers.dev.
 
 dig 확인 결과:
 [dig insight.taeannews.co.kr +short 결과 붙여넣기]

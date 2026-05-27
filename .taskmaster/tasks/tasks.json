@@ -397,12 +397,12 @@
       {
         "id": "8",
         "title": "Domain, DNS, and HTTPS Setup",
-        "description": "Register and configure insight.taeannews.co.kr with DNS and TLS 1.3 using Cloudflare Pages. Currently preparing the Cloudflare environment and waiting on external DNS/SSL setup via custom domain registration.",
+        "description": "Register and configure insight.taeannews.co.kr with DNS and TLS 1.3 using Cloudflare. Cloudflare Workers deployment is complete (taean-insight.chs9182.workers.dev). Currently waiting on external DNS/SSL setup via custom domain registration.",
         "status": "in-progress",
         "dependencies": [],
         "priority": "medium",
-        "details": "Deployment platform has been finalized as Cloudflare Pages (v1.6 decision). Code-side artifacts in docs/infrastructure/ need updates to remove Vercel options and prioritize Cloudflare. The Next.js application requires @cloudflare/next-on-pages, wrangler, and specific configuration files (wrangler.toml, .dev.vars.example). Next steps involve creating the Cloudflare Pages project, generating a .pages.dev preview domain, sending the updated email template to the domain administrator, and awaiting DNS propagation and auto-SSL provisioning before running the verification script.",
-        "testStrategy": "Verify Cloudflare Pages build succeeds with Edge runtime. Execute `docs/infrastructure/dns-verification.sh` to automatically verify DNS records, global propagation, HTTPS configuration, SSL validity, HTTP to HTTPS redirection, and security headers. Ensure A/SSL grades on SSL Labs target A+.",
+        "details": "Deployment platform has been finalized as Cloudflare Workers. The initial deployment is complete, and the worker domain `taean-insight.chs9182.workers.dev` has been assigned. Code-side artifacts in `docs/infrastructure/` (`dns-setup-guide.md`, `email-to-domain-admin.md`) have been successfully updated with the new CNAME target. Next steps involve sending the updated email template to the domain administrator, awaiting DNS CNAME addition, registering the custom domain (`insight.taeannews.co.kr`) in the Cloudflare dashboard, waiting 5-15 minutes for auto-SSL provisioning, and finally executing the verification script.",
+        "testStrategy": "Execute `docs/infrastructure/dns-verification.sh` to automatically verify DNS records, global propagation, HTTPS configuration, SSL validity, HTTP to HTTPS redirection, and security headers. Ensure A/SSL grades on SSL Labs target A+.",
         "subtasks": [
           {
             "id": 1,
@@ -415,34 +415,34 @@
           },
           {
             "id": 2,
-            "title": "Update Next.js Config and Infrastructure Docs for Cloudflare Pages",
-            "description": "Refactor infrastructure documents and Next.js configuration exclusively for Cloudflare Pages deployment to replace initial Vercel setup.",
+            "title": "Deploy to Cloudflare Workers and Update Infrastructure Docs",
+            "description": "Deploy application to Cloudflare and update documentation to reflect the new Worker domain.",
             "dependencies": [
               1
             ],
-            "details": "Rewrite `dns-setup-guide.md` and `email-to-domain-admin.md` to remove Vercel templates and focus on Cloudflare Pages (CNAME `taean-insight.pages.dev`). In `web/package.json`, add `@cloudflare/next-on-pages`, `wrangler`, `workers-types` and scripts (`build:cf`, `preview:cf`, `deploy:cf`). Create `web/wrangler.toml` (with compatibility_date, flags, env vars) and `web/.dev.vars.example`. Update `.gitignore` to include `.vercel`, `.wrangler`, and `.dev.vars`. Add CF Pages deployment and Edge runtime instructions to `web/README.md`.",
-            "status": "pending",
-            "testStrategy": "Run `npm run build:cf` locally to ensure the Next.js app compiles successfully for the Cloudflare Pages Edge runtime. Verify all mentioned documentation and config files exist."
+            "details": "Cloudflare Workers deployment completed, assigning the domain `taean-insight.chs9182.workers.dev`. Successfully updated `docs/infrastructure/dns-setup-guide.md` and updated the CNAME value in `email-to-domain-admin.md` to point to the new worker domain.",
+            "status": "done",
+            "testStrategy": "Verify the worker domain is accessible online and confirm the CNAME target is updated in the documentation files."
           },
           {
             "id": 3,
-            "title": "Create Cloudflare Pages Project and Notify Admin",
-            "description": "Initialize the Cloudflare Pages project and send the setup request to the domain administrator.",
+            "title": "Notify Domain Administrator for CNAME Configuration",
+            "description": "Send the setup request to the domain administrator using the updated email template.",
             "dependencies": [
               2
             ],
-            "details": "Create a new Pages project in the Cloudflare dashboard and link it to the GitHub repository. Trigger the first build to generate the `.pages.dev` domain. Send the updated email template from `email-to-domain-admin.md` to the taeannews.co.kr domain administrator, substituting the placeholder with the actual `.pages.dev` domain to request the CNAME DNS record.",
+            "details": "Send the updated email template from `email-to-domain-admin.md` to the taeannews.co.kr domain administrator. The email will request the addition of a CNAME record for `insight.taeannews.co.kr` pointing to the destination `taean-insight.chs9182.workers.dev.`.",
             "status": "pending",
-            "testStrategy": "Verify the Cloudflare Pages project successfully builds and is accessible via the `.pages.dev` domain. Confirm with the domain administrator that the email has been received."
+            "testStrategy": "Confirm with the domain administrator that the email has been received and the CNAME record has been added to their DNS settings."
           },
           {
             "id": 4,
-            "title": "Verify Custom Domain, DNS Propagation, and SSL Configuration",
-            "description": "Register the custom domain in Cloudflare and run the verification script.",
+            "title": "Register Custom Domain and Verify DNS/SSL Configuration",
+            "description": "Register the custom domain in the Cloudflare dashboard, wait for SSL issuance, and run the verification script.",
             "dependencies": [
               3
             ],
-            "details": "After the domain administrator configures the CNAME record, register the custom domain (`insight.taeannews.co.kr`) in the Cloudflare Pages project. Wait for DNS propagation and automatic SSL provisioning. Execute `docs/infrastructure/dns-verification.sh` to check DNS records, global propagation, HTTP to HTTPS redirection, SSL certificate validity, and security headers. Once the script passes all 6 stages successfully, mark the parent task as done.",
+            "details": "After the domain administrator configures the CNAME record, register the custom domain (`insight.taeannews.co.kr`) in the Cloudflare dashboard. Wait 5-15 minutes for DNS propagation and automatic SSL provisioning. Execute `docs/infrastructure/dns-verification.sh` to check DNS records, global propagation, HTTP to HTTPS redirection, SSL certificate validity, and security headers. Once the script passes all 6 stages successfully, mark the parent task as done.",
             "status": "pending",
             "testStrategy": "Run `docs/infrastructure/dns-verification.sh`. All checks must output success. Additionally verify SSL configuration using SSL Labs to ensure an A+ grade."
           }
@@ -1087,19 +1087,9 @@
         "status": "in-progress",
         "dependencies": [],
         "priority": "high",
-        "details": "Bootstrapped Next.js 14 App Router, Tailwind CSS, security headers (HSTS, nosniff, Referrer-Policy), and an accessibility provider (3-tier font size, high-contrast, reduced motion, skip links). Added AI label component for REQ-GOV-001. Next steps: implement generic shadcn/ui components (Buttons, Inputs, Cards, Dialogs) and ensure semantic HTML across the 5 core placeholder pages.",
-        "testStrategy": "Run axe-core automated accessibility tests. Perform manual VoiceOver/NVDA screen reader testing and keyboard-only navigation on all core components.",
+        "details": "Bootstrapped Next.js 14 App Router, Tailwind CSS, security headers, and an accessibility provider. Added AI label component for REQ-GOV-001. Successfully built and deployed to Cloudflare Workers using the OpenNext adapter (@opennextjs/cloudflare), bypassing Vercel CLI requirements. The 5 core placeholder pages (/ /reports /query /dashboard /citizen) are currently live at https://taean-insight.chs9182.workers.dev. Next steps: map the custom domain (insight.taeannews.co.kr), implement generic shadcn/ui components (Buttons, Inputs, Cards, Dialogs), transition placeholders to actual page implementations, and prepare for backend API integration (#21).",
+        "testStrategy": "Run axe-core automated accessibility tests. Perform manual VoiceOver/NVDA screen reader testing and keyboard-only navigation on all core components. Verify custom domain resolution and ensure OpenNext adapter edge compatibility functions without regressions.",
         "subtasks": [
-          {
-            "id": 1,
-            "title": "Bootstrap Next.js 14, Tailwind Config & Security Headers",
-            "description": "Initialize Next.js 14 with App Router, configure Tailwind CSS, set up security headers, and create core components.",
-            "dependencies": [],
-            "details": "Completed Next.js bootstrap in web/ directory (package.json, tsconfig, next.config, tailwind.config, postcss.config). Added strict security headers (HSTS, nosniff, Referrer-Policy). Created src/app layout with globals.css and 5 placeholder pages (Home, Report, Query, Dashboard, Citizen Journalist). Implemented src/components including site-header, footer, and ai-label-badge for REQ-GOV-001.",
-            "status": "completed",
-            "testStrategy": "Run local dev server to ensure successful compilation. Verify HTTP headers for security compliance and check that the AI label badge renders correctly on pages.",
-            "parentId": "undefined"
-          },
           {
             "id": 2,
             "title": "Implement Generic shadcn/ui Components",
@@ -1109,7 +1099,39 @@
             ],
             "details": "Implement generic UI elements: Buttons, Inputs, Cards, and Dialogs via shadcn. Ensure these components respond properly to the implemented high-contrast mode from the accessibility-provider, guaranteeing all text-to-background contrast ratios strictly exceed 4.5:1 (or 3:1 for large text).",
             "status": "pending",
-            "testStrategy": "Use Chrome DevTools and axe-core to measure contrast ratios in both standard and high-contrast modes across all generic components.",
+            "testStrategy": "Use Chrome DevTools and axe-core to measure contrast ratios in both standard and high-contrast modes across all generic components."
+          },
+          {
+            "id": 4,
+            "title": "Implement Semantic Layout and Keyboard Navigation Audits",
+            "description": "Ensure the 5 placeholder pages are fully traversable via keyboard and strictly adhere to semantic HTML standards.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Verify that the implemented skip links and focus-visible utilities work seamlessly across the 5 newly created pages (Home, Report, Query, Dashboard, Citizen Journalist). Review page layouts to ensure proper usage of <nav>, <main>, <aside>, and <header> tags, adding explicit role attributes where standard semantics fall short.",
+            "status": "pending",
+            "testStrategy": "Perform keyboard-only navigation across the 5 core pages. Verify there are no keyboard traps, all interactive elements are reachable, and run automated axe-core a11y tests."
+          },
+          {
+            "id": 5,
+            "title": "Map Custom Domain and Verify OpenNext Deployment",
+            "description": "Configure insight.taeannews.co.kr custom domain and prepare frontend to integrate with backend API (#21).",
+            "dependencies": [
+              1
+            ],
+            "details": "Following the successful deployment to Cloudflare Workers via @opennextjs/cloudflare (replacing @cloudflare/next-on-pages to bypass internal Vercel CLI calls), map the insight.taeannews.co.kr domain to the worker. Ensure the 5 live routes resolve correctly on the custom domain, maintaining the observed ~24ms startup times, and prepare the project structure for actual page implementation and backend API integration.",
+            "status": "pending",
+            "testStrategy": "Access insight.taeannews.co.kr and verify all 5 core routes (/ /reports /query /dashboard /citizen) load correctly over HTTPS and function seamlessly on Cloudflare's edge environment."
+          },
+          {
+            "id": 1,
+            "title": "Bootstrap Next.js 14, Tailwind Config & Security Headers",
+            "description": "Initialize Next.js 14 with App Router, configure Tailwind CSS, set up security headers, and create core components.",
+            "dependencies": [],
+            "details": "Completed Next.js bootstrap in web/ directory (package.json, tsconfig, next.config, tailwind.config, postcss.config). Added strict security headers (HSTS, nosniff, Referrer-Policy). Created src/app layout with globals.css and 5 placeholder pages (Home, Report, Query, Dashboard, Citizen Journalist). Implemented src/components including site-header, footer, and ai-label-badge for REQ-GOV-001.",
+            "status": "completed",
+            "testStrategy": "Run local dev server to ensure successful compilation. Verify HTTP headers for security compliance and check that the AI label badge renders correctly on pages.",
             "parentId": "undefined"
           },
           {
@@ -1123,24 +1145,8 @@
             "status": "completed",
             "testStrategy": "Perform manual testing using VoiceOver/NVDA to confirm the ARIA state changes are audibly announced when the font size or contrast is dynamically adjusted.",
             "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement Semantic Layout and Keyboard Navigation Audits",
-            "description": "Ensure the 5 placeholder pages are fully traversable via keyboard and strictly adhere to semantic HTML standards.",
-            "dependencies": [
-              2,
-              3
-            ],
-            "details": "Verify that the implemented skip links and focus-visible utilities work seamlessly across the 5 newly created pages (Home, Report, Query, Dashboard, Citizen Journalist). Review page layouts to ensure proper usage of <nav>, <main>, <aside>, and <header> tags, adding explicit role attributes where standard semantics fall short.",
-            "status": "pending",
-            "testStrategy": "Perform keyboard-only navigation across the 5 core pages. Verify there are no keyboard traps, all interactive elements are reachable, and run automated axe-core a11y tests.",
-            "parentId": "undefined"
           }
-        ],
-        "complexity": 7,
-        "recommendedSubtasks": 4,
-        "expansionPrompt": "Specify the required generic components and the ARIA implementations for the 3-tier font size toggles."
+        ]
       },
       {
         "id": 21,

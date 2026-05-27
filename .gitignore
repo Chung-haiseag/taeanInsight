@@ -29,10 +29,13 @@ node_modules/
 out/
 next-env.d.ts
 
-# Cloudflare Pages / Wrangler
-.vercel/
+# Cloudflare Workers / OpenNext / Wrangler
+.open-next/
 .wrangler/
 .dev.vars
+
+# (legacy) Vercel build output from next-on-pages — 더 이상 사용 안 함
+.vercel/
 
 # Python
 __pycache__/
