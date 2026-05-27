@@ -1,0 +1,333 @@
+{
+	"meta": {
+		"generatedAt": "2026-05-26T11:51:33.375Z",
+		"tasksAnalyzed": 40,
+		"totalTasks": 40,
+		"analysisCount": 40,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Setup GPU Infrastructure & Cloud Fallback",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down the local environment setup steps and detail the AWS Terraform fallback resources.",
+			"reasoning": "Procuring and setting up local hardware is straightforward, but configuring CUDA/Docker securely and writing an AWS Terraform fallback script adds DevOps complexity."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "LLM Benchmark & Selection",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Detail the deployment configuration for Solar and Llama models and the benchmark script requirements.",
+			"reasoning": "Requires setting up evaluation harnesses, managing multiple model weights, and accurately measuring inference speed against accuracy trade-offs."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Apply 4-bit Quantization (GPTQ/AWQ)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Provide steps for running AutoAWQ on a 14B model and verifying VRAM usage.",
+			"reasoning": "Quantization requires ML engineering knowledge to balance memory compression with accuracy degradation, especially for non-English contexts."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Build Korean Custom Evaluation Dataset",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Create subtasks for sourcing local tourism/weather data and structuring the JSONL QA pairs.",
+			"reasoning": "Mostly a manual data curation task. Complexity lies in ensuring absolute factual accuracy and proper edge-case coverage for hallucinations."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Caching Key Normalization PoC",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Detail the Python string normalization logic and context wrapper structure for cache keys.",
+			"reasoning": "Requires robust NLP text normalization (stripping stop words, handling Korean spacing) to prevent false-positive cache hits."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Cost Simulation Model Setup",
+			"complexityScore": 4,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Define the input variables and the simulation logic for the Monte-carlo test.",
+			"reasoning": "A localized script or spreadsheet task requiring basic statistical modeling, with low technical risk."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Citizen Reporter DB Schema & Application Form",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "List the necessary DB fields for roles and demographic data, and outline the submission API.",
+			"reasoning": "Standard CRUD application logic with basic schema design and form validation."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Domain, DNS, and HTTPS Setup",
+			"complexityScore": 3,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Outline the specific DNS records needed and the Certbot auto-renewal cron setup.",
+			"reasoning": "Standard IT/DevOps task with well-documented procedures (Certbot, DNS management)."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Initialize Backend API Framework",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Detail the directory structure for a modular monolith and the boilerplate configurations for FastAPI/NestJS.",
+			"reasoning": "Foundational setup that sets the tone for the project. Requires configuring auth, CORS, logging, and Swagger correctly from day one."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Taeannews 20-year Archive Scraper & OCR",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Define the crawler scheduler, OCR tool selection, and text normalization heuristics.",
+			"reasoning": "High complexity due to legacy HTML structures, handling OCR for old images, rate limiting, and cleaning boilerplates from dirty data."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Public API Ingestion Pipeline",
+			"complexityScore": 7,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down the integration steps for each public API and define the unified internal data schema.",
+			"reasoning": "Requires handling multiple disparate external formats (XML/JSON), dealing with unreliable government APIs, and mapping to a unified schema."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Setup PGVector & Text Embedding Pipeline",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Detail the text chunking strategy and the SQL commands for setting up PGVector with HNSW indexes.",
+			"reasoning": "Involves selecting optimal chunking strategies, generating high-dimensional embeddings efficiently, and tuning Postgres HNSW indices for <200ms retrieval."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Lite Knowledge Graph Extraction",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Specify the NER model to be used for Korean entities and outline the Graph node/edge definitions.",
+			"reasoning": "Building an accurate NER pipeline for a highly specific local domain and structuring it into a queryable graph is technically demanding."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Containerize vLLM/TGI Inference Server",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Provide the docker-compose YAML structure with GPU passthrough and vLLM startup arguments.",
+			"reasoning": "Requires specific Docker-NVIDIA runtime knowledge, optimizing continuous batching, and handling memory limits to prevent OOM errors."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Develop LangGraph Lite Router Agent",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Detail the nodes and edges of the LangGraph router and the zero-shot classification prompt.",
+			"reasoning": "Designing a deterministic routing layer that correctly classifies diverse Korean natural language inputs under strict latency constraints (<100ms)."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Develop Prediction & Generation Expert Agents",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Outline the system prompts for both agents and how they query the Vector DB and Knowledge Graph.",
+			"reasoning": "Complex RAG implementation requiring tight orchestration between semantic search, graph traversal, and heavily optimized prompt engineering."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "Redis Caching Layer Implementation",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Define the Redis connection pooling and the decorator/middleware logic for semantic cache retrieval.",
+			"reasoning": "Standard caching implementation, though requires careful integration with the normalized keys from the PoC."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Daily Pre-generation Batch Job",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Detail the cron schedule logic and how it interfaces with the LangGraph agents and Redis.",
+			"reasoning": "Requires robust background job scheduling, error handling for long-running inferences, and ensuring no overlap with peak hours."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Cost Monitoring & Circuit Breaker",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Define the cost_events schema and the middleware logic that intercepts requests based on budget limits.",
+			"reasoning": "Needs highly reliable middleware to track multi-faceted costs (tokens, external APIs) and safely block traffic without breaking the user experience."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Next.js Frontend & Accessibility System",
+			"complexityScore": 7,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Specify the required generic components and the ARIA implementations for the 3-tier font size toggles.",
+			"reasoning": "Requires strict adherence to WCAG 2.1 AA standards, custom high-contrast modes, and seamless Server-Side Rendering setup."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "OAuth2 SSO & Toss Payments Integration",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down the auth bridging logic with the legacy CMS and the payment state machine.",
+			"reasoning": "Integrating cross-domain SSO and managing a robust payment state machine (webhooks, retries, cancellations) is inherently complex and high-risk."
+		},
+		{
+			"taskId": 22,
+			"taskTitle": "Weekly Insight Report Pipeline",
+			"complexityScore": 7,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Detail the HTML-to-PDF tool to be used and the cron-based notification triggers.",
+			"reasoning": "Combining automated LLM generation, complex HTML-to-PDF rendering, and tiered access control middleware into a reliable chron job."
+		},
+		{
+			"taskId": 23,
+			"taskTitle": "AI Query Agent UI",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Outline the state management for the chat interface and how server-sent events (SSE) will be handled.",
+			"reasoning": "Requires robust UI state management for streaming responses, rendering complex markdown/tables, and displaying source citations dynamically."
+		},
+		{
+			"taskId": 24,
+			"taskTitle": "B2B Basic Dashboard UI & Charts",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Specify the Recharts/ECharts configuration for the core metrics and the data fetching hooks.",
+			"reasoning": "Involves integrating charting libraries, managing complex client-side filter states, and ensuring responsive design for dense data."
+		},
+		{
+			"taskId": 25,
+			"taskTitle": "Citizen Co-Pilot Web Editor",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Detail how TipTap extensions will be used for AI suggestions and diff tracking.",
+			"reasoning": "Building custom rich-text editor extensions (ProseMirror/TipTap) to handle inline AI diffs and side-by-side editing is front-end intensive."
+		},
+		{
+			"taskId": 26,
+			"taskTitle": "Human-In-The-Loop (HITL) Workflow",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Define the approval states (draft, pending, approved, rejected) and the API authorization rules.",
+			"reasoning": "Requires implementing a strict state machine, role-based access control, and comprehensive audit logging."
+		},
+		{
+			"taskId": 27,
+			"taskTitle": "AI Ethics & Governance Middleware",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Specify the regex patterns for Korean PII and the classification rules for sensitive topics.",
+			"reasoning": "Needs highly accurate text parsing to mask PII without breaking context, alongside intent classification to block non-compliant prompts."
+		},
+		{
+			"taskId": 28,
+			"taskTitle": "Citizen Reporter LMS Module",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Outline the database schema for user progress and the UI components for video/document viewing.",
+			"reasoning": "A lightweight integration of content delivery and progress tracking; structurally similar to basic CRUD but requires gating logic."
+		},
+		{
+			"taskId": 29,
+			"taskTitle": "Contributor Settlement Dashboard",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Define the SQL aggregation queries required to calculate monthly payouts per user.",
+			"reasoning": "Requires accurate SQL aggregations and reporting interfaces, but relies on standard admin dashboard patterns."
+		},
+		{
+			"taskId": 30,
+			"taskTitle": "Internal Alpha Testing & Bug Fixes",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "List the core critical paths (SSO, Chat, Payment) that require automated Playwright scripts.",
+			"reasoning": "Standard QA process requiring coordination, defining E2E test scripts, and squashing bugs before external exposure."
+		},
+		{
+			"taskId": 31,
+			"taskTitle": "External Beta Platform Setup",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Outline the database schema for invite codes and the configuration for the staging environment.",
+			"reasoning": "Involves managing parallel staging environments, invite mechanics, and telemetry/feedback widget integration."
+		},
+		{
+			"taskId": 32,
+			"taskTitle": "Citizen Reporter Pilot Execution",
+			"complexityScore": 4,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Define the metrics to be tracked during the pilot and the structure for qualitative interviews.",
+			"reasoning": "Primarily a project management and UX research task rather than heavy software engineering."
+		},
+		{
+			"taskId": 33,
+			"taskTitle": "B2B Pre-sales & CRM Integration",
+			"complexityScore": 4,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Detail the API webhooks required to sync Next.js auth states with Airtable for trial tracking.",
+			"reasoning": "Low complexity API integration connecting backend auth states with a third-party CRM or spreadsheet."
+		},
+		{
+			"taskId": 34,
+			"taskTitle": "Beta Feedback Integration & Refactoring",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Specify how regression testing will be handled when updating LangGraph prompts.",
+			"reasoning": "Requires surgical refactoring of core logic (prompts, cache TTLs) based on unpredictable user data, risking regressions."
+		},
+		{
+			"taskId": 35,
+			"taskTitle": "Performance & Load Testing",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Provide the K6 script requirements for simulating 200 concurrent users against cached and uncached endpoints.",
+			"reasoning": "Requires building accurate load simulation scripts, analyzing bottlenecks, and tuning Node.js/Postgres/Redis parameters."
+		},
+		{
+			"taskId": 36,
+			"taskTitle": "Security & Accessibility Audits",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "List the specific SAST tools to be used and the manual accessibility checklist.",
+			"reasoning": "Rigorous compliance checks requiring specialized tools (OWASP scanners, screen readers) and remedying found vulnerabilities."
+		},
+		{
+			"taskId": 37,
+			"taskTitle": "Launch Cross-Promotion on Legacy Site",
+			"complexityScore": 5,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Detail the JavaScript snippet to be injected into the legacy CMS and how it shares auth state.",
+			"reasoning": "Requires safely modifying a legacy CMS (NDSoft) without breaking existing functionality, and ensuring cross-domain cookies work."
+		},
+		{
+			"taskId": 38,
+			"taskTitle": "Analytics & KPI Tracking Setup",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "List the specific GA4 custom events and parameters needed for measuring conversions and AI usage.",
+			"reasoning": "Standard event tracking integration, ensuring accurate telemetry without performance hits or double counting."
+		},
+		{
+			"taskId": 39,
+			"taskTitle": "Final Release Checks & Production Deployment",
+			"complexityScore": 7,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Create a step-by-step production runbook including the zero-downtime database migration process.",
+			"reasoning": "High risk execution involving zero-downtime migrations, live DNS propagation, and monitoring critical infrastructure."
+		},
+		{
+			"taskId": 40,
+			"taskTitle": "Documentation & 2027 Roadmap Handoff",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Outline the required sections for the architecture document and the standard operating procedures.",
+			"reasoning": "Requires clear technical writing and synthesizing project learnings into a forward-looking roadmap."
+		}
+	]
+}

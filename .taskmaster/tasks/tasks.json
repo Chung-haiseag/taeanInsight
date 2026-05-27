@@ -1,0 +1,1980 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Hybrid LLM API Endpoints",
+        "description": "Configure Hybrid external LLM API setup using Anthropic Claude Batch API for offline jobs and Together AI Solar Mini for real-time queries. Note: The ~4,000,000 KRW saved from local GPU hardware is reallocated.",
+        "details": "Procure API keys for Anthropic and Together AI. Set up environment variables and securely integrate their respective Python SDKs into the backend. The hybrid approach mitigates downtime and scales without local hardware constraints.",
+        "testStrategy": "Verify API accessibility via simple curl commands or SDK test scripts. Run dummy payloads to ensure proper authentication and network stability.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Procure API Keys and Setup Billing",
+            "description": "Create accounts for Anthropic and Together AI, configure billing, and generate secure API keys.",
+            "dependencies": [],
+            "details": "Register for the Anthropic and Together AI platforms. Set up billing alerts. Note the 4,000,000 KRW hardware budget savings for reallocation. Securely store generated API keys in a secrets manager.",
+            "status": "pending",
+            "testStrategy": "Verify API keys authenticate successfully via simple curl commands to the respective provider's health or model-list endpoints."
+          },
+          {
+            "id": 2,
+            "title": "Configure Environment Variables and Secrets",
+            "description": "Set up environment variables for the new LLM SDK integrations to secure credentials.",
+            "dependencies": [
+              1
+            ],
+            "details": "Update the local, staging, and production `.env` templates to include `ANTHROPIC_API_KEY` and `TOGETHER_API_KEY`. Ensure CI/CD pipelines have access to these secrets.",
+            "status": "pending",
+            "testStrategy": "Check that the backend configuration loader successfully reads the new API keys and validates their existence on startup."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Anthropic and Together AI SDKs",
+            "description": "Install the official Python SDKs and build basic connection clients.",
+            "dependencies": [
+              2
+            ],
+            "details": "Install the `anthropic` and `together` Python packages. Build a basic connection script to verify connectivity to the Claude Batch API and Solar Mini endpoints.",
+            "status": "pending",
+            "testStrategy": "Run a test script utilizing both SDKs to verify standard text generation responses and confirm no library conflicts."
+          },
+          {
+            "id": 4,
+            "title": "Implement Fallback and Retry Logic",
+            "description": "Create robust error handling for network timeouts and external API rate limits.",
+            "dependencies": [
+              3
+            ],
+            "details": "Use a library like `tenacity` to implement exponential backoff logic for 429 Rate Limit and 5xx network errors from the external providers to ensure high availability.",
+            "status": "pending",
+            "testStrategy": "Mock a 429 Rate Limit response and ensure the retry logic backs off appropriately and retries correctly without dropping the request immediately."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "LLM Benchmark & Selection",
+        "description": "Benchmark Together AI Solar Mini, Anthropic Claude Haiku, and Llama-3.1-8B (reference) models for Korean language performance.",
+        "details": "Evaluate external API endpoints. Run benchmarks focusing on Korean contextual understanding, hallucination rates, and API inference speed (target < 8s for 1k tokens). Select the highest-performing model configuration that balances accuracy and token cost.",
+        "testStrategy": "Evaluate using a subset of KMMLU and a 200-question custom evaluation dataset representing local news contexts. Target >= 70% accuracy.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure API Endpoints for Benchmarking",
+            "description": "Setup the benchmark environment to point to Together AI Solar Mini, Anthropic Claude Haiku, and a reference Llama-3.1-8B endpoint.",
+            "dependencies": [],
+            "details": "Initialize client connections to the specific model strings for Solar Mini, Claude Haiku, and Llama-3.1-8B via the configured SDKs. Ensure generation parameters like temperature are identical for a fair comparison.",
+            "status": "pending",
+            "testStrategy": "Send a basic text completion request to each model endpoint to verify successful initialization and model string validity."
+          },
+          {
+            "id": 2,
+            "title": "Develop Korean Evaluation Benchmark Script",
+            "description": "Create an automated script to test the APIs against KMMLU and the custom 200-question dataset.",
+            "dependencies": [
+              1
+            ],
+            "details": "Write a Python script integrating with the evaluation harness. It must load a subset of KMMLU and the local news QA dataset, query the API endpoints concurrently, and measure time-to-first-token, tokens-per-second, and total latency.",
+            "status": "pending",
+            "testStrategy": "Run a dry-run test with 5 samples to ensure the script properly calculates accuracy, tracks hallucination rates, and logs API latency metrics."
+          },
+          {
+            "id": 3,
+            "title": "Execute Benchmarks and Compare Cost vs Accuracy",
+            "description": "Run the full evaluation pipeline and analyze the trade-offs between API performance, accuracy, and token costs.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Execute the benchmark script across all APIs. Compile results into a matrix comparing Korean contextual understanding (target >70%), hallucination frequency, latency (target <8s), and the explicit token cost per 1K tokens for each provider.",
+            "status": "pending",
+            "testStrategy": "Review the benchmark matrix report to ensure all constraints are met and definitively identify the optimal API configuration."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "API Performance & Cost Benchmarking",
+        "description": "Benchmark token usage, response times, and cost efficiency for the selected external APIs.",
+        "details": "Since external APIs eliminate the need for VRAM quantization, focus on optimizing prompt length, batching overhead, and calculating token consumption costs. Ensure response times meet the <8s constraint and token costs align with the projected budget.",
+        "testStrategy": "Run simulated queries through both Anthropic Batch and Together AI endpoints. Measure latency percentiles and calculate average cost per query.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Profile Token Usage and Prompt Optimization",
+            "description": "Analyze average input/output token counts and optimize prompt structures.",
+            "dependencies": [],
+            "details": "Profile the token consumption for typical RAG and summarization prompts. Optimize prompt structures to minimize input token spend while strictly retaining necessary context for accurate completions.",
+            "status": "pending",
+            "testStrategy": "Verify that optimized prompts produce identical semantic accuracy as raw prompts, while reducing token counts by at least 15%."
+          },
+          {
+            "id": 2,
+            "title": "Measure API Response Latency (P95)",
+            "description": "Write a load testing script to measure the time-to-first-token and total completion time for the real-time API.",
+            "dependencies": [
+              1
+            ],
+            "details": "Send concurrent requests to the Together AI Solar Mini API. Capture latency metrics specifically focusing on the 95th percentile (P95) to ensure it consistently hits the <8s target under expected query loads.",
+            "status": "pending",
+            "testStrategy": "Review the load test output report. Assert that P95 latency stays strictly below the 8-second ceiling during max-length context generation."
+          },
+          {
+            "id": 3,
+            "title": "Evaluate Batch vs Real-time Cost Delta",
+            "description": "Compare the discounted Anthropic Claude Batch API costs against the real-time Together AI costs.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Execute a sample dataset of 200 queries through both the Anthropic Batch API (leveraging the 50% discount) and the Together AI real-time API. Calculate the explicit financial delta to validate the cost model assumptions.",
+            "status": "pending",
+            "testStrategy": "Verify the financial calculations against official API pricing sheets to guarantee the hybrid approach remains within the 300,000 KRW monthly limit."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Build Korean Custom Evaluation Dataset",
+        "description": "Create a 500-question evaluation dataset covering Taean tourism, environment, real estate, and general domains (125 questions each).",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "details": "Extract domain-specific facts, historical weather data, and real estate stats for Taean, and incorporate samples from KMMLU and KoBEST. The budget was reallocated (+1,000,000 KRW from PRD v1.3) to expand the scale to 500 questions. The dataset will serve as the ground truth to evaluate LLM accuracy, hallucination rate, and source relevance. CI integration is required to run automated regression on every PR.",
+        "testStrategy": "Manually review the 500 QA pairs to ensure 100% factual accuracy. Format as a JSONL dataset for the automated CI test scripts to evaluate regressions accurately.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Source Taean Domain Data, KMMLU, and KoBEST",
+            "description": "Collect factual information for the Taean domains and source relevant general domain questions from existing Korean benchmarks.",
+            "dependencies": [],
+            "details": "Gather reliable data from local government portals for tourism, environment, and real estate. Additionally, sample relevant general domain data from existing KMMLU and KoBEST datasets to reach the expanded 500-question scale requirement.",
+            "status": "pending",
+            "testStrategy": "Cross-reference collected data points with official government records and validate benchmark samples to ensure absolute factual accuracy."
+          },
+          {
+            "id": 2,
+            "title": "Formulate 500 Question-Answer Pairs",
+            "description": "Draft 500 QA pairs balanced evenly across tourism, environment, real estate, and general domains (125 each).",
+            "dependencies": [
+              1
+            ],
+            "details": "Create diverse questions with exactly 125 items per domain. Mix custom-authored Taean facts with the borrowed KMMLU/KoBEST questions. Ensure QA pairs are tailored to measure the defined metrics: accuracy, hallucination rate, and source relevance.",
+            "status": "pending",
+            "testStrategy": "Manually review all 500 QA pairs to guarantee 100% factual accuracy and ensure they adequately challenge the specific evaluation metrics."
+          },
+          {
+            "id": 3,
+            "title": "Format Evaluation Dataset as JSONL",
+            "description": "Structure the reviewed 500 QA pairs into a JSONL format for ingestion by automated test scripts.",
+            "dependencies": [
+              2
+            ],
+            "details": "Compile the verified 500 QA pairs into a structured JSONL file. Ensure the schema aligns with the automated benchmarking framework and supports the required evaluation metrics (accuracy, hallucination, source relevance).",
+            "status": "pending",
+            "testStrategy": "Run a JSONL linter to validate file syntax and execute a dry-run ingestion test to confirm compatibility with the evaluation script."
+          },
+          {
+            "id": 4,
+            "title": "Integrate Automated Regression Testing in CI",
+            "description": "Configure the CI/CD pipeline to automatically execute the evaluation dataset on every Pull Request.",
+            "dependencies": [
+              3
+            ],
+            "details": "Set up a CI workflow (e.g., GitHub Actions) that runs the evaluation script using the 500-question JSONL dataset on every PR. The pipeline must output clear reports on accuracy, hallucination rate, and source relevance to block regressions.",
+            "status": "pending",
+            "testStrategy": "Create a test PR to trigger the CI workflow and verify that the evaluation script successfully runs, fails appropriately on regressions, and outputs the expected metric reports."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Caching Key Normalization PoC",
+        "description": "Develop a proof of concept for normalizing natural language queries to maximize cache hit rates.",
+        "details": "Implement an algorithm to strip stop words, normalize spacing/casing, and hash the intent (using sha256). Define context wrappers (`ctx.domain`, `ctx.date`) to ensure accurate cache retrieval for semantically identical questions.",
+        "testStrategy": "Input 50 variations of the same question (e.g., 'weather in Anmyeondo', 'Anmyeondo weather next week') and verify they resolve to the same cache key with zero false positives.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement String Normalization & Stop Word Filter",
+            "description": "Develop Python logic to clean natural language queries by removing stop words and normalizing whitespace and casing.",
+            "dependencies": [],
+            "details": "Create a Python module to process raw queries. Implement regex to normalize casing and fix Korean spacing issues. Utilize a predefined stop-word dictionary to strip unnecessary tokens that do not alter the core intent of the query.",
+            "status": "pending",
+            "testStrategy": "Unit test with 20 poorly formatted query strings (mixed casing, extra spaces, stop words) to ensure they normalize to identical base strings."
+          },
+          {
+            "id": 2,
+            "title": "Define Context Wrappers for Cache Accuracy",
+            "description": "Implement the context wrapper structure to include domain and date parameters for cache precision.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create Pydantic models or Python dataclasses for context variables like ctx.domain and ctx.date. Create a structured composite object that safely combines these variables with the normalized query string.",
+            "status": "pending",
+            "testStrategy": "Validate that identical normalized queries provided with different dates or domains result in distinct context wrapper objects, preventing cross-context false positives."
+          },
+          {
+            "id": 3,
+            "title": "Generate SHA-256 Cache Key",
+            "description": "Hash the combined normalized string and context wrappers using SHA-256 to generate the final cache key.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement a deterministic hashing function using Python's hashlib.sha256. Securely serialize the normalized text and context wrappers (e.g., using JSON serialization with sorted_keys=True) before generating the hash to guarantee consistent key generation.",
+            "status": "pending",
+            "testStrategy": "Run 50 variations of semantically identical queries through the entire pipeline and assert the generated SHA-256 hashes match exactly, ensuring a zero false-positive rate."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Cost Simulation Model Setup",
+        "description": "Validate the 'under 300,000 KRW/month' operational cost target using simulated traffic.",
+        "details": "Build a spreadsheet or script combining anticipated Anthropic Batch + Together AI token costs, external API costs, and infrastructure costs. Assume 12,000 MAU, a 75% cache hit rate, and max 200 req/sec peak.",
+        "testStrategy": "Run a monte-carlo simulation for varying cache hit rates (50% to 90%) and API queries to verify that the monthly cost stays under the 300,000 KRW threshold.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Cost Variables and Base Equation Model",
+            "description": "Identify and script all input variables including Anthropic Batch rates, Together AI token rates, and external infrastructure costs.",
+            "dependencies": [],
+            "details": "Create a Python script or Google Sheet mapping out the base costs. Assume 12,000 MAU, peak 200 req/sec. Include fixed infrastructure costs and variable token costs based on vendor pricing.",
+            "status": "pending",
+            "testStrategy": "Review the baseline model formula against standard pricing sheets for accuracy."
+          },
+          {
+            "id": 2,
+            "title": "Implement and Execute Monte-Carlo Simulation",
+            "description": "Develop the simulation logic to vary cache hit rates and request volumes, testing the 300,000 KRW threshold.",
+            "dependencies": [
+              1
+            ],
+            "details": "Write the Monte-Carlo simulation logic in Python using NumPy. Randomize the cache hit rate between 50 percent and 90 percent and fluctuate the daily queries. Run 10000 iterations to find the probability of exceeding the 300,000 KRW per month limit.",
+            "status": "pending",
+            "testStrategy": "Validate the simulation code by running edge cases and ensuring output matches expected manual calculations based on hybrid API usage."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Citizen Reporter DB Schema & Application Form",
+        "description": "Design the database schema and implement an application form for recruiting 12 citizen reporters.",
+        "details": "Create `users` table roles (`citizen_reporter`) and `citizen_articles` tables. Implement a secure web form for application submissions including region (eup/myeon) and demographic data for balanced selection.",
+        "testStrategy": "Submit mock applications, test database constraint violations, and verify secure storage of user data.",
+        "priority": "low",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design Database Schema for Users, Roles, and Articles",
+            "description": "Create the physical database schema reflecting the required roles, demographic properties, and application data structures.",
+            "dependencies": [],
+            "details": "Define the `users` table including a `role` column supporting `citizen_reporter`. Create an `applications` table capturing demographic fields (age, gender) and region specifics (eup/myeon). Set up the initial `citizen_articles` table schema with foreign keys.",
+            "status": "pending",
+            "testStrategy": "Execute database migrations on a test DB and verify table creation, foreign key constraints, and enum enforcements."
+          },
+          {
+            "id": 2,
+            "title": "Implement Application Submission API Endpoint",
+            "description": "Develop a secure backend REST API to process incoming citizen reporter applications.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a POST endpoint (e.g., `/api/applications`) that parses and validates submitted application data. Ensure demographic data and regional parameters meet defined criteria. Implement sanitization to prevent SQL injection and secure data storage.",
+            "status": "pending",
+            "testStrategy": "Send automated test requests using tools like Postman or Jest with both valid and maliciously crafted payloads. Verify successful insertions and appropriate 4xx error codes."
+          },
+          {
+            "id": 3,
+            "title": "Develop Frontend Application Web Form",
+            "description": "Design and build the user-facing secure web form for recruiting citizen reporters.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement a web form UI containing structured inputs for region selection (dropdowns for eup/myeon), demographic details, and applicant motivation. Wire the form to the backend submission API with client-side validation and success/error feedback loops.",
+            "status": "pending",
+            "testStrategy": "Run end-to-end tests using Cypress/Playwright to fill out the form with mock applications, submit them, and verify the UI correctly displays a success confirmation."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Domain, DNS, and HTTPS Setup",
+        "description": "Register and configure insight.taeannews.co.kr with DNS and TLS 1.3.",
+        "details": "Configure A/CNAME records pointing to the hosting server. Provision Let's Encrypt SSL/TLS certificates with auto-renewal via Certbot or equivalent.",
+        "testStrategy": "Verify A/SSL grades on SSL Labs (target A+). Ensure HTTP traffic redirects to HTTPS automatically.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure DNS Records for insight.taeannews.co.kr",
+            "description": "Set up the necessary A and CNAME DNS records to point the insight subdomain to the hosting server public IP address.",
+            "dependencies": [],
+            "details": "Log into the domain registrar or DNS management console for taeannews.co.kr. Create an A record for the insight subdomain pointing to the production server IPv4 address. Verify TTL settings are appropriately configured for DNS propagation.",
+            "status": "pending",
+            "testStrategy": "Use dig or nslookup to verify that insight.taeannews.co.kr correctly resolves to the expected IP address from multiple geographic locations."
+          },
+          {
+            "id": 2,
+            "title": "Provision TLS 1.3 Certificate and Certbot Cron Job",
+            "description": "Install Let Encrypt SSL/TLS certificates for the domain and configure a cron job for automatic renewal.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install Certbot on the hosting server. Generate the certificate for insight.taeannews.co.kr enforcing TLS 1.3. Add a cron job to check and renew the certificate automatically before expiration. Ensure web server redirects HTTP to HTTPS.",
+            "status": "pending",
+            "testStrategy": "Run a dry-run renewal command to ensure the cron job will succeed. Verify SSL configuration using SSL Labs to ensure an A+ grade."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Initialize Backend API Framework",
+        "description": "Setup FastAPI or NestJS project with basic routing, JWT/OAuth2 boilerplate, and OpenAPI (Swagger) documentation.",
+        "details": "Setup project structure following modular monolith architecture. Add CORS, basic security headers, structured JSON logging, and setup Swagger for API contract generation.",
+        "testStrategy": "Ensure `/docs` route loads Swagger UI. Check that a simple `/health` endpoint returns 200 OK within 50ms.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Modular Monolith Scaffolding",
+            "description": "Initialize the base project using the chosen framework (FastAPI or NestJS) and set up the modular monolith directory structure.",
+            "dependencies": [],
+            "details": "Create standard folders including 'src/modules', 'src/core', and 'src/shared'. Define application entry points, dependency injection (if applicable), and configuration modules to support a scalable modular monolith architecture.",
+            "status": "pending",
+            "testStrategy": "Verify the project compiles and runs successfully, and ensure the directory structure adheres to the defined modular monolith pattern."
+          },
+          {
+            "id": 2,
+            "title": "Configure Core Middleware and Security",
+            "description": "Set up cross-origin resource sharing (CORS), basic security headers, and structured JSON logging for the application.",
+            "dependencies": [
+              1
+            ],
+            "details": "Integrate CORS middleware to allow specific trusted origins. Add standard security headers (e.g., via Helmet or equivalent middleware) and implement a structured JSON logger for standardizing API request and error logs.",
+            "status": "pending",
+            "testStrategy": "Send mock HTTP requests to verify correct CORS headers and security headers in the response. Check stdout/stderr to ensure log outputs are formatted as valid JSON."
+          },
+          {
+            "id": 3,
+            "title": "Implement JWT and OAuth2 Boilerplate",
+            "description": "Set up the authentication middleware and JWT validation boilerplate to support upcoming SSO integration.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create authentication guards or middlewares that parse and validate JWTs. Set up boilerplate OAuth2 endpoints and token verification logic to prepare for the taeannews.co.kr Single Sign-On integration.",
+            "status": "pending",
+            "testStrategy": "Test protected endpoints using both valid and invalid JWTs to ensure appropriate 401 Unauthorized or 200 OK responses are returned by the application."
+          },
+          {
+            "id": 4,
+            "title": "Setup OpenAPI Documentation and Base Routes",
+            "description": "Configure Swagger UI for automated API contract generation and add a basic health check endpoint.",
+            "dependencies": [
+              1
+            ],
+            "details": "Initialize OpenAPI/Swagger UI and expose it at the '/docs' route. Implement a base '/health' endpoint that responds with a basic status object to easily verify API uptime and routing functionality.",
+            "status": "pending",
+            "testStrategy": "Ensure the '/docs' route loads the Swagger UI successfully. Check that a simple GET request to the '/health' endpoint returns a 200 OK status code within 50ms."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Taeannews 20-year Archive Scraper & OCR",
+        "description": "Crawl, OCR, and clean 20 years of historical local news articles from the existing CMS.",
+        "details": "Develop a scheduled crawler to fetch article texts, publish dates, and metadata. Utilize OCR for older image-based archives. Clean the text, remove boilerplates, and store it in the `documents` table.",
+        "testStrategy": "Run extraction on 100 sample articles and compare extracted text with visual representations. Verify metadata accuracy.",
+        "priority": "high",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Develop scheduled web crawler for article retrieval",
+            "description": "Build a robust web crawler to systematically fetch HTML articles, metadata, and publication dates from the existing Taeannews CMS.",
+            "dependencies": [],
+            "details": "Implement crawler using Scrapy or BeautifulSoup. Define rate-limiting (e.g., 1 req/sec) to avoid DDOSing the legacy CMS. Build a scheduler (e.g., Celery or Cron) to manage incremental crawls and historical backfilling.",
+            "status": "pending",
+            "testStrategy": "Run crawler on a limited subset (e.g., 50 URLs). Verify fetching speed, error handling, and that rate limits are strictly respected."
+          },
+          {
+            "id": 2,
+            "title": "Implement OCR for legacy image-based news articles",
+            "description": "Integrate an OCR engine to extract readable Korean text from scanned images or image-only legacy archives.",
+            "dependencies": [
+              1
+            ],
+            "details": "Evaluate and integrate Tesseract OCR or EasyOCR optimized for Korean text. Create a pipeline step that triggers when an article is detected as image-only. Handle image pre-processing (contrast, deskewing) to improve OCR accuracy.",
+            "status": "pending",
+            "testStrategy": "Provide 20 sample image-only articles. Compare OCR extracted text against manual transcripts to ensure >90 percent character accuracy."
+          },
+          {
+            "id": 3,
+            "title": "Develop text cleaning and boilerplate removal heuristics",
+            "description": "Create robust cleaning algorithms to strip out navigation elements, footers, ads, and HTML artifacts from the crawled text.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement heuristics (e.g., regex patterns, DOM tree analysis) to remove recurring boilerplates. Normalize text encoding to UTF-8 and handle common typo corrections or legacy font mappings if applicable.",
+            "status": "pending",
+            "testStrategy": "Run text cleaning on 100 raw crawled HTML files. Inspect output manually to ensure clean, readable text bodies without headers/footers."
+          },
+          {
+            "id": 4,
+            "title": "Store cleaned articles and metadata in documents table",
+            "description": "Save the fully processed text, publish dates, and associated metadata into the PostgreSQL documents table.",
+            "dependencies": [
+              3
+            ],
+            "details": "Define the database schema for the documents table (id, source_url, publish_date, title, body_text, author). Implement a robust batch insertion script via psycopg2 or SQLAlchemy with upsert logic to handle duplicates.",
+            "status": "pending",
+            "testStrategy": "Query the PostgreSQL database after a trial run to verify data types, integrity, and absence of duplicate entries for the same article URLs."
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Public API Ingestion Pipeline",
+        "description": "Develop ETL jobs to fetch and normalize data from TourAPI, KMA (Weather), MOF (Ocean), and KOSIS.",
+        "details": "Implement daily chron jobs to ingest public data. Map disparate JSON/XML schemas to a unified standard. Add fallback logic to use the last known good data if the external API is down.",
+        "testStrategy": "Mock external API failures and verify the system seamlessly falls back to cached data. Ensure data transformations correctly handle edge cases (e.g., null values).",
+        "priority": "high",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Unified Internal Data Schema",
+            "description": "Design a unified JSON schema to standardize output from disparate external APIs (TourAPI, KMA, MOF, KOSIS).",
+            "dependencies": [],
+            "details": "Create data models using Pydantic or similar libraries to map different XML/JSON structures into a single format. Ensure it handles null values appropriately.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to validate sample payloads from all four APIs against the unified schema."
+          },
+          {
+            "id": 2,
+            "title": "Implement TourAPI and KOSIS Data Fetchers",
+            "description": "Develop ETL modules to fetch tourism data from TourAPI and statistical data from KOSIS.",
+            "dependencies": [
+              1
+            ],
+            "details": "Write Python modules to call TourAPI and KOSIS REST endpoints. Parse XML/JSON responses and transform them into the unified schema defined in Subtask 1.",
+            "status": "pending",
+            "testStrategy": "Mock API responses and assert that the output exactly matches the expected unified schema."
+          },
+          {
+            "id": 3,
+            "title": "Implement KMA and MOF Data Fetchers",
+            "description": "Develop ETL modules to fetch weather data from KMA and ocean data from MOF.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create integration scripts for KMA (Weather) and MOF (Ocean). Handle complex XML parsing where necessary and normalize dates and geographical coordinates.",
+            "status": "pending",
+            "testStrategy": "Verify successful XML parsing and coordinate mapping using static XML mocks of KMA and MOF data."
+          },
+          {
+            "id": 4,
+            "title": "Implement Fallback Logic and Daily Cron Orchestration",
+            "description": "Set up daily cron jobs for the ETL pipelines and implement caching fallback logic for API failures.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Configure Airflow or standard cron to trigger jobs daily. Add try/except logic to load the last known good data from the database if the external API returns an error or times out.",
+            "status": "pending",
+            "testStrategy": "Simulate external API timeouts and 500 errors to verify the system seamlessly falls back to cached data without pipeline failure."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Setup PGVector & Text Embedding Pipeline",
+        "description": "Implement BGE-M3-Korean embedding model and index data in Postgres with PGVector.",
+        "details": "Chunk the extracted documents (Taeannews + Public API). Generate 1024-d vectors using the chosen embedding model. Create HNSW indexes on `document_embeddings` table to ensure < 200ms top-k retrieval.",
+        "testStrategy": "Run top-k=8 vector searches against test queries. Assert that results return under 200ms and exhibit strong semantic relevance to the query.",
+        "priority": "high",
+        "dependencies": [
+          10,
+          11
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Document Chunking Strategy",
+            "description": "Develop the text chunking logic for Taeannews articles and Public API documents.",
+            "dependencies": [],
+            "details": "Implement a recursive character text splitter optimized for Korean language semantics. Target a chunk size of 500-800 tokens with a 10-15% overlap to preserve context across boundaries. Apply custom preprocessing to clean HTML/XML tags from the raw Taeannews and API data before chunking.",
+            "status": "pending",
+            "testStrategy": "Run the chunker on sample Taeannews articles and API payloads. Assert that all chunks fall within the target token size limits and verify that overlaps contain the correct bridging text."
+          },
+          {
+            "id": 2,
+            "title": "Integrate BGE-M3-Korean Embedding Pipeline",
+            "description": "Set up the embedding generation pipeline using the BGE-M3-Korean model.",
+            "dependencies": [
+              1
+            ],
+            "details": "Initialize the BGE-M3-Korean embedding model within the data pipeline. Configure batch processing to map the text chunks generated in the previous step into 1024-dimensional dense vectors. Ensure proper error handling and batch sizing to optimize memory usage during inference.",
+            "status": "pending",
+            "testStrategy": "Pass a standardized set of test chunks through the model. Assert that the output vectors are exactly 1024 dimensions, contain no nulls, and process a batch of 100 chunks without memory overflow."
+          },
+          {
+            "id": 3,
+            "title": "Configure PGVector and HNSW Indexes",
+            "description": "Set up PGVector extension and create optimized HNSW indexes for fast retrieval.",
+            "dependencies": [
+              2
+            ],
+            "details": "Enable the PGVector extension in PostgreSQL. Create the `document_embeddings` table with a `vector(1024)` column. Execute the SQL command: `CREATE INDEX ON document_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);` to ensure the targeted < 200ms top-k retrieval performance.",
+            "status": "pending",
+            "testStrategy": "Insert 10,000 mock embeddings. Execute top-k=8 vector similarity searches using cosine distance. Measure query execution time to ensure it strictly stays under 200ms."
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Lite Knowledge Graph Extraction",
+        "description": "Extract entities (Places, People, Events) and relationships into a Lite Knowledge Graph.",
+        "details": "Use NLP NER (Named Entity Recognition) to identify key entities within the Taean domain. Load these nodes and edges into Neo4j or NetworkX to supplement RAG with relational context.",
+        "testStrategy": "Query the graph for adjacent entities (e.g., 'What events happen at Anmyeondo?'). Verify graph traversal speeds and entity accuracy.",
+        "priority": "medium",
+        "dependencies": [
+          10,
+          11
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Knowledge Graph Schema and Ontology",
+            "description": "Define the specific node and edge types for the Lite Knowledge Graph tailored to the Taean domain.",
+            "dependencies": [],
+            "details": "Create detailed definitions for Node types (e.g., 'Place', 'Person', 'Event', 'Organization') and Edge types (e.g., 'LOCATED_IN', 'PARTICIPATED_IN', 'OCCURRED_AT'). Document properties for each node type to ensure consistency during extraction.",
+            "status": "pending",
+            "testStrategy": "Peer review the schema document against a sample of 20 Taean news articles to ensure full coverage of required entities and relationship mappings."
+          },
+          {
+            "id": 2,
+            "title": "Select and Configure Korean NER Model",
+            "description": "Evaluate and configure a Named Entity Recognition model optimized for the Korean language.",
+            "dependencies": [
+              1
+            ],
+            "details": "Evaluate and deploy models such as KoBERT-NER, Pororo, or fine-tuned local LLMs (e.g., Solar-10.7B) for Korean entity recognition. Benchmark their performance specifically for the Taean local domain and set up the inference pipeline for the chosen model.",
+            "status": "pending",
+            "testStrategy": "Run the NER model on a benchmark dataset of 50 local news articles. Validate entity precision, recall, and F1 score, targeting > 85% accuracy."
+          },
+          {
+            "id": 3,
+            "title": "Implement Entity and Relationship Extraction Pipeline",
+            "description": "Build the data processing pipeline to extract structured triples from unstructured news text.",
+            "dependencies": [
+              2
+            ],
+            "details": "Develop a Python pipeline that ingests cleaned text, applies the selected Korean NER model, performs necessary co-reference resolution, and formats the output into structured Subject-Predicate-Object JSON triples matching the defined ontology.",
+            "status": "pending",
+            "testStrategy": "Unit test the extraction pipeline with complex edge cases (e.g., nested sentences, implicit relationships) and validate the resulting JSON triples against the schema."
+          },
+          {
+            "id": 4,
+            "title": "Graph Database Integration and RAG Query Layer",
+            "description": "Load extracted nodes and edges into the graph database and implement query endpoints.",
+            "dependencies": [
+              3
+            ],
+            "details": "Set up a local Neo4j instance or configure NetworkX for lightweight in-memory usage. Write batch ingestion scripts to load the extracted JSON triples. Implement a query layer using Cypher or Python to retrieve relational context for the RAG system.",
+            "status": "pending",
+            "testStrategy": "Query the graph for adjacent entities (e.g., 'What events happen at Anmyeondo?'). Verify graph traversal speeds are under 100ms and check entity relational accuracy."
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Develop Hybrid Router: LLM Client Abstraction Layer",
+        "description": "Build a client abstraction layer to route offline/batch tasks to Anthropic Batch API and real-time interactions to Together AI Solar Mini.",
+        "details": "Implement a routing manager in Python/FastAPI. Send pre-generation or asynchronous batch queries to Anthropic Claude Batch API to leverage the 50% discount. Route synchronous user queries directly to Together AI for low-latency responses.",
+        "testStrategy": "Send a mix of batch and real-time requests. Verify that batch requests are correctly queued via Anthropic and real-time requests return immediately via Together AI without errors.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define LLM Client Interfaces",
+            "description": "Create abstract base classes for the LLM client to standardize inputs across different providers.",
+            "dependencies": [],
+            "details": "Design Python abstract base classes and typed dictionaries to standardize prompt inputs, generation parameters, and text outputs regardless of whether Anthropic or Together AI is underlying the request.",
+            "status": "pending",
+            "testStrategy": "Write unit tests validating that the schema enforces correct typing for payloads matching both provider specifications."
+          },
+          {
+            "id": 2,
+            "title": "Implement Real-time Router for Together AI",
+            "description": "Build the concrete implementation for Together AI's Solar Mini endpoint.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the adapter using Together AI's Python SDK. Optimize for streaming (SSE) and immediate text generation specifically targeted for chat interfaces and fast user interactions.",
+            "status": "pending",
+            "testStrategy": "Verify streaming text outputs using curl or automated scripts, ensuring sub-second time-to-first-token responses from Together AI."
+          },
+          {
+            "id": 3,
+            "title": "Implement Asynchronous Batch Router for Anthropic",
+            "description": "Build the integration for Anthropic's Claude Batch API for off-peak jobs.",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop the adapter for Anthropic Claude's Message Batch API. Handle creating `.jsonl` payloads, uploading files, polling for batch completion, and downloading/parsing the resulting outputs.",
+            "status": "pending",
+            "testStrategy": "Submit a dummy batch of 10 requests, poll for completion, and assert that the retrieved JSONL file contains the expected generation outputs."
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Develop LangGraph Lite Router Agent",
+        "description": "Implement a lightweight intent router to classify user queries and forward them to specialized agents.",
+        "details": "Construct a LangGraph pipeline. The Router classifies queries into 'prediction', 'generation', 'factcheck', or 'other'. It enforces cache checks before invoking LLMs. Target classification accuracy >= 85%.",
+        "testStrategy": "Test the router with a 50-query dataset. Validate that intent routing matches expected outcomes in > 85% of cases and routing overhead is < 100ms.",
+        "priority": "high",
+        "dependencies": [
+          14,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design LangGraph Nodes and Routing Edges",
+            "description": "Define the node architecture and conditional edges for the LangGraph router pipeline to handle intent classification.",
+            "dependencies": [],
+            "details": "Implement the graph structure with an entry node for the user query, a cache-check node, a classification node, and conditional edges routing to 'prediction', 'generation', 'factcheck', and 'other'. Ensure lightweight state management.",
+            "status": "pending",
+            "testStrategy": "Unit test graph compilation and verify the graph schema contains all expected nodes and valid transitions."
+          },
+          {
+            "id": 2,
+            "title": "Implement Pre-routing Cache Checks",
+            "description": "Develop the logic to intercept and check user queries against the cache before invoking the LLM classification step.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a fast cache lookup node utilizing Redis or an exact match mechanism. If a cache hit occurs, route the graph execution directly to the return node, bypassing the LLM intent classifier to save resources.",
+            "status": "pending",
+            "testStrategy": "Measure cache hit/miss latency to ensure lookup overhead is under 50ms and that LLM invocation is verifiably bypassed on cache hits."
+          },
+          {
+            "id": 3,
+            "title": "Develop Zero-shot Classification Prompt",
+            "description": "Engineer a fast, zero-shot LLM prompt for classifying Korean natural language inputs into the four target categories.",
+            "dependencies": [
+              1
+            ],
+            "details": "Write and optimize a strict zero-shot prompt instructing the selected LLM to classify Korean inputs strictly into 'prediction', 'generation', 'factcheck', or 'other'. Tune the prompt to maximize accuracy while minimizing input/output tokens to help achieve the <100ms constraint.",
+            "status": "pending",
+            "testStrategy": "Evaluate prompt performance against the 50-query dataset. Assert that routing matches expected intent in >85% of cases and classification overhead stays under 100ms."
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Develop Prediction & Generation Expert Agents",
+        "description": "Implement the core RAG-based AI agents for answering queries and generating content.",
+        "details": "Prediction Agent focuses on tourism/environment forecasting using PGVector & KG context. Generation Agent handles summarization, rewriting, and title generation for citizen reporters. Enforce prompt engineering to minimize token usage (avg <= 2 LLM calls per query).",
+        "testStrategy": "Run domain-specific prompts. Verify response factual accuracy, formatting, and that the `ai_assisted` label metadata is consistently applied.",
+        "priority": "high",
+        "dependencies": [
+          14,
+          12,
+          13,
+          15
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design System Prompts & Core Agent Architecture",
+            "description": "Define the base classes and highly optimized system prompts for both the Prediction and Generation agents to ensure minimal token usage.",
+            "dependencies": [],
+            "details": "Create specialized prompt templates for both agents. The Prediction prompt must emphasize structured data analysis from RAG. The Generation prompt must focus on summarization and rewriting. Architect the classes to ensure average LLM calls remain <= 2 per query.",
+            "status": "pending",
+            "testStrategy": "Unit test prompt templates with mock RAG data to verify token count, prompt structure, and expected output formatting."
+          },
+          {
+            "id": 2,
+            "title": "Implement Prediction Agent RAG & KG Integration",
+            "description": "Develop the logic for the Prediction Agent to query PGVector and the Knowledge Graph for tourism and environmental data.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement hybrid search (vector similarity + graph traversal) to fetch relevant historical and forecasting data. Parse and format the context concisely to maximize information density before feeding it to the LLM.",
+            "status": "pending",
+            "testStrategy": "Mock PGVector and KG responses. Ensure the agent correctly formulates queries, retrieves relevant context, and processes it without exceeding context limits."
+          },
+          {
+            "id": 3,
+            "title": "Build Generation Agent Capabilities",
+            "description": "Implement the summarization, rewriting, and title generation functionalities for the Generation Agent.",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up the text processing pipelines for citizen reporter drafts. Implement strict output parsing to ensure responses are correctly formatted (e.g., extracting purely the title or summary). Apply the `ai_assisted` metadata label to all outputs.",
+            "status": "pending",
+            "testStrategy": "Test with 20 sample reporter drafts to verify summarization accuracy, title relevance, rewriting quality, and the reliable application of the `ai_assisted` label."
+          },
+          {
+            "id": 4,
+            "title": "Integrate Agents with Router and Optimize Token Usage",
+            "description": "Connect both agents to the LangGraph router and optimize execution to strictly enforce the token limits.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Wire the Prediction and Generation agents to the LangGraph Router (from Task 15). Implement telemetry to track LLM calls per query, handle fallbacks, and tune context windows to guarantee an average of <= 2 LLM calls per user query.",
+            "status": "pending",
+            "testStrategy": "Run end-to-end domain-specific prompts through the router. Monitor LLM call counts to assert the average is <= 2 calls per query and validate overall factual accuracy."
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Redis Caching Layer Implementation",
+        "description": "Implement semantic query caching with Redis to hit the 75% cache hit rate target.",
+        "details": "Integrate Redis to store LLM responses using the normalized keys from Task 5. Implement TTL policies (e.g., Weekly reports: 7 days, General QA: 24h, Market Data: 6h).",
+        "testStrategy": "Send a query, verify LLM is called (miss). Send the identical or semantically identical query again, verify it returns from Redis under 1 second (hit).",
+        "priority": "high",
+        "dependencies": [
+          5,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure Redis Connection Pooling",
+            "description": "Set up the initial Redis client configuration and robust connection pool to handle concurrent cache requests efficiently.",
+            "dependencies": [],
+            "details": "Initialize a scalable Redis connection pool using environment variables for host, port, and credentials. Ensure the client handles reconnects, timeouts, and max connection limits gracefully.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify the Redis connection pool initializes correctly and recovers from simulated connection drops."
+          },
+          {
+            "id": 2,
+            "title": "Create Caching Middleware using Normalized Keys",
+            "description": "Develop a middleware or decorator that intercepts LLM requests and checks Redis using the normalized semantic keys.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the interception logic. The middleware must utilize the hashing and string normalization logic developed in Task 5 to compute the cache key, check Redis, and return the cached LLM response if available.",
+            "status": "pending",
+            "testStrategy": "Send a mock query and verify a cache miss. Manually populate the cache with the normalized key, resend the query, and verify it returns the cached response in under 1 second."
+          },
+          {
+            "id": 3,
+            "title": "Implement Dynamic TTL Policies",
+            "description": "Apply specific Time-To-Live (TTL) values in Redis based on the query domain or category to optimize memory usage.",
+            "dependencies": [
+              2
+            ],
+            "details": "Extend the caching middleware to identify the query category and set dynamic expirations: 7 days for Weekly reports, 24 hours for General QA, and 6 hours for Market Data.",
+            "status": "pending",
+            "testStrategy": "Mock responses for each supported category and assert that the underlying Redis SET command receives the correctly calculated TTL value for each."
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Daily Pre-generation Batch Job",
+        "description": "Build a cron job to pre-generate answers for the top 200 daily popular queries during off-peak hours.",
+        "details": "Implement a Temporal or Cron based scheduler that runs daily at 02:00 AM. It fetches the most searched intents, passes them to the LangGraph agents, and populates the Redis cache directly.",
+        "testStrategy": "Trigger the cron manually. Verify that 200 responses are generated and stored in Redis. Assert that subsequent API calls for these queries result in cache hits without utilizing expensive real-time API calls.",
+        "priority": "medium",
+        "dependencies": [
+          16,
+          17
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Cron Scheduler and Top Query Fetcher",
+            "description": "Set up a Temporal or Cron scheduler to trigger at 02:00 AM daily and fetch the top 200 most popular queries from the analytics database.",
+            "dependencies": [],
+            "details": "Configure a Temporal cron workflow with schedule 0 2 * * * to initiate the batch job. Implement a repository method to aggregate search logs from the previous 24 hours and extract the top 200 unique intents.",
+            "status": "pending",
+            "testStrategy": "Trigger the workflow manually and verify it retrieves exactly 200 queries from a mocked analytics database."
+          },
+          {
+            "id": 2,
+            "title": "Integrate LangGraph Agents for Batch Inference",
+            "description": "Process the retrieved 200 queries through the LangGraph agents using the Anthropic Batch API.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement an asynchronous batch processor that takes the 200 intents, sends them to the LangGraph execution chain, and routes them via the Anthropic Batch API to leverage 50% discount savings. Ensure proper rate limit monitoring.",
+            "status": "pending",
+            "testStrategy": "Feed 5 mock queries to the processor and verify that all 5 return well-formed generated answers without hitting API rate limits."
+          },
+          {
+            "id": 3,
+            "title": "Populate Redis Cache with Generated Responses",
+            "description": "Write the pre-generated responses from the LangGraph agents directly into the Redis cache.",
+            "dependencies": [
+              2
+            ],
+            "details": "Map the generated answers to the corresponding cache keys used by the main API. Use bulk Redis operations like pipelining to store the data with appropriate TTL values. Ensure atomic updates to avoid partial cache states.",
+            "status": "pending",
+            "testStrategy": "Run the full pipeline with a mock intent, then make an API call to the retrieval endpoint to ensure it results in a cache hit."
+          }
+        ]
+      },
+      {
+        "id": 19,
+        "title": "Cost Monitoring & Circuit Breaker",
+        "description": "Implement middleware to track AI API usage costs and enforce circuit breakers.",
+        "details": "Track token usage, external API calls, and batch processing costs in the `cost_events` table. Build middleware that shuts off non-essential LLM generation if costs reach 100% of the 300,000 KRW budget. Send Slack alerts at 70%, 90%, and 100%.",
+        "testStrategy": "Mock high cost metrics in the DB. Verify Slack webhook alerts fire correctly and that the API rejects non-cached queries with a graceful fallback message when at 100% budget.",
+        "priority": "high",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and implement cost_events schema and logging service",
+            "description": "Create the database schema for the cost_events table and build a service to asynchronously log tokens and API calls.",
+            "dependencies": [],
+            "details": "Create a migration for the `cost_events` table with fields: id, resource_type (enum: token, external_api, batch_api), cost_amount_krw, description, and created_at. Implement a reusable logging service to insert events without blocking the main request cycle.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to insert mock events for each resource type and verify that total cost queries aggregate the KRW amounts correctly over a given time period."
+          },
+          {
+            "id": 2,
+            "title": "Implement budget calculation and Slack alert webhooks",
+            "description": "Develop a service that calculates current budget utilization and sends Slack alerts at predefined threshold levels.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a function to calculate the sum of `cost_amount_krw` for the current billing cycle against the 300,000 KRW limit. Integrate a Slack webhook to send warning messages at 70%, 90%, and 100% utilization. Store alert states (e.g., in Redis or the DB) to prevent duplicate notifications.",
+            "status": "pending",
+            "testStrategy": "Mock the aggregated DB cost to simulate crossing the 70%, 90%, and 100% thresholds. Verify that the Slack webhook is triggered exactly once per threshold."
+          },
+          {
+            "id": 3,
+            "title": "Build API circuit breaker middleware",
+            "description": "Implement request interception middleware to shut off non-essential LLM generation when the budget is 100% exhausted.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Develop API middleware that checks the current budget status before forwarding requests to the LLM generation service. If the budget is at 100%, block the request and return a graceful fallback message (e.g., HTTP 429). Ensure that requests hitting the Redis cache bypass this block.",
+            "status": "pending",
+            "testStrategy": "Force the system into a 100% budget exhausted state. Send a new LLM request and assert it fails with the correct fallback message. Send a request for a cached query and assert it succeeds."
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "title": "Next.js Frontend & Accessibility System",
+        "description": "Bootstrap Next.js 14 (App Router) and build a WCAG 2.1 AA compliant UI design system.",
+        "details": "Implement Tailwind CSS and shadcn/ui. Ensure high-contrast modes, 3-tier font size toggles, keyboard navigability, and ARIA attributes for elderly and visually impaired users. Create standard layouts.",
+        "testStrategy": "Run axe-core automated accessibility tests. Perform manual VoiceOver/NVDA screen reader testing and keyboard-only navigation on all core components.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Bootstrap Next.js 14 and Tailwind Base Configuration",
+            "description": "Initialize Next.js 14 with App Router, configure Tailwind CSS, and set up the base shadcn/ui library.",
+            "dependencies": [],
+            "details": "Use create-next-app to bootstrap the frontend. Configure tailwind.config.js for custom theming, including custom color variables. Initialize shadcn/ui to streamline accessible component creation. Define standard page layouts (header, main content area, footer) in the app directory.",
+            "status": "pending",
+            "testStrategy": "Run the local dev server to ensure successful compilation. Verify that Tailwind classes are correctly applied to a dummy component."
+          },
+          {
+            "id": 2,
+            "title": "Implement Generic Components & High-Contrast Mode",
+            "description": "Build foundational shadcn/ui components and integrate a high-contrast toggle for WCAG 2.1 AA compliance.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement generic UI elements: Buttons, Inputs, Cards, and Dialogs via shadcn. Integrate 'next-themes' to support multiple color schemes, specifically creating a dedicated high-contrast mode ensuring all text-to-background contrast ratios strictly exceed 4.5:1 (or 3:1 for large text).",
+            "status": "pending",
+            "testStrategy": "Use Chrome DevTools and axe-core to measure contrast ratios in both standard and high-contrast modes across all generic components."
+          },
+          {
+            "id": 3,
+            "title": "Develop 3-Tier Font Size Toggle with ARIA Attributes",
+            "description": "Implement a global state manager for a 3-tier font size system optimized for elderly users, complete with ARIA implementation.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create a React context or Zustand store managing 'normal', 'large', and 'x-large' states. Dynamically adjust the root HTML rem value. Implement the toggle UI using a radiogroup or button set with aria-label=\"Font size toggle\", aria-pressed mapping to the active state, and aria-controls linking to the main layout ID.",
+            "status": "pending",
+            "testStrategy": "Perform manual testing using VoiceOver/NVDA to confirm the ARIA state changes are audibly announced when the font size is adjusted."
+          },
+          {
+            "id": 4,
+            "title": "Implement Global Keyboard Navigation and Semantic Layout",
+            "description": "Ensure the entire layout is traversable via keyboard and strictly adheres to semantic HTML standards for visual impairment accessibility.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Apply clear visual focus indicators globally using Tailwind's 'focus-visible' utility. Implement a 'Skip to main content' link. Review standard layouts to ensure proper usage of <nav>, <main>, <aside>, and <header> tags, adding explicit role attributes where standard semantics fall short.",
+            "status": "pending",
+            "testStrategy": "Perform keyboard-only navigation across the site. Verify there are no keyboard traps, all interactive elements are reachable, and run automated axe-core a11y tests."
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "OAuth2 SSO & Toss Payments Integration",
+        "description": "Implement Single Sign-On with existing CMS and Toss Payments for subscriptions.",
+        "details": "Implement JWT-based authentication bridging `taeannews.co.kr`. Integrate Toss Payments SDK for processing B2C/B2B subscriptions, storing billing keys, and handling webhooks for renewals securely.",
+        "testStrategy": "Test complete E2E auth flow (login via taeannews, redirect to insight). Test Toss Payments in Sandbox mode for successful billing, failures, and cancellation flows.",
+        "priority": "high",
+        "dependencies": [
+          9,
+          20
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement JWT Auth Bridge for Legacy CMS",
+            "description": "Create a secure cross-domain authentication bridge using JWT between taeannews.co.kr and the new platform.",
+            "dependencies": [],
+            "details": "Set up OAuth2/JWT issuing endpoint on the legacy CMS side and validation middleware on the new service. Handle cookie/token synchronization and session expiration mapping.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for JWT token generation and validation. Test cross-domain redirect flow manually and via automated E2E tests."
+          },
+          {
+            "id": 2,
+            "title": "Integrate Toss Payments SDK",
+            "description": "Embed Toss Payments frontend SDK for B2C and B2B subscription checkouts.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the Toss Payments widget/SDK into the frontend application. Configure billing key generation endpoints for recurring payments securely.",
+            "status": "pending",
+            "testStrategy": "Verify widget rendering and billing key generation using Toss Payments Sandbox credentials."
+          },
+          {
+            "id": 3,
+            "title": "Implement Payment State Machine & Webhooks",
+            "description": "Develop backend state machine to manage subscription states and handle Toss Payments webhooks.",
+            "dependencies": [
+              2
+            ],
+            "details": "Create webhook endpoints to handle Toss payments events (success, failure, renewal, cancellation). Implement a robust state machine (ACTIVE, PAST_DUE, CANCELED) with database transactions and retry logic.",
+            "status": "pending",
+            "testStrategy": "Mock Toss Payments webhook payloads to test state transitions. Verify database integrity and retry logic on simulated payment failures."
+          },
+          {
+            "id": 4,
+            "title": "E2E Auth and Toss Payments Sandbox Testing",
+            "description": "Perform end-to-end testing of the SSO login flow and Toss Payments Sandbox transactions.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Run full integration tests simulating user login via legacy CMS, subscribing to a B2B/B2C plan via Toss Sandbox, and simulating webhook triggers for billing renewals and failures.",
+            "status": "pending",
+            "testStrategy": "Execute Cypress E2E tests simulating the complete user journey from login to successful subscription, auto-renewal, and cancellation flows."
+          }
+        ]
+      },
+      {
+        "id": 22,
+        "title": "Weekly Insight Report Pipeline",
+        "description": "Develop the batch generator and UI for the weekly predictive insight reports.",
+        "details": "Create a batch job running Thursday nights to generate HTML and PDF reports summarizing tourism, weather, and real estate. Restrict PDF downloads to Premium users via API middleware. Include email/push notification pipelines.",
+        "testStrategy": "Verify cron job executes end-to-end to create a complete report. Assert basic users can only see 30% preview, and premium users can download the generated PDF.",
+        "priority": "high",
+        "dependencies": [
+          16,
+          20,
+          21
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Data Aggregation and HTML Template Batch Job",
+            "description": "Develop a scheduled batch job to aggregate weekly insights and generate an HTML report template.",
+            "dependencies": [],
+            "details": "Create a scheduled task using node-cron (e.g., '0 23 * * 4' for Thursday at 11:00 PM) to aggregate tourism, weather, and real estate data. Combine this data using a templating engine like Handlebars to produce a styled HTML report.",
+            "status": "pending",
+            "testStrategy": "Manually trigger the cron job and assert that the output HTML file contains valid, populated data sections for tourism, weather, and real estate."
+          },
+          {
+            "id": 2,
+            "title": "Implement HTML-to-PDF Rendering Tool",
+            "description": "Integrate an HTML-to-PDF tool to convert the weekly generated HTML reports into downloadable PDF documents.",
+            "dependencies": [
+              1
+            ],
+            "details": "Utilize Puppeteer (headless Chrome) as the primary HTML-to-PDF rendering tool to ensure accurate rendering of charts, layout, and CSS. Ensure the generated PDFs are stored in an accessible S3 bucket with secure access URLs.",
+            "status": "pending",
+            "testStrategy": "Execute a unit test passing a complex HTML string to the rendering function, verifying the output is a valid PDF buffer with expected visual fidelity."
+          },
+          {
+            "id": 3,
+            "title": "Develop Tiered Access Control Middleware",
+            "description": "Create API middleware to gate the generated reports based on user subscription levels.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement an API middleware function that verifies user roles. Standard/Basic users should only be served a 30% truncated HTML preview, whereas Premium users are authorized to hit the PDF download endpoints.",
+            "status": "pending",
+            "testStrategy": "Test the API endpoints simulating basic and premium user JWTs. Assert basic users receive a 403 status when accessing the PDF endpoint, while premium users successfully download the file."
+          },
+          {
+            "id": 4,
+            "title": "Cron-based Email and Push Notification Pipeline",
+            "description": "Build the automated notification trigger to alert users once the weekly reports are successfully generated.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement a notification pipeline triggered by the successful completion of the Thursday night batch job. Integrate SendGrid for email delivery and Firebase Cloud Messaging (FCM) for push notifications to inform users that their weekly report is ready.",
+            "status": "pending",
+            "testStrategy": "Mock a successful batch job completion event and verify that the notification broker correctly dispatches formatted email and push notification requests to the external APIs."
+          }
+        ]
+      },
+      {
+        "id": 23,
+        "title": "AI Query Agent UI",
+        "description": "Build the user interface for the natural language query agent.",
+        "details": "Implement a chat-like interface displaying suggested queries. Integrate the backend `/api/v1/query`. Display AI sources, metadata labels (`[AI Assisted]`), and handle graceful degradation when caching fails.",
+        "testStrategy": "Test UI responsiveness. Ensure query submission displays a loading state and correctly parses/renders markdown and sources in the response. Verify rate limiting feedback (5 queries/day for free tier).",
+        "priority": "high",
+        "dependencies": [
+          15,
+          20
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Chat Interface UI & State Management",
+            "description": "Implement the base chat interface layout and robust state management for the conversation history.",
+            "dependencies": [],
+            "details": "Set up React state or a store (e.g., Zustand/Redux) to manage chat history, active query state, and user rate-limiting status. Build the UI shell, the prompt input component, suggested default queries, and visual loading states. Ensure rate limit feedback (5 queries/day for free tier) is integrated into the state logic.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for the state manager to ensure messages are appended correctly. Verify the UI accurately reflects disabled inputs and shows warnings when the mock rate limit is exceeded."
+          },
+          {
+            "id": 2,
+            "title": "SSE Integration & Backend Communication",
+            "description": "Connect the chat interface to the backend API using Server-Sent Events (SSE) for streaming AI responses.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the network layer to communicate with `/api/v1/query` via SSE. Manage the streaming connection, buffer incoming text chunks, and update the active message state in real-time. Add error boundary logic to handle connection timeouts, caching failures, and graceful degradation (e.g., falling back to a standard error message).",
+            "status": "pending",
+            "testStrategy": "Mock an SSE endpoint to simulate streaming text chunks. Test UI responsiveness during the stream and force connection drops to verify fallback error handling and graceful degradation logic."
+          },
+          {
+            "id": 3,
+            "title": "Markdown rendering and Metadata display",
+            "description": "Parse and render complex AI payloads including markdown, data tables, source citations, and metadata labels.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Integrate a robust markdown parser (like react-markdown with remark-gfm) to handle text, lists, and tables. Create a custom component for displaying clickable AI sources/citations appended to the response. Ensure every response correctly renders the `[AI Assisted]` metadata label for transparency.",
+            "status": "pending",
+            "testStrategy": "Render test messages containing complex markdown tables, broken markdown syntax, and multiple citation sources to ensure the UI remains intact and the '[AI Assisted]' badge displays appropriately."
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "title": "B2B Basic Dashboard UI & Charts",
+        "description": "Develop the B2B dashboard for tourism, real estate, and environment metrics using charting libraries.",
+        "details": "Integrate Recharts or Apache ECharts into Next.js. Fetch data from `/api/v1/dashboards/b2b`. Implement region (Eup/Myeon) and time period filters. Build CSV export functionality.",
+        "testStrategy": "Verify charts render correctly across screen sizes (responsive). Test CSV export to ensure data formats correctly. Validate B2B role-based access control (RBAC) blocks unauthorized users.",
+        "priority": "high",
+        "dependencies": [
+          11,
+          20,
+          21
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Data Fetching Hooks and Filter State",
+            "description": "Create custom React hooks to fetch B2B dashboard data and manage region and time filters.",
+            "dependencies": [],
+            "details": "Develop useB2BDashboard data hook to fetch from /api/v1/dashboards/b2b. Implement state management for Eup/Myeon regional filters and time period selections. Ensure the API calls update dynamically when filter state changes.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for the custom hook. Mock the API response and verify that changing filter states triggers a new API request with correct query parameters."
+          },
+          {
+            "id": 2,
+            "title": "Integrate ECharts/Recharts for Core Metrics",
+            "description": "Build responsive chart components for tourism, real estate, and environment metrics.",
+            "dependencies": [
+              1
+            ],
+            "details": "Configure and integrate Recharts or Apache ECharts into the Next.js pages. Create separate chart components for tourism trends, real estate values, and environmental data. Ensure chart responsiveness across devices and apply custom tooltips for dense data display.",
+            "status": "pending",
+            "testStrategy": "Render charts in a test environment. Validate responsiveness across mobile, tablet, and desktop viewports. Ensure tooltips display accurate data mapping and RBAC blocks unauthorized users."
+          },
+          {
+            "id": 3,
+            "title": "Implement CSV Export Functionality",
+            "description": "Build a utility to export the filtered dashboard metrics into a downloadable CSV file.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create a utility function to convert the JSON data fetched from the dashboard API into a CSV format. Add an 'Export to CSV' button on the dashboard UI. Ensure headers are correctly formatted and the exported file reflects the currently applied region and time filters.",
+            "status": "pending",
+            "testStrategy": "Test the CSV export button with mock data. Parse the downloaded CSV file to verify correct column headers, data alignment, and adherence to active filters."
+          }
+        ]
+      },
+      {
+        "id": 25,
+        "title": "Citizen Co-Pilot Web Editor",
+        "description": "Integrate TipTap/ProseMirror to create an AI-assisted text editor for citizen reporters.",
+        "details": "Build a custom rich text editor. Add floating UI buttons for AI actions (Summarize, Polish, Factcheck, Titles). Display AI suggestions in a side-by-side comparative view.",
+        "testStrategy": "Write a mock article, trigger 'Polish' action, and verify the side-by-side diff view renders accurately. Test saving drafts to the database.",
+        "priority": "high",
+        "dependencies": [
+          16,
+          20
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize TipTap Editor and Core Extensions",
+            "description": "Set up the base TipTap editor instance with standard rich text formatting options for citizen reporters.",
+            "dependencies": [],
+            "details": "Install @tiptap/react and @tiptap/starter-kit. Configure basic extensions like Bold, Italic, Underline, and Heading. Ensure the editor component is responsive and integrates cleanly into the citizen reporter portal UI.",
+            "status": "pending",
+            "testStrategy": "Render the editor component in the UI, apply various formatting options to mock text, and verify the HTML output matches expectations."
+          },
+          {
+            "id": 2,
+            "title": "Implement Floating AI Action Menu",
+            "description": "Create a floating UI menu that appears when text is selected, offering AI-assisted actions.",
+            "dependencies": [
+              1
+            ],
+            "details": "Utilize TipTap BubbleMenu extension. Add buttons for Summarize, Polish, Factcheck, and Titles. Wire these buttons to trigger API calls to the backend AI services, passing the selected text as payload.",
+            "status": "pending",
+            "testStrategy": "Highlight text in the editor, verify the BubbleMenu appears, click Polish, and intercept the network request to ensure correct payload is sent."
+          },
+          {
+            "id": 3,
+            "title": "Develop Custom TipTap Extension for Diff Tracking",
+            "description": "Build a custom TipTap extension to handle inline diffing and mark text changes proposed by the AI.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create a ProseMirror plugin or TipTap extension that utilizes text-diff algorithms to wrap added text in a custom addition mark and deleted text in a deletion mark for AI suggestions.",
+            "status": "pending",
+            "testStrategy": "Inject a mock AI response with text modifications, apply the diff extension, and verify that HTML output contains the correct custom spans for additions and deletions."
+          },
+          {
+            "id": 4,
+            "title": "Build Side-by-Side Comparative AI View",
+            "description": "Implement a split-pane interface to compare the original draft with the AI-suggested text and accept or reject changes.",
+            "dependencies": [
+              3
+            ],
+            "details": "Render two TipTap instances side-by-side. The left pane shows the original draft, and the right pane shows the AI response utilizing the diff tracking extension. Add Accept and Reject buttons.",
+            "status": "pending",
+            "testStrategy": "Trigger an AI action, ensure the side-by-side view opens, click Accept, and verify the original editor updates with the polished text."
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "title": "Human-In-The-Loop (HITL) Workflow",
+        "description": "Implement the review/approval workflow for citizen articles before publishing.",
+        "details": "Create an admin/editor dashboard. Enforce DB constraints where `published_at` cannot be set if `hitl_reviewer_id` is null. Guarantee `[AI 보조]` metadata tags persist through the review pipeline.",
+        "testStrategy": "Attempt to bypass the review system via API directly; verify 403 Forbidden. Ensure editors can approve and reject articles and that audit logs record the editor's ID.",
+        "priority": "high",
+        "dependencies": [
+          25,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Database schema and state machine for HITL",
+            "description": "Implement the database schema changes and state machine logic for article approval.",
+            "dependencies": [],
+            "details": "Define ENUM for draft, pending, approved, rejected. Add DB constraints to ensure published_at is only set when hitl_reviewer_id is present. Ensure AI metadata tags are preserved.",
+            "status": "pending",
+            "testStrategy": "Attempt to insert a published article without a reviewer ID and expect a database constraint violation."
+          },
+          {
+            "id": 2,
+            "title": "API endpoints and Role-Based Access Control",
+            "description": "Create the API layer for the review workflow, enforcing strict authorization rules.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement endpoints to transition article states. Add authorization middleware ensuring only admin/editor roles can approve/reject. Ensure audit logs capture the editor ID upon action.",
+            "status": "pending",
+            "testStrategy": "Directly call API endpoints as a regular user to verify 403 Forbidden. Call as an editor to verify successful state transition."
+          },
+          {
+            "id": 3,
+            "title": "Admin and Editor Dashboard Frontend",
+            "description": "Develop the frontend dashboard for editors to manage pending articles.",
+            "dependencies": [
+              2
+            ],
+            "details": "Build a dashboard displaying a list of pending articles. Implement a detailed view where editors can read the content, verify AI assistance tags, and click approve or reject.",
+            "status": "pending",
+            "testStrategy": "Use E2E testing to test the editor UI workflow, ensuring articles can be approved and the UI updates accordingly."
+          }
+        ]
+      },
+      {
+        "id": 27,
+        "title": "AI Ethics & Governance Middleware",
+        "description": "Implement mandatory PII masking, 7-category sensitive topic blocking (keyword + ML dual-verification), and policy-driven source enforcement.",
+        "status": "pending",
+        "dependencies": [
+          15,
+          26
+        ],
+        "priority": "high",
+        "details": "Build regex/NLP-based PII redaction middleware (AES-256 for DB). Integrate a two-tier (keyword matching + ML) classifier to detect 7 sensitive topics. Enforce handling policies via a JSON configuration file: route Elections/Religion to Editor-in-Chief, route Crime/Medical to 2-step fact-checking, and route Political Figures/Real Estate/Minorities to HITL with auto-attached disclaimers.",
+        "testStrategy": "Submit queries containing phone numbers and ID patterns to verify redaction. Submit prompts across all 7 sensitive categories to verify the dual-verification classifier triggers correctly and enforces the specific routing and disclaimer policies defined in the JSON configuration.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Korean PII Masking and DB Encryption",
+            "description": "Develop middleware using regex and NLP to detect and redact Korean PII such as Resident Registration Numbers and phone numbers.",
+            "dependencies": [],
+            "details": "Create validation patterns for Korean RRNs (6 digits - 7 digits) and standard mobile phone numbers. Implement AES-256 encryption for storing the original PII in the DB, ensuring only masked text is passed to the LLM.",
+            "status": "pending",
+            "testStrategy": "Submit test queries containing simulated Korean RRNs and phone numbers to confirm they are redacted before processing."
+          },
+          {
+            "id": 2,
+            "title": "Develop 2-Tier Sensitive Topic Classifier",
+            "description": "Integrate a two-tier detection system (keyword matching + ML classifier) to identify 7 specific sensitive topic categories.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement a dual-verification classifier for 4 basic categories (Elections, Crime, Medical, Religion) and 3 extended categories (Political figures, Real estate speculation advice, Minority issues). Create a JSON configuration file to centrally manage category detection rules and handling policies.",
+            "status": "pending",
+            "testStrategy": "Run a comprehensive test dataset containing examples from all 7 sensitive categories and benign prompts. Verify the two-tier system correctly flags each prompt and outputs the correct category ID based on the JSON config."
+          },
+          {
+            "id": 3,
+            "title": "Implement Category-Specific Policy Routing and Enforcement",
+            "description": "Build the enforcement mechanism that reads the JSON configuration and routes flagged content according to the 3 distinct policy rules.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement routing logic based on classification: (1) Elections/Religion: strictly block AI-only publishing and route to the Editor-in-Chief for direct writing. (2) Crime/Medical: block AI-only publishing and mandate a 2-step fact-checking workflow. (3) Political figures/Real estate/Minorities: require standard HITL review and automatically attach bias, discrimination, and disclaimer clauses to the text.",
+            "status": "pending",
+            "testStrategy": "Simulate API requests triggering each of the 3 policy types. Verify successful bypass of auto-publish, correct queue routing (Editor-in-Chief vs. 2-step fact-check), and automated appending of disclaimers."
+          }
+        ]
+      },
+      {
+        "id": 28,
+        "title": "Citizen Reporter LMS Module",
+        "description": "Develop a lightweight Learning Management System for the 6-session training program.",
+        "details": "Create video embedding, document viewing, and basic quiz functionalities within the citizen reporter portal to track completion of the required curriculum.",
+        "testStrategy": "Verify progress tracking updates correctly as modules are viewed. Ensure article drafting is gated until LMS completion is 100%.",
+        "priority": "medium",
+        "dependencies": [
+          20,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "LMS Database Schema and Progress Tracking",
+            "description": "Design and implement the database tables to store course modules, sessions, and user completion status.",
+            "dependencies": [],
+            "details": "Create tables for LMS_Modules, LMS_Sessions (supporting the 6 sessions), and User_LMS_Progress. Include fields for module completion boolean flags, quiz scores, and timestamps to track state.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify that a user progress record is created upon enrollment and updates correctly when a module is marked as complete."
+          },
+          {
+            "id": 2,
+            "title": "Develop Video and Document Viewer UI Components",
+            "description": "Build the frontend interface for the LMS to display embedded videos and render training documents.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement frontend components for embedding external video links (e.g., YouTube or Vimeo) and a document viewer for reading PDF training materials. Ensure responsive design for both mobile and desktop users.",
+            "status": "pending",
+            "testStrategy": "Manually test video playback and document rendering on both desktop and mobile screen sizes to ensure proper content delivery."
+          },
+          {
+            "id": 3,
+            "title": "Implement Quizzes and Editor Gating Logic",
+            "description": "Create basic quiz forms for each session and enforce the completion gate for the article editor.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Build the UI for basic multiple-choice quizzes at the end of each session. Implement a check in the portal that blocks access to the citizen reporter article editor until all 6 sessions and quizzes report 100 percent completion in the database.",
+            "status": "pending",
+            "testStrategy": "Log in with a mock user having incomplete LMS status and verify access to the editor is blocked. Update status to 100 percent complete and verify access is granted."
+          }
+        ]
+      },
+      {
+        "id": 29,
+        "title": "Contributor Settlement Dashboard",
+        "description": "Build an admin interface and automated system to track citizen reporter publications, calculate payouts, execute transfers, and provide reporter-facing settlement UI.",
+        "status": "pending",
+        "dependencies": [
+          26,
+          20
+        ],
+        "priority": "medium",
+        "details": "Implement automated monthly settlement per PRD v1.4: (1) Cron job to aggregate articles published by the 25th 23:59 each month. (2) Calculate payouts on the last day of the month based on the 50,000-100,000 KRW structure plus excellent bonuses. (3) Integrate Toss Payments Settlement API or a PG transfer API for automated transfers within the first 5 business days of the next month. (4) Create a contributor My Page UI for reporters to view real-time settlement and transfer statuses. Provide an admin export for accounting.",
+        "testStrategy": "Mock 10 published articles before/after the 25th for a user. Verify the cron job only picks up eligible articles. Verify calculation includes bonuses. Mock Toss Payments API responses to ensure transfer status transitions correctly (e.g., pending -> completed) and verify visibility in the contributor My Page UI.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design SQL query for monthly article aggregation",
+            "description": "Write the base SQL query to aggregate published articles per citizen reporter, grouped by month.",
+            "dependencies": [],
+            "details": "Create a query joining the `users` and `citizen_articles` tables, filtering by `status = 'published'`. Use grouping functions like `DATE_TRUNC('month', published_at)` and group by `user_id` to return total article counts per reporter per month.",
+            "status": "pending",
+            "testStrategy": "Execute the query against a staging DB populated with mock articles and verify the monthly counts match expected aggregates."
+          },
+          {
+            "id": 2,
+            "title": "Implement payout calculation logic in SQL",
+            "description": "Extend the base aggregation query to compute the exact payout amount based on the 50,000-100,000 KRW fee structure.",
+            "dependencies": [
+              1
+            ],
+            "details": "Integrate conditional logic using SQL CASE statements or join with a fee tier table to calculate the total monthly payout. Ensure the logic properly handles the variable KRW incentive per article and caps if applicable.",
+            "status": "pending",
+            "testStrategy": "Test calculations against edge cases (e.g., exactly 1 article, max allowed articles) to ensure the KRW structure applies correctly."
+          },
+          {
+            "id": 3,
+            "title": "Create settlement list export query for accounting",
+            "description": "Develop the final SQL query formatted specifically to match the accounting team's settlement export requirements.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Format the aggregated data to include the reporter's full name, bank account information, total article count, settlement month, and total payout amount. Map the output column names to the CSV format required by the accounting team.",
+            "status": "pending",
+            "testStrategy": "Run the query, export the output to a CSV file, and validate the column structure and data types against the accounting team's specification."
+          },
+          {
+            "id": 4,
+            "title": "Implement monthly cutoff and calculation cron jobs",
+            "description": "Create automated tasks for article cutoff aggregation and payout calculation.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement a cron job running on the 25th at 23:59 to snapshot eligible published articles. Implement a secondary job running on the last day of the month to execute the payout calculation logic (including 50k-100k base + excellent bonuses). Persist the results to a settlement ledger table.",
+            "status": "pending",
+            "testStrategy": "Trigger cron jobs manually in a test environment with simulated dates. Verify articles published on the 26th are excluded from the current month's batch and bonuses are correctly applied."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Toss Payments Settlement API",
+            "description": "Integrate automated payout processing using Toss Payments or an equivalent PG transfer API.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement API integration to initiate bank transfers for the calculated settlement ledger within the first 5 business days of the following month. Handle error scenarios (e.g., invalid bank accounts) and update the local settlement records with PG transaction IDs and status (pending, completed, failed).",
+            "status": "pending",
+            "testStrategy": "Use Toss Payments sandbox environment to simulate successful and failed transfer webhooks. Verify the settlement records update to the correct statuses."
+          },
+          {
+            "id": 6,
+            "title": "Build Contributor My Page Settlement UI",
+            "description": "Develop a real-time UI for citizen reporters to track their payout and transfer status.",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Create a new 'Settlement' section in the citizen reporter portal (My Page). Fetch data from the settlement ledger to display a monthly breakdown of eligible articles, applied bonuses, total payout amount, and current transfer status (e.g., Calculating, Transfer Pending, Transferred).",
+            "status": "pending",
+            "testStrategy": "Log in as a citizen reporter with mock settlement data. Verify the UI accurately reflects article counts, payout amounts, and real-time transfer states updated by the PG integration."
+          }
+        ]
+      },
+      {
+        "id": 30,
+        "title": "Internal Alpha Testing & Bug Fixes",
+        "description": "Conduct comprehensive internal testing of all P0 requirements.",
+        "details": "Involve developers, QA, and the editorial team. Test SSO, subscription logic, LangGraph query accuracy, and HITL pipelines. Triage and resolve P0/P1 bugs.",
+        "testStrategy": "Execute E2E Playwright test suites. Manually run edge cases (e.g., conflicting filters, broken markdown). Monitor error logs in Sentry.",
+        "priority": "medium",
+        "dependencies": [
+          18,
+          19,
+          21,
+          22,
+          23,
+          24,
+          27
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Develop Automated Playwright Test Scripts for Critical Paths",
+            "description": "Create and execute automated E2E Playwright test scripts covering the core critical paths: SSO, Chat, and Payment workflows.",
+            "dependencies": [],
+            "details": "Set up the testing environment with Playwright. Write robust automated scripts covering user login (SSO), chat interactions (querying the LangGraph model), and the subscription/payment workflows. Ensure these scripts can run reliably against the staging environment.",
+            "status": "pending",
+            "testStrategy": "Run automated test suites and ensure a 100% pass rate for all defined critical path scenarios before proceeding."
+          },
+          {
+            "id": 2,
+            "title": "Conduct Manual Edge Case and HITL Pipeline Testing",
+            "description": "Involve QA and the editorial team to perform manual testing on complex edge cases, LangGraph query accuracy, and HITL pipelines.",
+            "dependencies": [
+              1
+            ],
+            "details": "Coordinate with the editorial team to manually test complex user queries, conflicting UI filters, and broken markdown rendering. Evaluate the contextual accuracy of LangGraph responses and verify that the Human-In-The-Loop (HITL) fallback mechanisms function correctly.",
+            "status": "pending",
+            "testStrategy": "Document all manual test cases and results. Specifically review LangGraph outputs for hallucinations or factual errors and log them."
+          },
+          {
+            "id": 3,
+            "title": "Triage and Resolve P0 and P1 Bugs",
+            "description": "Identify, triage, and resolve all critical (P0) and high-priority (P1) bugs discovered during internal alpha testing.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Actively monitor Sentry error logs and aggregate feedback from internal developers, QA, and editorial testers. Triage issues based on severity. The development team must prioritize and resolve all P0/P1 issues related to SSO, Chat, Payments, and model performance prior to beta deployment.",
+            "status": "pending",
+            "testStrategy": "Re-run automated Playwright scripts and perform targeted manual regression testing on affected components to verify that all critical bugs are permanently resolved."
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "title": "External Beta Platform Setup",
+        "description": "Deploy the platform to a staging environment and onboard 100 external beta testers.",
+        "status": "pending",
+        "dependencies": [
+          30
+        ],
+        "priority": "medium",
+        "details": "Provide limited access via invite codes to 100 testers across 3 channels (30 Taean tourism influencers, 30 migrant cafe members, 40 B2B business owners). Set up a feedback intake widget (e.g., an in-app form or Notion integration) to capture UX friction and model hallucinations. Utilize the allocated 1M KRW budget for marketing, UX interviews, and beta incentives (10,000 KRW gift certificate + 6 months Premium free per person).",
+        "testStrategy": "Monitor Net Promoter Score (NPS) to ensure reliability and capture beta user analytics. Validate system handles 100 concurrent active users without degradation.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure and Deploy Staging Environment",
+            "description": "Set up the staging environment infrastructure to host the beta platform and handle at least 100 concurrent users.",
+            "dependencies": [],
+            "details": "Provision staging servers to mirror production. Configure environment variables, database connections, DNS, and SSL for secure access.",
+            "status": "pending",
+            "testStrategy": "Perform load testing on the staging URL with 100 concurrent simulated users to ensure no performance degradation."
+          },
+          {
+            "id": 2,
+            "title": "Implement Invite Code Schema and Logic",
+            "description": "Design the database schema and build backend endpoints to manage invite codes for the beta onboarding process.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create an 'invite_codes' table with fields: id, code (varchar, unique), status (enum: active, used), user_id (FK), and expires_at. Build API validation logic for signups and support batch generating 100+ codes for the targeted recruitment channels.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for invite code generation and validation to ensure a used code cannot be reused by another user."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Beta Feedback Intake Widget",
+            "description": "Embed an in-app form or Notion-backed widget to capture UX feedback, flag model hallucinations, and schedule UX interviews.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a React component for the feedback widget and link it to a Notion API integration. Include categorizations for 'UX Friction', 'Hallucination', and 'UX Interview Request'.",
+            "status": "pending",
+            "testStrategy": "Submit test feedback entries via the frontend widget and verify the payloads successfully populate the target Notion database."
+          },
+          {
+            "id": 4,
+            "title": "Beta Tester Recruitment and Incentive Distribution",
+            "description": "Manage recruitment of 100 beta testers across specific channels and distribute the allocated incentives.",
+            "dependencies": [
+              2
+            ],
+            "details": "Recruit 30 Taean tourism influencers, 30 migrant cafe members, and 40 B2B business owners. Execute the +1M KRW budget to distribute 10,000 KRW gift certificates and grant 6-month Premium free access to each participant. Coordinate UX interviews using the remaining budget.",
+            "status": "pending",
+            "testStrategy": "Verify exactly 100 users are recruited from specified channels, invite codes are distributed, and 6-month Premium subscriptions are successfully activated for beta users."
+          }
+        ]
+      },
+      {
+        "id": 32,
+        "title": "Citizen Reporter Pilot Execution",
+        "description": "Onboard the 12 selected citizen reporters for a pilot run of the Co-Pilot editor.",
+        "details": "Monitor the real-world usage of the AI Co-Pilot. Ensure each reporter successfully publishes at least 2 articles using the HITL process.",
+        "testStrategy": "Conduct qualitative interviews with the reporters to gauge the usefulness of the AI text polish/fact-check tools. Review logs to measure time saved per article.",
+        "priority": "medium",
+        "dependencies": [
+          31,
+          28
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Pilot Metrics and Interview Guide",
+            "description": "Establish quantitative tracking metrics and create the qualitative interview script for the pilot program.",
+            "dependencies": [],
+            "details": "Identify key usage metrics like time saved and AI tool usage frequency. Draft interview questions focusing on AI tool usefulness.",
+            "status": "pending",
+            "testStrategy": "Review metrics schema and interview guide with stakeholders for approval."
+          },
+          {
+            "id": 2,
+            "title": "Monitor Pilot and Conduct Interviews",
+            "description": "Track the 12 reporters during the pilot to ensure 2 articles are published each, and conduct post-pilot interviews.",
+            "dependencies": [
+              1
+            ],
+            "details": "Monitor database and logs for publishing thresholds. Schedule and execute 30-minute qualitative interviews with all 12 citizen reporters.",
+            "status": "pending",
+            "testStrategy": "Verify 24 articles total are published and 12 interview transcripts are recorded and summarized."
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "title": "B2B Pre-sales & CRM Integration",
+        "description": "Implement tools for managing B2B leads (pensions, restaurants) and tracking LOIs.",
+        "details": "Setup a lightweight CRM page or integrate with Airtable/Google Sheets via API to track the 30 B2B pre-sales contacts and grant 14-day free trial accesses.",
+        "testStrategy": "Verify the trial access logic automatically degrades to the free tier after 14 days and triggers an email reminder to purchase.",
+        "priority": "low",
+        "dependencies": [
+          24
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Airtable Integration API for CRM Sync",
+            "description": "Set up the backend integration to connect Next.js application with Airtable to track B2B pre-sales contacts and LOIs.",
+            "dependencies": [],
+            "details": "Create API endpoints and webhooks to sync Next.js auth states (user creation, login, trial status) with an Airtable base. Map fields for B2B leads, LOI status, and contact info.",
+            "status": "pending",
+            "testStrategy": "Trigger user creation and auth events in Next.js and verify corresponding rows are created/updated in Airtable."
+          },
+          {
+            "id": 2,
+            "title": "Develop 14-Day Free Trial Provisioning and Tracking",
+            "description": "Implement the logic to grant 14-day free trial access to B2B leads and track expiration.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement business logic to grant a 14-day trial. Create webhooks that fire on trial start, expiration, and degradation. Sync state changes back to Airtable and trigger email reminders.",
+            "status": "pending",
+            "testStrategy": "Mock a trial start date to 15 days ago and verify the system auto-degrades the access to the free tier and sends a purchase reminder email."
+          }
+        ]
+      },
+      {
+        "id": 34,
+        "title": "Beta Feedback Integration & Refactoring",
+        "description": "Address UX bottlenecks, AI prompt regressions, and performance issues discovered during beta.",
+        "details": "Refine LangGraph prompts based on hallucination feedback. Adjust Redis cache TTLs if hit rates are below 75%. Fix responsive UI issues on mobile devices.",
+        "testStrategy": "Re-run the 200-question evaluation dataset to ensure prompt tweaks didn't regress factual accuracy. Re-verify mobile Lighthouse scores.",
+        "priority": "high",
+        "dependencies": [
+          31,
+          32
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Refine LangGraph Prompts and Mitigate Hallucinations",
+            "description": "Update LangGraph prompt templates based on user feedback from the beta phase to reduce AI hallucinations.",
+            "dependencies": [],
+            "details": "Analyze hallucination reports from beta users. Adjust the LangGraph prompt chains to enforce stricter contextual boundaries. Regression testing must be handled by re-running the 200-question custom evaluation dataset to guarantee that new prompt tweaks do not degrade baseline factual accuracy.",
+            "status": "pending",
+            "testStrategy": "Execute the 200-question evaluation dataset and compare accuracy metrics to ensure no regression in factual correctness."
+          },
+          {
+            "id": 2,
+            "title": "Optimize Redis Cache TTL Configurations",
+            "description": "Analyze caching performance and adjust Redis TTL settings to resolve performance issues.",
+            "dependencies": [],
+            "details": "Monitor the current Redis cache hit rates. If the hit rate is found to be below the 75% threshold, reconfigure the Time-To-Live (TTL) settings for frequently accessed endpoints to improve cache efficiency and reduce database load.",
+            "status": "pending",
+            "testStrategy": "Monitor Redis hit rate metrics under simulated load to confirm the hit rate sustains above the 75% target."
+          },
+          {
+            "id": 3,
+            "title": "Fix Mobile Responsive UI and UX Bottlenecks",
+            "description": "Address responsive design bugs and UX friction points on mobile devices discovered during beta.",
+            "dependencies": [],
+            "details": "Review mobile UX feedback and fix responsive UI layout issues. Address any CSS media query regressions, improve touch target sizing, and optimize layout shifts for smaller screens to ensure a seamless mobile experience.",
+            "status": "pending",
+            "testStrategy": "Perform manual testing across multiple mobile devices/screen sizes and re-verify mobile Lighthouse scores."
+          }
+        ]
+      },
+      {
+        "id": 35,
+        "title": "Performance & Load Testing",
+        "description": "Ensure the system meets processing requirements (200 req/sec peak) and inference targets.",
+        "details": "Use K6 or JMeter to simulate 200 concurrent users hitting cached routes and 10 concurrent hitting the external LLM APIs. Tune database connection pooling and Node.js limits.",
+        "testStrategy": "Assert p95 response times < 1s for cache and < 8s for LLM inference under load. Ensure zero 502/503 Gateway Timeouts during the test.",
+        "priority": "high",
+        "dependencies": [
+          34
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Develop K6 Load Testing Scripts",
+            "description": "Create K6 scripts to simulate 200 concurrent users on cached endpoints and 10 concurrent users on LLM API endpoints.",
+            "dependencies": [],
+            "details": "Write a K6 script defining two distinct scenarios: a high-throughput scenario (200 VUs) targeting cached GET routes, and a compute-heavy scenario (10 VUs) targeting LLM inference endpoints. Configure appropriate ramping up and down phases.",
+            "status": "pending",
+            "testStrategy": "Run the scripts locally with 1-2 VUs to verify HTTP 200 responses and correct payload formatting before scaling up to full load."
+          },
+          {
+            "id": 2,
+            "title": "Execute Load Tests and Analyze Bottlenecks",
+            "description": "Run the developed K6 scripts against the staging environment to identify performance bottlenecks and measure p95 response times.",
+            "dependencies": [
+              1
+            ],
+            "details": "Execute the K6 tests while monitoring server resources such as CPU, memory, and network I/O. Track p95 response times to check if they exceed the 1s limit for cache and 8s limit for LLM inference. Document any 502 or 503 Gateway Timeouts.",
+            "status": "pending",
+            "testStrategy": "Generate K6 summary reports and review Grafana/Prometheus metrics to visualize latency distribution, throughput, and error rates during the test execution."
+          },
+          {
+            "id": 3,
+            "title": "Tune System Limits and Connection Pools",
+            "description": "Optimize Node.js, PostgreSQL, and Redis configurations to reliably handle the 200 req/sec peak target without errors.",
+            "dependencies": [
+              2
+            ],
+            "details": "Adjust database connection pools (e.g., using PgBouncer) and tune Node.js limits such as thread pool size and memory allocation. Optimize Redis connection settings and timeouts based on the bottleneck analysis.",
+            "status": "pending",
+            "testStrategy": "Re-run the full K6 load test suite to confirm the p95 response time targets (< 1s cache, < 8s LLM) are achieved with absolutely zero 502/503 errors under sustained load."
+          }
+        ]
+      },
+      {
+        "id": 36,
+        "title": "Security & Accessibility Audits",
+        "description": "Perform final audits for OWASP Top 10 vulnerabilities, KISA privacy laws, and WCAG AA.",
+        "details": "Run static analysis tools, check PII encryption standards, and ensure the terms of service/privacy policy reflect AI data usage restrictions. Engage (주)NC2 experts for a final a11y review.",
+        "testStrategy": "Validate all penetration testing reports are clear of High/Critical issues. Achieve 100% pass on screen reader and keyboard accessibility manual checks.",
+        "priority": "high",
+        "dependencies": [
+          34
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Execute SAST and KISA Privacy Audit",
+            "description": "Run SAST tools for OWASP Top 10 vulnerabilities and verify KISA privacy compliance.",
+            "dependencies": [],
+            "details": "Run SonarQube and Snyk for static code analysis. Verify AES-256 encryption for PII. Ensure Terms of Service and Privacy Policy clearly state AI data usage restrictions per KISA guidelines.",
+            "status": "pending",
+            "testStrategy": "Achieve 0 High/Critical vulnerabilities in SAST reports and obtain legal sign-off on the privacy policy."
+          },
+          {
+            "id": 2,
+            "title": "Perform Internal WCAG AA Accessibility Checklist",
+            "description": "Conduct automated and manual accessibility testing against WCAG 2.1 AA standards.",
+            "dependencies": [],
+            "details": "Run automated axe-core scans. Execute manual checklist: verify keyboard navigation (no traps), 3-tier font size toggle compatibility, color contrast (4.5:1 minimum), and screen reader flow (NVDA/VoiceOver).",
+            "status": "pending",
+            "testStrategy": "Pass 100% of the internal manual accessibility checklist and resolve all axe-core violations."
+          },
+          {
+            "id": 3,
+            "title": "Engage (주)NC2 for Final External Accessibility Review",
+            "description": "Coordinate with (주)NC2 experts for the final authoritative accessibility audit.",
+            "dependencies": [
+              2
+            ],
+            "details": "Package the internal audit results and provide system access to (주)NC2 experts. Triage their findings, assign remediation tickets for any identified WCAG gaps, and retest until approved.",
+            "status": "pending",
+            "testStrategy": "Receive formal certification or a clean audit report from (주)NC2 indicating full WCAG AA compliance."
+          }
+        ]
+      },
+      {
+        "id": 37,
+        "title": "Launch Cross-Promotion on Legacy Site",
+        "description": "Deploy integration banners and recommendation cards on taeannews.co.kr.",
+        "details": "Modify the NDSoft CMS templates of taeannews.co.kr to insert dynamic HTML snippets that load related insight reports at the bottom of free articles.",
+        "testStrategy": "Verify cross-domain tracking works and SSO seamlessly authenticates users clicking from the legacy site to the new insight portal.",
+        "priority": "medium",
+        "dependencies": [
+          20,
+          21
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Develop and Inject Dynamic JS Snippet for Legacy CMS",
+            "description": "Create the dynamic HTML and JavaScript snippet to load related insight reports and inject it into the NDSoft CMS templates.",
+            "dependencies": [],
+            "details": "Develop a lightweight, vanilla JavaScript snippet that fetches related insight reports from the new portal's API and renders them as recommendation cards at the bottom of free articles. Safely modify the legacy NDSoft CMS templates to include this script without conflicting with existing legacy scripts or layouts.",
+            "status": "pending",
+            "testStrategy": "Inject the snippet into a staging replica of the legacy site. Verify that recommendation cards load correctly on free articles with zero console errors and no layout breakage."
+          },
+          {
+            "id": 2,
+            "title": "Implement Cross-Domain Authentication State Sharing",
+            "description": "Configure cross-domain cookies and SSO token passing to share authentication state between the legacy site and the new portal.",
+            "dependencies": [
+              1
+            ],
+            "details": "Update the injected JavaScript to handle SSO state via cross-domain cookies or secure token passing in URL parameters (e.g., short-lived JWTs). Ensure that when a logged-in user clicks an insight report banner on taeannews.co.kr, their session state is securely recognized by the new platform's backend.",
+            "status": "pending",
+            "testStrategy": "Log into the legacy site, click a cross-promotion banner, and verify seamless SSO authentication into the new insight portal without needing to log in again. Check cookie domain configurations."
+          }
+        ]
+      },
+      {
+        "id": 38,
+        "title": "Analytics & KPI Tracking Setup",
+        "description": "Integrate Google Analytics 4, Toss Payments reporting, and Custom Admin Dashboards.",
+        "details": "Set up GA4 events for conversions, free-trial starts, and article reads. Configure the admin panel to track MRR, MAU, Churn rate, and operational costs against the 300,000 KRW threshold.",
+        "testStrategy": "Perform end-to-end user journeys and verify events show up correctly in GA4 Realtime and custom DB metrics without double counting.",
+        "priority": "medium",
+        "dependencies": [
+          20,
+          19
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure GA4 Custom Events and Parameters",
+            "description": "Define and implement GA4 custom events for tracking conversions, free-trial starts, article reads, and AI usage.",
+            "dependencies": [],
+            "details": "Implement the following custom GA4 events: 'free_trial_start' (params: user_id, tier), 'conversion_success' (params: amount, currency, method), 'article_read' (params: article_id, category), and 'ai_action_used' (params: tool_type, token_count). Use Google Tag Manager or direct gtag.js to push these events while ensuring idempotency to prevent double counting.",
+            "status": "pending",
+            "testStrategy": "Use GA4 DebugView to fire each custom event on the local/staging environment and verify that all specific parameters are correctly captured and sent."
+          },
+          {
+            "id": 2,
+            "title": "Integrate Toss Payments Webhooks for Revenue Tracking",
+            "description": "Set up webhook handlers to process Toss Payments events and calculate MRR and churn metrics.",
+            "dependencies": [],
+            "details": "Create a secure webhook endpoint to receive Toss Payments success, failure, and cancellation events. Update the local database's subscription tables in real-time. Calculate and store daily deltas for MRR and subscriber churn rate based on these webhook payloads.",
+            "status": "pending",
+            "testStrategy": "Simulate payment success and cancellation events using the Toss Payments sandbox environment, verifying that MRR and churn rate values correctly update in the database."
+          },
+          {
+            "id": 3,
+            "title": "Build Admin Dashboard for KPIs and Operational Costs",
+            "description": "Develop the admin dashboard UI and data aggregation endpoints to visualize MRR, MAU, Churn, and infrastructure costs.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create an API endpoint '/api/admin/kpis' to aggregate MAU (via GA4 API or internal DB), MRR, Churn rate, and operational server/LLM costs. Build a frontend view with progress bars to specifically monitor if the operational costs are staying under the strict 300,000 KRW monthly threshold.",
+            "status": "pending",
+            "testStrategy": "Seed the database with mock user activity and payment data, then verify the admin dashboard accurately calculates and displays MRR, MAU, Churn, and operational costs."
+          }
+        ]
+      },
+      {
+        "id": 39,
+        "title": "Final Release Checks & Production Deployment",
+        "description": "Execute the production deployment runbook and switch DNS to live.",
+        "details": "Deploy final Docker images. Execute zero-downtime database migrations. Ensure backup systems (daily pg_dump to S3) are active. Monitor logs meticulously for the first 24 hours.",
+        "testStrategy": "Verify the live environment passes a smoke test suite. Run a database recovery drill from S3 to ensure RPO < 24h targets are met.",
+        "priority": "high",
+        "dependencies": [
+          35,
+          36,
+          37,
+          38
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Pre-Deployment Backup and Environment Validation",
+            "description": "Validate the production environment configurations and ensure daily S3 pg_dump backup systems are fully active.",
+            "dependencies": [],
+            "details": "Verify all production environment variables and secrets. Trigger a manual pre-deployment database backup via pg_dump to S3 and verify the archive's integrity to guarantee safe recovery capability.",
+            "status": "pending",
+            "testStrategy": "Run a database recovery drill from the generated S3 snapshot to ensure RPO < 24h targets are met and data is intact."
+          },
+          {
+            "id": 2,
+            "title": "Execute Zero-Downtime Database Migrations",
+            "description": "Apply database schema changes to the production database utilizing zero-downtime deployment patterns.",
+            "dependencies": [
+              1
+            ],
+            "details": "Execute additive schema migrations first (e.g., adding tables/columns without dropping old ones). Ensure the current application versions remain fully operational during the schema transition.",
+            "status": "pending",
+            "testStrategy": "Monitor database connection pools and execution times during the migration. Verify legacy API endpoints continue to return 200 OK without errors."
+          },
+          {
+            "id": 3,
+            "title": "Deploy Final Docker Images and Execute DNS Switch",
+            "description": "Roll out the final production Docker images via rolling updates and orchestrate the DNS switch to the live environment.",
+            "dependencies": [
+              2
+            ],
+            "details": "Deploy the final Docker images to the production orchestrator using a rolling update strategy to prevent downtime. Once health checks pass on the new containers, update DNS A/CNAME records to route traffic to the live load balancer.",
+            "status": "pending",
+            "testStrategy": "Use global DNS propagation tracking tools to confirm the switch. Perform immediate health-check pings on the live domain."
+          },
+          {
+            "id": 4,
+            "title": "Post-Deployment Monitoring and Smoke Testing",
+            "description": "Conduct live environment smoke tests and meticulously monitor production application and database logs for 24 hours.",
+            "dependencies": [
+              3
+            ],
+            "details": "Run the complete post-deployment runbook. Establish a monitoring watch for the first 24 hours, focusing on unexpected application errors, database lock contention, and zero-downtime migration side-effects.",
+            "status": "pending",
+            "testStrategy": "Verify the live environment passes a comprehensive smoke test suite simulating critical user paths. Review error tracking systems (e.g., Sentry) for unhandled exceptions."
+          }
+        ]
+      },
+      {
+        "id": 40,
+        "title": "Documentation & 2027 Roadmap Handoff",
+        "description": "Finalize SOPs, OpenAPI docs, and project reports for the regional newspaper committee.",
+        "details": "Document the entire architecture, API endpoints (Swagger/Redoc), and operational runbooks. Draft the 2026 performance report and baseline the 2027 technical roadmap (PWA & advanced caching).",
+        "testStrategy": "Have a non-technical stakeholder read the SOPs to ensure clarity for managing alerts, issuing refunds, and running routine HITL workflows.",
+        "priority": "medium",
+        "dependencies": [
+          39
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Generate Architecture Document and OpenAPI Specs",
+            "description": "Compile and finalize the system architecture document and API endpoint documentation using Swagger/Redoc.",
+            "dependencies": [],
+            "details": "Outline the system architecture including components, data flow, and infrastructure. Finalize Swagger/Redoc for all API endpoints. Required architecture sections: High-Level Architecture, Component Diagram, Data Models, Security Architecture, and API Contracts.",
+            "status": "pending",
+            "testStrategy": "Verify OpenAPI specs render correctly in Swagger UI and Redoc, and ensure all production endpoints are thoroughly documented."
+          },
+          {
+            "id": 2,
+            "title": "Create Standard Operating Procedures (SOPs) and Runbooks",
+            "description": "Draft comprehensive SOPs and operational runbooks for system administrators, non-technical stakeholders, and editors.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create operational documentation. Required SOP sections: Incident Response, Alert Management, Refund Processing, Routine HITL (Human-in-the-Loop) Workflows, and Database Recovery/Backups. Document step-by-step resolution paths.",
+            "status": "pending",
+            "testStrategy": "Have a non-technical stakeholder read the SOPs to ensure clarity for managing alerts, issuing refunds, and running routine HITL workflows."
+          },
+          {
+            "id": 3,
+            "title": "Draft 2026 Performance Report & 2027 Technical Roadmap",
+            "description": "Synthesize project learnings into the 2026 performance report and baseline the forward-looking 2027 roadmap.",
+            "dependencies": [
+              2
+            ],
+            "details": "Draft the 2026 performance report detailing system metrics, pilot execution success, and LMS usage. Baseline the 2027 technical roadmap focusing specifically on Progressive Web App (PWA) integration and advanced caching strategies for high-traffic scenarios.",
+            "status": "pending",
+            "testStrategy": "Review the finalized performance report and 2027 roadmap with the regional newspaper committee for alignment, completeness, and formal sign-off."
+          }
+        ]
+      },
+      {
+        "id": 41,
+        "title": "Phase 3 Beta Closing & KPI Redefinition",
+        "description": "Analyze external beta metrics to redefine the 120 paid customers KPI and update the final business report for the regional newspaper committee.",
+        "details": "Extract analytics data from the 100 external beta users, specifically focusing on: (1) Free-to-premium actual conversion rates, (2) Average Revenue Per User (ARPU) separated by B2B and B2C segments, and (3) Churn cohort trends. Conduct a review session with the Project Manager and Digital Transformation Lead before 2026-11-30. Based on the data, formally redefine the initial 120 paid customers KPI into one of three models: (a) MRR single KPI, (b) Weighted KPI (B2B=5 points, B2C=1 point), or (c) Maintain the original business plan. Document the empirical rationale and finalize the Business Result Report required for the regional newspaper development committee.",
+        "testStrategy": "Verify data queries accurately isolate the 100 beta cohort users for Conversion, ARPU, and Churn metrics. Validate that the Business Result Report contains a dedicated section justifying the chosen KPI using the beta data. Confirm formal submission of the report by 2026-11-30.",
+        "status": "pending",
+        "dependencies": [
+          31,
+          38
+        ],
+        "priority": "high",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-05-26T11:40:02.589Z",
+      "updated": "2026-05-26T23:54:42.332Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
