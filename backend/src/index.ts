@@ -6,6 +6,7 @@ import { Hono } from "hono";
 
 import type { Env } from "./types";
 import { costRouter } from "./cost/router";
+import { meRouter } from "./preferences/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -20,6 +21,7 @@ app.get("/health", (c) =>
 );
 
 app.route("/api/cost", costRouter);
+app.route("/api/me", meRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
