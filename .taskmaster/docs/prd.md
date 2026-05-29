@@ -58,7 +58,7 @@
 
 ## 1. 개요 (Executive Summary)
 
-태안군의 지역 언론은 관광·환경·부동산 분야에서 급증하는 예측 정보 수요에 직면해 있으나, 실시간 Multi-Agent 기반 상용 LLM 운영 비용(월 100만원 이상)이 지속가능성을 가로막고 있습니다. 본 사업은 **캐싱 우선·배치 처리·Quantized Self-host**의 3축 비용 최적화 전략을 적용한 LangGraph Lite 기반 경량 AI 플랫폼(`insight.taeannews.co.kr`)을 구축하여, 기존 커뮤니티 허브(`taeannews.co.kr`)와 Hybrid 연동합니다. 2026년 12월까지 **월 AI 운영비 30만원 이내**, **MRR 1,500만원**, **유료 고객 120개**, **MAU 12,000명**을 달성하여 충남 서해안형 지역 AI 저널리즘의 표준 모델을 정립합니다.
+태안군의 지역 언론은 관광·환경·부동산 분야에서 급증하는 예측 정보 수요에 직면해 있으나, 실시간 Multi-Agent 기반 상용 LLM 운영 비용(월 100만원 이상)이 지속가능성을 가로막고 있습니다. 본 사업은 **캐싱 우선·배치 처리·Hybrid LLM API**(Anthropic Batch + Together AI Solar Mini)의 3축 비용 최적화 전략을 적용한 LangGraph Lite 기반 경량 AI 플랫폼(`insight.taeannews.co.kr`, Cloudflare Workers 서버리스)을 구축하여, 기존 커뮤니티 허브(`taeannews.co.kr`)와 Hybrid 연동합니다. 2026년 12월까지 **월 AI 운영비 30만원 이내**, **MRR 1,500만원**, **유료 고객 120개**, **MAU 12,000명**을 달성하여 충남 서해안형 지역 AI 저널리즘의 표준 모델을 정립합니다.
 
 ---
 
@@ -96,7 +96,7 @@
 
 ### 2.4 왜 지금 해결해야 하는가?
 
-- 2026년 오픈소스 Quantized 모델(Solar-10.7B, Llama-3.1-8B/14B)이 한국어 추론 품질에서 상용 모델 수준에 근접해 **저비용 Self-hosting의 기술적 임계점**에 도달
+- 2026년 들어 한국어 특화 상용 API(**Together AI Solar Mini $0.20/1M tokens**, **Anthropic Claude Haiku Batch 50% 할인**)와 무제한 무료 에지 컴퓨팅(**Cloudflare Workers**)이 결합해 **자체 GPU 없이도 월 30만원 운영의 경제성 임계점**에 도달 (v1.2 Hybrid API 결정)
 - 지역신문발전위원회의 2026년 보조사업 일정(5월 착수)에 맞춰 자금 확보 가능
 - 태안군의 관광·부동산 수요가 2024~2025년 연속 상승세로 시장 시그널 명확
 - (주)엔씨투의 20년 접근성 SW 전문성과 한국시각장애인연합회 등 공공기관 협력 실적으로 즉시 수행 가능한 컨소시엄 역량 확보
@@ -149,7 +149,7 @@
   - 캐싱 히트율 **≥ 75%**
   - HITL 검증 비율 **100%** ([AI 보조] 라벨 부착)
 - **기간:** 2026-12-15
-- **측정 방법:** CMS 메타데이터 태깅, Redis 캐시 통계, 에디터 검토 로그
+- **측정 방법:** CMS 메타데이터 태깅, Cloudflare KV 캐시 통계, 에디터 검토 로그
 
 ---
 
@@ -342,13 +342,13 @@
 **태스크 분해 힌트:**
 - Task 2.1: LangGraph Lite Router Agent 구현 (8h)
 - Task 2.2: 2개 Expert Agent(Prediction, Generation) 구현 (10h)
-- Task 2.3: 캐시 키 설계 및 Redis 캐싱 레이어 (6h)
+- Task 2.3: 캐시 키 설계 및 Cloudflare KV 캐싱 레이어 (6h)
 - Task 2.4: 출처 인용 메타데이터 시스템 (4h)
 - Task 2.5: PII 자동 마스킹 미들웨어 (3h)
 - Task 2.6: 민감 주제 분류기(키워드+분류 모델) (5h)
 - Task 2.7: 응답 시간 측정 및 부하 테스트 (4h)
 
-**의존성:** REQ-AI-001, REQ-AI-002, REQ-INFRA-001 (Self-hosted LLM)
+**의존성:** REQ-AI-001, REQ-AI-002, REQ-INFRA-001 (Hybrid LLM API)
 **우선순위:** Must Have (P0)
 
 ---
@@ -495,7 +495,7 @@ interface AgentResponse {
 - 응답 메타데이터 표준화: Small (3h)
 - 라우터 분류 정확도 평가셋 구축 및 측정: Medium (6h)
 
-**의존성:** REQ-INFRA-001 (Self-hosted Quantized LLM)
+**의존성:** REQ-INFRA-001 (Hybrid LLM API — Anthropic Batch + Together AI)
 
 ---
 
@@ -526,10 +526,10 @@ const TTL_POLICY = {
 ```
 
 **태스크 분해:**
-- Redis 클러스터 설정 및 보안: Small (3h)
+- Cloudflare KV 네임스페이스 설정 및 토큰 분리: Small (3h)
 - 캐시 키 정규화 및 해싱: Small (3h)
 - TTL 정책 및 무효화 로직: Medium (5h)
-- 사전 생성 배치 잡(Top-N): Medium (5h)
+- 사전 생성 배치 잡(Top-N, Cloudflare Queues + Workers cron): Medium (5h)
 - 캐시 히트율 메트릭 수집: Small (3h)
 
 **의존성:** REQ-AI-001
@@ -585,11 +585,11 @@ const TTL_POLICY = {
 - **v1.9 최종 AI Core Engine 누계: 19,000,000원 (38%)** — 사업계획서 "AI 기술 투자 56%" 방향성과 정합
 
 **태스크 분해:**
-- 모델 후보별 벤치마크: Medium (8h)
-- 양자화 변환(GPTQ/AWQ) 및 검증: Medium (6h)
-- vLLM/TGI 서버 구성 및 도커화: Medium (6h)
-- 자체 도메인 평가셋 구축: Medium (8h)
-- 추론 부하 테스트: Small (4h)
+- 모델 후보별 벤치마크 (Together AI Solar Mini · Anthropic Claude Haiku · 참고 Llama-3.1-8B): Medium (8h)
+- Anthropic Batch API 클라이언트 통합 (비동기 큐 → 결과 폴링): Medium (6h)
+- Together AI Solar Mini SDK 통합 + Workers 환경 검증: Medium (6h)
+- 자체 도메인 평가셋 구축 (500문항): Medium (8h)
+- Hybrid 클라이언트 부하·폴백 테스트 (두 채널 장애 시 캐시 폴백): Small (4h)
 
 **의존성:** 없음 (즉시 착수 가능)
 
@@ -898,9 +898,10 @@ interface UserPreferences {
 - 정상: 50 req/sec (MAU 12,000 기준 추정)
 - 피크: 200 req/sec (이벤트·재해 보도 시)
 
-**리소스:**
-- 단일 GPU 인스턴스(RTX 4090급) 1대 또는 A10G 클라우드 인스턴스
-- 메모리: 추론 서버 24GB VRAM, 백엔드 4GB RAM
+**리소스 (v1.9 — 서버리스):**
+- Cloudflare Workers (Edge runtime, 콜드 스타트 ~24ms, 메모리 128MB)
+- LLM 추론: Anthropic Batch API + Together AI Solar Mini (외부, 자체 GPU 없음)
+- 데이터: 외부 Postgres + PGVector (+ Hyperdrive), Cloudflare KV (캐시), Cloudflare D1 (메타데이터, Phase 2C 확정)
 - 캐시 히트율 75% 이상 유지
 
 ### 7.2 보안 (Security)
@@ -927,8 +928,8 @@ interface UserPreferences {
 
 **사용자 부하:**
 - 초기 MAU 12,000 → 2027년 30,000, 2030년 100,000+ 목표
-- 컨테이너화(Docker) 기반 수평 확장 준비
-- 단, 본 사업 단계(2026)에서는 단일 인스턴스 + 캐시로 충분
+- Cloudflare Workers 서버리스 자동 확장 (인스턴스 관리 불필요)
+- 단, 본 사업 단계(2026)에서는 KV 캐시(≥75% 히트율) + 배치 사전생성으로 LLM 호출 자체를 최소화
 
 **데이터 볼륨:**
 - 초기: 20년치 기사 약 10GB + 임베딩 약 5GB
@@ -1334,18 +1335,21 @@ CREATE INDEX idx_cost_events_month ON cost_events(date_trunc('month', event_at))
 - LLM 오케스트레이션: LangGraph 가벼운 구성 (Lite Router + 2 Expert Agent) — Phase 1 벤치마크 후 확정
 - 필요 시 RAG 인프라(PGVector)는 별도 Postgres 인스턴스로 분리
 
-**AI/ML:**
-- vLLM 또는 TGI (추론 서버)
-- Solar-10.7B (1차), Llama-3.1-8B (2차) — GPTQ 4bit
-- BGE-M3-Korean 또는 KURE-v1 (임베딩)
+**AI/ML (v1.9 Hybrid API):**
+- **배치 채널**: Anthropic Claude Batch API (Haiku/Sonnet, 50% 할인)
+- **실시간 채널**: Together AI Solar Mini ($0.20/1M tokens, 한국어 최적)
+- 참고용 대체 후보(Phase 1 벤치마크에서만 사용): Llama-3.1-8B
+- BGE-M3-Korean 또는 KURE-v1 (임베딩, Cloudflare Workers AI 또는 Together AI 호스팅)
 - Neo4j 또는 NetworkX (Lite KG)
+- (장기) 2027년 트래픽·매출 검증 후 Solar-10.7B 자체 호스팅 재검토
 
-**인프라:**
-- Docker + docker-compose (단일 호스트 운영)
-- 클라우드: AWS g5.xlarge 또는 자체 PC (RTX 4090)
-- CI/CD: GitHub Actions
-- 모니터링: Grafana + Prometheus + Sentry
-- 백업: 일일 Postgres dump → S3 호환 스토리지
+**인프라 (v1.9 서버리스):**
+- 런타임: Cloudflare Workers (Hono + TypeScript, OpenNext for Next.js)
+- 캐시·큐: Cloudflare KV + Cloudflare Queues + Workers cron
+- 저장소: 외부 Postgres + Hyperdrive (또는 Cloudflare D1) — Phase 2C 확정
+- CI/CD: GitHub Actions + `wrangler deploy`
+- 모니터링: Cloudflare Workers Analytics + Sentry + `cost_events` 자체 집계
+- 백업: Postgres 일일 dump → R2 (S3 호환)
 
 ### 8.5 외부 의존성
 
@@ -1368,7 +1372,7 @@ CREATE INDEX idx_cost_events_month ON cost_events(date_trunc('month', event_at))
 
 본 사업은 **신규 구축**이므로 마이그레이션 부담은 작으나, 다음 단계를 통해 점진 배포:
 
-1. **Phase 1: 인프라 준비 (5월)** — GPU 인스턴스, Postgres, Redis, 도메인 등록
+1. **Phase 1: 인프라 준비 (5월)** — Cloudflare 계정·Workers·KV·Queues 프로비저닝, 외부 Postgres + Hyperdrive, Anthropic/Together AI API 키 발급, 도메인 등록
 2. **Phase 2: 코어 개발 (7~9월)** — 모든 P0 기능 개발 + 비용 검증
 3. **Phase 3: 내·외부 베타 (10~11월)** — 한정 사용자 대상 베타
 4. **Phase 4: 정식 런칭 (12월)** — 마케팅·B2B 영업 본격화
@@ -1398,7 +1402,7 @@ CREATE INDEX idx_cost_events_month ON cost_events(date_trunc('month', event_at))
 
 **성능 테스트**
 - 동시 200 req/sec 부하 (k6)
-- 추론 서버 단독 부하 (vLLM 벤치마크)
+- Hybrid LLM 클라이언트 부하 테스트 (Anthropic Batch + Together AI 응답 시간·에러율·폴백 시나리오)
 
 **보안 테스트**
 - OWASP Top 10, KISA 점검 가이드
@@ -1418,17 +1422,17 @@ CREATE INDEX idx_cost_events_month ON cost_events(date_trunc('month', event_at))
 **목표:** 경량 아키텍처 설계, 월 30만원 운영비 검증, 기술 요구사항 확정
 
 **태스크:**
-- [ ] Task 1.1: GPU 인스턴스 후보 비교(자체 PC vs AWS g5.xlarge vs NCloud) — Small (4h)
-- [ ] Task 1.2: 모델 후보 벤치마크 (Solar/Llama 8B/14B) — Medium (8h)
-- [ ] Task 1.3: 양자화(GPTQ 4bit) 변환 및 추론 시간 측정 — Medium (6h)
+- [ ] Task 1.1: Hybrid LLM 채널 PoC (Anthropic Batch API + Together AI Solar Mini 계정 발급·SDK 통합) — Small (4h)
+- [ ] Task 1.2: 모델 후보 벤치마크 (Together AI Solar Mini · Anthropic Claude Haiku · 참고 Llama-3.1-8B) — Medium (8h)
+- [ ] Task 1.3: 두 채널 응답 시간·토큰 단가·한국어 품질 측정 + 분기 규칙 도출 — Medium (6h)
 - [ ] Task 1.4: 한국어 평가셋 500문항 구축 — Medium (8h)
-- [ ] Task 1.5: 캐시 키 정규화 PoC — Small (3h)
-- [ ] Task 1.6: 월 30만원 비용 모델 시뮬레이션 — Medium (5h)
+- [ ] Task 1.5: 캐시 키 정규화 PoC (Cloudflare KV 키 설계) — Small (3h)
+- [ ] Task 1.6: 월 30만원 비용 모델 시뮬레이션 (배치 비율·캐시 히트율·MAU 곡선) — Medium (5h)
 - [ ] ~~Task 1.7: 시민기자 모집 공고·선발~~ → **Phase 2C로 이전 (v1.5, 2026-07 중순)**
-- [ ] Task 1.8: insight 도메인 등록·DNS·HTTPS — Small (2h)
+- [ ] Task 1.8: insight 도메인 등록·DNS·HTTPS (Cloudflare Workers 라우팅) — Small (2h)
 - [ ] Task 1.9: 기술 요구사항 문서(SRS) 확정 — Medium (8h)
 
-**검증 체크포인트:** 단일 GPU + 캐시로 월 30만원 이내 운영 가능성 입증 (시뮬레이션 결과 보고)
+**검증 체크포인트:** Hybrid LLM API + Cloudflare KV 캐시 조합으로 월 30만원 이내 운영 가능성 입증 (시뮬레이션 결과 + Phase 1 벤치마크 실측 보고)
 
 ---
 
@@ -1441,16 +1445,16 @@ CREATE INDEX idx_cost_events_month ON cost_events(date_trunc('month', event_at))
 - [ ] Task 2.3: 임베딩 + PGVector 인덱싱 — Medium (8h)
 - [ ] Task 2.4: Lite KG 엔티티 추출 — Medium (10h)
 
-**Sub-Phase 2B: AI Core Engine (7~8월)**
-- [ ] Task 2.5: vLLM/TGI 추론 서버 도커화 — Medium (6h)
-- [ ] Task 2.6: LangGraph Lite Router 구현 — Medium (8h)
-- [ ] Task 2.7: Prediction Agent / Generation Agent — Large (14h)
-- [ ] Task 2.8: 캐시 레이어 (Redis) 구현 — Medium (6h)
-- [ ] Task 2.9: 사전 생성 배치 잡 (Top-N 200건) — Medium (5h)
-- [ ] Task 2.10: 비용 모니터링·서킷 브레이커 — Medium (8h)
+**Sub-Phase 2B: AI Core Engine (7~8월) — v1.9 스택**
+- [ ] Task 2.5: Hybrid LLM 클라이언트 통합 (Anthropic Batch API + Together AI Solar Mini) — Medium (6h)
+- [ ] Task 2.6: LangGraph Lite Router on Cloudflare Workers (Hono) — Medium (8h)
+- [ ] Task 2.7: Prediction Agent / Generation Agent (Workers 환경) — Large (14h)
+- [ ] Task 2.8: Cloudflare KV 캐시 레이어 + 키 정규화 적용 — Medium (6h)
+- [ ] Task 2.9: 사전 생성 배치 잡 (Cloudflare Queues + Workers cron, Top-N 200건) — Medium (5h)
+- [ ] Task 2.10: 비용 모니터링·서킷 브레이커 (`cost_events` 집계, 월 30만원 가드) — Medium (8h)
 
 **Sub-Phase 2C: 플랫폼 & 상품 (8~9월)**
-- [ ] Task 2.11: Next.js 프론트엔드 부트스트랩 + 디자인 시스템 — Medium (8h)
+- [ ] Task 2.11: Next.js + OpenNext on Cloudflare 부트스트랩 + 디자인 시스템 — Medium (8h)
 - [ ] Task 2.12: 인증·SSO·결제 통합 — Large (12h)
 - [ ] Task 2.13: 주간 리포트 발행 시스템 — Medium (10h)
 - [ ] Task 2.14: AI Query Agent UI — Medium (8h)
@@ -1521,10 +1525,11 @@ Phase 1 (설계):
   1.5 (캐시 PoC, 병렬)
   1.7 (시민기자 모집, 병렬)
 
-Phase 2:
+Phase 2 (v1.9 스택: Hono on Workers / KV / Queues / Hybrid LLM API):
   2A (데이터): 2.1, 2.2 → 2.3 → 2.4
-  2B (AI Core): 2.5 → 2.6 → 2.7 → 2.8 → 2.9, 2.10
-  2C (플랫폼): 2.11 → 2.12 → (2.13 || 2.14 || 2.15 || 2.16)
+  2B (AI Core): 2.5 (Hybrid LLM 클라이언트) → 2.6 (Router) → 2.7 (Agents)
+                → 2.8 (KV 캐시) → 2.9 (Queues 배치), 2.10 (비용 가드)
+  2C (플랫폼): 2.11 (Next.js + OpenNext) → 2.12 → (2.13 || 2.14 || 2.15 || 2.16)
                 → 2.17 → 2.18
   2D (교육, 병렬): 2.19 → 2.20
 
@@ -1633,19 +1638,19 @@ Phase 4 (런칭):
 - 시민기자단으로 **풀뿌리 저널리즘 + AI** 결합 차별화
 
 **약점 (Weaknesses):**
-- 자체 호스팅 Quantized LLM의 한국어 품질이 상용 LLM 대비 낮을 위험
+- 외부 LLM API(Anthropic·Together AI) 가격·정책 변경에 노출 (자체 GPU 미보유)
 - 단일 지역(태안)이라 절대 시장 규모 제한
 - 신규 도메인이라 SEO·브랜드 인지도 초기 부재
 
 **기회 (Opportunities):**
-- 2026년 한국어 Quantized 모델(Solar 등) 품질 임계점 도달
+- 2026년 한국어 특화 상용 API(Together AI Solar Mini, Anthropic Claude Haiku Batch)의 단가 임계점 도달 — 자체 GPU 없이 월 30만원 운영 가능
 - 태안 관광·환경 수요 상승세
 - 지역신문발전위원회 보조사업·지자체 협업 가능성
 - 패스키·서해안 AI Hub 등 2030 로드맵 확장 잠재력
 
 **위협 (Threats):**
 - 대형 포털/언론사의 지역 AI 서비스 진입
-- 상용 LLM 가격 급락 시 자체 호스팅 우위 약화
+- 외부 LLM API 가격 인상 또는 정책 변경 (예: Batch 할인율 축소)
 - B2B 영업 지연 시 MRR 1,500만원 미달 가능성
 - 시민기자 이탈·교육 효과 부족 위험
 
@@ -1665,7 +1670,7 @@ Phase 4 (런칭):
 
 #### ~~Q1: 최종 LLM 선정~~ → **Phase 1 벤치마크로 결정 (2026-05-26 합의)**
 - **상태:** **확정 — Phase 1 벤치마크 기반 결정**
-- **수행:** Solar-10.7B / Llama-3.1-8B / Llama-3.1-14B 3종을 한국어 평가셋 500문항으로 동시 측정
+- **수행:** Together AI Solar Mini · Anthropic Claude Haiku · (참고용) Llama-3.1-8B를 한국어 평가셋 500문항으로 동시 측정 (v1.2 이후 Hybrid API 채널 분기 규칙 도출용)
 - **결정 기준:** 정확도 ≥ 70% 통과한 모델 중 (추론 속도 + 비용) 종합 1순위
 - **마감:** 2026-06-15
 - **담당:** AI 엔지니어 + 디지털전환 총괄
@@ -1743,7 +1748,7 @@ Phase 4 (런칭):
 |-------|------|-----|------|-----|-----|
 | **AI 운영비 30만원 초과** | Medium | High | **Critical** | 캐싱 강화·배치 확대·상용 API 의존 추가 축소, 비용 임계 알림 70/90/100% | 자동 서킷 브레이커, 비필수 호출 차단, 무료 한도 축소 |
 | **목표 달성 지연(MRR/MAU)** | Medium | High | **High** | 핵심 기능 우선·출시 범위 단계 조정, 사전 B2B LOI 확보 | Phase 4에 마케팅 예산 집중, 가격 조정 |
-| **Quantized 모델 한국어 품질 저하** | Medium | High | **High** | 평가셋 500문항 사전 검증, 도메인 파인튜닝 옵션, HITL 검토 강화 | 보조 모델(Llama 14B) 전환, 일부 호출만 상용 API 잠정 사용 |
+| **Hybrid LLM API 한국어 품질 미달** | Medium | High | **High** | 평가셋 500문항 사전 검증, 두 채널 분기 규칙 튜닝, HITL 검토 강화 | 배치 채널 모델 격상(Haiku→Sonnet), 실시간 채널 일시 Claude Haiku 전환 |
 | **B2B 유료 고객 확보 지연** | **High** | High | **High** | 저가 진입(기본 3만/프리미엄 8만)으로 진입 장벽 낮춤, 기존 태안신문 광고주 네트워크 우선 영업, 협회 단체 가입 할인, 14일 무료 체험 | 단가 인상 가능성 검증, 데이터·API 판매 강화, B2C 비중 증대 |
 | **저가 정책으로 인한 영업 부담 증가** (NEW) | High | High | **High** | B2B 150개 확보 필요 — 사업계획서 120개 대비 +30개. 영업 자원 집중 + 협회·공공기관 일괄 영업 | KPI 가중치 재정의(Q4-NEW), 단가 인상 시점 검토 |
 | **시민기자 이탈** | Medium | Medium | **Medium** | 인센티브 30만원 + 우수자 시상, 동료 커뮤니티, 멘토링 | 예비 후보 풀 확보(3명), 활동 연장 의향 조사 |
@@ -1813,18 +1818,18 @@ Phase 4 (런칭):
 
 ### Checkpoint 1: Phase 1 종료 (2026-06-30)
 **기준:**
-- [ ] LLM 모델 최종 선정 및 양자화 변환 완료
-- [ ] GPU 인프라 결정 (자체 PC vs 클라우드)
+- [ ] Hybrid LLM 채널 확정 (배치=Anthropic Claude Haiku/Sonnet, 실시간=Together AI Solar Mini)
+- [ ] Anthropic·Together AI API 키 발급 및 SDK Workers 환경 통합 PoC 통과
 - [ ] 한국어 평가셋 500문항 구축 완료, 기준 정확도 측정
-- [ ] 캐싱 키 정규화 PoC 검증
+- [ ] 캐싱 키 정규화 PoC 검증 (Cloudflare KV)
 - [ ] 비용 시뮬레이션으로 월 30만원 달성 가능성 입증
-- [ ] 시민기자 12명 선발 완료
+- [ ] ~~시민기자 12명 선발~~ → **Phase 2C로 이전 (v1.5)**
 - [ ] 기술 요구사항서(SRS) 승인
 
 **실패 시 대응:**
-- 모델 품질 미달 → 보조 모델(Llama 14B) 전환 또는 일부 상용 API 잠정 활용
-- 비용 시뮬레이션 실패 → 캐시 정책 강화, 배치 처리 확대, 무료 한도 축소
-- 시민기자 미달 → 추가 모집 또는 인근 지역 확대
+- 모델 품질 미달 → 배치 채널을 Haiku에서 Sonnet으로 격상 또는 실시간을 Claude Haiku로 일시 전환
+- 비용 시뮬레이션 실패 → 캐시 정책 강화, 배치 사전생성 확대, 실시간 호출 쿼터 축소
+- API 가용성 이슈 → 두 채널 폴백 우선순위 재설정, 캐시 응답 비중 ≥85%로 상향
 
 ---
 
@@ -1839,7 +1844,7 @@ Phase 4 (런칭):
 
 **실패 시 대응:**
 - 캐시 히트율 저조 → 사전 생성 Top-N 확대, TTL 조정
-- 추론 지연 → 양자화 단계 강화(4bit), 동시 호출 제한
+- 추론 지연 → 모델 다운그레이드(Sonnet→Haiku, Solar Mini Lite) 또는 동시 호출 제한
 
 ---
 
@@ -1904,9 +1909,9 @@ Phase 4 (런칭):
 
 **Q1: 이 사업의 가장 큰 기술적 과제는 무엇인가요?**
 > A: **월 30만원 운영비 제약 하에서 한국어 LLM 품질 확보**가 최대 과제입니다. 구체적으로:
-> - 한국어 Quantized 모델(Solar-10.7B/Llama-3.1-8B 4bit)의 추론 품질이 상용 GPT-4 대비 어디까지 따라잡는지 평가셋 500문항으로 사전 검증
-> - 캐시 히트율 75%를 안정적으로 유지하기 위한 키 정규화·TTL·사전 생성 전략
-> - 배치 처리와 실시간 호출의 균형 (주간 리포트 = 배치, 사용자 질의 = 캐시 우선 + 미스 시에만 LLM)
+> - Hybrid 채널(Anthropic Claude Haiku Batch + Together AI Solar Mini)이 상용 GPT-4 대비 한국어 품질을 어디까지 유지하는지 평가셋 500문항으로 사전 검증
+> - 캐시 히트율 75%를 안정적으로 유지하기 위한 키 정규화·TTL·사전 생성 전략 (Cloudflare KV)
+> - 배치 처리와 실시간 호출의 균형 (주간 리포트 = Anthropic Batch, 사용자 질의 = 캐시 우선 + 미스 시 Together AI Solar Mini)
 
 **Q2: 기존 taeannews.co.kr CMS와 어떻게 통합하나요?**
 > A: 통합 전략:
@@ -1916,19 +1921,23 @@ Phase 4 (런칭):
 > - 기사 페이지 하단에 insight 추천 카드 삽입 (CMS 템플릿 수정 1회)
 > - 엔디소프트 협력 미흡 시 RSS·크롤링으로 백업 채널 확보
 
-**Q3: 사용해야 할 특정 라이브러리·프레임워크는?**
+**Q3: 사용해야 할 특정 라이브러리·프레임워크는? (v1.9 확정)**
 > A: 권장 스택:
-> - **백엔드**: FastAPI (Python) — LangGraph·LLM 통합 용이, 또는 NestJS (TypeScript) — 프론트와 언어 통일
-> - **AI 오케스트레이션**: LangGraph (Lite 구성)
-> - **추론 서버**: vLLM (한국어 모델 호환성 우수) 또는 TGI
-> - **임베딩**: BGE-M3-Korean 또는 KURE-v1
-> - **Vector DB**: PGVector (Postgres 확장, 운영 부담 최소)
+> - **백엔드**: Hono + TypeScript on Cloudflare Workers (Edge runtime ~24ms 콜드스타트)
+> - **프론트 배포**: Next.js 14 (App Router) + OpenNext for Cloudflare → Workers + Static Assets
+> - **AI 오케스트레이션**: LangGraph (Lite 구성, Workers에서 실행)
+> - **LLM**: Anthropic Claude Batch API (배치) + Together AI Solar Mini (실시간) — 자체 추론 서버 없음
+> - **임베딩**: BGE-M3-Korean 또는 KURE-v1 (외부 호스팅 또는 Workers AI)
+> - **Vector DB**: PGVector (외부 Postgres + Hyperdrive)
 > - **Knowledge Graph**: NetworkX (소규모) 또는 Neo4j Community
-> - **캐시·Queue**: Redis
-> - **프론트**: Next.js 14 (App Router) + Tailwind + shadcn/ui
+> - **캐시**: Cloudflare KV
+> - **큐·배치**: Cloudflare Queues + Workers cron
+> - **메타 저장소**: Cloudflare D1 또는 외부 Postgres (Phase 2C 확정)
+> - **UI**: Tailwind + shadcn/ui
 > - **차트**: Recharts (간단) 또는 Apache ECharts (B2B 대시보드)
 > - **에디터**: TipTap (시민기자)
-> - **결제**: 토스페이먼츠 SDK (개발자 친화) 또는 KG이니시스
+> - **결제**: 토스페이먼츠 SDK
+> - **Push**: Web Push (W3C 표준, VAPID 직접 운영)
 
 **Q4: 에러 핸들링 전략은?**
 > A: 계층화된 에러 핸들링:
@@ -1947,14 +1956,17 @@ Phase 4 (런칭):
 > - 모든 마이그레이션은 Alembic 또는 Flyway로 버전 관리
 
 **Q6: 비용 계측은 어떻게 정확히 하나요?**
-> A: 다층 계측:
-> - **LLM 추론**: 토큰 단위 — 입력/출력 토큰 수 × 모델별 단가 (Self-host는 GPU 시간 환산)
-> - **GPU 시간**: 클라우드 청구서 or 자체 PC는 전력 사용량(약 350W × 시간 × kWh 단가)
-> - **외부 API**: 호출당 단가 (Twilio·카카오 알림톡 등)
-> - **스토리지**: GB·월 단가
+> A: 다층 계측 (v1.9 Hybrid API 기준):
+> - **LLM 추론**: 토큰 단위 — 채널별 단가 적용
+>   - Anthropic Claude Batch: 입력/출력 토큰 × 모델 단가 × 50% 할인
+>   - Together AI Solar Mini: 입력/출력 토큰 × $0.20/1M
+> - **Cloudflare Workers**: 무료 한도 초과 시 요청 수 × 단가 (현 트래픽 예측은 무료 한도 내)
+> - **Cloudflare KV/Queues/D1**: 운영 수준에서 무료 한도 내 가정, 초과 시 자동 알림
+> - **외부 데이터 API**: 호출당 단가 (Twilio·카카오 알림톡 등)
+> - **스토리지**: R2/Postgres GB·월 단가
 > - **PG 수수료**: 트랜잭션 % (매출에서 차감 항목)
 > - 모든 이벤트는 `cost_events` 테이블에 적재, 일·주·월 집계
-> - 자동 알림: 월 누적 비용 70/90/100% 도달 시 슬랙·이메일
+> - 자동 알림: 월 누적 비용 70/90/100% 도달 시 슬랙·이메일 + 서킷 브레이커 발동
 
 **Q7: HITL 워크플로는 코드로 어떻게 강제하나요?**
 > A:
@@ -2052,7 +2064,7 @@ Phase 4 (런칭):
 > - 매우 긴 질의(>2,000 토큰)
 > - SQL Injection·프롬프트 Injection 시도
 > - 동시에 같은 사용자가 여러 기기로 결제 시도
-> - 캐시 미스 직후 LLM 다운 (Redis도 다운 시)
+> - 캐시 미스 직후 두 LLM 채널 모두 다운 (KV도 다운 시 우아한 안내)
 > - 시민기자가 AI 보조 없이 발행 (정상 시나리오)
 > - 결제 성공 후 PG 콜백 지연(웹훅 재시도)
 > - 외부 API(공공 데이터) 응답 형식 변경
@@ -2215,15 +2227,15 @@ Phase 4 (런칭):
 
 ### 17.1 권장 TaskMaster 태스크 구조
 
-**Phase 1 — 설계 및 검증 (9 태스크, ~60시간)**
-1. GPU 인프라 후보 비교 (4h)
-2. LLM 모델 벤치마크 (Solar/Llama 후보 3종) (8h)
-3. 양자화 변환 및 검증 (6h)
+**Phase 1 — 설계 및 검증 (9 태스크, ~60시간) — v1.9 Hybrid API 스택**
+1. Hybrid LLM 채널 PoC (Anthropic Batch + Together AI Solar Mini 계정·SDK 통합) (4h)
+2. LLM 모델 벤치마크 (Together AI Solar Mini · Claude Haiku · 참고 Llama-3.1-8B) (8h)
+3. 응답 시간·토큰 단가·한국어 품질 측정 + 분기 규칙 도출 (6h)
 4. 한국어 평가셋 500문항 구축 (8h)
-5. 캐싱 키 정규화 PoC (3h)
+5. 캐싱 키 정규화 PoC (Cloudflare KV) (3h)
 6. 월 30만원 비용 시뮬레이션 (5h)
-7. 시민기자 모집·선발 운영 (12h, 사업 운영)
-8. insight 도메인 등록 + DNS + HTTPS (2h)
+7. ~~시민기자 모집·선발 운영~~ → **Phase 2D로 이전 (v1.5)**
+8. insight 도메인 등록 + DNS + HTTPS (Cloudflare Workers 라우팅) (2h)
 9. 기술 요구사항서(SRS) 작성 및 승인 (12h)
 
 **Phase 2A — 데이터 파이프라인 (4 태스크, ~44시간)**
@@ -2232,16 +2244,16 @@ Phase 4 (런칭):
 12. 임베딩 + PGVector 인덱싱 (8h)
 13. Lite KG 엔티티 추출 및 적재 (10h)
 
-**Phase 2B — AI Core Engine (6 태스크, ~43시간)**
-14. vLLM/TGI 추론 서버 도커화 (6h)
-15. LangGraph Lite Router 구현 (8h)
-16. Prediction Agent / Generation Agent 구현 (14h)
-17. Redis 캐시 레이어 (6h)
-18. 사전 생성 배치 잡 (Top-N) (5h)
-19. 비용 모니터링 + 서킷 브레이커 (8h, 추가 분할 가능)
+**Phase 2B — AI Core Engine (6 태스크, ~43시간) — v1.9 Hybrid API 스택**
+14. Hybrid LLM 클라이언트 통합 (Anthropic Batch + Together AI Solar Mini, Workers 환경) (6h)
+15. LangGraph Lite Router on Cloudflare Workers (Hono) (8h)
+16. Prediction Agent / Generation Agent (Workers 환경) (14h)
+17. Cloudflare KV 캐시 레이어 + 키 정규화 적용 (6h)
+18. 사전 생성 배치 잡 (Cloudflare Queues + Workers cron, Top-N) (5h)
+19. 비용 모니터링 + 서킷 브레이커 (`cost_events` 집계, 월 30만원 가드) (8h, 추가 분할 가능)
 
 **Phase 2C — 플랫폼 & 상품 (8 태스크, ~82시간)**
-20. Next.js 부트스트랩 + 디자인 시스템 (8h)
+20. Next.js + OpenNext on Cloudflare 부트스트랩 + 디자인 시스템 (8h)
 21. 인증·SSO·결제 통합 (12h)
 22. 주간 리포트 발행 시스템 (10h)
 23. AI Query Agent UI (8h)
@@ -2282,15 +2294,15 @@ Phase 4 (런칭):
 - Phase 2D 시민기자 교육(#28, #29)은 Phase 2 전 기간 병렬
 
 **순차 필요:**
-- #14 (vLLM) → #15 (Router) → #16 (Agents) → #22~25 (상품 UI)
+- #14 (Hybrid LLM 클라이언트) → #15 (Router) → #16 (Agents) → #22~25 (상품 UI)
 - 모든 상품 → #27 (윤리 가드) → #30 (알파)
 - #30 → #31 → #34 → #36 (런칭)
 
 ### 17.3 임계 경로
 
 ```
-#2 (모델 벤치마크) → #3 (양자화) → #14 (추론 서버)
-  → #15 (Router) → #16 (Agents) → #17 (캐시) → #18 (사전 생성 배치)
+#2 (모델 벤치마크) → #3 (채널 분기 규칙) → #14 (Hybrid LLM 클라이언트)
+  → #15 (Router on Workers) → #16 (Agents) → #17 (KV 캐시) → #18 (Queues 사전생성 배치)
   → #22 (주간 리포트) → #23 (Query UI) → #25 (시민기자 에디터)
   → #27 (윤리 가드) → #31 (외부 베타) → #34 (피드백 반영)
   → #36 (런칭 마케팅) → #37 (KPI 측정)
@@ -2303,7 +2315,7 @@ Phase 4 (런칭):
 | 태스크 | 복잡도 | 위험도 | 의존성 | TaskMaster 우선순위 |
 |-------|------|------|------|-----|
 | #2 모델 벤치마크 | High | Critical | 없음 | **최우선** |
-| #3 양자화 | Medium | High | #2 | 1순위 |
+| #3 채널 분기 규칙 도출 | Medium | High | #2 | 1순위 |
 | #6 비용 시뮬레이션 | Medium | Critical | #2~3 | 1순위 |
 | #10 자체 기사 크롤링 | High | Medium | 없음 (병렬) | 2순위 |
 | #15~16 Router/Agents | High | High | #14 | 2순위 |
