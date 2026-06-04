@@ -3,12 +3,27 @@
 // PRD v1.8 §8 기술 아키텍처
 
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 
 import type { Env } from "./types";
 import { costRouter } from "./cost/router";
 import { meRouter } from "./preferences/router";
 
 const app = new Hono<{ Bindings: Env }>();
+
+// CORS — 프론트엔드(workers.dev 임시 도메인 + 운영 도메인)에서 호출 허용
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin) =>
+      /^https?:\/\/(localhost(:\d+)?|.*\.workers\.dev|.*\.taeannews\.co\.kr)$/.test(origin)
+        ? origin
+        : "",
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
+  }),
+);
 
 app.get("/", (c) => c.json({ name: "taean-insight-api", version: "0.1.0" }));
 
