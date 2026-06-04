@@ -46,6 +46,22 @@ export interface MeResponse {
   b2gMemberships?: B2gMembership[];
 }
 
+// ── 부가상품(add-on) — backend/src/payments/addons.ts 와 동기화 ──
+export type AddonKey = "hyper_personalization";
+
+export interface AddonProduct {
+  key: AddonKey;
+  name: string;
+  description: string;
+  priceKrw: number;
+  benefits: string[];
+}
+
+export interface AddonEntitlement {
+  key: AddonKey;
+  active: boolean;
+}
+
 // UI 라벨
 export const CATEGORY_LABELS: Record<InterestCategory, string> = {
   tourism: "관광",

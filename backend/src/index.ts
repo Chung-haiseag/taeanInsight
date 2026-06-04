@@ -8,6 +8,7 @@ import { cors } from "hono/cors";
 import type { Env } from "./types";
 import { costRouter } from "./cost/router";
 import { meRouter } from "./preferences/router";
+import { addonsRouter } from "./payments/addons_router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -37,6 +38,7 @@ app.get("/health", (c) =>
 
 app.route("/api/cost", costRouter);
 app.route("/api/me", meRouter);
+app.route("/api/addons", addonsRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
