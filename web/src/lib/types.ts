@@ -47,7 +47,7 @@ export interface MeResponse {
 }
 
 // ── 부가상품(add-on) — backend/src/payments/addons.ts 와 동기화 ──
-export type AddonKey = "hyper_personalization";
+export type AddonKey = "owner_pro";
 
 export interface AddonProduct {
   key: AddonKey;

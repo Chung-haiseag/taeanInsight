@@ -8,15 +8,15 @@ export type DemoHomeState = "anonymous" | "preview" | "entitled";
 const KEY = "taean-demo-home-state";
 
 export const MOCK_ADDON: AddonProduct = {
-  key: "hyper_personalization",
-  name: "초개인화 홈",
-  description: "로그인하면 첫 화면이 내 관심 지역·관심사 기반으로 재구성됩니다.",
-  priceKrw: 4_900,
+  key: "owner_pro",
+  name: "사장님 Pro",
+  description: "내 가게·내 지역 기준 주말 수요 예측과 가격·재고 실행 제안을 매일 받습니다.",
+  priceKrw: 9_900,
   benefits: [
-    "관심 지역의 오늘·이번 주 예측을 홈 최상단에",
-    "관심사 기반 맞춤 리포트 요약 자동 배치",
-    "즐겨찾기·알림 바로가기 위젯",
-    "초개인화 우선순위 정렬(critical/community/personal)",
+    "이번 주말 방문 수요 예측 (요일별 수치 + 근거)",
+    "가격·재고·인력 실행 제안 (예: 토요일 1박 +5천원)",
+    "적조·기상·행사 우선 알림 (영업 영향까지)",
+    "주변 상권 평균가·점유율 비교",
   ],
 };
 
