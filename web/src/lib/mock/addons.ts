@@ -25,9 +25,11 @@ export function isMockMode(): boolean {
 }
 
 export function getDemoHomeState(): DemoHomeState {
-  if (typeof window === "undefined") return "preview";
+  // 기본값은 anonymous — 첫 방문 시 에디토리얼 홈(히어로)을 보여주고,
+  // 우하단 토글로 미구독(페이월)·구독 상태를 전환해볼 수 있다.
+  if (typeof window === "undefined") return "anonymous";
   const v = window.localStorage.getItem(KEY);
-  return v === "anonymous" || v === "entitled" ? v : "preview";
+  return v === "preview" || v === "entitled" ? v : "anonymous";
 }
 
 export function setDemoHomeState(state: DemoHomeState): void {

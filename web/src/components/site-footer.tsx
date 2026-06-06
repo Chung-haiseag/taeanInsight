@@ -1,10 +1,12 @@
 export function SiteFooter() {
   return (
-    <footer className="border-t border-brand/10 bg-brand text-background/90 mt-16">
-      <div className="container mx-auto px-4 max-w-6xl py-8 grid gap-4 md:grid-cols-3 text-sm">
+    <footer className="bg-brand text-background/90 mt-24">
+      <div className="h-1 bg-gradient-to-r from-transparent via-accent/60 to-accent" aria-hidden="true" />
+      <div className="container mx-auto px-4 max-w-6xl py-12 grid gap-8 md:grid-cols-3 text-sm">
         <div>
-          <p className="font-semibold mb-2">태안 AI 인텔리전스</p>
-          <p className="text-background/70">
+          <p className="text-[10px] uppercase tracking-kicker text-accent-subtle mb-2">Taean Insight</p>
+          <p className="font-bold text-base mb-2">태안 AI 인텔리전스</p>
+          <p className="text-background/70 leading-relaxed">
             태안의 관광·환경·부동산 예측 인사이트를 AI로.
             <br />
             insight.taeannews.co.kr

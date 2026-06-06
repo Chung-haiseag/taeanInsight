@@ -35,10 +35,26 @@ export default {
           "Roboto",
           "sans-serif",
         ],
+        // 에디토리얼 디스플레이 — 큰 숫자·라틴 헤드라인용 세리프
+        display: ['"Iowan Old Style"', '"Apple Garamond"', "Georgia", '"Times New Roman"', "serif"],
       },
       fontSize: {
         // 사용자 글자 크기 옵션 3단계 — Tailwind plugin 없이 CSS 변수로 동적 스케일링
         base: ["var(--font-size-base, 1rem)", { lineHeight: "1.6" }],
+        // 에디토리얼 타이포 스케일
+        display: ["clamp(2.5rem, 6vw, 4.5rem)", { lineHeight: "1.05", letterSpacing: "-0.03em", fontWeight: "800" }],
+        "display-sm": ["clamp(1.75rem, 4vw, 2.75rem)", { lineHeight: "1.12", letterSpacing: "-0.02em", fontWeight: "700" }],
+      },
+      letterSpacing: {
+        kicker: "0.18em",
+      },
+      boxShadow: {
+        card: "0 1px 3px rgba(31,42,68,0.06)",
+        soft: "0 1px 2px rgba(31,42,68,0.04), 0 2px 10px rgba(31,42,68,0.05)",
+        lift: "0 8px 30px rgba(31,42,68,0.10)",
+      },
+      maxWidth: {
+        prose: "42rem",
       },
       screens: {
         // PRD §7.6 브레이크포인트

@@ -2,6 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── 에디토리얼 디자인 시스템 ─────────────────────────────── */
+@layer components {
+  /* 섹션 위 작은 라벨 (대문자 트래킹) */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-kicker text-accent;
+  }
+  /* 헤드라인 아래 짧은 강조선 */
+  .accent-rule {
+    @apply block h-1 w-12 rounded-full bg-accent;
+  }
+  /* 얇은 구분선 */
+  .hairline {
+    @apply border-t border-brand/10;
+  }
+  /* 버튼 */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-background hover:bg-brand-dark hover:shadow-lift;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-background hover:opacity-90 hover:shadow-lift;
+  }
+  .btn-ghost {
+    @apply btn border border-brand/20 text-brand hover:border-brand/50 hover:bg-brand/5;
+  }
+  /* 카드 호버 리프트 */
+  .card-lift {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift;
+  }
+}
+
+/* 텍스트 선택 색 */
+::selection {
+  background: #E8D7A4;
+  color: #1F2A44;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 /* CSS 변수로 사용자 글자 크기·고대비 옵션 동적 제어 (REQ-PLATFORM-001 접근성) */
 :root {
   --font-size-base: 1rem;        /* 기본 (16px) */
