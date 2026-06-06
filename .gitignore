@@ -48,3 +48,6 @@ venv/
 eval/evaluator/report.json
 eval/verification/checklist_completed.md
 eval/verification/verification_log.json
+
+# 백필 스크랩 산출물
+tools/backfill/out/
