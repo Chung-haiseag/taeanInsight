@@ -1,13 +1,21 @@
 "use client";
 
-// 관리자(운영자) 대시보드 — 골격(skeleton)
-// 비용 모니터링은 실데이터 연동, 나머지 섹션은 백엔드 구현 대기 자리표시.
-// 연관 TaskMaster: #19(비용·완료), #26(HITL 검수), #29(시민기자 정산), AI 거버넌스(#27)
+// 관리자(운영자) 대시보드
+// 비용 모니터링 + HITL 검수 큐는 실데이터 연동, 나머지 섹션은 백엔드 구현 대기 자리표시.
+// 연관 TaskMaster: #19(비용·완료), #26(HITL 검수·연동), #29(시민기자 정산), AI 거버넌스(#27)
 
 import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { getCostSummary, type MonthlyCostReport } from "@/lib/api/admin";
+import {
+  decideReview,
+  getReviewQueue,
+  PII_KIND_LABELS,
+  SENSITIVE_TOPIC_LABELS,
+  type ReviewItem,
+  type ReviewStats,
+} from "@/lib/api/review";
 
 export default function AdminPage() {
   return (
@@ -21,8 +29,8 @@ export default function AdminPage() {
         </div>
         <h1 className="text-3xl font-bold text-brand">관리자 대시보드</h1>
         <p className="text-foreground-muted">
-          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영을 한곳에서. 현재는 골격(skeleton)이며, 비용 현황만 실데이터와
-          연동됩니다.
+          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영을 한곳에서. 비용 현황과 HITL 검수 큐는 실데이터와 연동되며,
+          나머지는 백엔드 연결 대기 중입니다.
         </p>
         <div className="bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
           🔒 <strong className="text-brand">인증 미적용 (데모)</strong> — 실제 운영 시 SSO + 관리자 권한 검사가
@@ -109,18 +117,153 @@ function CostMonitorSection() {
   );
 }
 
-// ── 2. AI 콘텐츠 검수 큐 (HITL, 자리표시) ────────────────────
+// ── 2. AI 콘텐츠 검수 큐 (HITL, 실데이터) ────────────────────
 function ReviewQueueSection() {
+  const [items, setItems] = useState<ReviewItem[]>([]);
+  const [stats, setStats] = useState<ReviewStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { items, stats } = await getReviewQueue();
+        setItems(items);
+        setStats(stats);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "검수 큐를 불러오지 못했습니다");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  async function decide(id: string, decision: "approved" | "rejected") {
+    setBusyId(id);
+    // 낙관적 로컬 반영 (Workers 인메모리는 요청 간 영속되지 않음)
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, status: decision } : it)));
+    setStats((prev) =>
+      prev ? { ...prev, pending: Math.max(0, prev.pending - 1), [decision]: prev[decision] + 1 } : prev,
+    );
+    try {
+      await decideReview(id, decision);
+    } catch {
+      /* 데모: 실패해도 로컬 반영 유지 */
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
-    <PlaceholderSection
-      id="review"
-      title="🛡️ AI 콘텐츠 검수 큐 (HITL)"
-      badge="ai_assisted"
-      task="#26 / #27"
-      desc="AI가 생성·보조한 콘텐츠 중 사람 검수가 필요한 항목을 승인/반려합니다. PII·민감주제 탐지 결과가 함께 표시됩니다."
-      columns={["콘텐츠", "유형", "AI 라벨", "민감도", "검수 상태"]}
-    />
+    <section aria-labelledby="review-heading" className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 id="review-heading" className="text-xl font-bold text-brand">
+          🛡️ AI 콘텐츠 검수 큐 (HITL)
+        </h2>
+        <AILabelBadge kind="ai_assisted" />
+        {stats && (
+          <span className="text-xs text-foreground-muted">
+            대기 {stats.pending} · 승인 {stats.approved} · 반려 {stats.rejected}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-foreground-muted">
+        거버넌스 파이프라인이 PII·민감주제로 표시한 콘텐츠입니다. 승인/반려하세요.
+      </p>
+
+      {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+      {error && (
+        <p className="text-sm text-red-600 border border-red-200 rounded p-3 bg-red-50">⚠️ {error}</p>
+      )}
+
+      {!loading && !error && (
+        <div className="space-y-2">
+          {items.map((it) => (
+            <article key={it.id} className="border border-brand/15 rounded-lg p-4 bg-background space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-brand truncate">{it.title}</p>
+                  <p className="text-xs text-foreground-muted">
+                    {it.resourceType} · {it.resourceId}
+                  </p>
+                </div>
+                <StatusPill status={it.status} />
+              </div>
+
+              <p className="text-sm text-foreground-muted line-clamp-2">{it.excerpt}</p>
+
+              <div className="flex flex-wrap gap-1.5">
+                <AILabelBadge kind={it.aiLabel} />
+                {it.sensitiveTopics.map((t) => (
+                  <Tag key={t} tone="danger">
+                    {SENSITIVE_TOPIC_LABELS[t] ?? t}
+                  </Tag>
+                ))}
+                {it.piiKinds.map((k) => (
+                  <Tag key={k} tone="warn">
+                    PII·{PII_KIND_LABELS[k] ?? k}
+                  </Tag>
+                ))}
+                {it.blockAiOnly && <Tag tone="danger">AI 단독 차단</Tag>}
+              </div>
+
+              {it.status === "pending" ? (
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => decide(it.id, "approved")}
+                    disabled={busyId === it.id}
+                    className="bg-brand text-background px-3 py-1.5 rounded text-sm font-semibold disabled:opacity-60"
+                  >
+                    승인
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decide(it.id, "rejected")}
+                    disabled={busyId === it.id}
+                    className="border border-red-300 text-red-600 px-3 py-1.5 rounded text-sm font-semibold disabled:opacity-60"
+                  >
+                    반려
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-foreground-muted pt-1">
+                  {it.reviewerId ? `검토자 ${it.reviewerId}` : "처리됨"}
+                  {it.decisionReason ? ` · ${it.decisionReason}` : ""}
+                </p>
+              )}
+            </article>
+          ))}
+          {items.length === 0 && (
+            <p className="text-sm text-foreground-muted px-3 py-8 text-center border border-brand/15 rounded-lg">
+              검수 대기 항목이 없습니다.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
+}
+
+function StatusPill({ status }: { status: ReviewItem["status"] }) {
+  const map = {
+    pending: { text: "검수 대기", cls: "bg-amber-100 text-amber-800" },
+    approved: { text: "승인", cls: "bg-green-100 text-green-800" },
+    rejected: { text: "반려", cls: "bg-red-100 text-red-700" },
+  } as const;
+  const s = map[status];
+  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${s.cls}`}>{s.text}</span>;
+}
+
+function Tag({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "warn" | "danger" }) {
+  const cls =
+    tone === "danger"
+      ? "bg-red-50 text-red-700 border-red-200"
+      : tone === "warn"
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-brand/5 text-foreground-muted border-brand/15";
+  return <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs ${cls}`}>{children}</span>;
 }
 
 // ── 3. 시민기자 운영 (자리표시) ─────────────────────────────
