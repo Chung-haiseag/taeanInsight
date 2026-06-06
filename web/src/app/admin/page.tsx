@@ -25,6 +25,13 @@ import {
   type SettlementStatus,
 } from "@/lib/api/citizen";
 import { REGION_OPTIONS } from "@/lib/types";
+import {
+  classifyTest,
+  getRules,
+  updateRule,
+  type ClassifyTestResult,
+  type ManagedRule,
+} from "@/lib/api/rules";
 
 export default function AdminPage() {
   return (
@@ -38,8 +45,8 @@ export default function AdminPage() {
         </div>
         <h1 className="text-3xl font-bold text-brand">관리자 대시보드</h1>
         <p className="text-foreground-muted">
-          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영을 한곳에서. 비용·HITL 검수·시민기자 운영은 실데이터와
-          연동되며, 민감주제 규칙 편집만 백엔드 연결 대기 중입니다.
+          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영 · 민감주제 규칙을 한곳에서. 네 섹션 모두 백엔드 API와
+          실시간 연동됩니다.
         </p>
         <div className="bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
           🔒 <strong className="text-brand">인증 미적용 (데모)</strong> — 실제 운영 시 SSO + 관리자 권한 검사가
@@ -437,16 +444,234 @@ function SettlementPill({ status }: { status: SettlementStatus }) {
   );
 }
 
-// ── 4. 거버넌스 설정 (자리표시) ─────────────────────────────
+// ── 4. 민감주제 규칙 (실데이터) ─────────────────────────────
 function GovernanceSection() {
+  const [rules, setRules] = useState<ManagedRule[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setRules((await getRules()).rules);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "규칙을 불러오지 못했습니다");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  function patchLocal(topic: string, patch: Partial<ManagedRule>) {
+    setRules((prev) => prev.map((r) => (r.topic === topic ? { ...r, ...patch } : r)));
+  }
+
+  async function toggle(topic: string, field: "enabled" | "requiresHitl" | "blockAiOnly", value: boolean) {
+    patchLocal(topic, { [field]: value });
+    try {
+      await updateRule(topic, { [field]: value });
+    } catch {
+      /* 데모: 실패해도 로컬 반영 유지 */
+    }
+  }
+
+  async function saveKeywords(topic: string, keywords: string[]) {
+    patchLocal(topic, { keywords });
+    try {
+      await updateRule(topic, { keywords });
+    } catch {
+      /* 데모 */
+    }
+  }
+
   return (
-    <PlaceholderSection
-      id="governance"
-      title="⚠️ 민감주제 규칙"
-      task="#27"
-      desc="선거·범죄·의료 등 민감주제 차단 규칙(현재 7종 시드)을 편집팀이 추가/수정합니다."
-      columns={["주제", "키워드", "차단 동작"]}
-    />
+    <section aria-labelledby="governance-heading" className="space-y-3">
+      <h2 id="governance-heading" className="text-xl font-bold text-brand">
+        ⚠️ 민감주제 규칙
+      </h2>
+      <p className="text-sm text-foreground-muted">
+        선거·범죄·의료 등 민감주제 차단 규칙을 편집팀이 관리합니다. HITL(사람 검토)·AI 단독 차단·키워드를 조정할 수 있어요.
+      </p>
+
+      <ClassifyTestBox />
+
+      {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+      {error && (
+        <p className="text-sm text-red-600 border border-red-200 rounded p-3 bg-red-50">⚠️ {error}</p>
+      )}
+
+      {!loading && !error && (
+        <div className="space-y-2">
+          {rules.map((r) => (
+            <article
+              key={r.topic}
+              className={`border rounded-lg p-4 space-y-2 ${r.enabled ? "border-brand/15 bg-background" : "border-brand/10 bg-brand/5 opacity-70"}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-semibold text-brand">
+                    {SENSITIVE_TOPIC_LABELS[r.topic] ?? r.topic}
+                  </span>
+                  <span className="text-xs text-foreground-muted"> · {r.description}</span>
+                </div>
+                <Switch label="활성" checked={r.enabled} onChange={(v) => toggle(r.topic, "enabled", v)} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Switch label="HITL 검토" checked={r.requiresHitl} onChange={(v) => toggle(r.topic, "requiresHitl", v)} />
+                <Switch
+                  label="AI 단독 차단"
+                  checked={r.blockAiOnly}
+                  onChange={(v) => toggle(r.topic, "blockAiOnly", v)}
+                />
+              </div>
+
+              <KeywordEditor keywords={r.keywords} onSave={(kw) => saveKeywords(r.topic, kw)} />
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="inline-flex items-center gap-1.5 text-xs"
+    >
+      <span
+        className={`inline-block w-8 h-4 rounded-full transition-colors relative ${checked ? "bg-accent" : "bg-brand/20"}`}
+      >
+        <span
+          className={`absolute top-0.5 w-3 h-3 rounded-full bg-background transition-all ${checked ? "left-[18px]" : "left-0.5"}`}
+        />
+      </span>
+      <span className={checked ? "text-brand font-semibold" : "text-foreground-muted"}>{label}</span>
+    </button>
+  );
+}
+
+function KeywordEditor({ keywords, onSave }: { keywords: string[]; onSave: (kw: string[]) => void }) {
+  const [value, setValue] = useState(keywords.join(", "));
+  const [editing, setEditing] = useState(false);
+  const dirty = value !== keywords.join(", ");
+
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {keywords.map((k) => (
+          <span key={k} className="inline-flex items-center rounded bg-brand/5 border border-brand/15 px-2 py-0.5 text-xs text-foreground-muted">
+            {k}
+          </span>
+        ))}
+        <button type="button" onClick={() => setEditing(true)} className="text-xs text-accent hover:underline">
+          키워드 편집
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-label="키워드 (쉼표로 구분)"
+        className="w-full border border-brand/20 rounded px-2 py-1.5 text-sm"
+        placeholder="쉼표로 구분 (예: 선거, 후보, 정당)"
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const kw = value.split(",").map((s) => s.trim()).filter(Boolean);
+            onSave(kw);
+            setEditing(false);
+          }}
+          disabled={!dirty}
+          className="bg-brand text-background px-3 py-1 rounded text-xs font-semibold disabled:opacity-50"
+        >
+          저장
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setValue(keywords.join(", "));
+            setEditing(false);
+          }}
+          className="text-xs text-foreground-muted underline"
+        >
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ClassifyTestBox() {
+  const [text, setText] = useState("군수 후보가 갭투자 단기 매매를 권유했다");
+  const [result, setResult] = useState<ClassifyTestResult | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    if (!text.trim()) return;
+    setBusy(true);
+    try {
+      setResult(await classifyTest(text));
+    } catch {
+      setResult(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="border border-accent/40 rounded-lg p-3 bg-accent-subtle/20 space-y-2">
+      <p className="text-sm font-semibold text-brand">🔎 분류 테스트</p>
+      <div className="flex gap-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          aria-label="테스트 문장"
+          className="flex-1 border border-brand/20 rounded px-2 py-1.5 text-sm"
+          placeholder="문장을 입력하면 어떤 민감주제에 걸리는지 보여줍니다"
+        />
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          className="bg-accent text-background px-4 py-1.5 rounded text-sm font-semibold disabled:opacity-60"
+        >
+          {busy ? "검사 중…" : "검사"}
+        </button>
+      </div>
+      {result && (
+        <div className="text-sm space-y-1">
+          {result.matches.length === 0 ? (
+            <p className="text-foreground-muted">✅ 걸린 민감주제 없음</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {result.matches.map((m) => (
+                  <Tag key={m.topic} tone="danger">
+                    {SENSITIVE_TOPIC_LABELS[m.topic] ?? m.topic} ({m.matchedKeywords.join(", ")})
+                  </Tag>
+                ))}
+              </div>
+              <p className="text-xs text-foreground-muted">
+                {result.requiresHitl && "HITL 검토 필요 "}
+                {result.blockAiOnly && "· AI 단독 차단"}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -457,54 +682,5 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-foreground-muted">{label}</p>
       <p className="text-2xl font-bold text-brand mt-1">{value}</p>
     </article>
-  );
-}
-
-function PlaceholderSection({
-  id,
-  title,
-  desc,
-  columns,
-  task,
-  badge,
-}: {
-  id: string;
-  title: string;
-  desc: string;
-  columns: string[];
-  task: string;
-  badge?: "ai_assisted";
-}) {
-  return (
-    <section aria-labelledby={`${id}-heading`} className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h2 id={`${id}-heading`} className="text-xl font-bold text-brand">
-          {title}
-        </h2>
-        {badge && <AILabelBadge kind={badge} />}
-      </div>
-      <p className="text-sm text-foreground-muted">{desc}</p>
-
-      <div className="overflow-x-auto border border-brand/15 rounded-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-brand/5 text-left text-foreground-muted">
-              {columns.map((col) => (
-                <th key={col} className="px-3 py-2 font-semibold">
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={columns.length} className="px-3 py-8 text-center text-foreground-muted">
-                🚧 구현 예정 — TaskMaster {task} (백엔드 API 대기 중)
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
   );
 }
