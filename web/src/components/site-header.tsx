@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAccessibility } from "./accessibility-provider";
 
 const NAV_ITEMS = [
+  { href: "/news", label: "태안뉴스" },
   { href: "/reports", label: "주간 리포트" },
   { href: "/query", label: "AI 질의" },
   { href: "/dashboard", label: "B2B 대시보드" },
