@@ -16,6 +16,15 @@ import {
   type ReviewItem,
   type ReviewStats,
 } from "@/lib/api/review";
+import {
+  getReporters,
+  paySettlement,
+  SETTLEMENT_STATUS_LABELS,
+  type CitizenSummary,
+  type ReporterSummary,
+  type SettlementStatus,
+} from "@/lib/api/citizen";
+import { REGION_OPTIONS } from "@/lib/types";
 
 export default function AdminPage() {
   return (
@@ -29,8 +38,8 @@ export default function AdminPage() {
         </div>
         <h1 className="text-3xl font-bold text-brand">관리자 대시보드</h1>
         <p className="text-foreground-muted">
-          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영을 한곳에서. 비용 현황과 HITL 검수 큐는 실데이터와 연동되며,
-          나머지는 백엔드 연결 대기 중입니다.
+          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영을 한곳에서. 비용·HITL 검수·시민기자 운영은 실데이터와
+          연동되며, 민감주제 규칙 편집만 백엔드 연결 대기 중입니다.
         </p>
         <div className="bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
           🔒 <strong className="text-brand">인증 미적용 (데모)</strong> — 실제 운영 시 SSO + 관리자 권한 검사가
@@ -266,16 +275,165 @@ function Tag({ children, tone = "neutral" }: { children: React.ReactNode; tone?:
   return <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs ${cls}`}>{children}</span>;
 }
 
-// ── 3. 시민기자 운영 (자리표시) ─────────────────────────────
+// ── 3. 시민기자 운영 (실데이터) ─────────────────────────────
+function regionLabel(code: string): string {
+  return REGION_OPTIONS.find((r) => r.code === code)?.label ?? code;
+}
+
 function CitizenOpsSection() {
+  const [reporters, setReporters] = useState<ReporterSummary[]>([]);
+  const [summary, setSummary] = useState<CitizenSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { reporters, summary } = await getReporters();
+        setReporters(reporters);
+        setSummary(summary);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "시민기자 데이터를 불러오지 못했습니다");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  async function pay(reporterId: string) {
+    setBusyId(reporterId);
+    // 낙관적 로컬 반영 (Workers 인메모리는 요청 간 영속 안 됨)
+    setReporters((prev) =>
+      prev.map((r) =>
+        r.userId === reporterId && r.settlement
+          ? { ...r, settlement: { ...r.settlement, status: "paid" } }
+          : r,
+      ),
+    );
+    setSummary((prev) => (prev ? { ...prev, pendingSettlements: Math.max(0, prev.pendingSettlements - 1) } : prev));
+    try {
+      await paySettlement(reporterId);
+    } catch {
+      /* 데모: 실패해도 로컬 반영 유지 */
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
-    <PlaceholderSection
-      id="citizen"
-      title="📰 시민기자 운영"
-      task="#28 / #29 / #43"
-      desc="시민기자 신청 승인, 교육 진도, 기사 발행 현황, 월별 정산을 관리합니다. (모집 일정: 2026년 7월 중순)"
-      columns={["기자", "발행 수", "교육 진도", "이번 달 정산", "상태"]}
-    />
+    <section aria-labelledby="citizen-heading" className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <h2 id="citizen-heading" className="text-xl font-bold text-brand">
+          📰 시민기자 운영
+        </h2>
+        {summary && (
+          <span className="text-xs text-foreground-muted">
+            기자 {summary.totalReporters}명(활동 {summary.active}) · 발행 {summary.publishedTotal} ·{" "}
+            {summary.settlementMonth} 정산 ₩{summary.settlementTotalKrw.toLocaleString()}(대기{" "}
+            {summary.pendingSettlements})
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-foreground-muted">
+        ℹ️ 실제 모집은 2026년 7월 중순 예정 — 아래는 운영 화면 <strong>예시 데이터</strong>입니다.
+      </p>
+
+      {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+      {error && (
+        <p className="text-sm text-red-600 border border-red-200 rounded p-3 bg-red-50">⚠️ {error}</p>
+      )}
+
+      {!loading && !error && (
+        <div className="overflow-x-auto border border-brand/15 rounded-lg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-brand/5 text-left text-foreground-muted">
+                <th className="px-3 py-2 font-semibold">기자</th>
+                <th className="px-3 py-2 font-semibold">발행</th>
+                <th className="px-3 py-2 font-semibold">교육</th>
+                <th className="px-3 py-2 font-semibold">이번 달 정산</th>
+                <th className="px-3 py-2 font-semibold">처리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reporters.map((r) => (
+                <tr key={r.userId} className="border-t border-brand/10">
+                  <td className="px-3 py-2">
+                    <span className="font-semibold text-brand">{r.name}</span>
+                    <span className="text-xs text-foreground-muted"> · {regionLabel(r.eupMyeon)}</span>
+                    {!r.active && <span className="ml-1 text-xs text-red-500">중단</span>}
+                    {!r.onboardingCompleted && <span className="ml-1 text-xs text-amber-600">교육 미완</span>}
+                  </td>
+                  <td className="px-3 py-2">{r.publishedCount}건</td>
+                  <td className="px-3 py-2">
+                    <TrainingBar completed={r.trainingCompleted} />
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.settlement ? (
+                      <span>
+                        ₩{r.settlement.totalKrw.toLocaleString()}
+                        {r.settlement.bonusKrw > 0 && (
+                          <span className="text-xs text-accent"> (+보너스)</span>
+                        )}{" "}
+                        <SettlementPill status={r.settlement.status} />
+                      </span>
+                    ) : (
+                      <span className="text-foreground-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.settlement && r.settlement.status !== "paid" ? (
+                      <button
+                        type="button"
+                        onClick={() => pay(r.userId)}
+                        disabled={busyId === r.userId}
+                        className="bg-brand text-background px-3 py-1 rounded text-xs font-semibold disabled:opacity-60"
+                      >
+                        정산 처리
+                      </button>
+                    ) : (
+                      <span className="text-xs text-foreground-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TrainingBar({ completed }: { completed: number }) {
+  const total = 6;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="inline-block w-16 h-2 rounded bg-brand/10 overflow-hidden">
+        <span
+          className={`block h-full ${completed >= total ? "bg-accent" : "bg-amber-400"}`}
+          style={{ width: `${(completed / total) * 100}%` }}
+        />
+      </span>
+      <span className="text-xs text-foreground-muted">
+        {completed}/{total}
+      </span>
+    </span>
+  );
+}
+
+function SettlementPill({ status }: { status: SettlementStatus }) {
+  const map = {
+    pending: "bg-amber-100 text-amber-800",
+    processing: "bg-blue-100 text-blue-800",
+    paid: "bg-green-100 text-green-800",
+    failed: "bg-red-100 text-red-700",
+  } as const;
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${map[status]}`}>
+      {SETTLEMENT_STATUS_LABELS[status]}
+    </span>
   );
 }
 
