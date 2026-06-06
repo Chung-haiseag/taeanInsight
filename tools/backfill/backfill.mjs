@@ -28,6 +28,10 @@ const OUT_SUMMARY = join(OUT_DIR, "summary.json");
 const BASE = "https://www.taeannews.co.kr/news/articleView.html?idxno=";
 const LOGIN_URL = "https://www.taeannews.co.kr/member/login.php";
 const UA = "TaeanInsightBot/0.1 (+https://insight.taeannews.co.kr; archive backfill, contact taeannews)";
+// 회원 세션 사용 시: 서버가 세션을 브라우저 UA에 묶는 경우가 있어 실제 브라우저 UA 사용 (TAEAN_UA 로 덮어쓰기 가능)
+const BROWSER_UA =
+  process.env.TAEAN_UA ||
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
 // 회원 세션 쿠키 (로그인 시 채워짐). 비밀번호는 환경변수로만 받고 저장/로그 안 함.
 let SESSION_COOKIE = "";
@@ -146,6 +150,7 @@ function parseArticle(idxno, html) {
     category: classify(`${title} ${body}`),
     bodyChars: body.length,
     excerpt: body.length > 160 ? body.slice(0, 160) + "…" : body,
+    body, // 전문 (아카이브·검색·RAG용)
   };
 }
 
@@ -156,11 +161,16 @@ async function fetchArticle(idxno, opts) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), opts.timeout);
       const res = await fetch(BASE + idxno, {
-        headers: {
-          "User-Agent": UA,
-          Accept: "text/html",
-          ...(SESSION_COOKIE ? { Cookie: SESSION_COOKIE } : {}),
-        },
+        headers: SESSION_COOKIE
+          ? {
+              // 로그인 세션: 실제 브라우저처럼 위장 (세션-UA 바인딩 대응)
+              "User-Agent": BROWSER_UA,
+              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+              Referer: "https://www.taeannews.co.kr/",
+              Cookie: SESSION_COOKIE,
+            }
+          : { "User-Agent": UA, Accept: "text/html" },
         signal: ctrl.signal,
       });
       clearTimeout(t);
@@ -181,12 +191,20 @@ async function main() {
   const opts = parseArgs(process.argv);
   await mkdir(OUT_DIR, { recursive: true });
 
+  // 이미 로그인된 브라우저 세션 쿠키를 재사용하는 경로 (가장 확실)
+  // 브라우저 DevTools → Application → Cookies 에서 복사해 TAEAN_COOKIE 로 전달
+  if (process.env.TAEAN_COOKIE) SESSION_COOKIE = process.env.TAEAN_COOKIE.trim();
+
   // 로그인 1건 테스트: 회원 세션으로 회원전용 기사 본문이 풀리는지 확인
   if (opts.test != null) {
-    console.log("로그인 시도 중… (TAEAN_ID/TAEAN_PW 환경변수)");
-    const r = await login();
-    console.log(`로그인 응답: HTTP ${r.status} · 쿠키 ${r.cookieCount}개${r.alert ? ` · alert: "${r.alert}"` : ""}`);
-    if (!SESSION_COOKIE) console.log("⚠️ 세션 쿠키를 못 받았습니다 (자격 증명/CAPTCHA 확인).");
+    if (SESSION_COOKIE) {
+      console.log("TAEAN_COOKIE 환경변수의 브라우저 세션 쿠키 사용 (로그인 생략)");
+    } else {
+      console.log("로그인 시도 중… (TAEAN_ID/TAEAN_PW 환경변수)");
+      const r = await login();
+      console.log(`로그인 응답: HTTP ${r.status} · 쿠키 ${r.cookieCount}개${r.alert ? ` · alert: "${r.alert}"` : ""}`);
+    }
+    if (!SESSION_COOKIE) console.log("⚠️ 세션 쿠키가 없습니다 (TAEAN_COOKIE 또는 TAEAN_ID/PW 확인).");
     const html = await fetchArticle(opts.test, opts);
     if (html && (html.__error || html.__gap)) {
       console.log(`기사 ${opts.test} 가져오기 실패:`, html.__error || "결번/404");
@@ -206,11 +224,15 @@ async function main() {
     return;
   }
 
-  // 로그인 백필 모드
+  // 로그인 백필 모드 (TAEAN_COOKIE 가 있으면 그걸 쓰고, 없으면 id/pw 로그인)
   if (opts.login) {
-    const r = await login();
-    console.log(`로그인: HTTP ${r.status} · 쿠키 ${r.cookieCount}개${r.alert ? ` · alert "${r.alert}"` : ""}`);
-    if (!SESSION_COOKIE) throw new Error("로그인 실패 — 세션 쿠키 없음");
+    if (SESSION_COOKIE) {
+      console.log("TAEAN_COOKIE 세션 쿠키 사용");
+    } else {
+      const r = await login();
+      console.log(`로그인: HTTP ${r.status} · 쿠키 ${r.cookieCount}개${r.alert ? ` · alert "${r.alert}"` : ""}`);
+      if (!SESSION_COOKIE) throw new Error("로그인 실패 — 세션 쿠키 없음");
+    }
   }
 
   // 대상 idxno 목록
@@ -236,36 +258,65 @@ async function main() {
   }
   const todo = ids.filter((id) => !seen.has(id));
 
-  console.log(`대상 ${ids.length}건 (이미 ${ids.length - todo.length}건 처리됨) · delay ${opts.delay}ms · 동시 ${opts.concurrency}`);
+  console.log(`대상 ${ids.length}건 (이미 ${ids.length - todo.length}건 처리됨) · delay ${opts.delay}ms · 동시 ${opts.concurrency}${SESSION_COOKIE ? " · 회원세션" : ""}`);
   const stat = { fetched: 0, membersOnly: 0, gaps: 0, errors: 0, byCategory: {}, byYear: {}, sample: [] };
+
+  const startMs = Date.now();
+  let processed = 0;
+  let consecutiveLocked = 0;
+  let aborted = false;
+  const LOCK_ABORT = 20; // 로그인 상태에서 연속 20건 잠김 = 세션 만료 가능성
+
+  function progress() {
+    processed++;
+    if (processed % 200 === 0 || processed === todo.length) {
+      const elapsed = (Date.now() - startMs) / 1000;
+      const rate = processed / elapsed;
+      const remain = Math.round((todo.length - processed) / rate);
+      const eta = `${Math.floor(remain / 3600)}h${Math.floor((remain % 3600) / 60)}m`;
+      process.stdout.write(
+        `\r[${processed}/${todo.length}] 수집 ${stat.fetched}(잠김 ${stat.membersOnly}) · 결번 ${stat.gaps} · 오류 ${stat.errors} · ${rate.toFixed(1)}/s · ETA ${eta}   `,
+      );
+    }
+  }
 
   let idx = 0;
   async function worker() {
-    while (idx < todo.length) {
+    while (idx < todo.length && !aborted) {
       const id = todo[idx++];
       const html = await fetchArticle(id, opts);
       if (html && html.__gap) {
         stat.gaps++;
-        process.stdout.write(".");
       } else if (html && html.__error) {
         stat.errors++;
-        if (stat.errors <= 2) console.log(`\n[err ${id}] ${html.__error}`);
-        process.stdout.write("x");
+        if (stat.errors <= 3) console.log(`\n[err ${id}] ${html.__error}`);
       } else {
         const art = parseArticle(id, html);
         if (art.gap) {
           stat.gaps++;
-          process.stdout.write(".");
         } else {
           await appendFile(OUT_JSONL, JSON.stringify(art) + "\n");
           stat.fetched++;
-          if (art.membersOnly) stat.membersOnly++;
+          if (art.membersOnly) {
+            stat.membersOnly++;
+            consecutiveLocked++;
+          } else {
+            consecutiveLocked = 0;
+          }
           stat.byCategory[art.category] = (stat.byCategory[art.category] || 0) + 1;
           if (art.year) stat.byYear[art.year] = (stat.byYear[art.year] || 0) + 1;
-          if (stat.sample.length < 14) stat.sample.push({ idxno: id, year: art.year, category: art.category, section: art.section, title: art.title, author: art.author, bodyChars: art.bodyChars, membersOnly: art.membersOnly });
-          process.stdout.write(art.membersOnly ? "@" : "#");
+          if (stat.sample.length < 14) stat.sample.push({ idxno: id, year: art.year, category: art.category, section: art.section, title: art.title, bodyChars: art.bodyChars, membersOnly: art.membersOnly });
+          // 세션 만료 안전장치
+          if (SESSION_COOKIE && consecutiveLocked >= LOCK_ABORT) {
+            aborted = true;
+            console.log(
+              `\n\n⚠️ 연속 ${LOCK_ABORT}건이 잠겨 있습니다 — PHPSESSID 세션이 만료된 것 같습니다.\n` +
+                `   브라우저에서 쿠키를 다시 복사해 TAEAN_COOKIE 를 갱신한 뒤 같은 명령으로 재개하세요(이미 수집분은 건너뜁니다).`,
+            );
+          }
         }
       }
+      progress();
       await sleep(opts.delay);
     }
   }
