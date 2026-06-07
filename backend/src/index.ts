@@ -13,6 +13,7 @@ import { reviewRouter } from "./governance/review_router";
 import { rulesRouter } from "./governance/rules_router";
 import { citizenRouter } from "./citizen/router";
 import { newsRouter } from "./news/router";
+import { archiveRouter } from "./archive/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -47,6 +48,7 @@ app.route("/api/admin/review", reviewRouter);
 app.route("/api/admin/rules", rulesRouter);
 app.route("/api/admin/citizen", citizenRouter);
 app.route("/api/news", newsRouter);
+app.route("/api/archive", archiveRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {

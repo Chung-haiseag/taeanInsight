@@ -24,6 +24,7 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dir, "out");
 const OUT_JSONL = join(OUT_DIR, "articles.jsonl");
 const OUT_SUMMARY = join(OUT_DIR, "summary.json");
+const IMG_DIR = join(OUT_DIR, "images");
 
 const BASE = "https://www.taeannews.co.kr/news/articleView.html?idxno=";
 const LOGIN_URL = "https://www.taeannews.co.kr/member/login.php";
@@ -64,6 +65,8 @@ function parseArgs(argv) {
     const k = argv[i];
     if (k === "--sample") a.sample = true;
     else if (k === "--login") a.login = true;
+    else if (k === "--images") a.images = "lead"; // 대표 사진 1장만 다운로드
+    else if (k === "--images-all") a.images = "all"; // 본문 모든 사진 다운로드
     else if (k === "--test") a.test = Number(argv[++i]);
     else if (k === "--start") a.start = Number(argv[++i]);
     else if (k === "--end") a.end = Number(argv[++i]);
@@ -123,6 +126,34 @@ function extractImages(htmlChunk) {
     urls.push(u);
   }
   return [...new Set(urls)];
+}
+
+// 사진 파일 다운로드 (회원 세션 필요 — 사진도 회원전용). 우리가 보관해야 비회원에게 보임.
+async function downloadImages(idxno, urls, opts) {
+  const saved = [];
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), opts.timeout);
+      const res = await fetch(url, {
+        headers: { "User-Agent": BROWSER_UA, Referer: "https://www.taeannews.co.kr/", ...(SESSION_COOKIE ? { Cookie: SESSION_COOKIE } : {}) },
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length < 1024) continue; // 너무 작으면 오류/플레이스홀더
+      const ext = (url.match(/\.(jpe?g|png|gif|webp)(?:\?|$)/i)?.[1] || "jpg").toLowerCase();
+      const name = `${idxno}_${i}.${ext}`;
+      await writeFile(join(IMG_DIR, name), buf);
+      saved.push({ url, file: `images/${name}`, bytes: buf.length });
+    } catch {
+      /* 개별 이미지 실패는 무시 */
+    }
+    await sleep(opts.delay);
+  }
+  return saved;
 }
 
 function parseArticle(idxno, html) {
@@ -213,6 +244,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function main() {
   const opts = parseArgs(process.argv);
   await mkdir(OUT_DIR, { recursive: true });
+  if (opts.images) await mkdir(IMG_DIR, { recursive: true });
 
   // 이미 로그인된 브라우저 세션 쿠키를 재사용하는 경로 (가장 확실)
   // 브라우저 DevTools → Application → Cookies 에서 복사해 TAEAN_COOKIE 로 전달
@@ -240,6 +272,12 @@ async function main() {
     console.log(`회원전용 잠김: ${art.membersOnly ? "🔒 예 (본문 못 가져옴)" : "✅ 아니오 (본문 해제됨!)"}`);
     console.log(`본문 ${art.bodyChars}자 · 사진 ${art.images?.length ?? 0}장` + (art.bodyChars ? ` · 발췌: ${art.excerpt}` : ""));
     if (art.leadImage) console.log(`대표 이미지: ${art.leadImage}`);
+    if (opts.images && !art.membersOnly && art.images.length) {
+      await mkdir(IMG_DIR, { recursive: true });
+      const urls = opts.images === "all" ? art.images : art.images.slice(0, 1);
+      const saved = await downloadImages(opts.test, urls, opts);
+      console.log(`사진 다운로드: ${saved.length}장 저장` + (saved[0] ? ` → ${saved[0].file} (${Math.round(saved[0].bytes / 1024)}KB)` : " (실패 — 회원 세션/접근 확인)"));
+    }
     console.log(
       art.membersOnly
         ? "\n→ 로그인했는데도 잠김: 계정 등급이 유료 구독이어야 하거나, 세션 미적용일 수 있습니다."
@@ -319,6 +357,12 @@ async function main() {
         if (art.gap) {
           stat.gaps++;
         } else {
+          // 사진 다운로드 (옵션) — 회원전용 사진을 우리가 보관
+          if (opts.images && !art.membersOnly && art.images.length) {
+            const urls = opts.images === "all" ? art.images : art.images.slice(0, 1);
+            art.localImages = await downloadImages(id, urls, opts);
+            stat.imagesSaved = (stat.imagesSaved || 0) + art.localImages.length;
+          }
           await appendFile(OUT_JSONL, JSON.stringify(art) + "\n");
           stat.fetched++;
           if (art.membersOnly) {
@@ -348,7 +392,7 @@ async function main() {
 
   await writeFile(OUT_SUMMARY, JSON.stringify(stat, null, 2));
   console.log("\n\n=== 백필 요약 ===");
-  console.log(`수집 ${stat.fetched} (회원전용 ${stat.membersOnly} · 본문무료 ${stat.fetched - stat.membersOnly}) · 결번 ${stat.gaps} · 오류 ${stat.errors}`);
+  console.log(`수집 ${stat.fetched} (회원전용 ${stat.membersOnly} · 본문무료 ${stat.fetched - stat.membersOnly}) · 결번 ${stat.gaps} · 오류 ${stat.errors}${stat.imagesSaved ? ` · 사진 ${stat.imagesSaved}장 저장` : ""}`);
   console.log("연도별:", stat.byYear);
   console.log("분류별:", stat.byCategory);
   console.log("\n=== 파싱 표본 (@ = 회원전용/본문없음) ===");

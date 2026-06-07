@@ -11,8 +11,11 @@ export interface Env {
   TOGETHER_API_KEY?: string;
   SLACK_WEBHOOK_URL?: string;
 
-  // 바인딩 (미래에 추가)
-  // DB: D1Database;
+  // 태안신문 아카이브 바인딩
+  ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색
+  ARCHIVE_PHOTOS?: R2Bucket;      // 사진 파일
+
+  // 향후 추가
   // CACHE: KVNamespace;
   // BATCH_QUEUE: Queue;
 }
