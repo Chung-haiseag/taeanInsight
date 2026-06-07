@@ -109,6 +109,22 @@ function stripHtml(s) {
   return decodeEntities(s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
+// 본문 영역의 사진 URL 수집 (다운로드는 안 함 — 주소만). 로고·아이콘은 제외.
+function extractImages(htmlChunk) {
+  const urls = [];
+  const re = /<img[^>]+src=["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(htmlChunk))) {
+    let u = m[1].trim();
+    if (!u || u.startsWith("data:")) continue;
+    if (u.startsWith("//")) u = "https:" + u;
+    else if (u.startsWith("/")) u = "https://www.taeannews.co.kr" + u;
+    if (/logo|icon|btn|blank|spacer|sns/i.test(u)) continue; // 장식 이미지 제외
+    urls.push(u);
+  }
+  return [...new Set(urls)];
+}
+
 function parseArticle(idxno, html) {
   // 결번 감지
   if (html.length < 400 || html.includes("존재하지 않는 링크")) return { idxno, gap: true };
@@ -120,18 +136,23 @@ function parseArticle(idxno, html) {
 
   // 본문
   let body = "";
+  let images = [];
   const anchor = html.indexOf('id="article-view-content-div"');
   if (anchor !== -1) {
     const gt = html.indexOf(">", anchor);
     let chunk = html.slice(gt + 1, gt + 1 + 60000);
     const cut = chunk.search(/저작권자|무단전재|<script|id="dn_btn"|이 기사를 공유/);
     if (cut !== -1) chunk = chunk.slice(0, cut);
+    images = extractImages(chunk); // 텍스트 제거 전에 사진 URL 추출
     body = stripHtml(chunk);
   }
 
   // 회원전용기사: 비로그인 시 본문이 로그인 안내로 대체됨 → 전문 수집 불가
   const membersOnly = /회원전용기사|회원만 열람|로그인 또는 회원가입/.test(body);
-  if (membersOnly) body = "";
+  if (membersOnly) {
+    body = "";
+    images = [];
+  }
 
   // 기자 (best-effort): 본문에서만 "○○○ 기자" 추출 (상단 메뉴 오매칭 방지)
   const bylineMatch = body.match(/([가-힣]{2,4})\s*기자/);
@@ -151,6 +172,8 @@ function parseArticle(idxno, html) {
     bodyChars: body.length,
     excerpt: body.length > 160 ? body.slice(0, 160) + "…" : body,
     body, // 전문 (아카이브·검색·RAG용)
+    images, // 본문 사진 URL 목록 (다운로드 안 함, 주소만)
+    leadImage: images[0] ?? null, // 대표 이미지
   };
 }
 
@@ -215,7 +238,8 @@ async function main() {
     console.log(`idxno ${opts.test} · ${art.title}`);
     console.log(`발행 ${art.publishedAt} · 섹션 ${art.section}`);
     console.log(`회원전용 잠김: ${art.membersOnly ? "🔒 예 (본문 못 가져옴)" : "✅ 아니오 (본문 해제됨!)"}`);
-    console.log(`본문 ${art.bodyChars}자` + (art.bodyChars ? ` · 발췌: ${art.excerpt}` : ""));
+    console.log(`본문 ${art.bodyChars}자 · 사진 ${art.images?.length ?? 0}장` + (art.bodyChars ? ` · 발췌: ${art.excerpt}` : ""));
+    if (art.leadImage) console.log(`대표 이미지: ${art.leadImage}`);
     console.log(
       art.membersOnly
         ? "\n→ 로그인했는데도 잠김: 계정 등급이 유료 구독이어야 하거나, 세션 미적용일 수 있습니다."
