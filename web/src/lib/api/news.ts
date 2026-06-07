@@ -36,3 +36,12 @@ export async function getNews(category?: string, limit?: number): Promise<NewsRe
   const q = params.toString();
   return apiFetch<NewsResponse>(`/api/news${q ? `?${q}` : ""}`);
 }
+
+export interface NewsArticle extends NewsItem {
+  categoryLabel: string;
+  bodySource: "rss_excerpt" | "archive_fulltext";
+}
+
+export async function getNewsItem(id: string): Promise<NewsArticle> {
+  return apiFetch<NewsArticle>(`/api/news/${id}`);
+}

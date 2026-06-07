@@ -50,3 +50,21 @@ newsRouter.get("/", async (c) => {
     source: "주간태안신문 (taeannews.co.kr)",
   });
 });
+
+// 기사 1건 (자체 리더용). 현재 본문은 RSS 발췌 기준 — 아카이브 백필(D1) 연동 시 전문으로 교체.
+newsRouter.get("/:id", async (c) => {
+  let items;
+  try {
+    items = await getNews();
+  } catch (e) {
+    return c.json({ error: "rss_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
+  }
+  const item = items.find((it) => it.id === c.req.param("id"));
+  if (!item) return c.json({ error: "not_found" }, 404);
+  return c.json({
+    ...item,
+    categoryLabel: NEWS_CATEGORY_LABELS[item.category],
+    // 본문 출처 표시: 현재는 발췌(RSS). 백필 전문 연동 시 fullText:true 로 전환
+    bodySource: "rss_excerpt",
+  });
+});

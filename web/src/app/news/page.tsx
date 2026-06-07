@@ -4,6 +4,7 @@
 // 발췌 + 원문 링크(저작권 안전). 카테고리 탭 필터.
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { getNews, type NewsResponse } from "@/lib/api/news";
 
@@ -71,14 +72,12 @@ export default function NewsPage() {
             ))}
           </div>
 
-          {/* 기사 리스트 */}
+          {/* 기사 리스트 — 클릭 시 자체 리더로 */}
           <ul className="divide-y divide-brand/10">
             {items.map((it) => (
               <li key={it.id}>
-                <a
-                  href={it.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={`/news/${it.id}`}
                   className="group block py-5 transition-colors hover:bg-brand/[0.02] -mx-3 px-3 rounded-lg"
                 >
                   <div className="flex items-center gap-2 text-xs">
@@ -93,15 +92,15 @@ export default function NewsPage() {
                   </h2>
                   <p className="mt-1 text-sm leading-relaxed text-foreground-muted line-clamp-2">{it.excerpt}</p>
                   <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand">
-                    원문 보기 <span aria-hidden="true">↗</span>
+                    읽기 <span aria-hidden="true">→</span>
                   </span>
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
 
           <p className="text-xs text-foreground-muted">
-            출처: {data.source} · 10분마다 갱신 · AI 자동 분류(휴리스틱)
+            출처: {data.source} · 10분마다 갱신 · AI 자동 분류(휴리스틱) · 전문은 회원 전용
           </p>
         </>
       )}
