@@ -10,16 +10,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Env } from "../types";
-import {
-  InMemoryReviewQueue,
-  ReviewQueueService,
-  buildSeedItems,
-  type ReviewStatus,
-} from "./review_queue";
-
-const repo = new InMemoryReviewQueue();
-repo.seed(buildSeedItems());
-const svc = new ReviewQueueService(repo);
+import { reviewService as svc, type ReviewStatus } from "./review_queue";
 
 const STATUS_VALUES = ["pending", "approved", "rejected"] as const;
 

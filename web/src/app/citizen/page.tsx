@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AILabelBadge } from "@/components/ai-label-badge";
 
 export const metadata: Metadata = {
@@ -27,6 +28,11 @@ export default function CitizenPage() {
           태안의 이야기를 가장 잘 아는 사람은 태안에 사는 사람입니다. AI는 사실 확인·요약·문장
           다듬기를 보조하고, 편집부가 모든 발행물을 검토합니다.
         </p>
+        <div className="pt-2">
+          <Link href="/citizen/write" className="btn-accent">
+            ✍️ 시민기자 에디터 열기 (코파일럿)
+          </Link>
+        </div>
       </header>
 
       <section

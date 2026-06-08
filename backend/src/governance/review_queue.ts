@@ -50,6 +50,11 @@ export class InMemoryReviewQueue {
     for (const it of items) this.items.set(it.id, it);
   }
 
+  add(item: ReviewItem): ReviewItem {
+    this.items.set(item.id, item);
+    return item;
+  }
+
   list(status?: ReviewStatus): ReviewItem[] {
     const all = [...this.items.values()].sort((a, b) => b.queuedAt.localeCompare(a.queuedAt));
     return status ? all.filter((i) => i.status === status) : all;
@@ -93,6 +98,11 @@ export class ReviewQueueService {
 
   stats(): ReviewStats {
     return this.repo.stats();
+  }
+
+  // 시민 코파일럿 제출 → 검수 큐 등록
+  enqueue(item: ReviewItem): ReviewItem {
+    return this.repo.add(item);
   }
 }
 
@@ -187,3 +197,14 @@ export function buildSeedItems(): ReviewItem[] {
     };
   });
 }
+
+// ── 공유 싱글턴 — review_router(검수)와 copilot(제출)이 같은 큐를 본다 ──
+// (SEED_SPECS·buildSeedItems 정의 이후에 위치해야 초기화 순서 안전)
+let seq = 0;
+export function nextReviewId(): string {
+  seq += 1;
+  return `sub-${Date.now()}-${seq}`;
+}
+export const reviewStore = new InMemoryReviewQueue();
+reviewStore.seed(buildSeedItems());
+export const reviewService = new ReviewQueueService(reviewStore);
