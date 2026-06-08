@@ -167,7 +167,9 @@ function parseArticle(idxno, html) {
   // 공개 메타 — 회원전용이라 본문이 잠겨도 이건 받을 수 있음
   const ogDesc = stripHtml(metaContent(html, "property", "og:description"));
   const ogImageRaw = metaContent(html, "property", "og:image");
-  const ogImage = ogImageRaw && !/logo|sns|icon/i.test(ogImageRaw) ? ogImageRaw : null;
+  // og:image = 대표사진 썸네일(_v150). 로고면 제외. 원본은 /thumbnail→/photo + _v150 제거로 유도(둘 다 공개)
+  const ogThumb = ogImageRaw && !/logo|sns|icon/i.test(ogImageRaw) ? ogImageRaw : null;
+  const ogFull = ogThumb ? ogThumb.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "") : null;
 
   // 본문
   let body = "";
@@ -209,8 +211,9 @@ function parseArticle(idxno, html) {
     bodyChars: body.length,
     excerpt: excerptSource.length > 160 ? excerptSource.slice(0, 160) + "…" : excerptSource,
     body, // 전문 (있을 때만 — 회원전용이면 빈 문자열)
-    images, // 본문 사진 URL 목록 (다운로드 안 함, 주소만)
-    leadImage: images[0] ?? ogImage ?? null, // 대표 이미지
+    images, // 본문 사진 URL 목록 (로그인 시에만 — 회원전용이면 빈 배열)
+    leadImage: images[0] ?? ogFull ?? null, // 대표 사진 원본(공개)
+    leadThumb: ogThumb ?? null, // 대표 사진 썸네일(공개, 목록·카드용)
   };
 }
 
