@@ -154,7 +154,7 @@ function RelatedArticles({ items }: { items: ArchiveHit[] }) {
             >
               {it.lead_image && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={it.lead_image} alt="" className="h-12 w-16 shrink-0 rounded object-cover bg-brand/5" loading="lazy" />
+                <img src={it.lead_image} alt="" className="h-12 w-16 shrink-0 rounded object-cover bg-brand/5" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               )}
               <div className="min-w-0">
                 <p className="text-xs text-foreground-muted">{(it.published_at ?? "").slice(0, 10)}</p>
@@ -189,7 +189,7 @@ function FullBody({ article }: { article: Reader }) {
         <div className="space-y-3">
           {article.images.map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" className="w-full rounded-lg bg-brand/5" loading="lazy" />
+            <img key={src} src={src} alt="" className="w-full rounded-lg bg-brand/5" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
       )}

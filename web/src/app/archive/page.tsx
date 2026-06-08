@@ -115,6 +115,9 @@ export default function ArchivePage() {
                         alt=""
                         className="h-20 w-28 shrink-0 rounded object-cover bg-brand/5"
                         loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
                       />
                     )}
                     <div className="min-w-0">
