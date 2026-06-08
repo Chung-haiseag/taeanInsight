@@ -48,6 +48,10 @@ export async function getArchiveArticle(idxno: number): Promise<ArchiveArticle> 
   return apiFetch<ArchiveArticle>(`/api/archive/${idxno}`);
 }
 
+export async function getRelatedArchive(idxno: number): Promise<{ items: ArchiveHit[] }> {
+  return apiFetch<{ items: ArchiveHit[] }>(`/api/archive/related/${idxno}`);
+}
+
 export const ARCHIVE_CATEGORY_LABELS: Record<string, string> = {
   tourism: "관광",
   environment: "환경",

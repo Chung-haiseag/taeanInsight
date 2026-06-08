@@ -8,7 +8,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { getNewsItem } from "@/lib/api/news";
-import { getArchiveArticle, ARCHIVE_CATEGORY_LABELS } from "@/lib/api/archive";
+import {
+  getArchiveArticle,
+  getRelatedArchive,
+  ARCHIVE_CATEGORY_LABELS,
+  type ArchiveHit,
+} from "@/lib/api/archive";
 import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
 
 interface Reader {
@@ -35,8 +40,10 @@ export default function NewsReaderPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [member, setMember] = useState(false);
+  const [related, setRelated] = useState<ArchiveHit[]>([]);
 
   useEffect(() => {
+    getRelatedArchive(Number(params.id)).then((r) => setRelated(r.items ?? [])).catch(() => {});
     setMember(getDemoHomeState() === "entitled");
     (async () => {
       try {
@@ -119,6 +126,8 @@ export default function NewsReaderPage() {
         />
       )}
 
+      {related.length > 0 && <RelatedArticles items={related} />}
+
       {isMockMode() && (
         <DemoMemberToggle
           member={member}
@@ -129,6 +138,33 @@ export default function NewsReaderPage() {
         />
       )}
     </article>
+  );
+}
+
+function RelatedArticles({ items }: { items: ArchiveHit[] }) {
+  return (
+    <section className="border-t border-brand/10 pt-6 space-y-3">
+      <p className="eyebrow">📚 이 주제 과거 기사</p>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {items.map((it) => (
+          <li key={it.idxno}>
+            <Link
+              href={`/news/${it.idxno}`}
+              className="flex gap-3 rounded-lg border border-brand/12 p-3 hover:border-brand/30 hover:bg-brand/[0.02]"
+            >
+              {it.lead_image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={it.lead_image} alt="" className="h-12 w-16 shrink-0 rounded object-cover bg-brand/5" loading="lazy" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs text-foreground-muted">{(it.published_at ?? "").slice(0, 10)}</p>
+                <p className="text-sm font-semibold text-brand line-clamp-2">{it.title}</p>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

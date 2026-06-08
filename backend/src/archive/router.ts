@@ -74,6 +74,22 @@ archiveRouter.get("/search", async (c) => {
   }
 });
 
+// 관련 과거기사 — 같은 분류의 다른 기사(최신순). 추후 임베딩 의미검색으로 업그레이드.
+archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ items: [] });
+  const idxno = Number(c.req.param("idxno"));
+  const self = await db.prepare("SELECT category FROM archive_articles WHERE idxno = ?").bind(idxno).first<{ category: string }>();
+  if (!self) return c.json({ items: [] });
+  const rows = await db
+    .prepare(
+      "SELECT idxno,title,published_at,year,category,lead_image FROM archive_articles WHERE category = ? AND idxno != ? ORDER BY published_at DESC LIMIT 6",
+    )
+    .bind(self.category, idxno)
+    .all();
+  return c.json({ items: rows.results ?? [] });
+});
+
 // 기사 1건 (전문 포함)
 archiveRouter.get("/:idxno{[0-9]+}", async (c) => {
   const db = c.env.ARCHIVE_DB;
