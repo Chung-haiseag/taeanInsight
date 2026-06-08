@@ -1,24 +1,37 @@
 "use client";
 
 // 자체 기사 리더 — 태안신문으로 나가지 않고 우리 사이트에서 기사를 보여준다.
-// 단, 전문은 "우리 쪽 회원 게이트" 뒤에 둔다(태안신문 회원 수익 보호 정책).
-// 현재 본문은 RSS 발췌 기준 — 아카이브 백필(D1) 연동 시 전문으로 교체.
+// 전문은 D1 아카이브에서(우리 쪽 회원 게이트 뒤), 없으면 RSS 발췌로 폴백.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { getNewsItem, type NewsArticle } from "@/lib/api/news";
+import { getNewsItem } from "@/lib/api/news";
+import { getArchiveArticle, ARCHIVE_CATEGORY_LABELS } from "@/lib/api/archive";
 import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
 
+interface Reader {
+  title: string;
+  publishedAt: string;
+  author?: string;
+  categoryLabel: string;
+  excerpt: string;
+  body?: string; // 전문 (D1)
+  images: string[]; // 본문 사진
+  url?: string;
+  source: "archive" | "rss";
+  hasFullText: boolean;
+}
+
 function formatDate(s: string): string {
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
+  const m = (s || "").match(/(\d{4})[-.](\d{2})[-.](\d{2})[T ](\d{2}:\d{2})/);
   return m ? `${m[1]}. ${Number(m[2])}. ${Number(m[3])} ${m[4]}` : s;
 }
 
 export default function NewsReaderPage() {
   const params = useParams<{ id: string }>();
-  const [article, setArticle] = useState<NewsArticle | null>(null);
+  const [article, setArticle] = useState<Reader | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [member, setMember] = useState(false);
@@ -27,9 +40,38 @@ export default function NewsReaderPage() {
     setMember(getDemoHomeState() === "entitled");
     (async () => {
       try {
-        setArticle(await getNewsItem(params.id));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "기사를 불러오지 못했습니다");
+        // 1) D1 아카이브(전문) 우선
+        const a = await getArchiveArticle(Number(params.id));
+        setArticle({
+          title: a.title,
+          publishedAt: a.published_at,
+          author: a.author,
+          categoryLabel: ARCHIVE_CATEGORY_LABELS[a.category] ?? a.category,
+          excerpt: a.excerpt ?? "",
+          body: a.body,
+          images: Array.isArray(a.images) ? a.images : [],
+          url: a.url,
+          source: "archive",
+          hasFullText: !!(a.body && a.body.length > 0),
+        });
+      } catch {
+        // 2) 아카이브에 없으면 RSS 발췌
+        try {
+          const n = await getNewsItem(params.id);
+          setArticle({
+            title: n.title,
+            publishedAt: n.publishedAt,
+            author: n.author,
+            categoryLabel: n.categoryLabel,
+            excerpt: n.excerpt,
+            images: [],
+            url: n.url,
+            source: "rss",
+            hasFullText: false,
+          });
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "기사를 불러오지 못했습니다");
+        }
       } finally {
         setLoading(false);
       }
@@ -49,9 +91,10 @@ export default function NewsReaderPage() {
 
   return (
     <article className="mx-auto max-w-prose space-y-6">
-      <Link href="/news" className="text-sm text-foreground-muted hover:text-brand">
-        ← 태안뉴스
-      </Link>
+      <div className="flex gap-4 text-sm text-foreground-muted">
+        <Link href="/news" className="hover:text-brand">← 태안뉴스</Link>
+        <Link href="/archive" className="hover:text-brand">아카이브 검색</Link>
+      </div>
 
       <header className="space-y-3 border-b border-brand/10 pb-6">
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -70,7 +113,10 @@ export default function NewsReaderPage() {
       {member ? (
         <FullBody article={article} />
       ) : (
-        <MemberGate onUnlock={() => { setDemoHomeState("entitled"); setMember(true); }} />
+        <MemberGate
+          hasFullText={article.hasFullText}
+          onUnlock={() => { setDemoHomeState("entitled"); setMember(true); }}
+        />
       )}
 
       {isMockMode() && (
@@ -86,34 +132,52 @@ export default function NewsReaderPage() {
   );
 }
 
-function FullBody({ article }: { article: NewsArticle }) {
+function FullBody({ article }: { article: Reader }) {
   return (
     <div className="space-y-5">
-      {/* 본문 (현재 발췌 기준 — 백필 연동 시 전문) */}
-      <div className="space-y-4 text-foreground leading-relaxed">
-        <p>{article.excerpt}</p>
-      </div>
+      {article.hasFullText ? (
+        <div className="space-y-4 text-foreground leading-relaxed whitespace-pre-line">{article.body}</div>
+      ) : (
+        <>
+          <div className="space-y-4 text-foreground leading-relaxed">
+            <p>{article.excerpt}</p>
+          </div>
+          <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
+            📚 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
+          </div>
+        </>
+      )}
 
-      <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
-        📚 전체 본문은 아카이브 백필(전문) 데이터 연동 시 이 자리에 표시됩니다. 현재 데모는 RSS 발췌 기준입니다.
-      </div>
+      {/* 본문 사진 */}
+      {article.images.length > 0 && (
+        <div className="space-y-3">
+          {article.images.map((src) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={src} src={src} alt="" className="w-full rounded-lg bg-brand/5" loading="lazy" />
+          ))}
+        </div>
+      )}
 
       {/* 출처 표기 */}
       <div className="flex items-center justify-between border-t border-brand/10 pt-4 text-sm">
         <span className="text-foreground-muted">출처 · 주간태안신문</span>
-        <a href={article.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">
-          원문 보기 ↗
-        </a>
+        {article.url && (
+          <a href={article.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">
+            원문 보기 ↗
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
-function MemberGate({ onUnlock }: { onUnlock: () => void }) {
+function MemberGate({ hasFullText, onUnlock }: { hasFullText: boolean; onUnlock: () => void }) {
   return (
     <div className="relative rounded-2xl border border-accent/40 bg-accent-subtle/20 p-7 text-center space-y-4">
       <p className="eyebrow justify-center">🔒 회원 전용</p>
-      <h2 className="text-xl font-bold text-brand">이 기사의 전문은 태안 인텔리전스 회원에게 제공됩니다</h2>
+      <h2 className="text-xl font-bold text-brand">
+        {hasFullText ? "이 기사의 전문은 태안 인텔리전스 회원에게 제공됩니다" : "회원이 되시면 더 많은 기능을 이용하실 수 있어요"}
+      </h2>
       <p className="text-sm text-foreground-muted">
         로그인하시면 전문과 AI 요약·관련 기사까지 한곳에서 보실 수 있어요.
       </p>
