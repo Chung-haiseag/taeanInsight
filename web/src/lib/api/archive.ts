@@ -1,0 +1,59 @@
+// 아카이브(24년) API 클라이언트 — backend/src/archive/router.ts 매핑
+
+import { apiFetch } from "./client";
+
+export interface ArchiveHit {
+  idxno: number;
+  title: string;
+  published_at: string;
+  year: number;
+  section: string;
+  category: string;
+  author?: string;
+  excerpt?: string;
+  lead_image?: string | null;
+  members_only?: number;
+}
+
+export interface ArchiveSearchResult {
+  items: ArchiveHit[];
+  page: number;
+  pageSize: number;
+  mode?: string;
+  note?: string;
+}
+
+export interface ArchiveArticle extends ArchiveHit {
+  body?: string;
+  images?: string[];
+  url?: string;
+}
+
+export async function searchArchive(params: {
+  q?: string;
+  category?: string;
+  year?: string;
+  page?: number;
+}): Promise<ArchiveSearchResult> {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.category) sp.set("category", params.category);
+  if (params.year) sp.set("year", params.year);
+  if (params.page) sp.set("page", String(params.page));
+  const qs = sp.toString();
+  return apiFetch<ArchiveSearchResult>(`/api/archive/search${qs ? `?${qs}` : ""}`);
+}
+
+export async function getArchiveArticle(idxno: number): Promise<ArchiveArticle> {
+  return apiFetch<ArchiveArticle>(`/api/archive/${idxno}`);
+}
+
+export const ARCHIVE_CATEGORY_LABELS: Record<string, string> = {
+  tourism: "관광",
+  environment: "환경",
+  realestate: "부동산",
+  policy: "정책·행정",
+  industry: "수산·산업",
+  culture: "문화·교육",
+  society: "지역사회",
+};
