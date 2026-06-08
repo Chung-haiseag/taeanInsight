@@ -125,6 +125,20 @@ function stripHtml(s) {
   return decodeEntities(s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
+// 본문 전용 — 블록 태그를 줄바꿈으로 바꿔 문단 구분 보존
+function bodyText(s) {
+  const withBreaks = s
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, "\n\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "");
+  return decodeEntities(withBreaks)
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 // 본문 영역의 사진 URL 수집 (다운로드는 안 함 — 주소만). 로고·아이콘은 제외.
 function extractImages(htmlChunk) {
   const urls = [];
@@ -194,7 +208,7 @@ function parseArticle(idxno, html) {
     const cut = chunk.search(/저작권자|무단전재|<script|id="dn_btn"|이 기사를 공유/);
     if (cut !== -1) chunk = chunk.slice(0, cut);
     images = extractImages(chunk); // 텍스트 제거 전에 사진 URL 추출
-    body = stripHtml(chunk);
+    body = bodyText(chunk); // 문단 구분(\n) 보존
   }
 
   // 회원전용기사: 비로그인 시 본문이 로그인 안내로 대체됨 → 전문 수집 불가

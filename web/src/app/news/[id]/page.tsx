@@ -114,16 +114,28 @@ export default function NewsReaderPage() {
         <h1 className="text-display-sm font-bold text-brand">{article.title}</h1>
       </header>
 
-      {/* 리드(발췌) — 누구나 */}
-      <p className="text-lg leading-relaxed text-foreground">{article.excerpt}</p>
-
-      {member ? (
+      {member && article.hasFullText ? (
         <FullBody article={article} />
       ) : (
-        <MemberGate
-          hasFullText={article.hasFullText}
-          onUnlock={() => { setDemoHomeState("entitled"); setMember(true); }}
-        />
+        <>
+          {/* 리드(발췌) */}
+          <p className="text-lg leading-relaxed text-foreground">{article.excerpt}</p>
+          {member ? (
+            <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
+              📚 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
+              {article.url && (
+                <a href={article.url} target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-brand hover:underline">
+                  원문 보기 ↗
+                </a>
+              )}
+            </div>
+          ) : (
+            <MemberGate
+              hasFullText={article.hasFullText}
+              onUnlock={() => { setDemoHomeState("entitled"); setMember(true); }}
+            />
+          )}
+        </>
       )}
 
       {related.length > 0 && <RelatedArticles items={related} />}
@@ -168,21 +180,26 @@ function RelatedArticles({ items }: { items: ArchiveHit[] }) {
   );
 }
 
+function splitParagraphs(text: string): string[] {
+  const t = (text || "").trim();
+  if (!t) return [];
+  // 백필이 문단(\n)을 보존했으면 그대로, 아니면(한 덩어리) 문장 단위로 묶어 문단화
+  if (t.includes("\n")) return t.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  const sentences = t.split(/(?<=[.?!”"’])\s+/).filter(Boolean);
+  const paras: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join(" "));
+  return paras.length ? paras : [t];
+}
+
 function FullBody({ article }: { article: Reader }) {
+  const paras = splitParagraphs(article.body || "");
   return (
     <div className="space-y-5">
-      {article.hasFullText ? (
-        <div className="space-y-4 text-foreground leading-relaxed whitespace-pre-line">{article.body}</div>
-      ) : (
-        <>
-          <div className="space-y-4 text-foreground leading-relaxed">
-            <p>{article.excerpt}</p>
-          </div>
-          <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
-            📚 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
-          </div>
-        </>
-      )}
+      <div className="space-y-5 text-[1.05rem] leading-[1.9] text-foreground">
+        {paras.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </div>
 
       {/* 본문 사진 */}
       {article.images.length > 0 && (
