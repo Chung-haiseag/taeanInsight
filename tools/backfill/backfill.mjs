@@ -365,8 +365,22 @@ async function main() {
         const art = parseArticle(id, html);
         if (art.gap) {
           stat.gaps++;
+        } else if (art.membersOnly && SESSION_COOKIE) {
+          // 인증 모드인데 잠김 = 세션 만료 가능성 → 기록하지 않음(재개 시 다시 받음), 연속 카운트만
+          consecutiveLocked++;
+          stat.sessionLocked = (stat.sessionLocked || 0) + 1;
+          if (consecutiveLocked >= LOCK_ABORT) {
+            aborted = true;
+            console.log(
+              `\n\n⚠️ 연속 ${LOCK_ABORT}건이 잠겼습니다 — PHPSESSID 세션이 만료된 것 같습니다.\n` +
+                `   잠긴 구간은 기록하지 않았으니, 쿠키만 갱신하면 그대로 이어받습니다:\n` +
+                `   1) 브라우저에서 cURL 다시 복사 → pbpaste > /tmp/taean-curl.txt\n` +
+                `   2) export TAEAN_COOKIE/TAEAN_UA 재실행 → 같은 백필 명령 재실행`,
+            );
+          }
         } else {
-          // 사진 다운로드 (옵션) — 회원전용 사진을 우리가 보관
+          // 정상 기록 (인증 본문 또는 비로그인 발췌)
+          consecutiveLocked = 0;
           if (opts.images && !art.membersOnly && art.images.length) {
             const urls = opts.images === "all" ? art.images : art.images.slice(0, 1);
             art.localImages = await downloadImages(id, urls, opts);
@@ -374,23 +388,10 @@ async function main() {
           }
           await appendFile(OUT_JSONL, JSON.stringify(art) + "\n");
           stat.fetched++;
-          if (art.membersOnly) {
-            stat.membersOnly++;
-            consecutiveLocked++;
-          } else {
-            consecutiveLocked = 0;
-          }
+          if (art.membersOnly) stat.membersOnly++; // 비로그인 발췌 수집분
           stat.byCategory[art.category] = (stat.byCategory[art.category] || 0) + 1;
           if (art.year) stat.byYear[art.year] = (stat.byYear[art.year] || 0) + 1;
           if (stat.sample.length < 14) stat.sample.push({ idxno: id, year: art.year, category: art.category, section: art.section, title: art.title, bodyChars: art.bodyChars, membersOnly: art.membersOnly });
-          // 세션 만료 안전장치
-          if (SESSION_COOKIE && consecutiveLocked >= LOCK_ABORT) {
-            aborted = true;
-            console.log(
-              `\n\n⚠️ 연속 ${LOCK_ABORT}건이 잠겨 있습니다 — PHPSESSID 세션이 만료된 것 같습니다.\n` +
-                `   브라우저에서 쿠키를 다시 복사해 TAEAN_COOKIE 를 갱신한 뒤 같은 명령으로 재개하세요(이미 수집분은 건너뜁니다).`,
-            );
-          }
         }
       }
       progress();
