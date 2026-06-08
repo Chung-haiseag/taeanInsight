@@ -14,6 +14,7 @@ export interface Env {
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색
   ARCHIVE_PHOTOS?: R2Bucket;      // 사진 파일
+  AI?: Ai;                        // Workers AI (저가 오픈모델)
 
   // 향후 추가
   // CACHE: KVNamespace;

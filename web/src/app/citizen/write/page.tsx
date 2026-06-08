@@ -10,11 +10,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import {
+  copilotAssist,
   copilotCheck,
   copilotSubmit,
   PII_LABELS,
   SENSITIVE_LABELS,
   type AiLabel,
+  type AssistMode,
   type CheckResult,
   type SubmitResult,
 } from "@/lib/api/copilot";
@@ -161,7 +163,7 @@ export default function CopilotEditorPage() {
         {/* 코파일럿 사이드 */}
         <aside className="space-y-4">
           <GovernancePanel check={check} />
-          <ComingSoonPanel />
+          <AssistPanel body={body} onApply={(t) => setBody(t)} />
         </aside>
       </div>
     </div>
@@ -202,27 +204,67 @@ function GovernancePanel({ check }: { check: CheckResult | null }) {
   );
 }
 
-function ComingSoonPanel() {
-  const items = [
-    ["✍️", "문장 다듬기·요약"],
-    ["💡", "제목 추천"],
-    ["📚", "관련 과거기사 (아카이브)"],
-    ["🔎", "AI 팩트체크"],
+function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) => void }) {
+  const [busy, setBusy] = useState<AssistMode | null>(null);
+  const [out, setOut] = useState<{ mode: AssistMode; result: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function run(mode: AssistMode) {
+    if (!body.trim()) {
+      setErr("본문을 먼저 입력하세요.");
+      return;
+    }
+    setBusy(mode);
+    setErr(null);
+    setOut(null);
+    try {
+      const r = await copilotAssist(mode, body);
+      setOut({ mode, result: r.result });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "보조 실패");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const buttons: [AssistMode, string][] = [
+    ["polish", "✍️ 다듬기"],
+    ["summarize", "📝 요약"],
+    ["title", "💡 제목 추천"],
   ];
+
   return (
-    <section className="rounded-2xl border border-dashed border-brand/20 bg-brand/[0.02] p-4 space-y-2">
+    <section className="rounded-2xl border border-brand/15 bg-background p-4 space-y-3">
       <h2 className="text-sm font-bold text-brand">🤖 AI 글쓰기 보조</h2>
-      <ul className="space-y-1.5">
-        {items.map(([icon, label]) => (
-          <li key={label} className="flex items-center justify-between text-sm text-foreground-muted">
-            <span>
-              {icon} {label}
-            </span>
-            <span className="text-[10px] rounded-full bg-brand/10 px-2 py-0.5">준비 중</span>
-          </li>
+      <div className="flex flex-wrap gap-2">
+        {buttons.map(([mode, label]) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => run(mode)}
+            disabled={busy !== null}
+            className="rounded-full border border-brand/20 px-3 py-1.5 text-sm text-brand hover:bg-brand/5 disabled:opacity-50"
+          >
+            {busy === mode ? "생성 중…" : label}
+          </button>
         ))}
-      </ul>
-      <p className="text-[11px] text-foreground-muted">아카이브 백필·LLM 연결 시 활성화됩니다.</p>
+      </div>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      {out && (
+        <div className="rounded-lg border border-accent/30 bg-accent-subtle/20 p-3 space-y-2">
+          <p className="whitespace-pre-wrap text-sm text-foreground">{out.result}</p>
+          {out.mode === "polish" && (
+            <button
+              type="button"
+              onClick={() => onApply(out.result)}
+              className="text-xs font-semibold text-accent hover:underline"
+            >
+              본문에 반영 →
+            </button>
+          )}
+        </div>
+      )}
+      <p className="text-[11px] text-foreground-muted">Workers AI (Llama 3.1) · 무료 할당 내 종량 0 · 관련 과거기사·팩트체크는 아카이브 백필 후</p>
     </section>
   );
 }

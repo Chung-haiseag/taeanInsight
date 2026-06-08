@@ -27,6 +27,10 @@
       "bucket_name": "taean-archive-photos"
     }
   ],
+  // Workers AI — 저가 오픈모델(무료 할당 내 종량 0). 코파일럿 글쓰기 보조·요약·분류용
+  "ai": {
+    "binding": "AI"
+  },
   // 향후: KV(캐시·세션), Queues(배치), Vectorize(RAG),
   //       Secrets: ANTHROPIC_API_KEY, TOGETHER_API_KEY, SLACK_WEBHOOK_URL
   "triggers": {

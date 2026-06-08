@@ -46,6 +46,37 @@ copilotRouter.post("/check", async (c) => {
   });
 });
 
+// ── AI 글쓰기 보조 (Workers AI 저가 오픈모델 — 무료 할당 내 종량 0) ──
+const ASSIST_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const ASSIST_PROMPTS: Record<string, string> = {
+  polish: "다음 한국어 기사 문장을 사실은 바꾸지 말고 자연스럽고 명확하게 다듬어줘. 결과만 출력해.",
+  summarize: "다음 한국어 기사를 핵심 3줄로 요약해줘. 불릿으로.",
+  title: "다음 한국어 기사에 어울리는 신문 제목 3개를 제안해줘. 각 줄에 하나씩.",
+};
+
+copilotRouter.post("/assist", async (c) => {
+  if (!c.env.AI) return c.json({ error: "ai_unbound", message: "Workers AI 바인딩이 없습니다" }, 503);
+  const body = await c.req.json().catch(() => ({}));
+  const mode = typeof body?.mode === "string" ? body.mode : "";
+  const text = typeof body?.text === "string" ? body.text : "";
+  const system = ASSIST_PROMPTS[mode];
+  if (!system) return c.json({ error: "invalid_mode" }, 400);
+  if (!text.trim()) return c.json({ error: "empty_text" }, 400);
+
+  try {
+    const res = (await c.env.AI.run(ASSIST_MODEL as never, {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: text.slice(0, 4000) },
+      ],
+      max_tokens: 512,
+    } as never)) as { response?: string };
+    return c.json({ mode, model: ASSIST_MODEL, result: (res.response ?? "").trim() });
+  } catch (e) {
+    return c.json({ error: "assist_failed", detail: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
+
 // ── 제출 → 거버넌스 적용 → AI 라벨 산정 → 검수 큐 등록 ───────
 const submitSchema = z.object({
   title: z.string().min(1),

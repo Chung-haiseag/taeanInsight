@@ -30,6 +30,12 @@ export async function copilotCheck(title: string, text: string): Promise<CheckRe
   return apiFetch("/api/copilot/check", { method: "POST", body: JSON.stringify({ title, text }) });
 }
 
+export type AssistMode = "polish" | "summarize" | "title";
+
+export async function copilotAssist(mode: AssistMode, text: string): Promise<{ result: string; model: string }> {
+  return apiFetch("/api/copilot/assist", { method: "POST", body: JSON.stringify({ mode, text }) });
+}
+
 export async function copilotSubmit(input: {
   title: string;
   body: string;
