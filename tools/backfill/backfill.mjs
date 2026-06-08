@@ -164,6 +164,10 @@ function parseArticle(idxno, html) {
   const publishedAt = metaContent(html, "property", "article:published_time");
   const section = metaContent(html, "property", "article:section");
   const section1 = metaContent(html, "property", "article:section1");
+  // 공개 메타 — 회원전용이라 본문이 잠겨도 이건 받을 수 있음
+  const ogDesc = stripHtml(metaContent(html, "property", "og:description"));
+  const ogImageRaw = metaContent(html, "property", "og:image");
+  const ogImage = ogImageRaw && !/logo|sns|icon/i.test(ogImageRaw) ? ogImageRaw : null;
 
   // 본문
   let body = "";
@@ -189,6 +193,8 @@ function parseArticle(idxno, html) {
   const bylineMatch = body.match(/([가-힣]{2,4})\s*기자/);
   const author = bylineMatch ? `${bylineMatch[1]} 기자` : undefined;
 
+  // 발췌: 본문 있으면 본문, 없으면(회원전용) 공개 메타 설명
+  const excerptSource = body || ogDesc;
   const year = publishedAt ? publishedAt.slice(0, 4) : "";
   return {
     idxno,
@@ -199,12 +205,12 @@ function parseArticle(idxno, html) {
     section: section1 ? `${section}>${section1}` : section,
     author,
     membersOnly,
-    category: classify(`${title} ${body}`),
+    category: classify(`${title} ${excerptSource}`),
     bodyChars: body.length,
-    excerpt: body.length > 160 ? body.slice(0, 160) + "…" : body,
-    body, // 전문 (아카이브·검색·RAG용)
+    excerpt: excerptSource.length > 160 ? excerptSource.slice(0, 160) + "…" : excerptSource,
+    body, // 전문 (있을 때만 — 회원전용이면 빈 문자열)
     images, // 본문 사진 URL 목록 (다운로드 안 함, 주소만)
-    leadImage: images[0] ?? null, // 대표 이미지
+    leadImage: images[0] ?? ogImage ?? null, // 대표 이미지
   };
 }
 
