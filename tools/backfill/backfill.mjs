@@ -16,9 +16,22 @@
 // Node 20+ (global fetch). 외부 의존성 없음.
 
 import { mkdir, appendFile, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// 'Copy as cURL' 파일에서 쿠키·UA 자동 추출 (셸 따옴표 지옥 방지)
+// 사용: TAEAN_CURL_FILE=/tmp/taean-curl.txt node backfill.mjs ...
+if (process.env.TAEAN_CURL_FILE && existsSync(process.env.TAEAN_CURL_FILE)) {
+  const curl = readFileSync(process.env.TAEAN_CURL_FILE, "utf8");
+  const ck = curl.match(/-b '([^']*)'/) || curl.match(/-H '[Cc]ookie: ([^']*)'/);
+  const ua = curl.match(/-H '[Uu]ser-[Aa]gent: ([^']*)'/);
+  if (ck && !process.env.TAEAN_COOKIE) process.env.TAEAN_COOKIE = ck[1];
+  if (ua && !process.env.TAEAN_UA) process.env.TAEAN_UA = ua[1];
+  console.log(
+    `cURL 파일에서 추출: 쿠키 ${(process.env.TAEAN_COOKIE || "").length}자 · UA ${(process.env.TAEAN_UA || "").slice(0, 28)}…`,
+  );
+}
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dir, "out");
