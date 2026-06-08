@@ -37,6 +37,7 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dir, "out");
 const OUT_JSONL = join(OUT_DIR, "articles.jsonl");
 const OUT_SUMMARY = join(OUT_DIR, "summary.json");
+const OUT_GAPS = join(OUT_DIR, "gaps.txt");
 const IMG_DIR = join(OUT_DIR, "images");
 
 const BASE = "https://www.taeannews.co.kr/news/articleView.html?idxno=";
@@ -345,7 +346,7 @@ async function main() {
   }
   if (opts.limit) ids = ids.slice(0, opts.limit);
 
-  // 재개: 기존 출력의 idxno 제외
+  // 재개: 기존 출력의 idxno 제외 + 이미 확인된 결번도 제외(재확인 안 함)
   const seen = new Set();
   if (existsSync(OUT_JSONL)) {
     const prev = await readFile(OUT_JSONL, "utf8");
@@ -354,9 +355,16 @@ async function main() {
       try { seen.add(JSON.parse(line).idxno); } catch {}
     }
   }
+  let knownGaps = 0;
+  if (existsSync(OUT_GAPS)) {
+    for (const line of (await readFile(OUT_GAPS, "utf8")).split("\n")) {
+      const n = Number(line.trim());
+      if (n) { seen.add(n); knownGaps++; }
+    }
+  }
   const todo = ids.filter((id) => !seen.has(id));
 
-  console.log(`대상 ${ids.length}건 (이미 ${ids.length - todo.length}건 처리됨) · delay ${opts.delay}ms · 동시 ${opts.concurrency}${SESSION_COOKIE ? " · 회원세션" : ""}`);
+  console.log(`대상 ${ids.length}건 (이미 ${ids.length - todo.length}건 처리됨, 그중 결번 ${knownGaps}건 스킵) · delay ${opts.delay}ms · 동시 ${opts.concurrency}${SESSION_COOKIE ? " · 회원세션" : ""}`);
   const stat = { fetched: 0, membersOnly: 0, gaps: 0, errors: 0, byCategory: {}, byYear: {}, sample: [] };
 
   const startMs = Date.now();
@@ -385,6 +393,7 @@ async function main() {
       const html = await fetchArticle(id, opts);
       if (html && html.__gap) {
         stat.gaps++;
+        await appendFile(OUT_GAPS, id + "\n"); // 결번 기록 → 재개 시 재확인 안 함
       } else if (html && html.__error) {
         stat.errors++;
         if (stat.errors <= 3) console.log(`\n[err ${id}] ${html.__error}`);
@@ -392,6 +401,7 @@ async function main() {
         const art = parseArticle(id, html);
         if (art.gap) {
           stat.gaps++;
+          await appendFile(OUT_GAPS, id + "\n"); // 결번 기록
         } else if (art.membersOnly && SESSION_COOKIE) {
           // 인증 모드인데 잠김 = 세션 만료 가능성 → 기록하지 않음(재개 시 다시 받음), 연속 카운트만
           consecutiveLocked++;
