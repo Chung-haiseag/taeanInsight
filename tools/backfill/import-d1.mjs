@@ -17,15 +17,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const JSONL = join(__dir, "out", "articles.jsonl");
-const SQL_DIR = join(__dir, "out", "d1");
 
 function arg(name, def) {
   const i = process.argv.indexOf(name);
   return i !== -1 ? process.argv[i + 1] : def;
 }
 
-const BATCH = Number(arg("--batch", "500"));
+// --in 으로 다른 JSONL(예: ebook) 적재 가능. 기본은 backfill 결과.
+const JSONL = arg("--in", join(__dir, "out", "articles.jsonl"));
+const SQL_DIR = join(__dir, "out", "d1");
+
+const BATCH = Number(arg("--batch", "200"));
 
 // SQL 문자열 이스케이프 — 작은따옴표만 이중화, NUL 제거 (공백·줄바꿈은 보존)
 function q(v) {
@@ -54,11 +56,11 @@ async function main() {
 
   async function flush() {
     if (!rows.length) return;
-    const sql =
+    // 행마다 개별 INSERT (단일 statement가 D1 한도 넘지 않게 — 본문 최대 ~17KB)
+    const header =
       "INSERT OR REPLACE INTO archive_articles\n" +
-      "(idxno,title,published_at,year,section,category,author,excerpt,body,images,lead_image,members_only,url) VALUES\n" +
-      rows.join(",\n") +
-      ";\n";
+      "(idxno,title,published_at,year,section,category,author,excerpt,body,images,lead_image,members_only,url) VALUES\n";
+    const sql = rows.map((r) => header + r + ";").join("\n") + "\n";
     const name = `insert_${String(fileIdx).padStart(3, "0")}.sql`;
     await writeFile(join(SQL_DIR, name), sql);
     fileIdx++;
