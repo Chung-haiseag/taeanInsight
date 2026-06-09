@@ -112,14 +112,20 @@ function metaContent(html, attr, value) {
   return m ? decodeEntities(m[1]).trim() : "";
 }
 
+const NAMED_ENT = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", hellip: "…",
+  middot: "·", ndash: "–", mdash: "—", deg: "°", times: "×",
+  laquo: "«", raquo: "»", copy: "©", reg: "®", trade: "™",
+};
 function decodeEntities(s) {
-  return s
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;|&#39;/g, "'");
+  return s.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, code) => {
+    if (code[0] === "#") {
+      const n = code[1].toLowerCase() === "x" ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return Number.isFinite(n) ? String.fromCodePoint(n) : m;
+    }
+    return NAMED_ENT[code.toLowerCase()] ?? m;
+  });
 }
 
 function stripHtml(s) {

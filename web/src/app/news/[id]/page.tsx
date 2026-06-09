@@ -15,6 +15,7 @@ import {
   type ArchiveHit,
 } from "@/lib/api/archive";
 import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
+import { decodeEntities } from "@/lib/html";
 
 interface Reader {
   title: string;
@@ -50,12 +51,12 @@ export default function NewsReaderPage() {
         // 1) D1 아카이브(전문) 우선
         const a = await getArchiveArticle(Number(params.id));
         setArticle({
-          title: a.title,
+          title: decodeEntities(a.title),
           publishedAt: a.published_at,
           author: a.author,
           categoryLabel: ARCHIVE_CATEGORY_LABELS[a.category] ?? a.category,
-          excerpt: a.excerpt ?? "",
-          body: a.body,
+          excerpt: decodeEntities(a.excerpt ?? ""),
+          body: decodeEntities(a.body),
           images: Array.isArray(a.images) ? a.images : [],
           url: a.url,
           source: "archive",
@@ -66,11 +67,11 @@ export default function NewsReaderPage() {
         try {
           const n = await getNewsItem(params.id);
           setArticle({
-            title: n.title,
+            title: decodeEntities(n.title),
             publishedAt: n.publishedAt,
             author: n.author,
             categoryLabel: n.categoryLabel,
-            excerpt: n.excerpt,
+            excerpt: decodeEntities(n.excerpt),
             images: [],
             url: n.url,
             source: "rss",
@@ -170,7 +171,7 @@ function RelatedArticles({ items }: { items: ArchiveHit[] }) {
               )}
               <div className="min-w-0">
                 <p className="text-xs text-foreground-muted">{(it.published_at ?? "").slice(0, 10)}</p>
-                <p className="text-sm font-semibold text-brand line-clamp-2">{it.title}</p>
+                <p className="text-sm font-semibold text-brand line-clamp-2">{decodeEntities(it.title)}</p>
               </div>
             </Link>
           </li>

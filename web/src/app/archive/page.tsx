@@ -11,6 +11,7 @@ import {
   ARCHIVE_CATEGORY_LABELS,
   type ArchiveHit,
 } from "@/lib/api/archive";
+import { decodeEntities } from "@/lib/html";
 
 const CATEGORIES = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
 const YEARS = Array.from({ length: 25 }, (_, i) => String(2026 - i));
@@ -128,9 +129,9 @@ export default function ArchivePage() {
                         <span className="text-foreground-muted">{(h.published_at ?? "").slice(0, 10)}</span>
                         {h.author && <span className="text-foreground-muted">· {h.author}</span>}
                       </div>
-                      <h2 className="mt-1 font-bold text-brand group-hover:underline">{h.title}</h2>
+                      <h2 className="mt-1 font-bold text-brand group-hover:underline">{decodeEntities(h.title)}</h2>
                       {h.excerpt && (
-                        <p className="mt-1 text-sm text-foreground-muted line-clamp-2">{h.excerpt}</p>
+                        <p className="mt-1 text-sm text-foreground-muted line-clamp-2">{decodeEntities(h.excerpt)}</p>
                       )}
                     </div>
                   </Link>
