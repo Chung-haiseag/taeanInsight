@@ -117,6 +117,7 @@ const NAMED_ENT = {
   ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", hellip: "…",
   middot: "·", ndash: "–", mdash: "—", deg: "°", times: "×",
   laquo: "«", raquo: "»", copy: "©", reg: "®", trade: "™",
+  rarr: "→", larr: "←", uarr: "↑", darr: "↓", harr: "↔", bull: "•",
 };
 function decodeEntities(s) {
   return s.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, code) => {

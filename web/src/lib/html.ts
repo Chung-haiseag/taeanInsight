@@ -23,10 +23,23 @@ const NAMED: Record<string, string> = {
   copy: "©",
   reg: "®",
   trade: "™",
+  rarr: "→",
+  larr: "←",
+  uarr: "↑",
+  darr: "↓",
+  harr: "↔",
+  bull: "•",
 };
 
 export function decodeEntities(s?: string | null): string {
   if (!s) return s ?? "";
+  // 브라우저: 네이티브 디코더로 모든 엔티티 처리 (textarea는 콘텐츠를 텍스트로 다뤄 안전)
+  if (typeof document !== "undefined") {
+    const el = document.createElement("textarea");
+    el.innerHTML = s;
+    return el.value;
+  }
+  // SSR 폴백: 명명/숫자 엔티티 맵
   return s.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, code: string) => {
     if (code[0] === "#") {
       const n =
