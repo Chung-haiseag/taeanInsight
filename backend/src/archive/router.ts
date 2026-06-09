@@ -79,6 +79,8 @@ archiveRouter.get("/search", async (c) => {
 const REL_STOP = new Set([
   "태안", "태안군", "주간", "우리", "위해", "관련", "오늘", "올해", "지난", "이번",
   "대회", "행사", "개최", "실시", "운영", "마련", "추진", "지원", "교육", "사업", "방문", "참여",
+  "전면", "착용", "의무화", "확대", "강화", "재검토", "선정", "모집", "안내", "협약", "체결",
+  "전국", "최대", "최초", "처음", "기념", "예정", "결정", "촉구", "주민", "지역",
 ]);
 
 archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
@@ -92,7 +94,6 @@ archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
   if (!self) return c.json({ items: [] });
   const adb: D1Database = db;
   const cols = "idxno,title,published_at,year,category,lead_image";
-  const before = self.published_at ?? "9999";
 
   // 제목에서 키워드 추출 (2자 이상, 흔한 단어 제외, 최대 4개)
   const kws = [
@@ -100,28 +101,43 @@ archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
       (self.title ?? "")
         .split(/[\s,.·…!?"'“”‘’()[\]/~\-—–]+/)
         .map((w) => w.trim())
-        .filter((w) => w.length >= 2 && !REL_STOP.has(w)),
+        // 2자 이상 · 흔한 단어 제외 · 날짜/숫자 토큰 제외(7월, 1일부터, 2026, 20만 …)
+        .filter((w) => w.length >= 2 && !REL_STOP.has(w) && !/^\d/.test(w)),
     ),
-  ].slice(0, 4);
+  ]
+    .sort((a, b) => b.length - a.length) // 긴 단어(더 고유한 복합명사) 우선
+    .slice(0, 3);
 
-  async function topicPast() {
-    if (!kws.length) return { results: [] };
-    const where = "(" + kws.map(() => "title LIKE ?").join(" OR ") + ") AND idxno != ? AND published_at < ?";
-    const sql = `SELECT ${cols} FROM archive_articles WHERE ${where} ORDER BY published_at DESC LIMIT 6`;
-    return adb.prepare(sql).bind(...kws.map((k) => `%${k}%`), idxno, before).all();
-  }
-  async function categoryPast() {
-    const sql = `SELECT ${cols} FROM archive_articles WHERE category = ? AND idxno != ? AND published_at < ? ORDER BY published_at DESC LIMIT 6`;
-    return adb.prepare(sql).bind(self.category, idxno, before).all();
-  }
+  const page = Math.max(1, Number(c.req.query("page") ?? "1"));
+  const PAGE = 6;
+  const offset = (page - 1) * PAGE;
 
-  let rows = await topicPast();
-  let mode = "topic";
-  if ((rows.results?.length ?? 0) < 3) {
-    rows = await categoryPast();
+  // 주제(제목 키워드) 매칭 — 시간 무관, 최근순. 매칭이 0이면 같은 분류로 폴백.
+  let where: string;
+  let binds: unknown[];
+  let mode: string;
+  if (kws.length) {
+    where = "(" + kws.map(() => "title LIKE ?").join(" OR ") + ") AND idxno != ?";
+    binds = [...kws.map((k) => `%${k}%`), idxno];
+    mode = "topic";
+    const cnt = await adb.prepare(`SELECT COUNT(*) n FROM archive_articles WHERE ${where}`).bind(...binds).first<{ n: number }>();
+    if (!cnt || cnt.n === 0) {
+      where = "category = ? AND idxno != ?";
+      binds = [self.category, idxno];
+      mode = "category";
+    }
+  } else {
+    where = "category = ? AND idxno != ?";
+    binds = [self.category, idxno];
     mode = "category";
   }
-  return c.json({ items: rows.results ?? [], mode, keywords: kws });
+
+  const total = (await adb.prepare(`SELECT COUNT(*) n FROM archive_articles WHERE ${where}`).bind(...binds).first<{ n: number }>())?.n ?? 0;
+  const rows = await adb
+    .prepare(`SELECT ${cols} FROM archive_articles WHERE ${where} ORDER BY published_at DESC LIMIT ? OFFSET ?`)
+    .bind(...binds, PAGE, offset)
+    .all();
+  return c.json({ items: rows.results ?? [], total, page, pageSize: PAGE, mode, keywords: kws });
 });
 
 // 기사 1건 (전문 포함)

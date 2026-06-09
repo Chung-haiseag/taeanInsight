@@ -41,10 +41,8 @@ export default function NewsReaderPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [member, setMember] = useState(false);
-  const [related, setRelated] = useState<ArchiveHit[]>([]);
 
   useEffect(() => {
-    getRelatedArchive(Number(params.id)).then((r) => setRelated(r.items ?? [])).catch(() => {});
     setMember(getDemoHomeState() === "entitled");
     (async () => {
       try {
@@ -139,7 +137,7 @@ export default function NewsReaderPage() {
         </>
       )}
 
-      {related.length > 0 && <RelatedArticles items={related} />}
+      <RelatedArticles idxno={Number(params.id)} />
 
       {isMockMode() && (
         <DemoMemberToggle
@@ -154,10 +152,39 @@ export default function NewsReaderPage() {
   );
 }
 
-function RelatedArticles({ items }: { items: ArchiveHit[] }) {
+function RelatedArticles({ idxno }: { idxno: number }) {
+  const [items, setItems] = useState<ArchiveHit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getRelatedArchive(idxno, page)
+      .then((r) => {
+        if (!alive) return;
+        setItems(r.items ?? []);
+        setTotal(r.total ?? 0);
+        setPageSize(r.pageSize ?? 6);
+      })
+      .catch(() => alive && setItems([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [idxno, page]);
+
+  if (!loading && total === 0) return null;
+  const pages = Math.ceil(total / pageSize);
+
   return (
     <section className="border-t border-brand/10 pt-6 space-y-3">
-      <p className="eyebrow">📚 이 주제 과거 기사</p>
+      <div className="flex items-baseline justify-between">
+        <p className="eyebrow">📚 관련 뉴스</p>
+        {total > 0 && <span className="text-xs text-foreground-muted">총 {total}건 · 최근순</span>}
+      </div>
       <ul className="grid gap-2 sm:grid-cols-2">
         {items.map((it) => (
           <li key={it.idxno}>
@@ -177,7 +204,68 @@ function RelatedArticles({ items }: { items: ArchiveHit[] }) {
           </li>
         ))}
       </ul>
+      {pages > 1 && <Pager page={page} pages={pages} onGo={setPage} />}
     </section>
+  );
+}
+
+function Pager({ page, pages, onGo }: { page: number; pages: number; onGo: (p: number) => void }) {
+  // 현재 페이지 주변 일부 + 처음/끝
+  const win = 2;
+  const nums: number[] = [];
+  for (let p = Math.max(1, page - win); p <= Math.min(pages, page + win); p++) nums.push(p);
+  return (
+    <nav className="flex flex-wrap items-center justify-center gap-1 pt-2 text-sm" aria-label="관련 뉴스 페이지">
+      <PagerBtn disabled={page <= 1} onClick={() => onGo(page - 1)}>
+        ←
+      </PagerBtn>
+      {nums[0] > 1 && (
+        <>
+          <PagerBtn onClick={() => onGo(1)}>1</PagerBtn>
+          {nums[0] > 2 && <span className="px-1 text-foreground-muted">…</span>}
+        </>
+      )}
+      {nums.map((p) => (
+        <PagerBtn key={p} active={p === page} onClick={() => onGo(p)}>
+          {p}
+        </PagerBtn>
+      ))}
+      {nums[nums.length - 1] < pages && (
+        <>
+          {nums[nums.length - 1] < pages - 1 && <span className="px-1 text-foreground-muted">…</span>}
+          <PagerBtn onClick={() => onGo(pages)}>{pages}</PagerBtn>
+        </>
+      )}
+      <PagerBtn disabled={page >= pages} onClick={() => onGo(page + 1)}>
+        →
+      </PagerBtn>
+    </nav>
+  );
+}
+
+function PagerBtn({
+  children,
+  active,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-current={active ? "page" : undefined}
+      className={`min-w-8 rounded px-2.5 py-1 ${
+        active ? "bg-brand text-background font-semibold" : "text-foreground-muted hover:bg-brand/5"
+      } disabled:opacity-40`}
+    >
+      {children}
+    </button>
   );
 }
 

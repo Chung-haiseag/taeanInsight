@@ -48,8 +48,17 @@ export async function getArchiveArticle(idxno: number): Promise<ArchiveArticle> 
   return apiFetch<ArchiveArticle>(`/api/archive/${idxno}`);
 }
 
-export async function getRelatedArchive(idxno: number): Promise<{ items: ArchiveHit[] }> {
-  return apiFetch<{ items: ArchiveHit[] }>(`/api/archive/related/${idxno}`);
+export interface RelatedResult {
+  items: ArchiveHit[];
+  total: number;
+  page: number;
+  pageSize: number;
+  mode: string;
+  keywords: string[];
+}
+
+export async function getRelatedArchive(idxno: number, page = 1): Promise<RelatedResult> {
+  return apiFetch<RelatedResult>(`/api/archive/related/${idxno}?page=${page}`);
 }
 
 export const ARCHIVE_CATEGORY_LABELS: Record<string, string> = {
