@@ -74,20 +74,54 @@ archiveRouter.get("/search", async (c) => {
   }
 });
 
-// 관련 과거기사 — 같은 분류의 다른 기사(최신순). 추후 임베딩 의미검색으로 업그레이드.
+// 관련 "과거" 기사 — 제목 키워드로 주제 매칭 + 현재 기사보다 이전(published_at <) 우선.
+// 주제 매칭이 부족하면 같은 분류의 과거 기사로 폴백. 추후 임베딩 의미검색으로 업그레이드.
+const REL_STOP = new Set([
+  "태안", "태안군", "주간", "우리", "위해", "관련", "오늘", "올해", "지난", "이번",
+  "대회", "행사", "개최", "실시", "운영", "마련", "추진", "지원", "교육", "사업", "방문", "참여",
+]);
+
 archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ items: [] });
   const idxno = Number(c.req.param("idxno"));
-  const self = await db.prepare("SELECT category FROM archive_articles WHERE idxno = ?").bind(idxno).first<{ category: string }>();
+  const self = await db
+    .prepare("SELECT title, category, published_at FROM archive_articles WHERE idxno = ?")
+    .bind(idxno)
+    .first<{ title: string; category: string; published_at: string }>();
   if (!self) return c.json({ items: [] });
-  const rows = await db
-    .prepare(
-      "SELECT idxno,title,published_at,year,category,lead_image FROM archive_articles WHERE category = ? AND idxno != ? ORDER BY published_at DESC LIMIT 6",
-    )
-    .bind(self.category, idxno)
-    .all();
-  return c.json({ items: rows.results ?? [] });
+  const adb: D1Database = db;
+  const cols = "idxno,title,published_at,year,category,lead_image";
+  const before = self.published_at ?? "9999";
+
+  // 제목에서 키워드 추출 (2자 이상, 흔한 단어 제외, 최대 4개)
+  const kws = [
+    ...new Set(
+      (self.title ?? "")
+        .split(/[\s,.·…!?"'“”‘’()[\]/~\-—–]+/)
+        .map((w) => w.trim())
+        .filter((w) => w.length >= 2 && !REL_STOP.has(w)),
+    ),
+  ].slice(0, 4);
+
+  async function topicPast() {
+    if (!kws.length) return { results: [] };
+    const where = "(" + kws.map(() => "title LIKE ?").join(" OR ") + ") AND idxno != ? AND published_at < ?";
+    const sql = `SELECT ${cols} FROM archive_articles WHERE ${where} ORDER BY published_at DESC LIMIT 6`;
+    return adb.prepare(sql).bind(...kws.map((k) => `%${k}%`), idxno, before).all();
+  }
+  async function categoryPast() {
+    const sql = `SELECT ${cols} FROM archive_articles WHERE category = ? AND idxno != ? AND published_at < ? ORDER BY published_at DESC LIMIT 6`;
+    return adb.prepare(sql).bind(self.category, idxno, before).all();
+  }
+
+  let rows = await topicPast();
+  let mode = "topic";
+  if ((rows.results?.length ?? 0) < 3) {
+    rows = await categoryPast();
+    mode = "category";
+  }
+  return c.json({ items: rows.results ?? [], mode, keywords: kws });
 });
 
 // 기사 1건 (전문 포함)
