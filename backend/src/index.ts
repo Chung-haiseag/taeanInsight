@@ -15,6 +15,7 @@ import { citizenRouter } from "./citizen/router";
 import { newsRouter } from "./news/router";
 import { archiveRouter } from "./archive/router";
 import { copilotRouter } from "./copilot/router";
+import { queryRouter } from "./query/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -51,6 +52,7 @@ app.route("/api/admin/citizen", citizenRouter);
 app.route("/api/news", newsRouter);
 app.route("/api/archive", archiveRouter);
 app.route("/api/copilot", copilotRouter);
+app.route("/api/query", queryRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
