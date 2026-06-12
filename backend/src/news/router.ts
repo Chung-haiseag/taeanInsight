@@ -42,6 +42,19 @@ newsRouter.get("/", async (c) => {
   }
   if (limit > 0) filtered = filtered.slice(0, limit);
 
+  // 대표사진: 아카이브(D1)에 백필/수집된 lead_image를 배치 조인해 부착
+  if (c.env.ARCHIVE_DB && filtered.length) {
+    const ids = filtered.map((it) => Number(it.id)).filter((n) => Number.isFinite(n) && n > 0);
+    if (ids.length) {
+      const rs = await c.env.ARCHIVE_DB
+        .prepare(`SELECT idxno, lead_image FROM archive_articles WHERE idxno IN (${ids.map(() => "?").join(",")}) AND lead_image IS NOT NULL`)
+        .bind(...ids)
+        .all();
+      const imgMap = new Map((rs.results ?? []).map((r) => [String(r.idxno), r.lead_image as string]));
+      filtered = filtered.map((it) => ({ ...it, leadImage: imgMap.get(it.id) ?? null }));
+    }
+  }
+
   return c.json({
     items: filtered,
     total: items.length,

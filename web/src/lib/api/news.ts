@@ -19,6 +19,7 @@ export interface NewsItem {
   author?: string;
   publishedAt: string;
   category: NewsCategory;
+  leadImage?: string | null;  // 아카이브(D1)에서 조인된 대표사진
 }
 
 export interface NewsResponse {

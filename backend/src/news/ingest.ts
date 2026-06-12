@@ -138,16 +138,29 @@ export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise
   for (const it of items) {
     const idxno = Number(it.id);
     if (!Number.isFinite(idxno) || idxno <= 0) continue;
+    // 이미 있으면 페이지 fetch 생략(비용·트래픽 절약)
+    const exists = await db.prepare("SELECT 1 FROM archive_articles WHERE idxno=?").bind(idxno).first();
+    if (exists) continue;
     const publishedAt = it.publishedAt.replace(" ", "T") + "+09:00";
+    // 대표사진: 기사 페이지의 og:image 썸네일(_v150) → 원본 photo URL 유도. 로고면 제외 (백필과 동일 규칙)
+    let leadImage: string | null = null;
+    try {
+      const html = await (await fetch(it.url, { headers: { "User-Agent": UA } })).text();
+      const og = /property="og:image"\s+content="([^"]+)"/.exec(html)?.[1];
+      if (og && !og.includes("/logo/")) {
+        leadImage = og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "");
+      }
+    } catch { /* 사진 없이 진행 */ }
     const r = await db
       .prepare(
         `INSERT OR IGNORE INTO archive_articles
          (idxno, title, published_at, year, section, category, author, excerpt, body, images, lead_image, members_only, url)
-         VALUES (?, ?, ?, ?, 'RSS', ?, ?, ?, ?, '[]', NULL, 0, ?)`,
+         VALUES (?, ?, ?, ?, 'RSS', ?, ?, ?, ?, ?, ?, 0, ?)`,
       )
       .bind(
         idxno, it.title, publishedAt, Number(it.publishedAt.slice(0, 4)),
-        it.category, it.author ?? null, it.excerpt, it.excerpt, it.url,
+        it.category, it.author ?? null, it.excerpt, it.excerpt,
+        leadImage ? JSON.stringify([leadImage]) : "[]", leadImage, it.url,
       )
       .run();
     if (r.meta.changes) inserted++;

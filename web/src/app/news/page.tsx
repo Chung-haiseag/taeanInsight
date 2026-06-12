@@ -78,8 +78,9 @@ export default function NewsPage() {
               <li key={it.id}>
                 <Link
                   href={`/news/${it.id}`}
-                  className="group block py-5 transition-colors hover:bg-brand/[0.02] -mx-3 px-3 rounded-lg"
+                  className="group flex gap-4 py-5 transition-colors hover:bg-brand/[0.02] -mx-3 px-3 rounded-lg"
                 >
+                  <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-xs">
                     <span className="rounded-full bg-accent/15 px-2 py-0.5 font-semibold text-accent">
                       {data.labels[it.category]}
@@ -94,6 +95,17 @@ export default function NewsPage() {
                   <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand">
                     읽기 <span aria-hidden="true">→</span>
                   </span>
+                  </div>
+                  {it.leadImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={it.leadImage}
+                      alt=""
+                      className="hidden h-24 w-32 shrink-0 self-center rounded-lg object-cover bg-brand/5 sm:block"
+                      loading="lazy"
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    />
+                  )}
                 </Link>
               </li>
             ))}
