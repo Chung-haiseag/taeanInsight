@@ -233,7 +233,7 @@ async function structure(apiJpg, ocrText) {
     method: "POST",
     headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
-      model: MODEL, max_tokens: 8192,
+      model: MODEL, max_tokens: 16384,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: "image/jpeg", data } },
         { type: "text", text: structurePrompt(ocrText) },
@@ -305,7 +305,7 @@ async function main() {
   const ocrName = OCR_ENGINE === "google" ? "Google Vision(클라우드)" : "Apple Vision(로컬·무료)";
   console.log(`이번 실행 ${todo.length}p · OCR=${ocrName} · 구조화=${MODEL} · ${RENDER_DPI}dpi`);
 
-  let inTok = 0, outTok = 0, nArticles = 0, nPhotos = 0, nFlag = 0, nDrop = 0;
+  let inTok = 0, outTok = 0, nArticles = 0, nPhotos = 0, nFlag = 0, nDrop = 0, nStub = 0;
   for (let i = 0; i < todo.length; i++) {
     const { date, page, path } = todo[i];
     const prefix = join(TMP, `${date}_${page}`);
@@ -339,46 +339,74 @@ async function main() {
       const detectedPhotos = detectPhotos(ocrLines); // 빈 영역 기반 사진 박스
       if (!ocrText.trim()) { console.log(`\n[빈 OCR ${date} ${page}]`); await appendFile(OUT_REVIEW, `${date}_${page}\t빈 OCR\n`); continue; }
 
+      // 지면 1장을 그 면의 모든 기사가 공유(목록 썸네일 + 리더 하단 '원본 지면').
+      const leadImage = `${PHOTO_BASE}/ebook/${date}/page_${page}.jpg`;
+      const baseRec = (title, body, faith, category = "society") => ({
+        date, page, title,
+        publishedAt: `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+09:00`,
+        year: Number(date.slice(0, 4)), section: `지면 ${page}면`,
+        category, author: null, membersOnly: false,
+        ocrEngine: OCR_ENGINE === "google" ? "google_vision" : "apple_vision",
+        faithfulness: Number(faith.toFixed(3)),
+        bodyChars: body.length, excerpt: body.replace(/\s+/g, " ").slice(0, 158) + "…",
+        body, images: [], leadImage, url: null,
+      });
+      const stubRec = () => baseRec(
+        `[지면 자료] ${date.slice(0,4)}.${Number(date.slice(4,6))}.${Number(date.slice(6,8))} ${page}면 (공고·시세표 등)`,
+        "이 지면은 명단·공고·가격표 등 표 형식 자료입니다. 본문 추출 대신 아래 '원본 지면 보기'에서 원문 이미지를 확인하세요.",
+        1,
+      );
+      const writeRec = async (r) => { r.idxno = nextIdx++; await appendFile(OUT_JSONL, JSON.stringify(r) + "\n"); nArticles++; };
+
+      // 표 지면 사전 감지 — 숫자 비율 극단(공고 명단·시세표)은 구조화 생략하고 스텁 1건
+      const allTxt = ocrLines.map((l) => l.t).join("");
+      const digitRatio = ((allTxt.match(/[0-9]/g) || []).length) / Math.max(1, allTxt.length);
+      if (digitRatio >= 0.35 || ocrLines.length >= 450) {
+        await writeRec(stubRec());
+        await appendFile(OUT_REVIEW, `${date}_${page}\t표지면(숫자비 ${digitRatio.toFixed(2)}, 라인 ${ocrLines.length}) → 스텁\n`);
+        nStub++;
+        process.stdout.write(`\r[${i + 1}/${todo.length}] ${date} ${page}면 · 기사 ${nArticles} · 표스텁 ${nStub} · 경고 ${nFlag}   `);
+        continue;
+      }
+
       // ③ 구조화
       const { articles, usage, truncated, parseFailed } = await structure(apiJpg, ocrText);
       inTok += usage.input_tokens; outTok += usage.output_tokens;
-      if (truncated || parseFailed) { const why = parseFailed ? "구조화 파싱실패" : "구조화 절단"; console.log(`\n[⚠️ ${date} ${page}] ${why}`); await appendFile(OUT_REVIEW, `${date}_${page}\t${why}\n`); }
 
+      // 결과 가드: 절단/파싱실패 또는 경고율 50%↑(기사 6건↑) → 쓰레기 기사 대신 스텁으로 대체
+      const recs = [];
+      let pageFlagged = 0;
       for (let a = 0; a < articles.length; a++) {
         const art = articles[a];
         if (!art?.title || !art?.body) continue;
         const body = String(art.body);
-        // 광고 제외 (LLM isAd 1차 + 휴리스틱 백스톱) — 드롭하되 기록(은닉 유실 방지)
         if (art.isAd === true || looksLikeAd(String(art.title), body)) {
           nDrop++;
           await appendFile(OUT_DROPPED, `${date}_${page}\t${String(art.title).replace(/\s+/g, " ").slice(0, 50)}\n`);
           continue;
         }
         const faith = faithfulness(body, ocrText);
-        if (faith < minFaith) { nFlag++; await appendFile(OUT_REVIEW, `${date}_${page}\t기사${a} 충실도 ${faith.toFixed(2)} (<${minFaith})\n`); }
-        const idxno = nextIdx++;
-        // 기사별 크롭 없음 — 지면 1장을 그 면의 모든 기사가 공유(목록 썸네일 + 리더 하단 '원본 지면').
-        // images는 비움(본문 인라인 중복 방지). 지면 업로드는 페이지 루프에서 1회만 수행(아래).
-        const leadImage = `${PHOTO_BASE}/ebook/${date}/page_${page}.jpg`;
-        const images = [];
-        const rec = {
-          idxno, date, page, title: String(art.title),
-          publishedAt: `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+09:00`,
-          year: Number(date.slice(0, 4)), section: `지면 ${page}면`,
-          category: CATS.includes(art.category) ? art.category : "society",
-          author: null, membersOnly: false, ocrEngine: OCR_ENGINE === "google" ? "google_vision" : "apple_vision", faithfulness: Number(faith.toFixed(3)),
-          bodyChars: body.length, excerpt: body.replace(/\s+/g, " ").slice(0, 158) + "…",
-          body, images, leadImage, url: null,
-        };
-        await appendFile(OUT_JSONL, JSON.stringify(rec) + "\n");
-        nArticles++;
+        if (faith < minFaith) pageFlagged++;
+        recs.push(baseRec(String(art.title), body, faith, CATS.includes(art.category) ? art.category : "society"));
       }
-      process.stdout.write(`\r[${i + 1}/${todo.length}] ${date} ${page}면 · 기사 ${nArticles} · 사진 ${nPhotos} · 충실도경고 ${nFlag}   `);
+      const flagRatio = recs.length ? pageFlagged / recs.length : 0;
+      if (truncated || parseFailed || (recs.length >= 6 && flagRatio >= 0.5)) {
+        const why = parseFailed ? "파싱실패" : truncated ? "절단" : `경고율 ${(flagRatio * 100).toFixed(0)}%`;
+        await writeRec(stubRec());
+        await appendFile(OUT_REVIEW, `${date}_${page}\t구조화 불안정(${why}) → 스텁 대체\n`);
+        nStub++;
+      } else {
+        for (const r of recs) {
+          if (r.faithfulness < minFaith) { nFlag++; await appendFile(OUT_REVIEW, `${date}_${page}\t"${r.title.slice(0, 20)}" 충실도 ${r.faithfulness} (<${minFaith})\n`); }
+          await writeRec(r);
+        }
+      }
+      process.stdout.write(`\r[${i + 1}/${todo.length}] ${date} ${page}면 · 기사 ${nArticles} · 표스텁 ${nStub} · 경고 ${nFlag}   `);
     } catch (e) { console.log(`\n[실패 ${date} ${page}] ${e.message}`); }
   }
   const cost = (inTok / 1e6) * PRICE_IN + (outTok / 1e6) * PRICE_OUT;
   console.log(`\n\n=== 완료 ===`);
-  console.log(`기사 ${nArticles} · 사진 ${nPhotos} · 광고제외 ${nDrop}건 · 충실도경고 ${nFlag}건`);
+  console.log(`기사 ${nArticles} · 사진 ${nPhotos} · 광고제외 ${nDrop} · 표스텁 ${nStub} · 충실도경고 ${nFlag}`);
   console.log(`OCR=${ocrName} · 구조화 Haiku in ${inTok}/out ${outTok} ≈ $${cost.toFixed(4)} (≈${nArticles ? (cost / Math.max(1, todo.length)).toFixed(4) : 0}/면)`);
   console.log(`출력: ${OUT_JSONL}`);
 }
