@@ -14,6 +14,7 @@ import { rulesRouter } from "./governance/rules_router";
 import { citizenRouter } from "./citizen/router";
 import { newsRouter } from "./news/router";
 import { archiveRouter } from "./archive/router";
+import { ebookReviewRouter } from "./archive/ebook_review";
 import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
 
@@ -49,6 +50,7 @@ app.route("/api/addons", addonsRouter);
 app.route("/api/admin/review", reviewRouter);
 app.route("/api/admin/rules", rulesRouter);
 app.route("/api/admin/citizen", citizenRouter);
+app.route("/api/admin/ebook", ebookReviewRouter);
 app.route("/api/news", newsRouter);
 app.route("/api/archive", archiveRouter);
 app.route("/api/copilot", copilotRouter);
