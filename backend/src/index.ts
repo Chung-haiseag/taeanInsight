@@ -60,8 +60,15 @@ app.route("/api/query", queryRouter);
 export default {
   fetch: app.fetch,
 
-  // 매시간 cron — 비용 집계 + 임계값 알림
+  // 매시간 cron — ① 태안신문 RSS → 아카이브 자동 적재(영구 보존) ② 비용 집계 + 임계값 알림
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    try {
+      const { ingestToArchive } = await import("./news/ingest");
+      const r = await ingestToArchive(env);
+      if (r.inserted) console.log(`[cron] RSS 적재: 신규 ${r.inserted}/${r.fetched}`);
+    } catch (e) {
+      console.warn("[cron] RSS 적재 실패:", e instanceof Error ? e.message : e);
+    }
     const { runHourlyAggregation } = await import("./cost/scheduled");
     await runHourlyAggregation(env);
   },

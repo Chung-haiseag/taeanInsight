@@ -125,3 +125,32 @@ export function categoryCounts(items: NewsItem[]): Record<string, number> {
   for (const it of items) counts[it.category] = (counts[it.category] ?? 0) + 1;
   return counts;
 }
+
+// ── RSS → D1 아카이브 자동 적재 (cron) ─────────────────────────────────────
+// 새 기사를 archive_articles에 영구 보존 — RSS(최근 50건)가 흘러가도 검색·관련뉴스에 남는다.
+// idxno = taeannews 원본 기사번호 → 백필 데이터와 같은 키스페이스로 자연 통합(중복은 IGNORE).
+// 저작권: RSS 발췌만 저장(전문 없음), 원문 링크 보존.
+export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise<{ fetched: number; inserted: number }> {
+  const db = env.ARCHIVE_DB;
+  if (!db) return { fetched: 0, inserted: 0 };
+  const items = await getNews(true);
+  let inserted = 0;
+  for (const it of items) {
+    const idxno = Number(it.id);
+    if (!Number.isFinite(idxno) || idxno <= 0) continue;
+    const publishedAt = it.publishedAt.replace(" ", "T") + "+09:00";
+    const r = await db
+      .prepare(
+        `INSERT OR IGNORE INTO archive_articles
+         (idxno, title, published_at, year, section, category, author, excerpt, body, images, lead_image, members_only, url)
+         VALUES (?, ?, ?, ?, 'RSS', ?, ?, ?, ?, '[]', NULL, 0, ?)`,
+      )
+      .bind(
+        idxno, it.title, publishedAt, Number(it.publishedAt.slice(0, 4)),
+        it.category, it.author ?? null, it.excerpt, it.excerpt, it.url,
+      )
+      .run();
+    if (r.meta.changes) inserted++;
+  }
+  return { fetched: items.length, inserted };
+}

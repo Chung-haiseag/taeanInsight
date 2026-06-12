@@ -68,3 +68,14 @@ newsRouter.get("/:id", async (c) => {
     bodySource: "rss_excerpt",
   });
 });
+
+// 수동 적재 트리거 (cron과 동일 동작 — 운영자 검증용)
+newsRouter.post("/ingest", async (c) => {
+  const { ingestToArchive } = await import("./ingest");
+  try {
+    const r = await ingestToArchive(c.env);
+    return c.json({ ok: true, ...r });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
