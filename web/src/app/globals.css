@@ -106,3 +106,8 @@ body {
   background-color: theme("colors.background.DEFAULT");
   color: theme("colors.foreground.DEFAULT");
 }
+
+/* 앵커 점프 시 sticky 헤더에 제목이 가리지 않도록 */
+h2[id] {
+  scroll-margin-top: 7rem;
+}

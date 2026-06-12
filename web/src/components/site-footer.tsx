@@ -1,4 +1,11 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { AdminFooter } from "./admin-header";
+
 export function SiteFooter() {
+  const pathname = usePathname();
+  if (pathname.startsWith("/admin")) return <AdminFooter />;
   return (
     <footer className="bg-brand text-background/90 mt-24">
       <div className="h-1 bg-gradient-to-r from-transparent via-accent/60 to-accent" aria-hidden="true" />

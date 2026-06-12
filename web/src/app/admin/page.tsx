@@ -32,21 +32,23 @@ import {
   type ClassifyTestResult,
   type ManagedRule,
 } from "@/lib/api/rules";
+import {
+  absUrl,
+  getEbookArticles,
+  getEbookIssues,
+  verifyEbookArticle,
+  type EbookArticle,
+  type EbookIssue,
+} from "@/lib/api/ebook-review";
 
 export default function AdminPage() {
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center rounded bg-brand px-2 py-0.5 text-xs font-semibold text-background">
-            관리자 전용
-          </span>
-          <span className="text-sm text-foreground-muted">내부 운영 도구 · 외부 노출 금지</span>
-        </div>
         <h1 className="text-3xl font-bold text-brand">관리자 대시보드</h1>
         <p className="text-foreground-muted">
-          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영 · 민감주제 규칙을 한곳에서. 네 섹션 모두 백엔드 API와
-          실시간 연동됩니다.
+          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영 · 민감주제 규칙 · 전자북 검수를 한곳에서. 상단 메뉴로
+          각 섹션으로 바로 이동할 수 있습니다.
         </p>
         <div className="bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
           🔒 <strong className="text-brand">인증 미적용 (데모)</strong> — 실제 운영 시 SSO + 관리자 권한 검사가
@@ -58,6 +60,7 @@ export default function AdminPage() {
       <ReviewQueueSection />
       <CitizenOpsSection />
       <GovernanceSection />
+      <EbookReviewSection />
     </div>
   );
 }
@@ -682,5 +685,200 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-foreground-muted">{label}</p>
       <p className="text-2xl font-bold text-brand mt-1">{value}</p>
     </article>
+  );
+}
+
+// ── 5. 전자북(과거지면) 디지털화 검수 ─────────────────────────
+// 신문사 관리자가 OCR 결과를 원본 지면과 나란히 대조해 승인/수정필요를 기록.
+function EbookReviewSection() {
+  const [issues, setIssues] = useState<EbookIssue[]>([]);
+  const [date, setDate] = useState<string>("");
+  const [status, setStatus] = useState<"all" | "unverified" | "approved" | "flagged">("unverified");
+  const [items, setItems] = useState<EbookArticle[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [openPage, setOpenPage] = useState<number | null>(null); // 원본 지면 펼친 idxno
+  const [openBody, setOpenBody] = useState<number | null>(null); // 본문 펼친 idxno
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await getEbookIssues();
+        setIssues(r.issues);
+        const first = r.issues.find((i) => i.unverified > 0) ?? r.issues[0];
+        if (first) setDate(first.date);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "검수 현황을 불러오지 못했습니다");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!date) return;
+    (async () => {
+      try {
+        const r = await getEbookArticles(date, status, page);
+        setItems(r.items);
+        setTotal(r.total);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "기사 목록을 불러오지 못했습니다");
+      }
+    })();
+  }, [date, status, page]);
+
+  async function decide(idxno: number, s: "approved" | "flagged" | null) {
+    let note: string | undefined;
+    if (s === "flagged") {
+      const v = window.prompt("수정필요 사유(선택):") ?? "";
+      note = v.trim() || undefined;
+    }
+    await verifyEbookArticle(idxno, s, note);
+    // 로컬 갱신 + 현황 새로고침
+    setItems((prev) =>
+      prev.map((a) => (a.idxno === idxno ? { ...a, verify_status: s, verify_note: note ?? null } : a)),
+    );
+    getEbookIssues().then((r) => setIssues(r.issues)).catch(() => {});
+  }
+
+  const faithBadge = (f: number | null) => {
+    if (f == null) return null;
+    const cls = f >= 0.9 ? "bg-green-100 text-green-800" : f >= 0.85 ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700";
+    return <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${cls}`}>충실도 {f.toFixed(2)}</span>;
+  };
+  const statusBadge = (a: EbookArticle) =>
+    a.verify_status === "approved" ? (
+      <span className="rounded bg-green-600 px-1.5 py-0.5 text-xs font-semibold text-white">✓ 승인됨</span>
+    ) : a.verify_status === "flagged" ? (
+      <span className="rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">⚠ 수정필요</span>
+    ) : (
+      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs font-semibold text-gray-600">미검수</span>
+    );
+
+  return (
+    <section aria-labelledby="ebook-heading" className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 id="ebook-heading" className="text-xl font-bold text-brand">
+          📰 전자북(과거지면) 디지털화 검수
+        </h2>
+        <span className="text-xs text-foreground-muted">OCR 결과를 원본 지면과 대조해 승인/반려</span>
+      </div>
+
+      {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {/* 호(발행일) 선택 */}
+      {issues.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {issues.map((i) => (
+            <button
+              key={i.date}
+              onClick={() => { setDate(i.date); setPage(1); }}
+              className={`rounded border px-3 py-1.5 text-sm ${date === i.date ? "border-brand bg-brand text-background" : "border-brand/20 hover:border-brand/50"}`}
+            >
+              {i.date}
+              <span className="ml-2 text-xs opacity-80">
+                {i.unverified > 0 ? `미검수 ${i.unverified}` : "완료"} / {i.total}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 상태 필터 */}
+      {date && (
+        <div className="flex gap-1 text-sm">
+          {([["unverified", "미검수"], ["flagged", "수정필요"], ["approved", "승인됨"], ["all", "전체"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => { setStatus(k); setPage(1); }}
+              className={`rounded px-2.5 py-1 ${status === k ? "bg-brand text-background" : "bg-foreground-muted/10 hover:bg-foreground-muted/20"}`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="ml-auto self-center text-xs text-foreground-muted">{total}건</span>
+        </div>
+      )}
+
+      {/* 기사 목록 (충실도 낮은 순 — 의심부터 검수) */}
+      <ul className="space-y-3">
+        {items.map((a) => (
+          <li key={a.idxno} className="rounded-lg border border-brand/15 bg-background p-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {statusBadge(a)}
+              {faithBadge(a.faithfulness)}
+              <span className="text-xs text-foreground-muted">{a.section} · #{a.idxno}</span>
+              <div className="ml-auto flex gap-1.5">
+                <button onClick={() => decide(a.idxno, "approved")} className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700">✓ 승인</button>
+                <button onClick={() => decide(a.idxno, "flagged")} className="rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700">⚠ 수정필요</button>
+                {a.verify_status && (
+                  <button onClick={() => decide(a.idxno, null)} className="rounded bg-gray-300 px-2 py-1 text-xs hover:bg-gray-400">↩︎</button>
+                )}
+              </div>
+            </div>
+            <h3 className="font-bold text-brand">{a.title}</h3>
+            {a.verify_note && <p className="text-xs text-red-700">메모: {a.verify_note}</p>}
+            <p className="text-sm text-foreground-muted line-clamp-2">{a.excerpt}</p>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button onClick={() => setOpenBody(openBody === a.idxno ? null : a.idxno)} className="underline text-brand">
+                {openBody === a.idxno ? "본문 접기" : "본문 전체 보기"}
+              </button>
+              {a.page_image && (
+                <button onClick={() => setOpenPage(openPage === a.idxno ? null : a.idxno)} className="underline text-brand">
+                  {openPage === a.idxno ? "원본 지면 접기" : "원본 지면과 대조"}
+                </button>
+              )}
+              <a href={`/news/${a.idxno}`} target="_blank" rel="noreferrer" className="underline text-foreground-muted">독자 화면에서 보기 ↗</a>
+            </div>
+
+            {openBody === a.idxno && (
+              <div className="whitespace-pre-wrap rounded bg-foreground-muted/5 p-3 text-sm">{a.body}</div>
+            )}
+
+            {/* 대조 뷰: 좌=디지털화 본문 / 우=원본 지면 (지면 공유 구조 — 클립 없음) */}
+            {openPage === a.idxno && a.page_image && (
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-foreground-muted">디지털화 본문</p>
+                  <div className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded bg-foreground-muted/5 p-3 text-sm leading-relaxed">{a.body}</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-foreground-muted">원본 지면 ({a.section})</p>
+                    <a
+                      href={(absUrl(a.page_image) ?? "").replace(/\.jpg(\?|$)/, "full.jpg$1")}
+                      target="_blank" rel="noreferrer"
+                      className="text-xs underline text-brand"
+                    >🔍 고해상 새 창</a>
+                  </div>
+                  <div className="max-h-[32rem] overflow-auto rounded border">
+                    <img src={absUrl(a.page_image) ?? ""} alt="원본 지면" className="w-full" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </li>
+        ))}
+        {date && items.length === 0 && (
+          <li className="rounded-lg border border-dashed border-brand/20 p-6 text-center text-sm text-foreground-muted">
+            해당 조건의 기사가 없습니다.
+          </li>
+        )}
+      </ul>
+
+      {/* 페이지네이션 */}
+      {total > 20 && (
+        <div className="flex items-center justify-center gap-3 text-sm">
+          <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded border px-3 py-1 disabled:opacity-40">이전</button>
+          <span>{page} / {Math.ceil(total / 20)}</span>
+          <button disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(page + 1)} className="rounded border px-3 py-1 disabled:opacity-40">다음</button>
+        </div>
+      )}
+    </section>
   );
 }

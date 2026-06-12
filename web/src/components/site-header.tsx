@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccessibility } from "./accessibility-provider";
+import { AdminHeader } from "./admin-header";
 
 const NAV_ITEMS = [
   { href: "/news", label: "태안뉴스" },
@@ -17,6 +18,9 @@ const NAV_ITEMS = [
 export function SiteHeader() {
   const { fontSize, setFontSize, theme, setTheme } = useAccessibility();
   const pathname = usePathname();
+
+  // 관리자 영역은 공개 사이트와 완전히 다른 운영 콘솔 크롬 사용
+  if (pathname.startsWith("/admin")) return <AdminHeader />;
 
   return (
     <header className="sticky top-0 z-50 border-b border-brand/10 bg-background/80 backdrop-blur-md">
