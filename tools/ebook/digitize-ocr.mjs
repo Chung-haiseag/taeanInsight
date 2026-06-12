@@ -281,11 +281,21 @@ async function main() {
   const minFaith = Number(arg("--min-faith", "0.8"));
   await mkdir(TMP, { recursive: true });
 
-  const dates = (await readdir(dir)).filter((d) => /^\d{8}$/.test(d)).sort();
+  // 날짜 폴더 탐색 — 두 구조 지원: <dir>/<YYYYMMDD>/ 또는 <dir>/<YYYY>/<YYYYMMDD>/ (연도 중첩)
+  const dateDirs = [];
+  for (const d of (await readdir(dir)).sort()) {
+    if (/^\d{8}$/.test(d)) dateDirs.push({ date: d, dirPath: join(dir, d) });
+    else if (/^\d{4}$/.test(d)) {
+      for (const dd of (await readdir(join(dir, d)).catch(() => [])).sort()) {
+        if (/^\d{8}$/.test(dd)) dateDirs.push({ date: dd, dirPath: join(dir, d, dd) });
+      }
+    }
+  }
+  dateDirs.sort((a, b) => a.date.localeCompare(b.date));
   let pages = [];
-  for (const d of dates) {
-    const files = (await readdir(join(dir, d))).filter((f) => /^TA_\d{8}_\d+\.pdf$/i.test(f)).sort();
-    for (const f of files) pages.push({ date: d, page: (f.match(/_(\d+)\.pdf$/i) || [])[1], path: join(dir, d, f) });
+  for (const { date: d, dirPath } of dateDirs) {
+    const files = (await readdir(dirPath)).filter((f) => /^TA_\d{8}_\d+\.pdf$/i.test(f)).sort();
+    for (const f of files) pages.push({ date: d, page: (f.match(/_(\d+)\.pdf$/i) || [])[1], path: join(dirPath, f) });
   }
   const done = new Set(); let nextIdx = 90000001;
   if (existsSync(OUT_JSONL)) for (const line of (await readFile(OUT_JSONL, "utf8")).split("\n")) {
