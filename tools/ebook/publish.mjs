@@ -33,7 +33,10 @@ async function sh(c, a, opts = {}) { return exec(c, a, { maxBuffer: 64e6, ...opt
 async function d1(sqlOrFile, isFile = false) {
   const args = ["wrangler", "d1", "execute", "taean-archive", "--remote", isFile ? "--file" : "--command", sqlOrFile, "--json"];
   const { stdout } = await sh("npx", args);
-  return JSON.parse(stdout);
+  // wrangler가 JSON 앞에 진행 메시지("├ Checking…")를 찍는 경우가 있어 JSON 시작점부터 파싱
+  const i = stdout.indexOf("[");
+  if (i === -1) throw new Error("wrangler 응답에 JSON 없음: " + stdout.slice(0, 200));
+  return JSON.parse(stdout.slice(i));
 }
 
 async function main() {
