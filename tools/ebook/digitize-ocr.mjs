@@ -151,13 +151,30 @@ function pickPhoto(detected, hint) {
 // 사진을 정밀 검출하는 대신 "기사 전체(텍스트+사진)"를 통째로 보여줌 → 위치 검출 실패 우회.
 function articleRegion(art, lines, photoBox) {
   const body = normH((art.title || "") + " " + (art.body || ""));
-  const boxes = [];
-  for (const l of lines) { const t = normH(l.t); if (t.length >= 5 && body.includes(t)) boxes.push(l); }
-  if (photoBox) boxes.push(photoBox);
-  if (boxes.length < 3) return photoBox;             // 매칭 부족 → 기존 사진박스
-  const x0 = Math.min(...boxes.map((b) => b.x)), y0 = Math.min(...boxes.map((b) => b.y));
-  const x1 = Math.max(...boxes.map((b) => b.x + b.w)), y1 = Math.max(...boxes.map((b) => b.y + b.h));
-  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  const mine = [], foreign = [];
+  for (const l of lines) {
+    const t = normH(l.t);
+    if (t.length >= 5 && body.includes(t)) mine.push(l); else foreign.push(l);
+  }
+  if (photoBox) mine.push(photoBox);
+  if (mine.length < 3) return photoBox;              // 매칭 부족 → 기존 사진박스
+  // 핵심(core) 박스 = 기사 자신의 라인들
+  const cx0 = Math.min(...mine.map((b) => b.x)), cy0 = Math.min(...mine.map((b) => b.y));
+  const cx1 = Math.max(...mine.map((b) => b.x + b.w)), cy1 = Math.max(...mine.map((b) => b.y + b.h));
+  // 희망 패딩으로 확장 후, 패딩 밴드에 침범한 "남의" 라인 직전까지 트림 (만화·옆기사 번짐 방지)
+  const pad = PHOTO_PAD, gap = 0.004;
+  let x0 = Math.max(0, cx0 - pad), y0 = Math.max(0, cy0 - pad);
+  let x1 = Math.min(1, cx1 + pad), y1 = Math.min(1, cy1 + pad);
+  for (const f of foreign) {
+    const fx0 = f.x, fy0 = f.y, fx1 = f.x + f.w, fy1 = f.y + f.h;
+    if (!(fx1 > x0 && fx0 < x1 && fy1 > y0 && fy0 < y1)) continue;  // 박스 밖
+    if (fx0 >= cx1) x1 = Math.max(cx1, Math.min(x1, fx0 - gap));        // 오른쪽 밴드 침범
+    else if (fx1 <= cx0) x0 = Math.min(cx0, Math.max(x0, fx1 + gap));   // 왼쪽
+    else if (fy0 >= cy1) y1 = Math.max(cy1, Math.min(y1, fy0 - gap));   // 아래
+    else if (fy1 <= cy0) y0 = Math.min(cy0, Math.max(y0, fy1 + gap));   // 위
+    // core 내부와 겹치는 foreign(오인식 등)은 트림 불가 — 무시
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, padded: true };
 }
 
 // ── 사진/텍스트그래픽 판별: 크롭 영역의 "중간톤 비율"로 진짜 사진인지 검사 ──────
@@ -202,7 +219,7 @@ function structurePrompt(ocrText) {
 이미지를 참고하여 기사들을 구분해 JSON 배열로만 출력하세요(설명·코드펜스 없이 JSON만).
 절대 규칙(충실 전사):
 - body는 [OCR] 텍스트의 글자를 그대로 사용. 맞춤법·표현 수정·요약·재작성 금지.
-- 허용: (a) 어느 줄이 어느 기사에 속하는지 분류·재배열, (b) 단락 구분(\\n\\n), (c) 컬럼 경계로 끊긴 문장 잇기.
+- 허용: (a) 어느 줄이 어느 기사에 속하는지 분류·재배열, (b) 단락 구분(\\n\\n), (c) 컬럼 경계로 끊긴 문장 잇기, (d) 컬럼 줄바꿈 때문에 단어 중간에 들어간 공백 제거(예: "발 전을"→"발전을") — 단, 글자 자체는 절대 변경 금지.
 - [OCR]에 없는 내용 추가 금지. 목차·제호(신문 머리글)·판권은 출력에서 제외.
 - 광고/홍보(은행·기업 상품광고, 슬로건, 전화번호·상담문의, 시세표·분양 안내 등)는 제외하지 말고 "isAd": true 로 표시하세요. 일반 기사는 "isAd": false.
 각 기사: {"title","body","category"(후보: ${CATS.join(", ")}),"photo":{x,y,w,h 0~1}|null,"isAd": true/false}
@@ -291,8 +308,23 @@ async function main() {
       const apiJpg = `${prefix}_api.jpg`;
       await sh("sips", ["-Z", "1568", "-s", "format", "jpeg", "-s", "formatOptions", "85", full, "--out", apiJpg]);
 
+      // 지면 이미지 1회 업로드 — 이 면의 모든 기사가 공유 (목록 썸네일 + 원본 지면 보기)
+      const pageJpg = `${prefix}_page.jpg`;
+      await sh("sips", ["-Z", "1600", "-s", "format", "jpeg", "-s", "formatOptions", "80", full, "--out", pageJpg]);
+      await sh("npx", ["wrangler", "r2", "object", "put", `${R2_BUCKET}/ebook/${date}/page_${page}.jpg`, "--file", pageJpg, "--content-type", "image/jpeg", "--remote"]);
+      const pageFull = `${prefix}_pagefull.jpg`;   // 고해상(확대 보기용)
+      await sh("sips", ["--resampleWidth", "1800", "-s", "format", "jpeg", "-s", "formatOptions", "82", full, "--out", pageFull]);
+      await sh("npx", ["wrangler", "r2", "object", "put", `${R2_BUCKET}/ebook/${date}/page_${page}full.jpg`, "--file", pageFull, "--content-type", "image/jpeg", "--remote"]);
+      nPhotos++; // = 업로드한 지면 수
+
       // ① OCR(로컬) + ② 컬럼정렬
-      const ocrLines = await visionOCR(full);
+      // OCR 입력: 구글은 업로드 크기 절감(고품질 JPEG ~1-2MB), 애플은 로컬이라 원본 PNG
+      let ocrInput = full;
+      if (OCR_ENGINE === "google") {
+        ocrInput = `${prefix}_gocr.jpg`;
+        await sh("sips", ["-Z", "3000", "-s", "format", "jpeg", "-s", "formatOptions", "90", full, "--out", ocrInput]);
+      }
+      const ocrLines = await visionOCR(ocrInput);
       const ocrText = columnSort(ocrLines);
       const detectedPhotos = detectPhotos(ocrLines); // 빈 영역 기반 사진 박스
       if (!ocrText.trim()) { console.log(`\n[빈 OCR ${date} ${page}]`); await appendFile(OUT_REVIEW, `${date}_${page}\t빈 OCR\n`); continue; }
@@ -315,26 +347,10 @@ async function main() {
         const faith = faithfulness(body, ocrText);
         if (faith < minFaith) { nFlag++; await appendFile(OUT_REVIEW, `${date}_${page}\t기사${a} 충실도 ${faith.toFixed(2)} (<${minFaith})\n`); }
         const idxno = nextIdx++;
-        let images = [], leadImage = null;
-        if (art.photo && fw && fh) {
-          const photoBox = pickPhoto(detectedPhotos, art.photo);
-          const region = articleRegion(art, ocrLines, photoBox);    // 기사 영역(텍스트+사진 통째로)
-          const pad = PHOTO_PAD;                                     // 사방 여백
-          const x = Math.max(0, region.x - pad), y = Math.max(0, region.y - pad);
-          const w = Math.min(1 - x, region.w + 2 * pad), h = Math.min(1 - y, region.h + 2 * pad);
-          const X = Math.max(0, Math.round(x * fw)), Y = Math.max(0, Math.round(y * fh));
-          const W = Math.min(fw - X, Math.round(w * fw)), H = Math.min(fh - Y, Math.round(h * fh));
-          if (W > 80 && H > 60) {
-            try {
-              const cpng = `${prefix}_p${a}.png`, cjpg = `${prefix}_p${a}.jpg`;
-              await sh("pdftoppm", ["-png", "-r", String(RENDER_DPI), "-singlefile", "-x", String(X), "-y", String(Y), "-W", String(W), "-H", String(H), path, `${prefix}_p${a}`]);
-              await sh("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "82", cpng, "--out", cjpg]);
-              const key = `ebook/${date}/p${page}_a${a}.jpg`;
-              await sh("npx", ["wrangler", "r2", "object", "put", `${R2_BUCKET}/${key}`, "--file", cjpg, "--content-type", "image/jpeg", "--remote"]);
-              leadImage = `${PHOTO_BASE}/${key}`; images = [leadImage]; nPhotos++;
-            } catch {}
-          }
-        }
+        // 기사별 크롭 없음 — 지면 1장을 그 면의 모든 기사가 공유(목록 썸네일 + 리더 하단 '원본 지면').
+        // images는 비움(본문 인라인 중복 방지). 지면 업로드는 페이지 루프에서 1회만 수행(아래).
+        const leadImage = `${PHOTO_BASE}/ebook/${date}/page_${page}.jpg`;
+        const images = [];
         const rec = {
           idxno, date, page, title: String(art.title),
           publishedAt: `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+09:00`,
