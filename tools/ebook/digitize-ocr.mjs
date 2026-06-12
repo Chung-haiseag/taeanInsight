@@ -278,7 +278,7 @@ async function main() {
   if (OCR_ENGINE === "google" && !GV_KEY) { console.error("GOOGLE_VISION_API_KEY(또는 GOOGLE_API_KEY) 필요 — Cloud Vision API 사용설정"); process.exit(1); }
   if (!process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY 필요(구조화용)"); process.exit(1); }
   const limit = Number(arg("--limit", "0"));
-  const minFaith = Number(arg("--min-faith", "0.8"));
+  const minFaith = Number(arg("--min-faith", "0.75"));
   await mkdir(TMP, { recursive: true });
 
   // 날짜 폴더 탐색 — 두 구조 지원: <dir>/<YYYYMMDD>/ 또는 <dir>/<YYYY>/<YYYYMMDD>/ (연도 중첩)
