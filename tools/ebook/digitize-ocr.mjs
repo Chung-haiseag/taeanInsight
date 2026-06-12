@@ -70,6 +70,7 @@ async function googleVisionOCR(pngPath) {
   const content = (await readFile(pngPath)).toString("base64");
   const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${GV_KEY}`, {
     method: "POST", headers: { "content-type": "application/json" },
+    signal: AbortSignal.timeout(90_000),  // 잠자기 복귀 시 죽은 연결에 매달리지 않게
     body: JSON.stringify({ requests: [{ image: { content }, features: [{ type: "DOCUMENT_TEXT_DETECTION" }], imageContext: { languageHints: ["ko", "zh"] } }] }),
   });
   if (!res.ok) throw new Error(`Vision ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -231,6 +232,7 @@ async function structure(apiJpg, ocrText) {
   const data = (await readFile(apiJpg)).toString("base64");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    signal: AbortSignal.timeout(180_000),  // 잠자기 복귀 시 즉시 실패→해당 면 재시도 대상
     headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL, max_tokens: 16384,
