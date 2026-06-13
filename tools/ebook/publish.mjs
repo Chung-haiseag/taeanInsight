@@ -63,9 +63,23 @@ async function main() {
   if (!target.length) { console.log("적재할 새 호가 없습니다. (옵션: --dates YYYYMMDD,... 또는 --all)"); return; }
   console.log(`적재 대상: ${targetDates.join(", ")} · 기사 ${target.length}건`);
 
-  // ① 띄어쓰기: 신규 호는 구조화 프롬프트가 줄바꿈 공백을 이미 교정함.
-  //    잔여분이 보이면 별도로 `node fix-spacing.mjs` 실행(글자 동일성 가드 + D1 자동 반영).
-  console.log("① 띄어쓰기: 파이프라인 내장 교정 적용됨 (추가 교정 필요 시 fix-spacing.mjs)");
+  // ① 띄어쓰기 교정: 대상 호를 fix-spacing으로 보정(글자 동일성 가드).
+  //    --no-d1 → JSONL만 갱신하고, 아래 ③에서 보정된 본문으로 적재한다.
+  //    --skip-spacing 또는 ANTHROPIC_API_KEY 없으면 생략.
+  if (flag("--skip-spacing")) {
+    console.log("① 띄어쓰기: --skip-spacing (생략)");
+  } else if (!process.env.ANTHROPIC_API_KEY) {
+    console.log("① 띄어쓰기: ANTHROPIC_API_KEY 없음 → 생략 (나중에 fix-spacing.mjs 실행 권장)");
+  } else {
+    console.log(`① 띄어쓰기 교정 중 (${targetDates.length}개 호)...`);
+    const fixer = join(__dir, "fix-spacing.mjs");
+    await sh("node", [fixer, "--dates", targetDates.join(","), "--no-d1", "--conc", "10"], { stdio: "inherit" });
+    // 보정본 다시 읽어 target 갱신
+    const reread = (await readFile(JSONL, "utf8")).trim().split("\n").filter(Boolean).map(JSON.parse);
+    const byIdx = new Map(reread.map((a) => [a.idxno, a]));
+    for (let i = 0; i < target.length; i++) target[i] = byIdx.get(target[i].idxno) || target[i];
+    console.log("① 띄어쓰기 교정 완료");
+  }
 
   // ② 버전 URL 부여한 import 파일 생성 (target만)
   const V = "v" + Math.floor(Date.now() / 1000);
