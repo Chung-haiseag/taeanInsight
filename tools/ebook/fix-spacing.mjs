@@ -55,6 +55,48 @@ async function fixText(text) {
 
 const q = (v) => "'" + String(v).replace(/'/g, "''") + "'";
 
+// 원문 글자는 100% 보존하고, Haiku 출력의 "띄어쓰기"만 옮겨온다.
+//   두 텍스트의 내용 글자(공백 제외)를 LCS로 정렬 → 원문에서 연속한 두 글자가
+//   Haiku에서도 연속이면 그 사이 공백을 Haiku 것으로, 아니면 원문 공백을 유지.
+//   결과의 내용 글자열은 원문과 항상 동일(왜곡 0). Haiku가 글자를 바꿔/지어내도 안전.
+function transferSpacing(orig, hint) {
+  // 내용 글자 + 각 글자 앞 공백 파싱
+  const parse = (s) => {
+    const chars = [], gap = []; let g = "";
+    for (const ch of s) { if (/\s/.test(ch)) g += ch; else { chars.push(ch); gap.push(g); g = ""; } }
+    return { chars, gap };
+  };
+  const O = parse(orig), H = parse(hint);
+  const n = O.chars.length, m = H.chars.length;
+  if (n === 0) return orig;
+  if (n * m > 6_000_000) return null; // 과대 → 호출측에서 원문 유지
+  // LCS DP (Int32) → 정렬 매핑 matchedH[i] = H 인덱스 또는 -1
+  const dp = new Int32Array((n + 1) * (m + 1));
+  const W = m + 1;
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
+    dp[i * W + j] = O.chars[i] === H.chars[j]
+      ? dp[(i + 1) * W + (j + 1)] + 1
+      : Math.max(dp[(i + 1) * W + j], dp[i * W + (j + 1)]);
+  }
+  const matchedH = new Int32Array(n).fill(-1);
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (O.chars[i] === H.chars[j]) { matchedH[i] = j; i++; j++; }
+    else if (dp[(i + 1) * W + j] >= dp[i * W + (j + 1)]) i++;
+    else j++;
+  }
+  // 재조립: 내용=원문, 공백=가능하면 Haiku
+  let out = O.gap[0]; // 선행 공백
+  for (let k = 0; k < n; k++) {
+    if (k > 0) {
+      const a = matchedH[k - 1], b = matchedH[k];
+      out += (a !== -1 && b === a + 1) ? H.gap[b] : O.gap[k];
+    }
+    out += O.chars[k];
+  }
+  return out;
+}
+
 async function main() {
   if (!process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY 필요"); process.exit(1); }
   const lines = (await readFile(JSONL, "utf8")).trim().split("\n").filter(Boolean);
@@ -63,7 +105,7 @@ async function main() {
   if (LIMIT) todo = todo.slice(0, LIMIT);
   console.log(`대상 ${todo.length}건${DATES.length ? ` (날짜: ${DATES.length}개 호)` : ""} · 동시 ${CONC}`);
 
-  let fixed = 0, skipped = 0, rejected = 0, inTok = 0, outTok = 0, done = 0;
+  let clean = 0, transferred = 0, skipped = 0, rejected = 0, inTok = 0, outTok = 0, done = 0;
   const sqls = [];
 
   async function handle(a) {
@@ -71,16 +113,27 @@ async function main() {
     try {
       const { out, usage } = await fixText(before);
       inTok += usage.input_tokens || 0; outTok += usage.output_tokens || 0;
-      if (sig(out) !== sig(before)) { rejected++; process.stdout.write("x"); return; } // 글자 변경 → 거부
-      const nl = out.indexOf("\n");
-      const newTitle = (nl > 0 ? out.slice(0, nl) : a.title).trim();
-      const newBody = (nl > 0 ? out.slice(nl) : out).trim();
+
+      let result, viaTransfer;
+      if (sig(out) === sig(before)) {
+        result = out; viaTransfer = false;            // Haiku가 글자 보존 → 그대로 사용
+      } else {
+        const t = transferSpacing(before, out);       // 글자 바뀜 → 띄어쓰기만 이식
+        if (t && sig(t) === sig(before)) { result = t; viaTransfer = true; }
+        else { rejected++; process.stdout.write("x"); return; } // 이식 실패 시 원문 유지
+      }
+
+      const nl = result.indexOf("\n");
+      const newTitle = (nl > 0 ? result.slice(0, nl) : a.title).trim();
+      const newBody = (nl > 0 ? result.slice(nl) : result).trim();
+      // 글자 동일성 최종 가드 (제목+본문 합쳐 검사)
+      if (sig(`${newTitle}\n\n${newBody}`) !== sig(before)) { rejected++; process.stdout.write("x"); return; }
       if (newBody === a.body && newTitle === a.title) { skipped++; process.stdout.write("."); return; }
       a.title = newTitle; a.body = newBody;
       a.excerpt = newBody.replace(/\s+/g, " ").slice(0, 158) + "…";
       a.bodyChars = newBody.length;
       sqls.push(`UPDATE archive_articles SET title=${q(a.title)}, body=${q(a.body)}, excerpt=${q(a.excerpt)} WHERE idxno=${a.idxno};`);
-      fixed++; process.stdout.write("o");
+      if (viaTransfer) { transferred++; process.stdout.write("t"); } else { clean++; process.stdout.write("o"); }
     } catch (e) { rejected++; process.stdout.write("E"); }
     finally { if (++done % 50 === 0) process.stdout.write(` ${done}/${todo.length}\n`); }
   }
@@ -90,7 +143,8 @@ async function main() {
   async function worker() { while (idx < todo.length) { const a = todo[idx++]; await handle(a); } }
   await Promise.all(Array.from({ length: Math.min(CONC, todo.length) }, worker));
 
-  console.log(`\n교정 ${fixed} · 변화없음 ${skipped} · 거부/오류 ${rejected} · Haiku ≈ $${(inTok / 1e6 * 1 + outTok / 1e6 * 5).toFixed(3)}`);
+  const fixed = clean + transferred;
+  console.log(`\n교정 ${fixed} (직접 ${clean}·이식 ${transferred}) · 변화없음 ${skipped} · 거부/오류 ${rejected} · Haiku ≈ $${(inTok / 1e6 * 1 + outTok / 1e6 * 5).toFixed(3)}`);
   if (DRY) { console.log("(--dry: 저장/적용 안 함)"); return; }
   await writeFile(JSONL, arts.map((x) => JSON.stringify(x)).join("\n") + "\n");
   if (NO_D1) { console.log(`JSONL ${fixed}건 갱신 (D1 적용 생략 — publish가 적재)`); return; }
