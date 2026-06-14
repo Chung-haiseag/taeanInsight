@@ -30,13 +30,29 @@ const SQL_DIR = join(__dir, "..", "backfill", "out", "d1");
 function flag(n) { return process.argv.includes(n); }
 function arg(n) { const i = process.argv.indexOf(n); return i !== -1 ? process.argv[i + 1] : null; }
 async function sh(c, a, opts = {}) { return exec(c, a, { maxBuffer: 64e6, ...opts }); }
-async function d1(sqlOrFile, isFile = false) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function d1(sqlOrFile, isFile = false, tries = 4) {
   const args = ["wrangler", "d1", "execute", "taean-archive", "--remote", isFile ? "--file" : "--command", sqlOrFile, "--json"];
-  const { stdout } = await sh("npx", args);
-  // wrangler가 JSON 앞에 진행 메시지("├ Checking…")를 찍는 경우가 있어 JSON 시작점부터 파싱
-  const i = stdout.indexOf("[");
-  if (i === -1) throw new Error("wrangler 응답에 JSON 없음: " + stdout.slice(0, 200));
-  return JSON.parse(stdout.slice(i));
+  let lastErr;
+  for (let t = 1; t <= tries; t++) {
+    try {
+      const { stdout } = await sh("npx", args);
+      // wrangler가 JSON 앞에 진행 메시지("├ Checking…")를 찍는 경우가 있어 JSON 시작점부터 파싱
+      const i = stdout.indexOf("[");
+      if (i === -1) throw new Error("wrangler 응답에 JSON 없음: " + stdout.slice(0, 200));
+      return JSON.parse(stdout.slice(i));
+    } catch (e) {
+      lastErr = e;
+      // 일시적 오류 재시도 — 네트워크/DNS + Cloudflare 서버측 일시오류
+      const msg = String(e.stderr || e.message || "");
+      const transient = /fetch failed|Unable to resolve|ENOTFOUND|ETIMEDOUT|ECONNRESET|network|InternalError|could not be uploaded|Please (retry|try again)|Internal (Server )?[Ee]rror|\b50[0234]\b/i;
+      if (t < tries && transient.test(msg)) {
+        process.stderr.write(`  (D1 재시도 ${t}/${tries - 1})\n`); await sleep(2000 * t); continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
 async function main() {
