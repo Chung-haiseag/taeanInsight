@@ -6,11 +6,14 @@ import { Hono } from "hono";
 
 import type { Env } from "../types";
 import { fetchConditions, type Conditions } from "./sources";
+import { fetchTour, type TourInfo } from "./tour";
 
 export const envRouter = new Hono<{ Bindings: Env }>();
 
 const TTL_MS = 30 * 60 * 1000;
 let cache: { at: number; data: Conditions } | null = null;
+let tourCache: { at: number; data: TourInfo } | null = null;
+const TOUR_TTL_MS = 6 * 3600 * 1000; // 관광 정보는 자주 안 바뀜 — 6시간 캐시
 
 async function cached(env: Env): Promise<Conditions> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
@@ -24,6 +27,15 @@ envRouter.get("/taean", async (c) => {
   if (!data.available) {
     return c.json({ available: false, message: "DATA_GO_KR_KEY 미설정 — 공공데이터포털 인증키를 Worker 시크릿으로 등록하세요" }, 200);
   }
+  return c.json(data);
+});
+
+// 태안 관광 — 축제(현재·예정) + 대표 관광지 (6시간 캐시)
+envRouter.get("/tour", async (c) => {
+  if (tourCache && Date.now() - tourCache.at < TOUR_TTL_MS) return c.json(tourCache.data);
+  const data = await fetchTour(c.env);
+  if (!data.available) return c.json({ available: false, message: "DATA_GO_KR_KEY 미설정" }, 200);
+  tourCache = { at: Date.now(), data };
   return c.json(data);
 });
 
