@@ -38,7 +38,7 @@ async function retrieveArchive(
     ),
   ];
   if (!tokens.length) return [];
-  const cols = "a.idxno, a.title, a.published_at, substr(a.body,1,900) AS body";
+  const cols = "a.idxno, a.title, a.published_at, substr(a.body,1,1300) AS body";
   // FTS5(트라이그램)는 3글자 이상만 매칭 — 특정 키워드는 FTS, 없으면 가장 긴 토큰 LIKE
   const ftsTokens = tokens.filter((t) => t.length >= 3).map((t) => `"${t.replace(/"/g, "")}"`);
   if (ftsTokens.length) {
@@ -102,9 +102,11 @@ queryRouter.post("/", async (c) => {
             {
               role: "system",
               content:
-                "너는 태안 지역정보 도우미다. 아래 [태안신문·아카이브 기사]만 근거로 한국어로 정확히 답하라. " +
-                "근거에 없는 내용은 지어내지 말고, 모르면 '아카이브에서 해당 정보를 찾지 못했습니다'라고 답하라. " +
-                "답변 끝에 사용한 출처를 [번호] 형식으로 표기하라.",
+                "너는 태안 지역정보 도우미다. 아래 [태안신문·아카이브 기사]를 근거로 한국어로 답하라.\n" +
+                "- 기사에서 질문과 관련된 내용을 최대한 종합해 구체적으로 답하라(이름·수치·날짜 포함).\n" +
+                "- 기사에 일부만 있으면 그 부분을 답하고 '확인된 범위는 여기까지'처럼 한계를 덧붙여라.\n" +
+                "- 기사들이 질문과 '완전히' 무관할 때만 '아카이브에서 해당 정보를 찾지 못했습니다'라고 하라.\n" +
+                "- 기사에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
             },
             { role: "user", content: `[태안신문·아카이브 기사]\n${context}\n\n[질문] ${query}` },
           ],
