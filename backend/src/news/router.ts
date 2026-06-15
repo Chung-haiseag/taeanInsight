@@ -47,11 +47,17 @@ newsRouter.get("/", async (c) => {
     const ids = filtered.map((it) => Number(it.id)).filter((n) => Number.isFinite(n) && n > 0);
     if (ids.length) {
       const rs = await c.env.ARCHIVE_DB
-        .prepare(`SELECT idxno, lead_image FROM archive_articles WHERE idxno IN (${ids.map(() => "?").join(",")}) AND lead_image IS NOT NULL`)
+        .prepare(`SELECT idxno, lead_image, excerpt FROM archive_articles WHERE idxno IN (${ids.map(() => "?").join(",")})`)
         .bind(...ids)
         .all();
-      const imgMap = new Map((rs.results ?? []).map((r) => [String(r.idxno), r.lead_image as string]));
-      filtered = filtered.map((it) => ({ ...it, leadImage: imgMap.get(it.id) ?? null }));
+      const imgMap = new Map((rs.results ?? []).map((r) => [String(r.idxno), r.lead_image as string | null]));
+      const excMap = new Map((rs.results ?? []).map((r) => [String(r.idxno), r.excerpt as string | null]));
+      // 목록 출처 기사는 발췌가 비어 있으므로 D1(og:description) 발췌로 보강
+      filtered = filtered.map((it) => ({
+        ...it,
+        leadImage: imgMap.get(it.id) ?? null,
+        excerpt: it.excerpt || excMap.get(it.id) || it.excerpt,
+      }));
     }
   }
 

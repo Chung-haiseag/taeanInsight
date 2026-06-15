@@ -145,13 +145,22 @@ let cache: { at: number; items: NewsItem[] } | null = null;
 
 export async function getNews(force = false): Promise<NewsItem[]> {
   if (!force && cache && Date.now() - cache.at < TTL_MS) return cache.items;
-  const res = await fetch(RSS_URL, { headers: { "User-Agent": UA, Accept: "application/rss+xml, text/xml" } });
-  if (!res.ok) {
-    if (cache) return cache.items; // 실패 시 직전 캐시 유지
-    throw new Error(`RSS fetch failed: ${res.status}`);
+  // RSS + 기사목록 병합 — RSS가 정체돼도 목록의 최신 기사를 피드에 반영
+  let rss: NewsItem[] = [];
+  try {
+    const res = await fetch(RSS_URL, { headers: { "User-Agent": UA, Accept: "application/rss+xml, text/xml" } });
+    if (res.ok) rss = parseRss(await res.text());
+  } catch { /* 목록으로 폴백 */ }
+  const list = await getListNews();
+  const byId = new Map<string, NewsItem>();
+  for (const it of rss) byId.set(it.id, it);                 // RSS 우선(발췌 포함)
+  for (const it of list) if (!byId.has(it.id)) byId.set(it.id, it);
+  const items = [...byId.values()];
+  if (!items.length) {
+    if (cache) return cache.items; // 둘 다 실패 시 직전 캐시 유지
+    throw new Error("news fetch failed (RSS + list)");
   }
-  const xml = await res.text();
-  const items = parseRss(xml);
+  items.sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : a.publishedAt > b.publishedAt ? -1 : 0)); // 최신순
   cache = { at: Date.now(), items };
   return items;
 }
@@ -169,12 +178,8 @@ export function categoryCounts(items: NewsItem[]): Record<string, number> {
 export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise<{ fetched: number; inserted: number }> {
   const db = env.ARCHIVE_DB;
   if (!db) return { fetched: 0, inserted: 0 };
-  // RSS + 기사목록 병합(idxno 중복 제거) — RSS가 정체돼도 목록의 최신 기사를 수집
-  const rssItems = await getNews(true).catch(() => [] as NewsItem[]);
-  const byId = new Map<string, NewsItem>();
-  for (const it of rssItems) byId.set(it.id, it);              // RSS 우선(발췌 포함)
-  for (const it of await getListNews()) if (!byId.has(it.id)) byId.set(it.id, it);
-  const items = [...byId.values()];
+  // getNews가 RSS + 기사목록을 병합 제공 (RSS 정체 시에도 최신 포함)
+  const items = await getNews(true).catch(() => [] as NewsItem[]);
   let inserted = 0;
   for (const it of items) {
     const idxno = Number(it.id);
