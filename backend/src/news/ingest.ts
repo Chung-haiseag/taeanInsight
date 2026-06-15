@@ -251,18 +251,24 @@ export async function ingestToArchive(
     if (existing && !(isStub && cookie)) continue;
 
     const publishedAt = it.publishedAt.replace(" ", "T") + "+09:00";
-    const hdr = { "User-Agent": BROWSER_UA, Referer: "https://www.taeannews.co.kr/", ...(cookie ? { Cookie: cookie } : {}) };
+    const baseHdr = { "User-Agent": BROWSER_UA, Referer: "https://www.taeannews.co.kr/" };
     let leadImage: string | null = null;
     let body = "";
     let excerpt = it.excerpt;
     try {
-      const html = await (await fetch(it.url, { headers: hdr })).text();
+      // 익명으로 먼저 — 공개 기사는 그대로 전문 추출(로그인 세션이 일부 공개 기사를 깨뜨림)
+      const html = await (await fetch(it.url, { headers: baseHdr })).text();
       const og = /property="og:image"\s+content="([^"]+)"/.exec(html)?.[1];
       if (og && !og.includes("/logo/")) leadImage = og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "");
-      if (cookie) body = extractFullBody(html); // 로그인 시 전문
       if (!excerpt) {
         const desc = /property="og:description"\s+content="([^"]*)"/.exec(html)?.[1];
         if (desc) excerpt = stripHtml(desc);
+      }
+      body = extractFullBody(html);
+      // 익명이 회원전용 게이트면 로그인 쿠키로 재시도
+      if (!body && cookie) {
+        const html2 = await (await fetch(it.url, { headers: { ...baseHdr, Cookie: cookie } })).text();
+        body = extractFullBody(html2);
       }
     } catch { /* 사진/본문 없이 진행 */ }
     // 발췌: 전문 있으면 전문 앞부분, 없으면 메타 설명
