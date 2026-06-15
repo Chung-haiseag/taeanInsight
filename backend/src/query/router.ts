@@ -19,6 +19,51 @@ import { WorkersAiLlmClient } from "../llm/workers_ai";
 
 export const queryRouter = new Hono<{ Bindings: Env }>();
 
+// 질문에서 핵심 키워드 추출 → 아카이브(FTS5 우선, LIKE 폴백)에서 근거 기사 검색
+const QUERY_STOP = new Set([
+  "알려줘", "알려", "주세요", "관해서", "관하여", "대해서", "대하여", "대해", "무엇", "어떤", "어떻게",
+  "현황", "정보", "궁금해", "궁금", "관련", "입니다", "인가", "무슨", "그리고", "에서", "에게", "으로",
+  "저것", "이것", "그것", "있나", "있는", "되나", "보여줘", "찾아줘",
+]);
+async function retrieveArchive(
+  db: D1Database,
+  query: string,
+): Promise<Array<{ idxno: number; title: string; published_at: string; body: string }>> {
+  const tokens = [
+    ...new Set(
+      query
+        .replace(/[^가-힣0-9a-zA-Z]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length >= 2 && !QUERY_STOP.has(t)),
+    ),
+  ];
+  if (!tokens.length) return [];
+  const cols = "a.idxno, a.title, a.published_at, substr(a.body,1,900) AS body";
+  // FTS5(트라이그램)는 3글자 이상만 매칭 — 특정 키워드는 FTS, 없으면 가장 긴 토큰 LIKE
+  const ftsTokens = tokens.filter((t) => t.length >= 3).map((t) => `"${t.replace(/"/g, "")}"`);
+  if (ftsTokens.length) {
+    try {
+      const r = await db
+        .prepare(
+          `SELECT ${cols} FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid ` +
+            `WHERE archive_fts MATCH ? ORDER BY a.published_at DESC LIMIT 6`,
+        )
+        .bind(ftsTokens.join(" OR "))
+        .all<{ idxno: number; title: string; published_at: string; body: string }>();
+      if (r.results?.length) return r.results;
+    } catch { /* LIKE 폴백 */ }
+  }
+  const kw = `%${tokens.sort((a, b) => b.length - a.length)[0]}%`;
+  const r = await db
+    .prepare(
+      `SELECT ${cols} FROM archive_articles a WHERE a.title LIKE ?1 OR a.body LIKE ?1 ` +
+        `ORDER BY a.published_at DESC LIMIT 6`,
+    )
+    .bind(kw)
+    .all<{ idxno: number; title: string; published_at: string; body: string }>();
+  return r.results ?? [];
+}
+
 // 아이솔레이트 단위 공유 캐시 — 동일 워커 인스턴스 내 반복 질의 히트
 const sharedCache = new InMemoryCacheStore();
 
@@ -40,8 +85,44 @@ queryRouter.post("/", async (c) => {
   }
   const { query, domain, location, userTier } = parsed.data;
 
-  // ── 런타임 조립 (무료 Workers AI 경로) ──────────────────────────
+  // ── ① RAG: 태안뉴스·아카이브에서 근거 검색 → 그 근거로만 답변(출처 표기) ──
   const client = new WorkersAiLlmClient({ ai: c.env.AI });
+  if (c.env.ARCHIVE_DB) {
+    try {
+      const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
+      if (rows.length) {
+        const context = rows
+          .map((r, i) => `[${i + 1}] ${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`)
+          .join("\n\n");
+        const res = await client.complete({
+          channel: "realtime",
+          maxTokens: 800,
+          temperature: 0.2,
+          messages: [
+            {
+              role: "system",
+              content:
+                "너는 태안 지역정보 도우미다. 아래 [태안신문·아카이브 기사]만 근거로 한국어로 정확히 답하라. " +
+                "근거에 없는 내용은 지어내지 말고, 모르면 '아카이브에서 해당 정보를 찾지 못했습니다'라고 답하라. " +
+                "답변 끝에 사용한 출처를 [번호] 형식으로 표기하라.",
+            },
+            { role: "user", content: `[태안신문·아카이브 기사]\n${context}\n\n[질문] ${query}` },
+          ],
+        });
+        return c.json({
+          answer: res.content,
+          intent: "archive_rag",
+          confidence: 0.9,
+          fromCache: false,
+          llmCalls: 1,
+          sources: rows.map((r) => ({ idxno: r.idxno, title: r.title, publishedAt: r.published_at, url: `/news/${r.idxno}` })),
+          model: client.model,
+        });
+      }
+    } catch { /* 검색 실패 시 일반 경로로 폴백 */ }
+  }
+
+  // ── ② 폴백: 근거 없으면 기존 일반 에이전트(순수 LLM) ──────────────
   const limitKrw = Number(c.env.MONTHLY_COST_LIMIT_KRW ?? "300000") || 300000;
   // NOTE: 비용 영속 저장은 cost 라우터(D1 도입 시)와 통합 예정. 무료 모델은 0원이라 차단 미발생.
   const recorder = new DefaultCostRecorder(new InMemoryCostStore());
