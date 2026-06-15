@@ -4,7 +4,7 @@
 // 비용 모니터링 + HITL 검수 큐는 실데이터 연동, 나머지 섹션은 백엔드 구현 대기 자리표시.
 // 연관 TaskMaster: #19(비용·완료), #26(HITL 검수·연동), #29(시민기자 정산), AI 거버넌스(#27)
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { getCostSummary, type MonthlyCostReport } from "@/lib/api/admin";
@@ -935,9 +935,7 @@ function EbookReviewSection() {
                       className="text-xs underline text-brand"
                     >🔍 고해상 새 창</a>
                   </div>
-                  <div className="max-h-[32rem] overflow-auto rounded border">
-                    <img src={absUrl(a.page_image) ?? ""} alt="원본 지면" className="w-full" />
-                  </div>
+                  <ZoomPanImage src={absUrl(a.page_image) ?? ""} fullSrc={(absUrl(a.page_image) ?? "").replace(/\.jpg(\?|$)/, "full.jpg$1")} />
                 </div>
               </div>
             )}
@@ -959,5 +957,58 @@ function EbookReviewSection() {
         </div>
       )}
     </section>
+  );
+}
+
+// 원본 지면 인라인 줌/팬 — 검수화면에서 새 창 없이 그 자리에서 확대·마우스 이동
+function ZoomPanImage({ src, fullSrc }: { src: string; fullSrc: string }) {
+  const [zoom, setZoom] = useState(1); // 1=폭맞춤, 최대 4배
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const drag = useRef({ on: false, x: 0, y: 0, sl: 0, st: 0 });
+
+  // 확대하면 고해상 이미지로 교체(선명하게), 폭맞춤이면 일반 이미지
+  const imgSrc = zoom > 1 ? fullSrc : src;
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return; // 일반 휠은 스크롤(이동), 핀치/ctrl+휠만 줌
+      e.preventDefault();
+      setZoom((z) => Math.min(4, Math.max(1, z - Math.sign(e.deltaY) * 0.2)));
+    };
+    el?.addEventListener("wheel", onWheel, { passive: false });
+    return () => el?.removeEventListener("wheel", onWheel);
+  }, []);
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => setZoom((z) => Math.max(1, z - 0.25))} className="rounded bg-foreground-muted/15 px-2.5 py-1 text-sm font-bold hover:bg-foreground-muted/25" aria-label="축소">−</button>
+        <span className="w-12 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
+        <button onClick={() => setZoom((z) => Math.min(4, z + 0.25))} className="rounded bg-foreground-muted/15 px-2.5 py-1 text-sm font-bold hover:bg-foreground-muted/25" aria-label="확대">＋</button>
+        <button onClick={() => setZoom((z) => (z === 1 ? 2 : 1))} className="rounded bg-foreground-muted/15 px-2 py-1 text-xs hover:bg-foreground-muted/25">{zoom === 1 ? "200%" : "폭맞춤"}</button>
+        <span className="ml-auto text-[11px] text-foreground-muted">＋−·ctrl+휠 확대 · 드래그 이동</span>
+      </div>
+      <div
+        ref={scrollRef}
+        className={`max-h-[32rem] overflow-auto rounded border ${zoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+        onPointerDown={(e) => {
+          if (zoom <= 1) return;
+          const el = scrollRef.current; if (!el) return;
+          drag.current = { on: true, x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const el = scrollRef.current, d = drag.current; if (!d.on || !el) return;
+          el.scrollLeft = d.sl - (e.clientX - d.x); el.scrollTop = d.st - (e.clientY - d.y);
+        }}
+        onPointerUp={() => { drag.current.on = false; }}
+      >
+        <div style={{ width: `${zoom * 100}%` }} className="transition-[width] duration-150">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imgSrc} alt="원본 지면" className="w-full select-none" draggable={false} />
+        </div>
+      </div>
+    </div>
   );
 }
