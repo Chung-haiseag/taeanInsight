@@ -37,6 +37,7 @@ import {
   getEbookArticles,
   getEbookIssues,
   verifyEbookArticle,
+  editEbookArticle,
   type EbookArticle,
   type EbookIssue,
 } from "@/lib/api/ebook-review";
@@ -699,6 +700,10 @@ function EbookReviewSection() {
   const [page, setPage] = useState(1);
   const [openPage, setOpenPage] = useState<number | null>(null); // 원본 지면 펼친 idxno
   const [openBody, setOpenBody] = useState<number | null>(null); // 본문 펼친 idxno
+  const [editIdx, setEditIdx] = useState<number | null>(null);   // 교정 중인 idxno
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -742,6 +747,34 @@ function EbookReviewSection() {
       prev.map((a) => (a.idxno === idxno ? { ...a, verify_status: s, verify_note: note ?? null } : a)),
     );
     getEbookIssues().then((r) => setIssues(r.issues)).catch(() => {});
+  }
+
+  function startEdit(a: EbookArticle) {
+    setEditIdx(a.idxno);
+    setDraftTitle(a.title);
+    setDraftBody(a.body ?? "");
+    if (openPage !== a.idxno) setOpenPage(a.idxno); // 원본 지면 자동 펼침
+  }
+
+  async function saveEdit(idxno: number) {
+    if (!draftBody.trim()) { window.alert("본문이 비어 있습니다."); return; }
+    setSaving(true);
+    try {
+      const r = await editEbookArticle(idxno, draftTitle, draftBody);
+      setItems((prev) =>
+        prev.map((a) =>
+          a.idxno === idxno
+            ? { ...a, title: r.title ?? draftTitle, body: r.body, excerpt: r.excerpt, verify_status: "approved", verify_note: "본문 교정" }
+            : a,
+        ),
+      );
+      setEditIdx(null);
+      getEbookIssues().then((rr) => setIssues(rr.issues)).catch(() => {});
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const faithBadge = (f: number | null) => {
@@ -833,6 +866,9 @@ function EbookReviewSection() {
                   {openPage === a.idxno ? "원본 지면 접기" : "원본 지면과 대조"}
                 </button>
               )}
+              <button onClick={() => (editIdx === a.idxno ? setEditIdx(null) : startEdit(a))} className="underline text-brand font-semibold">
+                {editIdx === a.idxno ? "교정 취소" : "✏️ 본문 교정"}
+              </button>
               <a href={`/news/${a.idxno}`} target="_blank" rel="noreferrer" className="underline text-foreground-muted">독자 화면에서 보기 ↗</a>
             </div>
 
@@ -844,8 +880,42 @@ function EbookReviewSection() {
             {openPage === a.idxno && a.page_image && (
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-foreground-muted">디지털화 본문</p>
-                  <div className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded bg-foreground-muted/5 p-3 text-sm leading-relaxed">{a.body}</div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-foreground-muted">디지털화 본문 {editIdx === a.idxno && <span className="text-brand">· 교정 중</span>}</p>
+                    {editIdx !== a.idxno && (
+                      <button onClick={() => startEdit(a)} className="text-xs underline text-brand">✏️ 교정</button>
+                    )}
+                  </div>
+                  {editIdx === a.idxno ? (
+                    <div className="space-y-2">
+                      <input
+                        value={draftTitle}
+                        onChange={(e) => setDraftTitle(e.target.value)}
+                        placeholder="제목"
+                        className="w-full rounded border border-brand/30 px-2 py-1 text-sm font-semibold"
+                      />
+                      <textarea
+                        value={draftBody}
+                        onChange={(e) => setDraftBody(e.target.value)}
+                        rows={16}
+                        className="w-full rounded border border-brand/30 p-3 text-sm leading-relaxed font-mono"
+                        placeholder="원본 지면을 보고 본문을 교정하세요"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => saveEdit(a.idxno)}
+                          disabled={saving}
+                          className="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                        >
+                          {saving ? "저장 중…" : "💾 저장 (승인 처리)"}
+                        </button>
+                        <button onClick={() => setEditIdx(null)} className="rounded bg-foreground-muted/15 px-3 py-1.5 text-xs hover:bg-foreground-muted/25">취소</button>
+                        <span className="text-xs text-foreground-muted">저장하면 라이브에 즉시 반영되고 ‘승인됨’으로 처리됩니다</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded bg-foreground-muted/5 p-3 text-sm leading-relaxed">{a.body}</div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

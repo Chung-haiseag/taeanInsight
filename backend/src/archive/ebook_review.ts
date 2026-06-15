@@ -69,6 +69,31 @@ ebookReviewRouter.get("/articles", async (c) => {
   return c.json({ items, total: total?.n ?? 0, pageSize: PAGE_SIZE });
 });
 
+// 본문 교정 — 신문사 관리자가 원본 지면을 보고 OCR 결과를 직접 수정. 저장 시 자동 승인 처리.
+//   POST /api/admin/ebook/edit/:idxno  { title?, body }
+ebookReviewRouter.post("/edit/:idxno{[0-9]+}", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const idxno = Number(c.req.param("idxno"));
+  if (idxno < LO || idxno > HI) return c.json({ error: "ebook 대역 아님" }, 400);
+  const b = await c.req.json().catch(() => ({}));
+  const title = typeof b?.title === "string" ? b.title.trim().slice(0, 300) : null;
+  const body = typeof b?.body === "string" ? b.body : null;
+  if (body == null || !body.trim()) return c.json({ error: "body(본문) 필요" }, 400);
+  const excerpt = body.replace(/\s+/g, " ").trim().slice(0, 158) + "…";
+  const at = new Date().toISOString();
+  // 교정 저장 = 검수 완료(승인)로 처리 — 의심 목록에서 빠지고 라이브에 즉시 반영
+  const r = await db
+    .prepare(
+      "UPDATE archive_articles SET title=COALESCE(?,title), body=?, excerpt=?, " +
+        "verify_status='approved', verify_note='본문 교정', verified_at=? WHERE idxno=?",
+    )
+    .bind(title, body, excerpt, at, idxno)
+    .run();
+  if (!r.meta.changes) return c.json({ error: "기사 없음" }, 404);
+  return c.json({ ok: true, idxno, title, body, excerpt, verify_status: "approved", verify_note: "본문 교정", verified_at: at });
+});
+
 // 검수 기록 — 승인/수정필요(+메모). status:null 로 검수 취소(미검수 복귀)도 허용
 ebookReviewRouter.post("/verify/:idxno{[0-9]+}", async (c) => {
   const db = c.env.ARCHIVE_DB;

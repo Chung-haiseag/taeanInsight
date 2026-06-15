@@ -58,3 +58,15 @@ export async function verifyEbookArticle(
     body: JSON.stringify({ status, note }),
   });
 }
+
+// 본문 교정 저장 — 원본 지면 보고 수정한 제목/본문을 D1에 반영(저장 시 자동 승인)
+export async function editEbookArticle(
+  idxno: number,
+  title: string,
+  body: string,
+): Promise<{ ok: boolean; title: string; body: string; excerpt: string; verify_status: VerifyStatus; verified_at: string }> {
+  return apiFetch(`/api/admin/ebook/edit/${idxno}`, {
+    method: "POST",
+    body: JSON.stringify({ title, body }),
+  });
+}
