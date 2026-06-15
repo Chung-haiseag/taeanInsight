@@ -36,6 +36,8 @@ const PRICE_IN = Number(process.env.PRICE_IN || "1.0");
 const PRICE_OUT = Number(process.env.PRICE_OUT || "5.0");
 const RENDER_DPI = Number(process.env.RENDER_DPI || "300");
 const OCR_COLS = Number(process.env.OCR_COLS || "6"); // 컬럼 정렬 빈 수
+// 지면 단위 모드: Haiku(기사 구조화) 미사용 — Vision 텍스트를 면 1건으로 저장. 클로드 비용 0.
+const PAGE_MODE = process.env.PAGE_MODE === "1" || (process.env.STRUCT || "").toLowerCase() === "page";
 const PHOTO_PAD = Number(process.env.PHOTO_PAD || "0.03"); // 사진 크롭 사방 여백(잘림 방지)
 const CATS = ["tourism", "environment", "realestate", "policy", "industry", "culture", "society"];
 function arg(name, def) { const i = process.argv.indexOf(name); return i !== -1 ? process.argv[i + 1] : def; }
@@ -85,7 +87,11 @@ async function googleVisionOCR(pngPath) {
       for (const w of (pa.words || [])) for (const s of (w.symbols || [])) {
         t += s.text || "";
         const br = s.property && s.property.detectedBreak;
-        if (br && (br.type === "SPACE" || br.type === "EOL_SURE_SPACE" || br.type === "LINE_BREAK")) t += " ";
+        if (!br) continue;
+        // 지면 모드: LINE_BREAK(시각적 줄끝, 흔히 단어 중간 줄바꿈)는 공백 없이 붙여 "대 머리"식 분리 제거.
+        //   EOL_SURE_SPACE/SPACE(Vision이 띄어쓰기 확신)만 공백. → 결정론적 띄어쓰기 개선.
+        if (br.type === "SPACE" || br.type === "SURE_SPACE" || br.type === "EOL_SURE_SPACE") t += " ";
+        else if (br.type === "LINE_BREAK") t += PAGE_MODE ? "" : " ";
       }
       const vs = (pa.boundingBox && pa.boundingBox.vertices) || []; if (vs.length < 2) continue;
       const xs = vs.map((v) => v.x || 0), ys = vs.map((v) => v.y || 0);
@@ -278,7 +284,7 @@ async function main() {
   if (!dir) { console.error("--dir <경로> 필요"); process.exit(1); }
   if (OCR_ENGINE === "apple" && !existsSync(OCR_BIN)) { console.error(`${OCR_BIN} 없음 — 먼저: swiftc -O ocr_vision.swift -o ocr_vision`); process.exit(1); }
   if (OCR_ENGINE === "google" && !GV_KEY) { console.error("GOOGLE_VISION_API_KEY(또는 GOOGLE_API_KEY) 필요 — Cloud Vision API 사용설정"); process.exit(1); }
-  if (!process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY 필요(구조화용)"); process.exit(1); }
+  if (!PAGE_MODE && !process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY 필요(구조화용) — 또는 PAGE_MODE=1 로 지면 단위(클로드 미사용)"); process.exit(1); }
   const limit = Number(arg("--limit", "0"));
   const minFaith = Number(arg("--min-faith", "0.75"));
   await mkdir(TMP, { recursive: true });
@@ -305,7 +311,7 @@ async function main() {
   }
   const todo = pages.filter((p) => !done.has(`${p.date}_${p.page}`)).slice(0, limit || undefined);
   const ocrName = OCR_ENGINE === "google" ? "Google Vision(클라우드)" : "Apple Vision(로컬·무료)";
-  console.log(`이번 실행 ${todo.length}p · OCR=${ocrName} · 구조화=${MODEL} · ${RENDER_DPI}dpi`);
+  console.log(`이번 실행 ${todo.length}p · OCR=${ocrName} · ${PAGE_MODE ? "지면 단위(클로드 미사용)" : `구조화=${MODEL}`} · ${RENDER_DPI}dpi`);
 
   let inTok = 0, outTok = 0, nArticles = 0, nPhotos = 0, nFlag = 0, nDrop = 0, nStub = 0;
   for (let i = 0; i < todo.length; i++) {
@@ -318,7 +324,7 @@ async function main() {
       const fw = Number((stdout.match(/pixelWidth:\s*(\d+)/) || [])[1]);
       const fh = Number((stdout.match(/pixelHeight:\s*(\d+)/) || [])[1]);
       const apiJpg = `${prefix}_api.jpg`;
-      await sh("sips", ["-Z", "1568", "-s", "format", "jpeg", "-s", "formatOptions", "85", full, "--out", apiJpg]);
+      if (!PAGE_MODE) await sh("sips", ["-Z", "1568", "-s", "format", "jpeg", "-s", "formatOptions", "85", full, "--out", apiJpg]); // Haiku 이미지 입력용(지면모드 불필요)
 
       // 지면 이미지 1회 업로드 — 이 면의 모든 기사가 공유 (목록 썸네일 + 원본 지면 보기)
       const pageJpg = `${prefix}_page.jpg`;
@@ -359,6 +365,14 @@ async function main() {
         1,
       );
       const writeRec = async (r) => { r.idxno = nextIdx++; await appendFile(OUT_JSONL, JSON.stringify(r) + "\n"); nArticles++; };
+
+      // ── 지면 단위 모드: Haiku 없이 면 1건 저장 (클로드 비용 0) ──
+      if (PAGE_MODE) {
+        const pageTitle = `${date.slice(0,4)}.${Number(date.slice(4,6))}.${Number(date.slice(6,8))} ${page}면`;
+        await writeRec(baseRec(pageTitle, ocrText, 1, "society"));
+        process.stdout.write(`\r[${i + 1}/${todo.length}] ${date} ${page}면 · 면 ${nArticles}   `);
+        continue;
+      }
 
       // 표 지면 사전 감지 — 숫자 비율 극단(공고 명단·시세표)은 구조화 생략하고 스텁 1건
       const allTxt = ocrLines.map((l) => l.t).join("");
@@ -408,8 +422,13 @@ async function main() {
   }
   const cost = (inTok / 1e6) * PRICE_IN + (outTok / 1e6) * PRICE_OUT;
   console.log(`\n\n=== 완료 ===`);
-  console.log(`기사 ${nArticles} · 사진 ${nPhotos} · 광고제외 ${nDrop} · 표스텁 ${nStub} · 충실도경고 ${nFlag}`);
-  console.log(`OCR=${ocrName} · 구조화 Haiku in ${inTok}/out ${outTok} ≈ $${cost.toFixed(4)} (≈${nArticles ? (cost / Math.max(1, todo.length)).toFixed(4) : 0}/면)`);
+  if (PAGE_MODE) {
+    console.log(`면 ${nArticles} · 지면이미지 ${nPhotos}`);
+    console.log(`OCR=${ocrName} · 지면 단위(클로드 미사용) · 추가 LLM 비용 $0`);
+  } else {
+    console.log(`기사 ${nArticles} · 사진 ${nPhotos} · 광고제외 ${nDrop} · 표스텁 ${nStub} · 충실도경고 ${nFlag}`);
+    console.log(`OCR=${ocrName} · 구조화 Haiku in ${inTok}/out ${outTok} ≈ $${cost.toFixed(4)} (≈${nArticles ? (cost / Math.max(1, todo.length)).toFixed(4) : 0}/면)`);
+  }
   console.log(`출력: ${OUT_JSONL}`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
