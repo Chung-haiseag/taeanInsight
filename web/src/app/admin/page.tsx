@@ -920,6 +920,11 @@ function EbookReviewSection() {
             </div>
             <h3 className="font-bold text-brand">{a.title}</h3>
             {a.verify_note && <p className="text-xs text-red-700">메모: {a.verify_note}</p>}
+            {typeof a.faithfulness === "number" && a.faithfulness < 0.75 && (
+              <p className="rounded-md border-l-4 border-amber-600 bg-amber-100 px-3 py-2 text-xs font-bold text-amber-900">
+                ⚠ 완벽하게 OCR이 되지 않아, 기사 내용을 확인하려면 원본 지면을 확인하세요. (독자 화면에도 동일 안내 표시됨)
+              </p>
+            )}
             <p className="text-sm text-foreground-muted line-clamp-2">{a.excerpt}</p>
 
             <div className="flex flex-wrap gap-2 text-xs">
