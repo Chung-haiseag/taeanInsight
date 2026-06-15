@@ -30,7 +30,12 @@ interface Reader {
   hasFullText: boolean;
   pageImage?: string | null; // 전자북(과거지면): 원본 지면 스캔
   pageLabel?: string | null; // 예: "1990.5.14 · 지면 03면"
+  faithfulness?: number | null; // 전자북 OCR 충실도
 }
+
+// 이 값 미만이면 "OCR 불완전 — 원본 지면 확인" 안내를 본문 하단에 표시
+// (검수 '경고' 임계값과 동일 — 약 14.6%, 7건 중 1건)
+const LOW_FAITH = 0.75;
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.insight.taeannews.co.kr";
 
@@ -75,6 +80,7 @@ export default function NewsReaderPage() {
           url: a.url,
           source: "archive",
           hasFullText: !!(a.body && a.body.length > 0),
+          faithfulness: typeof a.faithfulness === "number" ? a.faithfulness : null,
           ...ebookPageImage(Number(params.id), a.section, a.published_at),
         });
       } catch {
@@ -315,6 +321,13 @@ function FullBody({ article }: { article: Reader }) {
             <img key={src} src={src} alt="" className="w-full rounded-lg bg-brand/5" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
+      )}
+
+      {/* 저충실도 전자북: OCR 불완전 안내 (본문 하단, 진한 색) */}
+      {article.pageImage && typeof article.faithfulness === "number" && article.faithfulness < LOW_FAITH && (
+        <p className="rounded-md border-l-4 border-amber-600 bg-amber-100 px-4 py-3 text-sm font-bold text-amber-900">
+          ⚠ 완벽하게 OCR이 되지 않아, 기사 내용을 확인하려면 아래 <span className="underline">원본 지면</span>을 확인하세요.
+        </p>
       )}
 
       {/* 전자북: 원본 지면 스캔 (디지털화 본문과 대조 가능) */}

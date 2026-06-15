@@ -27,6 +27,7 @@ export interface ArchiveArticle extends ArchiveHit {
   body?: string;
   images?: string[];
   url?: string;
+  faithfulness?: number | null; // 전자북 OCR 충실도(낮으면 독자에 원본 대조 안내)
 }
 
 export async function searchArchive(params: {
