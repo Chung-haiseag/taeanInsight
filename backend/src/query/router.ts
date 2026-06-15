@@ -16,6 +16,10 @@ import { CircuitBreaker, InMemoryMonthlyQuery } from "../cost/circuit_breaker";
 import { DefaultCostRecorder, InMemoryCostStore } from "../cost/recorder";
 import { HybridLlmRouter } from "../llm/hybrid_router";
 import { WorkersAiLlmClient } from "../llm/workers_ai";
+import { fetchConditions } from "../env/sources";
+
+// 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
+const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
 
 export const queryRouter = new Hono<{ Bindings: Env }>();
 
@@ -85,44 +89,64 @@ queryRouter.post("/", async (c) => {
   }
   const { query, domain, location, userTier } = parsed.data;
 
-  // ── ① RAG: 태안뉴스·아카이브에서 근거 검색 → 그 근거로만 답변(출처 표기) ──
+  // ── ① RAG: 실시간 관측(날씨·대기질) + 태안뉴스·아카이브를 근거로 답변(출처 표기) ──
   const client = new WorkersAiLlmClient({ ai: c.env.AI });
-  if (c.env.ARCHIVE_DB) {
-    try {
-      const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
-      if (rows.length) {
-        const context = rows
-          .map((r, i) => `[${i + 1}] ${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`)
-          .join("\n\n");
-        const res = await client.complete({
-          channel: "realtime",
-          maxTokens: 800,
-          temperature: 0.2,
-          messages: [
-            {
-              role: "system",
-              content:
-                "너는 태안 지역정보 도우미다. 아래 [태안신문·아카이브 기사]를 근거로 한국어로 답하라.\n" +
-                "- 기사에서 질문과 관련된 내용을 최대한 종합해 구체적으로 답하라(이름·수치·날짜 포함).\n" +
-                "- 기사에 일부만 있으면 그 부분을 답하고 '확인된 범위는 여기까지'처럼 한계를 덧붙여라.\n" +
-                "- 기사들이 질문과 '완전히' 무관할 때만 '아카이브에서 해당 정보를 찾지 못했습니다'라고 하라.\n" +
-                "- 기사에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
-            },
-            { role: "user", content: `[태안신문·아카이브 기사]\n${context}\n\n[질문] ${query}` },
-          ],
-        });
-        return c.json({
-          answer: res.content,
-          intent: "archive_rag",
-          confidence: 0.9,
-          fromCache: false,
-          llmCalls: 1,
-          sources: rows.map((r) => ({ idxno: r.idxno, title: r.title, publishedAt: r.published_at, url: `/news/${r.idxno}` })),
-          model: client.model,
-        });
+  try {
+    const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string } }> = [];
+
+    // (a) 날씨·대기질 질문이면 실시간 관측값을 근거에 추가
+    if (WEATHER_RE.test(query) && c.env.DATA_GO_KR_KEY) {
+      const cond = await fetchConditions(c.env);
+      if (cond.available && (cond.weather.temp != null || cond.air.pm10 != null || cond.air.grade)) {
+        const w = cond.weather, a = cond.air;
+        const text =
+          `태안 실시간 관측(${String(cond.observedAt).slice(0, 16).replace("T", " ")} KST) — ` +
+          `기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, 강수 ${w.pty ?? "?"}; ` +
+          `미세먼지(PM10) ${a.pm10 ?? "?"}㎍/㎥, 초미세(PM2.5) ${a.pm25 ?? "?"}㎍/㎥, 오존 ${a.o3 ?? "?"}ppm, ` +
+          `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
+        parts.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
       }
-    } catch { /* 검색 실패 시 일반 경로로 폴백 */ }
-  }
+    }
+
+    // (b) 아카이브·태안뉴스 근거 검색
+    if (c.env.ARCHIVE_DB) {
+      const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
+      for (const r of rows) {
+        parts.push({ text: `${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`, source: { title: r.title, url: `/news/${r.idxno}`, publishedAt: r.published_at } });
+      }
+    }
+
+    if (parts.length) {
+      const context = parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
+      const res = await client.complete({
+        channel: "realtime",
+        maxTokens: 800,
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content:
+              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·태안신문 기사)를 근거로 한국어로 답하라.\n" +
+              "- 근거에서 질문과 관련된 내용을 최대한 종합해 구체적으로 답하라(수치·이름·날짜 포함).\n" +
+              "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
+              "- 일부만 있으면 그 부분을 답하고 '확인된 범위는 여기까지'처럼 한계를 덧붙여라.\n" +
+              "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
+              "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
+          },
+          { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
+        ],
+      });
+      return c.json({
+        answer: res.content,
+        intent: "archive_rag",
+        confidence: 0.9,
+        fromCache: false,
+        llmCalls: 1,
+        sources: parts.map((p) => p.source),
+        model: client.model,
+      });
+    }
+  } catch { /* 실패 시 일반 경로로 폴백 */ }
 
   // ── ② 폴백: 근거 없으면 기존 일반 에이전트(순수 LLM) ──────────────
   const limitKrw = Number(c.env.MONTHLY_COST_LIMIT_KRW ?? "300000") || 300000;
