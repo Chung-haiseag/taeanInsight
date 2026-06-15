@@ -68,7 +68,10 @@ async function fetchAir(key: string, stationHint: string): Promise<Conditions["a
     const res = await fetch(`${AIR_BASE}/getCtprvnRltmMesureDnsty?${sp}`, { signal: AbortSignal.timeout(8000) });
     const j = (await res.json()) as { response?: { body?: { items?: Array<Record<string, string>> } } };
     const items = j.response?.body?.items ?? [];
-    const it = items.find((x) => (x.stationName || "").includes("태안")) ?? items.find((x) => (x.stationName || "").includes(stationHint));
+    const taean = items.filter((x) => (x.stationName || "").includes("태안"));
+    const hasData = (x: Record<string, string>) => num(x.pm10Value) !== null || num(x.pm25Value) !== null || num(x.khaiGrade) !== null;
+    // 태안 측정소 중 데이터 있는 것 우선(태안읍 통신장애 시 태안항으로 폴백)
+    const it = taean.find(hasData) ?? taean[0] ?? items.find((x) => (x.stationName || "").includes(stationHint));
     if (it) {
       out.station = it.stationName ?? null;
       out.pm10 = num(it.pm10Value);
