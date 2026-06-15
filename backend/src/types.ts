@@ -10,6 +10,8 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   TOGETHER_API_KEY?: string;
   SLACK_WEBHOOK_URL?: string;
+  TAEAN_ID?: string;              // 태안신문 회원 로그인 ID (전문 수집용)
+  TAEAN_PW?: string;              // 태안신문 회원 로그인 PW
 
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색

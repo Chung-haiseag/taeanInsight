@@ -171,51 +171,123 @@ export function categoryCounts(items: NewsItem[]): Record<string, number> {
   return counts;
 }
 
+// ── 회원 로그인 + 전문 추출 (taeannews는 본문을 회원 게이트 뒤에 둠) ──────────
+// 세션 바인딩 때문에 실제 브라우저 UA 사용. 비밀번호는 시크릿으로만 받고 로그/저장 안 함.
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+const LOGIN_URL = "https://www.taeannews.co.kr/member/login.php";
+
+async function login(id: string, pw: string): Promise<string> {
+  const form = new URLSearchParams({ user_id: id, user_pw: pw, backUrl: "", id_save: "N" });
+  const res = await fetch(LOGIN_URL, {
+    method: "POST",
+    headers: { "User-Agent": BROWSER_UA, "Content-Type": "application/x-www-form-urlencoded", Referer: LOGIN_URL },
+    body: form,
+    redirect: "manual",
+  });
+  const setCookie = (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+  return setCookie.map((c) => c.split(";")[0]).join("; ");
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+// 기사 페이지 HTML에서 전문 추출 (백필과 동일 규칙). 게이트(회원전용 안내)면 "" 반환.
+function extractFullBody(html: string): string {
+  const anchor = html.indexOf('id="article-view-content-div"');
+  if (anchor === -1) return "";
+  const gt = html.indexOf(">", anchor);
+  let chunk = html.slice(gt + 1, gt + 1 + 60000);
+  const cut = chunk.search(/저작권자|무단전재|<script|id="dn_btn"|이 기사를 공유/);
+  if (cut !== -1) chunk = chunk.slice(0, cut);
+  const text = decodeEntities(
+    chunk
+      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
+      .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, "\n\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (/회원전용기사|회원만 열람|로그인 또는 회원가입/.test(text)) return ""; // 비로그인 게이트
+  return text;
+}
+
 // ── RSS → D1 아카이브 자동 적재 (cron) ─────────────────────────────────────
 // 새 기사를 archive_articles에 영구 보존 — RSS(최근 50건)가 흘러가도 검색·관련뉴스에 남는다.
 // idxno = taeannews 원본 기사번호 → 백필 데이터와 같은 키스페이스로 자연 통합(중복은 IGNORE).
-// 저작권: RSS 발췌만 저장(전문 없음), 원문 링크 보존.
-export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise<{ fetched: number; inserted: number }> {
+// 저작권: 자사(태안신문) 콘텐츠. 회원 로그인 시 전문 저장, 없으면 발췌 + 원문 링크.
+export async function ingestToArchive(
+  env: { ARCHIVE_DB?: D1Database; TAEAN_ID?: string; TAEAN_PW?: string },
+): Promise<{ fetched: number; inserted: number; upgraded: number; loggedIn: boolean }> {
   const db = env.ARCHIVE_DB;
-  if (!db) return { fetched: 0, inserted: 0 };
+  if (!db) return { fetched: 0, inserted: 0, upgraded: 0, loggedIn: false };
+  // 회원 로그인(전문 수집용) — 자격증명 있을 때만. 실패해도 발췌로 폴백.
+  let cookie = "";
+  if (env.TAEAN_ID && env.TAEAN_PW) {
+    try { cookie = await login(env.TAEAN_ID, env.TAEAN_PW); } catch { /* 발췌 폴백 */ }
+  }
   // getNews가 RSS + 기사목록을 병합 제공 (RSS 정체 시에도 최신 포함)
   const items = await getNews(true).catch(() => [] as NewsItem[]);
-  let inserted = 0;
+  let inserted = 0, upgraded = 0;
   for (const it of items) {
     const idxno = Number(it.id);
     if (!Number.isFinite(idxno) || idxno <= 0) continue;
-    // 이미 있으면 페이지 fetch 생략(비용·트래픽 절약)
-    const exists = await db.prepare("SELECT 1 FROM archive_articles WHERE idxno=?").bind(idxno).first();
-    if (exists) continue;
+    // 기존 행 상태 — 전문 이미 있으면 스킵. RSS 스텁(발췌만)인데 로그인됐으면 전문으로 업그레이드.
+    const existing = await db
+      .prepare("SELECT section, length(body) AS blen FROM archive_articles WHERE idxno=?")
+      .bind(idxno)
+      .first<{ section: string | null; blen: number | null }>();
+    const isStub = !!existing && existing.section === "RSS" && (existing.blen ?? 0) < 300;
+    if (existing && !(isStub && cookie)) continue;
+
     const publishedAt = it.publishedAt.replace(" ", "T") + "+09:00";
-    // 대표사진: 기사 페이지의 og:image 썸네일(_v150) → 원본 photo URL 유도. 로고면 제외 (백필과 동일 규칙)
+    const hdr = { "User-Agent": BROWSER_UA, Referer: "https://www.taeannews.co.kr/", ...(cookie ? { Cookie: cookie } : {}) };
     let leadImage: string | null = null;
+    let body = "";
     let excerpt = it.excerpt;
     try {
-      const html = await (await fetch(it.url, { headers: { "User-Agent": UA } })).text();
+      const html = await (await fetch(it.url, { headers: hdr })).text();
       const og = /property="og:image"\s+content="([^"]+)"/.exec(html)?.[1];
-      if (og && !og.includes("/logo/")) {
-        leadImage = og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "");
-      }
-      // 목록 출처 기사는 발췌가 없으므로 og:description으로 채움
+      if (og && !og.includes("/logo/")) leadImage = og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "");
+      if (cookie) body = extractFullBody(html); // 로그인 시 전문
       if (!excerpt) {
         const desc = /property="og:description"\s+content="([^"]*)"/.exec(html)?.[1];
-        if (desc) { const d = stripHtml(desc); excerpt = d.length > 140 ? d.slice(0, 140) + "…" : d; }
+        if (desc) excerpt = stripHtml(desc);
       }
-    } catch { /* 사진/발췌 없이 진행 */ }
-    const r = await db
-      .prepare(
-        `INSERT OR IGNORE INTO archive_articles
-         (idxno, title, published_at, year, section, category, author, excerpt, body, images, lead_image, members_only, url)
-         VALUES (?, ?, ?, ?, 'RSS', ?, ?, ?, ?, ?, ?, 0, ?)`,
-      )
-      .bind(
-        idxno, it.title, publishedAt, Number(it.publishedAt.slice(0, 4)),
-        it.category, it.author ?? null, excerpt, excerpt,
-        leadImage ? JSON.stringify([leadImage]) : "[]", leadImage, it.url,
-      )
-      .run();
-    if (r.meta.changes) inserted++;
+    } catch { /* 사진/본문 없이 진행 */ }
+    // 발췌: 전문 있으면 전문 앞부분, 없으면 메타 설명
+    const excSource = body || excerpt;
+    excerpt = excSource.length > 140 ? excSource.slice(0, 140) + "…" : excSource;
+    const storeBody = body || excerpt; // 전문 없으면 발췌를 본문으로(폴백)
+
+    if (existing && isStub) {
+      const r = await db
+        .prepare("UPDATE archive_articles SET body=?, excerpt=?, lead_image=COALESCE(?,lead_image), images=? WHERE idxno=?")
+        .bind(storeBody, excerpt, leadImage, leadImage ? JSON.stringify([leadImage]) : "[]", idxno)
+        .run();
+      if (r.meta.changes && body) upgraded++;
+    } else {
+      const r = await db
+        .prepare(
+          `INSERT OR IGNORE INTO archive_articles
+           (idxno, title, published_at, year, section, category, author, excerpt, body, images, lead_image, members_only, url)
+           VALUES (?, ?, ?, ?, 'RSS', ?, ?, ?, ?, ?, ?, 0, ?)`,
+        )
+        .bind(
+          idxno, it.title, publishedAt, Number(it.publishedAt.slice(0, 4)),
+          it.category, it.author ?? null, excerpt, storeBody,
+          leadImage ? JSON.stringify([leadImage]) : "[]", leadImage, it.url,
+        )
+        .run();
+      if (r.meta.changes) inserted++;
+    }
   }
-  return { fetched: items.length, inserted };
+  return { fetched: items.length, inserted, upgraded, loggedIn: !!cookie };
 }
