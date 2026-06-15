@@ -412,7 +412,7 @@ function OriginalPage({ src, label }: { src: string; label: string }) {
         <div className="space-y-2 px-4 pb-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-foreground-muted">
-              주간태안신문 원본 지면 스캔 — 여기서 ＋−·ctrl+휠로 확대하고 드래그로 이동하세요.
+              주간태안신문 원본 지면 스캔 — 마우스 휠로 확대하고 드래그로 이동하세요.
             </p>
             <button
               onClick={() => setViewer(true)}

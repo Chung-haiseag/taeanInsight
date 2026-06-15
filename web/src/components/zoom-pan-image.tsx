@@ -16,12 +16,16 @@ export function ZoomPanImage({
   const [zoom, setZoom] = useState(1); // 1=폭맞춤, 최대 4배
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef({ on: false, x: 0, y: 0, sl: 0, st: 0 });
+  const zoomRef = useRef(1);
   const imgSrc = zoom > 1 ? (fullSrc ?? src) : src;
+
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
   useEffect(() => {
     const el = scrollRef.current;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return; // 일반 휠은 스크롤(이동), 핀치/ctrl+휠만 줌
+      // 휠만으로 확대/축소. 단, 폭맞춤(100%)에서 더 내리면 페이지 스크롤로 넘김(이미지에 안 갇히게)
+      if (e.deltaY > 0 && zoomRef.current <= 1) return;
       e.preventDefault();
       setZoom((z) => Math.min(4, Math.max(1, z - Math.sign(e.deltaY) * 0.2)));
     };
@@ -36,7 +40,7 @@ export function ZoomPanImage({
         <span className="w-12 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
         <button onClick={() => setZoom((z) => Math.min(4, z + 0.25))} className="rounded bg-foreground-muted/15 px-2.5 py-1 text-sm font-bold hover:bg-foreground-muted/25" aria-label="확대">＋</button>
         <button onClick={() => setZoom((z) => (z === 1 ? 2 : 1))} className="rounded bg-foreground-muted/15 px-2 py-1 text-xs hover:bg-foreground-muted/25">{zoom === 1 ? "200%" : "폭맞춤"}</button>
-        <span className="ml-auto text-[11px] text-foreground-muted">＋−·ctrl+휠 확대 · 드래그 이동</span>
+        <span className="ml-auto text-[11px] text-foreground-muted">휠·＋− 확대 · 드래그 이동</span>
       </div>
       <div
         ref={scrollRef}
