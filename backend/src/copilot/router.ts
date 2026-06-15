@@ -46,8 +46,9 @@ copilotRouter.post("/check", async (c) => {
   });
 });
 
-// ── AI 글쓰기 보조 (Workers AI 저가 오픈모델 — 무료 할당 내 종량 0) ──
-const ASSIST_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+// ── AI 글쓰기 보조 (Workers AI 오픈모델 — 무료 할당 내 종량 0) ──
+// llama-3.1-8b-instruct는 2026-05-30 폐기 → 현행 고속 모델로 교체
+const ASSIST_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const ASSIST_PROMPTS: Record<string, string> = {
   polish: "다음 한국어 기사 문장을 사실은 바꾸지 말고 자연스럽고 명확하게 다듬어줘. 결과만 출력해.",
   summarize: "다음 한국어 기사를 핵심 3줄로 요약해줘. 불릿으로.",

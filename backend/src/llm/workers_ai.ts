@@ -6,8 +6,8 @@
 import type { LlmChannel, LlmClient, LlmRequest, LlmResponse } from "./types";
 import { VendorError } from "./types";
 
-// 기본 모델 — 코파일럿 보조와 동일(@cf/meta/llama-3.1-8b-instruct)
-const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+// 기본 모델 — llama-3.1-8b-instruct는 2026-05-30 폐기됨. 현행 고속 모델로 교체.
+const DEFAULT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 export interface WorkersAiClientOptions {
   ai: Ai;
