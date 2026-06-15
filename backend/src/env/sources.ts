@@ -10,7 +10,7 @@ export interface Conditions {
   available: boolean;
   observedAt: string | null;          // ISO (KST)
   weather: { temp: number | null; humidity: number | null; sky: string | null; pty: string | null };
-  air: { pm10: number | null; pm25: number | null; o3: number | null; khaiGrade: number | null; grade: string | null };
+  air: { pm10: number | null; pm25: number | null; o3: number | null; khaiGrade: number | null; grade: string | null; station: string | null };
 }
 
 const SKY: Record<string, string> = { "1": "맑음", "3": "구름많음", "4": "흐림" };
@@ -58,16 +58,19 @@ async function fetchWeather(key: string, nx: string, ny: string): Promise<Condit
   return out;
 }
 
-// 에어코리아 측정소별 실시간 대기질
-async function fetchAir(key: string, station: string): Promise<Conditions["air"]> {
-  const out = { pm10: null as number | null, pm25: null as number | null, o3: null as number | null, khaiGrade: null as number | null, grade: null as string | null };
+// 에어코리아 대기질 — 측정소명을 몰라도 충남 전체에서 '태안' 측정소를 자동 탐색
+async function fetchAir(key: string, stationHint: string): Promise<Conditions["air"] & { station: string | null }> {
+  const out = { pm10: null as number | null, pm25: null as number | null, o3: null as number | null, khaiGrade: null as number | null, grade: null as string | null, station: null as string | null };
+  const num = (v?: string) => (v && v !== "-" && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
   try {
-    const sp = new URLSearchParams({ serviceKey: key, returnType: "json", numOfRows: "1", pageNo: "1", stationName: station, dataTerm: "DAILY", ver: "1.5" });
-    const res = await fetch(`${AIR_BASE}/getMsrstnAcctoRltmMesureDnsty?${sp}`, { signal: AbortSignal.timeout(8000) });
+    // 시도별 실시간 — 충남 측정소 전체 후 '태안' 포함 측정소 선택 (없으면 hint 일치)
+    const sp = new URLSearchParams({ serviceKey: key, returnType: "json", sidoName: "충남", numOfRows: "100", pageNo: "1", ver: "1.5" });
+    const res = await fetch(`${AIR_BASE}/getCtprvnRltmMesureDnsty?${sp}`, { signal: AbortSignal.timeout(8000) });
     const j = (await res.json()) as { response?: { body?: { items?: Array<Record<string, string>> } } };
-    const it = j.response?.body?.items?.[0];
+    const items = j.response?.body?.items ?? [];
+    const it = items.find((x) => (x.stationName || "").includes("태안")) ?? items.find((x) => (x.stationName || "").includes(stationHint));
     if (it) {
-      const num = (v?: string) => (v && v !== "-" && !Number.isNaN(Number(v)) ? Number(v) : null);
+      out.station = it.stationName ?? null;
       out.pm10 = num(it.pm10Value);
       out.pm25 = num(it.pm25Value);
       out.o3 = num(it.o3Value);
@@ -86,7 +89,7 @@ export async function fetchConditions(env: {
   TAEAN_AIR_STATION?: string;
 }): Promise<Conditions> {
   const key = env.DATA_GO_KR_KEY;
-  if (!key) return { available: false, observedAt: null, weather: { temp: null, humidity: null, sky: null, pty: null }, air: { pm10: null, pm25: null, o3: null, khaiGrade: null, grade: null } };
+  if (!key) return { available: false, observedAt: null, weather: { temp: null, humidity: null, sky: null, pty: null }, air: { pm10: null, pm25: null, o3: null, khaiGrade: null, grade: null, station: null } };
   const nx = env.TAEAN_NX || "51"; // 태안군 기상청 격자 (기본값, 필요시 조정)
   const ny = env.TAEAN_NY || "109";
   const station = env.TAEAN_AIR_STATION || "태안읍";
