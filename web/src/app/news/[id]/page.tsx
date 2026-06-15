@@ -119,7 +119,7 @@ export default function NewsReaderPage() {
     );
 
   return (
-    <article className="mx-auto max-w-prose space-y-6">
+    <article className="mx-auto max-w-4xl space-y-6">
       <div className="flex gap-4 text-sm text-foreground-muted">
         <Link href="/news" className="hover:text-brand">← 태안뉴스</Link>
         <Link href="/archive" className="hover:text-brand">아카이브 검색</Link>
