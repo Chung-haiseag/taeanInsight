@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/archive";
 import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
 import { decodeEntities } from "@/lib/html";
+import { ZoomPanImage } from "@/components/zoom-pan-image";
 
 interface Reader {
   title: string;
@@ -411,19 +412,16 @@ function OriginalPage({ src, label }: { src: string; label: string }) {
         <div className="space-y-2 px-4 pb-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-foreground-muted">
-              주간태안신문 원본 지면 스캔 — 지면을 클릭하면 확대 뷰어로 크게 볼 수 있습니다.
+              주간태안신문 원본 지면 스캔 — 여기서 ＋−·ctrl+휠로 확대하고 드래그로 이동하세요.
             </p>
             <button
               onClick={() => setViewer(true)}
               className="shrink-0 rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
             >
-              🔍 크게 보기
+              🔍 전체화면
             </button>
           </div>
-          <button onClick={() => setViewer(true)} className="block w-full" aria-label="원본 지면 확대 뷰어 열기">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={`원본 지면 (${label})`} className="w-full cursor-zoom-in rounded border border-brand/10" loading="lazy" />
-          </button>
+          <ZoomPanImage src={src} fullSrc={fullSrc} maxHeightClass="max-h-[40rem]" />
         </div>
       )}
       {viewer && <PageViewer src={fullSrc} label={label} onClose={() => setViewer(false)} />}
