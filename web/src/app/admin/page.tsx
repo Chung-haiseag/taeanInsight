@@ -33,6 +33,7 @@ import {
   type ManagedRule,
 } from "@/lib/api/rules";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
+import { PageViewer } from "@/components/page-viewer";
 import {
   absUrl,
   getEbookArticles,
@@ -747,6 +748,7 @@ function EbookReviewSection() {
   const [editIdx, setEditIdx] = useState<number | null>(null);   // 교정 중인 idxno
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
+  const [viewer, setViewer] = useState<{ src: string; label: string } | null>(null); // 전체화면 뷰어
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -991,11 +993,10 @@ function EbookReviewSection() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-foreground-muted">원본 지면 ({a.section})</p>
-                    <a
-                      href={(absUrl(a.page_image) ?? "").replace(/\.jpg(\?|$)/, "full.jpg$1")}
-                      target="_blank" rel="noreferrer"
-                      className="text-xs underline text-brand"
-                    >🔍 고해상 새 창</a>
+                    <button
+                      onClick={() => setViewer({ src: (absUrl(a.page_image) ?? "").replace(/\.jpg(\?|$)/, "full.jpg$1"), label: a.section ?? "" })}
+                      className="rounded border border-brand/30 px-2 py-0.5 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
+                    >🔍 전체화면</button>
                   </div>
                   <ZoomPanImage src={absUrl(a.page_image) ?? ""} fullSrc={(absUrl(a.page_image) ?? "").replace(/\.jpg(\?|$)/, "full.jpg$1")} />
                 </div>
@@ -1018,6 +1019,7 @@ function EbookReviewSection() {
           <button disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(page + 1)} className="rounded border px-3 py-1 disabled:opacity-40">다음</button>
         </div>
       )}
+      {viewer && <PageViewer src={viewer.src} label={viewer.label} onClose={() => setViewer(null)} />}
     </section>
   );
 }
