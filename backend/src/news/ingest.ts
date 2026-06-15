@@ -4,6 +4,9 @@
 // TaskMaster #10(아카이브 스크래퍼) / #11(수집 파이프라인)
 
 const RSS_URL = "https://www.taeannews.co.kr/rss/allArticle.xml";
+// 기사목록(전 섹션 최신) — RSS 피드가 소스 쪽에서 정체될 때 최신 기사를 보강 수집
+const LIST_URL = "https://www.taeannews.co.kr/news/articleList.html?view_type=sm";
+const ARTICLE_BASE = "https://www.taeannews.co.kr/news/articleView.html?idxno=";
 const TTL_MS = 10 * 60 * 1000;
 const UA = "TaeanInsightBot/0.1 (+https://insight.taeannews.co.kr; 자사 RSS 수집)";
 
@@ -104,6 +107,39 @@ function parseRss(xml: string): NewsItem[] {
   return items;
 }
 
+// ── 기사목록 HTML 파싱 (RSS 정체 시 최신 보강) ───────────────
+// articleList.html에서 idxno·제목·발행시각·기자 추출. 발췌는 없으므로 적재 시 og:description으로 채움.
+function parseArticleList(html: string): NewsItem[] {
+  const re =
+    /articleView\.html\?idxno=(\d+)"[^>]*>([^<]+)<\/a>\s*<\/H2>\s*<em class="info dated">([^<]+)<\/em>(?:\s*<em class="info name">([^<]+)<\/em>)?/g;
+  const items: NewsItem[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const id = m[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const title = stripHtml(m[2]);
+    if (!title) continue;
+    // "2026-06-12 16:00" → "2026-06-12 16:00:00"
+    const dt = m[3].trim();
+    const publishedAt = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(dt) ? `${dt}:00` : dt;
+    const author = m[4] ? stripHtml(m[4]) : undefined;
+    items.push({ id, title, url: `${ARTICLE_BASE}${id}`, excerpt: "", author, publishedAt, category: classifyNews(title) });
+  }
+  return items;
+}
+
+async function getListNews(): Promise<NewsItem[]> {
+  try {
+    const res = await fetch(LIST_URL, { headers: { "User-Agent": UA } });
+    if (!res.ok) return [];
+    return parseArticleList(await res.text());
+  } catch {
+    return [];
+  }
+}
+
 // ── 캐시된 수집 ─────────────────────────────────────────────
 let cache: { at: number; items: NewsItem[] } | null = null;
 
@@ -133,7 +169,12 @@ export function categoryCounts(items: NewsItem[]): Record<string, number> {
 export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise<{ fetched: number; inserted: number }> {
   const db = env.ARCHIVE_DB;
   if (!db) return { fetched: 0, inserted: 0 };
-  const items = await getNews(true);
+  // RSS + 기사목록 병합(idxno 중복 제거) — RSS가 정체돼도 목록의 최신 기사를 수집
+  const rssItems = await getNews(true).catch(() => [] as NewsItem[]);
+  const byId = new Map<string, NewsItem>();
+  for (const it of rssItems) byId.set(it.id, it);              // RSS 우선(발췌 포함)
+  for (const it of await getListNews()) if (!byId.has(it.id)) byId.set(it.id, it);
+  const items = [...byId.values()];
   let inserted = 0;
   for (const it of items) {
     const idxno = Number(it.id);
@@ -144,13 +185,19 @@ export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise
     const publishedAt = it.publishedAt.replace(" ", "T") + "+09:00";
     // 대표사진: 기사 페이지의 og:image 썸네일(_v150) → 원본 photo URL 유도. 로고면 제외 (백필과 동일 규칙)
     let leadImage: string | null = null;
+    let excerpt = it.excerpt;
     try {
       const html = await (await fetch(it.url, { headers: { "User-Agent": UA } })).text();
       const og = /property="og:image"\s+content="([^"]+)"/.exec(html)?.[1];
       if (og && !og.includes("/logo/")) {
         leadImage = og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "");
       }
-    } catch { /* 사진 없이 진행 */ }
+      // 목록 출처 기사는 발췌가 없으므로 og:description으로 채움
+      if (!excerpt) {
+        const desc = /property="og:description"\s+content="([^"]*)"/.exec(html)?.[1];
+        if (desc) { const d = stripHtml(desc); excerpt = d.length > 140 ? d.slice(0, 140) + "…" : d; }
+      }
+    } catch { /* 사진/발췌 없이 진행 */ }
     const r = await db
       .prepare(
         `INSERT OR IGNORE INTO archive_articles
@@ -159,7 +206,7 @@ export async function ingestToArchive(env: { ARCHIVE_DB?: D1Database }): Promise
       )
       .bind(
         idxno, it.title, publishedAt, Number(it.publishedAt.slice(0, 4)),
-        it.category, it.author ?? null, it.excerpt, it.excerpt,
+        it.category, it.author ?? null, excerpt, excerpt,
         leadImage ? JSON.stringify([leadImage]) : "[]", leadImage, it.url,
       )
       .run();
