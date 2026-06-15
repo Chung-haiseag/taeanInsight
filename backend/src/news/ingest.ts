@@ -193,6 +193,7 @@ function decodeEntities(s: string): string {
   return s
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&middot;/g, "·").replace(/&hellip;/g, "…").replace(/&ldquo;|&rdquo;/g, '"').replace(/&lsquo;|&rsquo;/g, "'")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
 }
 
@@ -202,7 +203,9 @@ function extractFullBody(html: string): string {
   if (anchor === -1) return "";
   const gt = html.indexOf(">", anchor);
   let chunk = html.slice(gt + 1, gt + 1 + 60000);
-  const cut = chunk.search(/저작권자|무단전재|<script|id="dn_btn"|이 기사를 공유/);
+  // 본문 끝(저작권 푸터/공유버튼)에서 자른다. <script는 제외 — 본문 앞 인라인 스크립트(광고)에
+  // 잘려 본문이 비는 경우 방지. 스크립트 블록은 아래 bodyText가 통째로 제거.
+  const cut = chunk.search(/저작권자|무단전재|id="dn_btn"|이 기사를 공유/);
   if (cut !== -1) chunk = chunk.slice(0, cut);
   const text = decodeEntities(
     chunk
