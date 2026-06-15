@@ -735,6 +735,21 @@ function EbookReviewSection() {
     })();
   }, [date, status, page]);
 
+  // 현재 필터와 맞는 상태인가 — 안 맞으면 목록에서 제거(예: '미검수' 필터에서 승인되면 사라짐)
+  const matchesFilter = (st: "approved" | "flagged" | null) =>
+    status === "all" || (status === "unverified" ? st === null : st === status);
+
+  // 상태 변경 후 목록 반영 — 필터에 맞으면 갱신, 안 맞으면 제거(+건수 감소)
+  function reflect(idxno: number, patch: Partial<EbookArticle>, newStatus: "approved" | "flagged" | null) {
+    if (matchesFilter(newStatus)) {
+      setItems((prev) => prev.map((a) => (a.idxno === idxno ? { ...a, ...patch } : a)));
+    } else {
+      setItems((prev) => prev.filter((a) => a.idxno !== idxno));
+      setTotal((t) => Math.max(0, t - 1));
+    }
+    getEbookIssues().then((r) => setIssues(r.issues)).catch(() => {});
+  }
+
   async function decide(idxno: number, s: "approved" | "flagged" | null) {
     let note: string | undefined;
     if (s === "flagged") {
@@ -742,11 +757,7 @@ function EbookReviewSection() {
       note = v.trim() || undefined;
     }
     await verifyEbookArticle(idxno, s, note);
-    // 로컬 갱신 + 현황 새로고침
-    setItems((prev) =>
-      prev.map((a) => (a.idxno === idxno ? { ...a, verify_status: s, verify_note: note ?? null } : a)),
-    );
-    getEbookIssues().then((r) => setIssues(r.issues)).catch(() => {});
+    reflect(idxno, { verify_status: s, verify_note: note ?? null }, s);
   }
 
   function startEdit(a: EbookArticle) {
@@ -761,15 +772,13 @@ function EbookReviewSection() {
     setSaving(true);
     try {
       const r = await editEbookArticle(idxno, draftTitle, draftBody);
-      setItems((prev) =>
-        prev.map((a) =>
-          a.idxno === idxno
-            ? { ...a, title: r.title ?? draftTitle, body: r.body, excerpt: r.excerpt, verify_status: "approved", verify_note: "본문 교정" }
-            : a,
-        ),
-      );
       setEditIdx(null);
-      getEbookIssues().then((rr) => setIssues(rr.issues)).catch(() => {});
+      // 교정 저장 = 승인 처리 → 필터에 안 맞으면(미검수/수정필요) 목록에서 제거
+      reflect(
+        idxno,
+        { title: r.title ?? draftTitle, body: r.body, excerpt: r.excerpt, verify_status: "approved", verify_note: "본문 교정" },
+        "approved",
+      );
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "저장 실패");
     } finally {
