@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // 원본 지면 인라인 줌/팬 — 새 창 없이 그 자리에서 확대(최대 4배)·마우스 드래그 이동.
 // 확대 시 고해상(fullSrc) 이미지로 교체해 선명하게. fullSrc 미지정 시 src 사용.
@@ -17,9 +17,20 @@ export function ZoomPanImage({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef({ on: false, x: 0, y: 0, sl: 0, st: 0 });
   const zoomRef = useRef(1);
+  const pendingScroll = useRef<{ sl: number; st: number } | null>(null); // 줌 후 보정할 스크롤(커서 고정)
   const imgSrc = zoom > 1 ? (fullSrc ?? src) : src;
 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+
+  // 줌 변경 후, 커서 아래 지점이 고정되도록 스크롤 보정 (paint 전)
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el && pendingScroll.current) {
+      el.scrollLeft = pendingScroll.current.sl;
+      el.scrollTop = pendingScroll.current.st;
+      pendingScroll.current = null;
+    }
+  }, [zoom]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -27,7 +38,19 @@ export function ZoomPanImage({
       // 휠만으로 확대/축소. 단, 폭맞춤(100%)에서 더 내리면 페이지 스크롤로 넘김(이미지에 안 갇히게)
       if (e.deltaY > 0 && zoomRef.current <= 1) return;
       e.preventDefault();
-      setZoom((z) => Math.min(4, Math.max(1, z - Math.sign(e.deltaY) * 0.2)));
+      if (!el) return;
+      const oldZoom = zoomRef.current;
+      const newZoom = Math.min(4, Math.max(1, oldZoom - Math.sign(e.deltaY) * 0.2));
+      if (newZoom === oldZoom) return;
+      // 커서 위치를 중심으로 확대 — 커서 아래 콘텐츠 지점이 그대로 유지되도록 스크롤 계산
+      const factor = newZoom / oldZoom;
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      pendingScroll.current = {
+        sl: (el.scrollLeft + cx) * factor - cx,
+        st: (el.scrollTop + cy) * factor - cy,
+      };
+      setZoom(newZoom);
     };
     el?.addEventListener("wheel", onWheel, { passive: false });
     return () => el?.removeEventListener("wheel", onWheel);
