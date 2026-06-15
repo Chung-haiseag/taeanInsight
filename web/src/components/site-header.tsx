@@ -26,7 +26,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-brand/10 bg-background/80 backdrop-blur-md">
       {/* 상단 황토 라인 */}
       <div className="h-1 bg-gradient-to-r from-accent via-accent/60 to-transparent" aria-hidden="true" />
-      <div className="container mx-auto px-4 max-w-6xl flex items-center justify-between h-16">
+      <div className="container mx-auto px-4 max-w-7xl flex items-center justify-between h-16">
         <Link
           href="/"
           className="flex items-center gap-2.5 text-brand"

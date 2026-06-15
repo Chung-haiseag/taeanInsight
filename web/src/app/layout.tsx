@@ -40,7 +40,7 @@ export default function RootLayout({
         <AccessibilityProvider>
           <div className="min-h-screen flex flex-col">
             <SiteHeader />
-            <main id="main" className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
+            <main id="main" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
               {children}
             </main>
             <SiteFooter />
