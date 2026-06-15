@@ -94,6 +94,18 @@ ebookReviewRouter.post("/edit/:idxno{[0-9]+}", async (c) => {
   return c.json({ ok: true, idxno, title, body, excerpt, verify_status: "approved", verify_note: "본문 교정", verified_at: at });
 });
 
+// 기사 삭제 — 오인식·광고·잘못 분리된 기사를 D1에서 제거(ebook 대역만)
+//   DELETE /api/admin/ebook/article/:idxno
+ebookReviewRouter.delete("/article/:idxno{[0-9]+}", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const idxno = Number(c.req.param("idxno"));
+  if (idxno < LO || idxno > HI) return c.json({ error: "ebook 대역 아님" }, 400);
+  const r = await db.prepare("DELETE FROM archive_articles WHERE idxno=?").bind(idxno).run();
+  if (!r.meta.changes) return c.json({ error: "기사 없음" }, 404);
+  return c.json({ ok: true, idxno, deleted: true });
+});
+
 // 검수 기록 — 승인/수정필요(+메모). status:null 로 검수 취소(미검수 복귀)도 허용
 ebookReviewRouter.post("/verify/:idxno{[0-9]+}", async (c) => {
   const db = c.env.ARCHIVE_DB;

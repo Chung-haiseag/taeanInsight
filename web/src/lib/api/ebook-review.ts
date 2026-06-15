@@ -59,6 +59,11 @@ export async function verifyEbookArticle(
   });
 }
 
+// 기사 삭제 — 오인식·광고 등 D1에서 제거
+export async function deleteEbookArticle(idxno: number): Promise<{ ok: boolean; deleted: boolean }> {
+  return apiFetch(`/api/admin/ebook/article/${idxno}`, { method: "DELETE" });
+}
+
 // 본문 교정 저장 — 원본 지면 보고 수정한 제목/본문을 D1에 반영(저장 시 자동 승인)
 export async function editEbookArticle(
   idxno: number,

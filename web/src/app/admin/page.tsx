@@ -38,6 +38,7 @@ import {
   getEbookIssues,
   verifyEbookArticle,
   editEbookArticle,
+  deleteEbookArticle,
   type EbookArticle,
   type EbookIssue,
 } from "@/lib/api/ebook-review";
@@ -750,6 +751,18 @@ function EbookReviewSection() {
     getEbookIssues().then((r) => setIssues(r.issues)).catch(() => {});
   }
 
+  async function removeArticle(a: EbookArticle) {
+    if (!window.confirm(`이 기사를 삭제할까요?\n\n#${a.idxno} ${a.title}\n\n되돌릴 수 없습니다.`)) return;
+    try {
+      await deleteEbookArticle(a.idxno);
+      setItems((prev) => prev.filter((x) => x.idxno !== a.idxno));
+      setTotal((t) => Math.max(0, t - 1));
+      getEbookIssues().then((r) => setIssues(r.issues)).catch(() => {});
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "삭제 실패");
+    }
+  }
+
   async function decide(idxno: number, s: "approved" | "flagged" | null) {
     let note: string | undefined;
     if (s === "flagged") {
@@ -860,6 +873,7 @@ function EbookReviewSection() {
                 {a.verify_status && (
                   <button onClick={() => decide(a.idxno, null)} className="rounded bg-gray-300 px-2 py-1 text-xs hover:bg-gray-400">↩︎</button>
                 )}
+                <button onClick={() => removeArticle(a)} className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50" title="기사 삭제">🗑 삭제</button>
               </div>
             </div>
             <h3 className="font-bold text-brand">{a.title}</h3>
