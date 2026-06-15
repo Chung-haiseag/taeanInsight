@@ -43,14 +43,40 @@ import {
   type EbookIssue,
 } from "@/lib/api/ebook-review";
 
+type AdminTab = "cost" | "review" | "citizen" | "governance" | "ebook";
+const ADMIN_TABS: { key: AdminTab; label: string }[] = [
+  { key: "cost", label: "💰 비용" },
+  { key: "review", label: "🛡 AI 검수" },
+  { key: "citizen", label: "🧑‍💻 시민기자" },
+  { key: "governance", label: "📏 민감규칙" },
+  { key: "ebook", label: "📰 전자북 검수" },
+];
+
 export default function AdminPage() {
+  const [tab, setTab] = useState<AdminTab>("cost");
+
+  // 상단 헤더 메뉴(해시 앵커) 클릭 ↔ 탭 동기화
+  useEffect(() => {
+    const fromHash = () => {
+      const h = window.location.hash.replace("#", "").replace("-heading", "");
+      if (ADMIN_TABS.some((t) => t.key === h)) setTab(h as AdminTab);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
+
+  const selectTab = (k: AdminTab) => {
+    setTab(k);
+    if (typeof window !== "undefined") window.history.replaceState(null, "", `#${k}-heading`);
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header className="space-y-2">
         <h1 className="text-3xl font-bold text-brand">관리자 대시보드</h1>
         <p className="text-foreground-muted">
-          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영 · 민감주제 규칙 · 전자북 검수를 한곳에서. 상단 메뉴로
-          각 섹션으로 바로 이동할 수 있습니다.
+          비용 감시 · AI 콘텐츠 검수 · 시민기자 운영 · 민감주제 규칙 · 전자북 검수. 메뉴별로 전환됩니다.
         </p>
         <div className="bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
           🔒 <strong className="text-brand">인증 미적용 (데모)</strong> — 실제 운영 시 SSO + 관리자 권한 검사가
@@ -58,11 +84,27 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <CostMonitorSection />
-      <ReviewQueueSection />
-      <CitizenOpsSection />
-      <GovernanceSection />
-      <EbookReviewSection />
+      {/* 탭바 — 메뉴별 전환 (헤더 메뉴와 동기화) */}
+      <div className="flex flex-wrap gap-1.5 border-b border-brand/15 pb-2">
+        {ADMIN_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => selectTab(t.key)}
+            aria-current={tab === t.key ? "page" : undefined}
+            className={`rounded-t px-3.5 py-2 text-sm font-semibold transition-colors ${
+              tab === t.key ? "bg-brand text-background" : "text-foreground-muted hover:bg-foreground-muted/10"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
+      <div className={tab === "review" ? "" : "hidden"}><ReviewQueueSection /></div>
+      <div className={tab === "citizen" ? "" : "hidden"}><CitizenOpsSection /></div>
+      <div className={tab === "governance" ? "" : "hidden"}><GovernanceSection /></div>
+      <div className={tab === "ebook" ? "" : "hidden"}><EbookReviewSection /></div>
     </div>
   );
 }
