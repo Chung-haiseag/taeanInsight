@@ -20,6 +20,16 @@ import { fetchConditions } from "../env/sources";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
+// 순수 날씨 질문 판별 — 날씨 용어·지명·시간어 외에 다른 내용 키워드가 없으면 true(기사 출처 생략)
+const PLACE_TIME = new Set(["태안", "태안군", "안면도", "안면", "오늘", "지금", "현재", "요즘", "내일", "오전", "오후", "이번", "어때", "어떄", "정도", "수준", "농도", "상태"]);
+function isPureWeather(query: string): boolean {
+  if (!WEATHER_RE.test(query)) return false;
+  const extra = query
+    .replace(/[^가-힣0-9a-zA-Z]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length >= 2 && !WEATHER_RE.test(t) && !PLACE_TIME.has(t) && !QUERY_STOP.has(t));
+  return extra.length === 0;
+}
 
 export const queryRouter = new Hono<{ Bindings: Env }>();
 
@@ -108,8 +118,8 @@ queryRouter.post("/", async (c) => {
       }
     }
 
-    // (b) 아카이브·태안뉴스 근거 검색
-    if (c.env.ARCHIVE_DB) {
+    // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
+    if (c.env.ARCHIVE_DB && !isPureWeather(query)) {
       const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
       for (const r of rows) {
         parts.push({ text: `${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`, source: { title: r.title, url: `/news/${r.idxno}`, publishedAt: r.published_at } });
