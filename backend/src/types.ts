@@ -12,6 +12,10 @@ export interface Env {
   SLACK_WEBHOOK_URL?: string;
   TAEAN_ID?: string;              // 태안신문 회원 로그인 ID (전문 수집용)
   TAEAN_PW?: string;              // 태안신문 회원 로그인 PW
+  DATA_GO_KR_KEY?: string;        // 공공데이터포털 인증키 (날씨·대기질)
+  TAEAN_NX?: string;              // 기상청 격자 X (기본 51)
+  TAEAN_NY?: string;              // 기상청 격자 Y (기본 109)
+  TAEAN_AIR_STATION?: string;     // 에어코리아 측정소명 (기본 태안읍)
 
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색

@@ -17,6 +17,7 @@ import { archiveRouter } from "./archive/router";
 import { ebookReviewRouter } from "./archive/ebook_review";
 import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
+import { envRouter } from "./env/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -55,6 +56,7 @@ app.route("/api/news", newsRouter);
 app.route("/api/archive", archiveRouter);
 app.route("/api/copilot", copilotRouter);
 app.route("/api/query", queryRouter);
+app.route("/api/conditions", envRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
@@ -65,9 +67,16 @@ export default {
     try {
       const { ingestToArchive } = await import("./news/ingest");
       const r = await ingestToArchive(env);
-      if (r.inserted) console.log(`[cron] RSS 적재: 신규 ${r.inserted}/${r.fetched}`);
+      if (r.inserted || r.upgraded) console.log(`[cron] 뉴스: 신규 ${r.inserted} · 전문화 ${r.upgraded}/${r.fetched}`);
     } catch (e) {
-      console.warn("[cron] RSS 적재 실패:", e instanceof Error ? e.message : e);
+      console.warn("[cron] 뉴스 적재 실패:", e instanceof Error ? e.message : e);
+    }
+    try {
+      const { snapshotEnv } = await import("./env/router");
+      const s = await snapshotEnv(env);
+      if (s.stored) console.log("[cron] 환경 스냅샷 저장됨");
+    } catch (e) {
+      console.warn("[cron] 환경 스냅샷 실패:", e instanceof Error ? e.message : e);
     }
     const { runHourlyAggregation } = await import("./cost/scheduled");
     await runHourlyAggregation(env);
