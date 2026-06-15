@@ -319,8 +319,9 @@ function FullBody({ article }: { article: Reader }) {
       {article.images.length > 0 && (
         <div className="space-y-3">
           {article.images.map((src) => (
+            // 자연 크기 표시(작으면 작게), 단 본문 폭·높이 상한만 둠 — 작은 사진이 흐릿하게 늘어나지 않게
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" className="w-full rounded-lg bg-brand/5" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img key={src} src={src} alt="" className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
       )}
