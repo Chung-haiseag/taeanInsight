@@ -32,8 +32,11 @@ const PHOTO_BASE = "https://taean-insight-api.chs9182.workers.dev/api/archive/ph
 const OCR_ENGINE = (process.env.OCR_ENGINE || "apple").toLowerCase(); // apple | google
 const GV_KEY = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
-const PRICE_IN = Number(process.env.PRICE_IN || "1.0");
-const PRICE_OUT = Number(process.env.PRICE_OUT || "5.0");
+// 구조화 엔진 — GEMINI_API_KEY 있으면 Gemini(텍스트 전용, 저가), 없으면 Anthropic(Haiku)
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const PRICE_IN = Number(process.env.PRICE_IN || (GEMINI_KEY ? "0.10" : "1.0"));   // Gemini 2.0 Flash: $0.10/$0.40 per M
+const PRICE_OUT = Number(process.env.PRICE_OUT || (GEMINI_KEY ? "0.40" : "5.0"));
 const RENDER_DPI = Number(process.env.RENDER_DPI || "300");
 const OCR_COLS = Number(process.env.OCR_COLS || "6"); // 컬럼 정렬 빈 수
 // 지면 단위 모드: Haiku(기사 구조화) 미사용 — Vision 텍스트를 면 1건으로 저장. 클로드 비용 0.
@@ -234,7 +237,39 @@ function structurePrompt(ocrText) {
 [OCR]
 ${ocrText}`;
 }
+// Gemini 구조화 — 텍스트 전용(이미지 불필요: 공유 지면 방식이라 photo 좌표 미사용). 저가·고속.
+async function structureGemini(ocrText) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
+    {
+      method: "POST",
+      signal: AbortSignal.timeout(180_000),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: structurePrompt(ocrText) }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json" },
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const j = await res.json();
+  const cand = (j.candidates || [])[0] || {};
+  const text = (cand.content?.parts || []).map((p) => p.text || "").join("");
+  const usage = { input_tokens: j.usageMetadata?.promptTokenCount || 0, output_tokens: j.usageMetadata?.candidatesTokenCount || 0 };
+  const truncated = cand.finishReason === "MAX_TOKENS";
+  let articles = [], parseFailed = false;
+  try {
+    const parsed = JSON.parse(text);
+    articles = Array.isArray(parsed) ? parsed : (parsed.articles || parsed.기사 || []);
+  } catch {
+    const m = text.match(/\[[\s\S]*\]/);
+    try { articles = JSON.parse(m ? m[0] : text); } catch { parseFailed = true; }
+  }
+  return { articles: Array.isArray(articles) ? articles : [], usage, truncated, parseFailed };
+}
+
 async function structure(apiJpg, ocrText) {
+  if (GEMINI_KEY) return structureGemini(ocrText); // 이미지 불필요(텍스트 전용)
   const data = (await readFile(apiJpg)).toString("base64");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -284,7 +319,7 @@ async function main() {
   if (!dir) { console.error("--dir <경로> 필요"); process.exit(1); }
   if (OCR_ENGINE === "apple" && !existsSync(OCR_BIN)) { console.error(`${OCR_BIN} 없음 — 먼저: swiftc -O ocr_vision.swift -o ocr_vision`); process.exit(1); }
   if (OCR_ENGINE === "google" && !GV_KEY) { console.error("GOOGLE_VISION_API_KEY(또는 GOOGLE_API_KEY) 필요 — Cloud Vision API 사용설정"); process.exit(1); }
-  if (!PAGE_MODE && !process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY 필요(구조화용) — 또는 PAGE_MODE=1 로 지면 단위(클로드 미사용)"); process.exit(1); }
+  if (!PAGE_MODE && !process.env.ANTHROPIC_API_KEY && !GEMINI_KEY) { console.error("구조화 키 필요: GEMINI_API_KEY(권장·저가) 또는 ANTHROPIC_API_KEY — 또는 PAGE_MODE=1 로 지면 단위"); process.exit(1); }
   const limit = Number(arg("--limit", "0"));
   const minFaith = Number(arg("--min-faith", "0.75"));
   await mkdir(TMP, { recursive: true });
@@ -311,7 +346,8 @@ async function main() {
   }
   const todo = pages.filter((p) => !done.has(`${p.date}_${p.page}`)).slice(0, limit || undefined);
   const ocrName = OCR_ENGINE === "google" ? "Google Vision(클라우드)" : "Apple Vision(로컬·무료)";
-  console.log(`이번 실행 ${todo.length}p · OCR=${ocrName} · ${PAGE_MODE ? "지면 단위(클로드 미사용)" : `구조화=${MODEL}`} · ${RENDER_DPI}dpi`);
+  const structName = PAGE_MODE ? "지면 단위(LLM 미사용)" : GEMINI_KEY ? `구조화=${GEMINI_MODEL}` : `구조화=${MODEL}`;
+  console.log(`이번 실행 ${todo.length}p · OCR=${ocrName} · ${structName} · ${RENDER_DPI}dpi`);
 
   let inTok = 0, outTok = 0, nArticles = 0, nPhotos = 0, nFlag = 0, nDrop = 0, nStub = 0;
   for (let i = 0; i < todo.length; i++) {
@@ -324,7 +360,7 @@ async function main() {
       const fw = Number((stdout.match(/pixelWidth:\s*(\d+)/) || [])[1]);
       const fh = Number((stdout.match(/pixelHeight:\s*(\d+)/) || [])[1]);
       const apiJpg = `${prefix}_api.jpg`;
-      if (!PAGE_MODE) await sh("sips", ["-Z", "1568", "-s", "format", "jpeg", "-s", "formatOptions", "85", full, "--out", apiJpg]); // Haiku 이미지 입력용(지면모드 불필요)
+      if (!PAGE_MODE && !GEMINI_KEY) await sh("sips", ["-Z", "1568", "-s", "format", "jpeg", "-s", "formatOptions", "85", full, "--out", apiJpg]); // Haiku 이미지 입력용(Gemini·지면모드 불필요)
 
       // 지면 이미지 1회 업로드 — 이 면의 모든 기사가 공유 (목록 썸네일 + 원본 지면 보기)
       const pageJpg = `${prefix}_page.jpg`;
@@ -427,7 +463,7 @@ async function main() {
     console.log(`OCR=${ocrName} · 지면 단위(클로드 미사용) · 추가 LLM 비용 $0`);
   } else {
     console.log(`기사 ${nArticles} · 사진 ${nPhotos} · 광고제외 ${nDrop} · 표스텁 ${nStub} · 충실도경고 ${nFlag}`);
-    console.log(`OCR=${ocrName} · 구조화 Haiku in ${inTok}/out ${outTok} ≈ $${cost.toFixed(4)} (≈${nArticles ? (cost / Math.max(1, todo.length)).toFixed(4) : 0}/면)`);
+    console.log(`OCR=${ocrName} · 구조화 ${GEMINI_KEY ? GEMINI_MODEL : "Haiku"} in ${inTok}/out ${outTok} ≈ $${cost.toFixed(4)} (≈${nArticles ? (cost / Math.max(1, todo.length)).toFixed(4) : 0}/면)`);
   }
   console.log(`출력: ${OUT_JSONL}`);
 }
