@@ -1,6 +1,6 @@
 "use client";
 
-// 아카이브 검색 — 태안신문 24년(2002~) 기사 전문/발췌 검색.
+// 아카이브 검색 — 태안신문 1991년 옛 신문~최신 기사 전문/발췌 검색.
 // 백필→D1 적재 후 채워짐. 데이터 없으면 빈 결과(안내).
 
 import { useState } from "react";
@@ -14,7 +14,10 @@ import {
 import { decodeEntities } from "@/lib/html";
 
 const CATEGORIES = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
-const YEARS = Array.from({ length: 25 }, (_, i) => String(2026 - i));
+// 1991년(옛 신문 디지털화) ~ 올해. 1990은 세로쓰기로 제외.
+const FIRST_YEAR = 1991;
+const THIS_YEAR = 2026;
+const YEARS = Array.from({ length: THIS_YEAR - FIRST_YEAR + 1 }, (_, i) => String(THIS_YEAR - i));
 
 export default function ArchivePage() {
   const [q, setQ] = useState("");
@@ -46,7 +49,7 @@ export default function ArchivePage() {
           Archive Search
         </p>
         <h1 className="mt-4 text-display-sm font-bold text-brand">태안신문 아카이브</h1>
-        <p className="mt-2 text-foreground-muted">2002년부터 24년치 기사를 한 번에 검색하세요.</p>
+        <p className="mt-2 text-foreground-muted">1991년 옛 신문부터 최신까지 한 번에 검색하세요.</p>
       </header>
 
       {/* 검색 폼 */}
