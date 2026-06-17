@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const __dir = dirname(fileURLToPath(import.meta.url));
 const JSONL = join(__dir, "out", "ebook_articles.jsonl");
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const CATS = ["tourism", "environment", "realestate", "policy", "industry", "culture", "society"];
 
 if (!GEMINI_KEY) { console.error("GEMINI_API_KEY 필요 (https://aistudio.google.com/ 무료 발급)"); process.exit(1); }

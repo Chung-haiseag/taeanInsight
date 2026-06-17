@@ -34,7 +34,7 @@ const GV_KEY = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 // 구조화 엔진 — GEMINI_API_KEY 있으면 Gemini(텍스트 전용, 저가), 없으면 Anthropic(Haiku)
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const PRICE_IN = Number(process.env.PRICE_IN || (GEMINI_KEY ? "0.10" : "1.0"));   // Gemini 2.0 Flash: $0.10/$0.40 per M
 const PRICE_OUT = Number(process.env.PRICE_OUT || (GEMINI_KEY ? "0.40" : "5.0"));
 const RENDER_DPI = Number(process.env.RENDER_DPI || "300");
