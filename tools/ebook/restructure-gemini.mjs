@@ -50,11 +50,17 @@ function prompt(ocrText) {
 [OCR]
 ${ocrText}`;
 }
-async function gemini(text) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
-    method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(180_000),
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt(text) }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json" } }),
-  });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function gemini(text, tries = 5) {
+  let res;
+  for (let t = 1; t <= tries; t++) {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+      method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(180_000),
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt(text) }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json" } }),
+    });
+    if (res.status === 429 || res.status >= 500) { if (t < tries) { await sleep(2000 * t * t); continue; } } // rate-limit/일시오류 백오프
+    break;
+  }
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j = await res.json();
   const out = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
