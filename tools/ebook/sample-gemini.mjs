@@ -17,7 +17,8 @@ if (!GEMINI_KEY) { console.error("GEMINI_API_KEY 필요 (https://aistudio.google
 function prompt(ocrText) {
   return `아래 [OCR]는 신문 지면을 정확히 전사한 텍스트입니다(대체로 컬럼 순서).
 기사들을 구분해 JSON 배열로만 출력하세요(설명 없이 JSON만).
-- body는 [OCR] 글자를 그대로 사용. 맞춤법·요약·재작성 금지. (컬럼으로 끊긴 문장 잇기, 단어 중간 공백 제거는 허용, 단 글자 변경 금지)
+- body는 [OCR]의 글자를 그대로 사용 — 글자 추가/삭제/변경·요약·재작성 금지.
+- **띄어쓰기(공백)만은 한국어 맞춤법에 맞게 바로잡아라**: 단어 중간 잘못된 공백 제거("도약 하는"→"도약하는", "새 롭게"→"새롭게"), 붙은 단어는 띄우기, 컬럼으로 끊긴 문장 잇기.
 - 제호·목차·판권·발행정보는 제외. 광고는 제외 말고 "isAd": true.
 각 기사: {"title","body","category"(${CATS.join("|")}),"isAd":true/false}
 [OCR]
