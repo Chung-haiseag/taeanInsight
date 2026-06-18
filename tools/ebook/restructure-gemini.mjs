@@ -82,9 +82,23 @@ async function main() {
   const targetIdx = new Set(targets.map((a) => a.idxno));
   console.log(`재구조화 대상 면 ${targets.length} (연도 ${YEARS.join(",")}) · 동시 ${CONC} · 모델 ${GEMINI_MODEL}`);
 
-  const newRecs = [];          // 새 기사 레코드
+  const CHECKPOINT = Number(arg("--checkpoint", "40")); // N면마다 중간 저장
+  const base = recs.filter((a) => !targetIdx.has(a.idxno)); // 대상 외 레코드(불변)
+  const newRecs = [];          // 새 기사 + 분리실패로 유지한 면
   const delIdx = [];           // D1에서 지울 옛 면 idxno
-  let inTok = 0, outTok = 0, nArt = 0, nStub = 0, nFlag = 0, done = 0, fail = 0;
+  const handled = new Set();   // 처리 완료한 대상 면 idxno
+  let inTok = 0, outTok = 0, nArt = 0, nFlag = 0, done = 0, fail = 0, cpLock = false;
+
+  // 중간 저장 — 완료분(newRecs) + 미처리 대상(원본 면)으로 JSONL 재구성. 중단/크래시에 안전·이어하기 가능.
+  async function checkpoint() {
+    if (cpLock) return; cpLock = true;
+    try {
+      const unhandled = targets.filter((t) => !handled.has(t.idxno));
+      const all = base.concat(newRecs, unhandled);
+      await writeFile(JSONL, all.map((x) => JSON.stringify(x)).join("\n") + "\n");
+      await writeFile(DELLIST, delIdx.join("\n") + (delIdx.length ? "\n" : ""));
+    } finally { cpLock = false; }
+  }
 
   async function handle(pg) {
     const src = pg.body || "";
@@ -108,35 +122,32 @@ async function main() {
           bodyChars: body.length, excerpt: body.replace(/\s+/g, " ").slice(0, 158) + "…",
           body, images: [], leadImage: pg.leadImage, url: null,
           isAd: a.isAd === true,
-          idxno: 0, // 나중에 배정
+          idxno: nextIdx++,        // 즉시 배정(체크포인트에 완전한 레코드 저장)
         });
         nArt++;
       }
       process.stdout.write("o");
-    } catch { newRecs.push(pg); fail++; process.stdout.write("x"); }
-    finally { if (++done % 50 === 0) process.stdout.write(` ${done}/${targets.length}\n`); }
+    } catch (e) {
+      newRecs.push(pg); fail++; process.stdout.write("x");
+      if (/Gemini 4\d\d/.test(String(e?.message)) && fail % 20 === 0) await sleep(15000); // 인증/한도 추정 시 잠깐 쉼
+    } finally {
+      handled.add(pg.idxno);
+      if (++done % 50 === 0) process.stdout.write(` ${done}/${targets.length}\n`);
+      if (done % CHECKPOINT === 0) await checkpoint();
+    }
   }
 
   let qi = 0;
   await Promise.all(Array.from({ length: Math.min(CONC, targets.length) }, async () => {
     while (qi < targets.length) await handle(targets[qi++]);
   }));
-
-  // idxno 배정 (새 기사들)
-  for (const r of newRecs) if (r.idxno === 0) r.idxno = nextIdx++;
-
-  // 최종 JSONL = (대상 면 전체 제거) + newRecs(분리된 기사 + 분리실패로 유지한 면).
-  // delIdx(성공해서 교체된 면)만 D1에서 삭제 — 유지된 면은 같은 idxno로 newRecs에 그대로 있음.
-  const base = recs.filter((a) => !targetIdx.has(a.idxno));
-  const finalAll = base.concat(newRecs);
-  await writeFile(JSONL, finalAll.map((x) => JSON.stringify(x)).join("\n") + "\n");
-  await writeFile(DELLIST, delIdx.join("\n") + "\n");
+  await checkpoint(); // 최종 저장
 
   const cost = (inTok / 1e6) * 0.30 + (outTok / 1e6) * 2.50; // gemini-2.5-flash 대략가
   console.log(`\n\n=== 재구조화 완료 ===`);
   console.log(`면 ${targets.length} → 기사 ${nArt} (교체 ${delIdx.length}면) · 분리실패/유지 ${targets.length - delIdx.length} · 오류 ${fail} · 충실도경고 ${nFlag}`);
   console.log(`토큰 in ${inTok}/out ${outTok} ≈ $${cost.toFixed(3)}`);
-  console.log(`JSONL 갱신: ${finalAll.length} 레코드 · D1 삭제목록: ${DELLIST} (${delIdx.length}건)`);
+  console.log(`JSONL 갱신: ${base.length + newRecs.length} 레코드 · D1 삭제목록: ${DELLIST} (${delIdx.length}건)`);
   console.log(`다음: 옛 면 ${delIdx.length}건 D1 삭제 + 새 기사 적재 (publish)`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
