@@ -248,7 +248,7 @@ async function structureGemini(ocrText) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: structurePrompt(ocrText) }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json" },
+        generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
       }),
     },
   );

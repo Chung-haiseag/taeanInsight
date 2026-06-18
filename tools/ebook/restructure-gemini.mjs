@@ -56,7 +56,7 @@ async function gemini(text, tries = 5) {
   for (let t = 1; t <= tries; t++) {
     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
       method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(180_000),
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt(text) }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json" } }),
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt(text) }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 16384, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } } }),
     });
     if (res.status === 429 || res.status >= 500) { if (t < tries) { await sleep(2000 * t * t); continue; } } // rate-limit/일시오류 백오프
     break;
