@@ -38,6 +38,9 @@ interface Reader {
 // 이 값 미만이면 "OCR 불완전 — 원본 지면 확인" 안내를 본문 하단에 표시
 // (검수 '경고' 임계값과 동일 — 약 14.6%, 7건 중 1건)
 const LOW_FAITH = 0.75;
+// 1990~1994 옛 신문(세로쓰기·저품질 인쇄)은 충실도 수치와 무관하게 항상 안내 표시.
+// (특히 1990은 Gemini 멀티모달 전사라 원문 대조 가드가 없어 신뢰성 고지 필요)
+const OLD_PRINT_UNTIL = 1994;
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.insight.taeannews.co.kr";
 
@@ -326,8 +329,11 @@ function FullBody({ article }: { article: Reader }) {
         </div>
       )}
 
-      {/* 저충실도 전자북: OCR 불완전 안내 (본문 하단, 진한 색) */}
-      {article.pageImage && typeof article.faithfulness === "number" && article.faithfulness < LOW_FAITH && (
+      {/* OCR 불완전 안내: 저충실도이거나 1990~1994 옛 신문이면 표시 (본문 하단, 진한 색) */}
+      {article.pageImage && (
+        (typeof article.faithfulness === "number" && article.faithfulness < LOW_FAITH) ||
+        Number((article.publishedAt || "").slice(0, 4)) <= OLD_PRINT_UNTIL
+      ) && (
         <p className="rounded-md border-l-4 border-amber-600 bg-amber-100 px-4 py-3 text-sm font-bold text-amber-900">
           ⚠ 완벽하게 OCR이 되지 않아, 기사 내용을 확인하려면 아래 <span className="underline">원본 지면</span>을 확인하세요.
         </p>
