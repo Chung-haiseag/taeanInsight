@@ -133,15 +133,19 @@ async function main() {
     } finally {
       handled.add(pg.idxno);
       if (++done % 50 === 0) process.stdout.write(` ${done}/${targets.length}\n`);
-      if (done % CHECKPOINT === 0) await checkpoint();
+      if (done % CHECKPOINT === 0) { try { await checkpoint(); } catch (e) { console.error("\n체크포인트 실패(무시·계속):", e?.message); } }
     }
   }
 
+  // 워커: 한 면에서 예기치 못한 예외가 나도 전체 런이 죽지 않게 보호
   let qi = 0;
   await Promise.all(Array.from({ length: Math.min(CONC, targets.length) }, async () => {
-    while (qi < targets.length) await handle(targets[qi++]);
+    while (qi < targets.length) {
+      const pg = targets[qi++];
+      try { await handle(pg); } catch (e) { handled.add(pg.idxno); newRecs.push(pg); fail++; console.error("\n면 처리 예외(유지·계속):", e?.message); }
+    }
   }));
-  await checkpoint(); // 최종 저장
+  try { await checkpoint(); } catch (e) { console.error("최종 저장 실패:", e?.message); }
 
   const cost = (inTok / 1e6) * 0.30 + (outTok / 1e6) * 2.50; // gemini-2.5-flash 대략가
   console.log(`\n\n=== 재구조화 완료 ===`);
