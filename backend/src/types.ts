@@ -21,6 +21,7 @@ export interface Env {
   VAPID_PRIVATE_KEY?: string;     // Web Push VAPID 개인키(시크릿, base64url d)
   VAPID_SUBJECT?: string;         // VAPID sub ("mailto:..." 기본)
   JWT_SECRET?: string;            // /api/me 인증 서명키
+  GOV_IMPORT_TOKEN?: string;      // 군청 로컬 크롤러 → /api/gov/import 공유 토큰
 
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색

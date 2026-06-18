@@ -80,6 +80,36 @@ async function liveConditions(env: Env): Promise<string> {
   }
 }
 
+// 태안군청 군정 게시판(gov_notices) — 보드명/키워드로 최근 글
+async function govNotices(
+  db: D1Database,
+  opts: { boardName?: string; keywords?: string[]; days?: number; limit?: number },
+): Promise<string[]> {
+  const since = new Date(Date.now() - (opts.days ?? 21) * 86_400_000).toISOString().slice(0, 10);
+  const where: string[] = ["published_at >= ?1"];
+  const binds: unknown[] = [since];
+  if (opts.boardName) { binds.push(opts.boardName); where.push(`board_name = ?${binds.length}`); }
+  if (opts.keywords?.length) {
+    const ors = opts.keywords.map((k) => { binds.push(`%${k}%`); return `(title LIKE ?${binds.length} OR body LIKE ?${binds.length})`; });
+    where.push(`(${ors.join(" OR ")})`);
+  }
+  try {
+    const r = await db
+      .prepare(
+        `SELECT board_name, title, dept, published_at, substr(body,1,500) AS body
+           FROM gov_notices WHERE ${where.join(" AND ")}
+          ORDER BY published_at DESC LIMIT ${opts.limit ?? 6}`,
+      )
+      .bind(...binds)
+      .all<{ board_name: string; title: string; dept: string; published_at: string; body: string }>();
+    return (r.results ?? []).map(
+      (x) => `· [${x.published_at}] ${x.title} (${x.board_name}${x.dept ? `·${x.dept}` : ""})\n  ${x.body.replace(/\s+/g, " ").trim()}`,
+    );
+  } catch {
+    return [];
+  }
+}
+
 // 부동산 실거래가 — 국토부 RTMS (아파트·토지)
 async function realEstateFacts(env: Env): Promise<string> {
   try {
@@ -174,6 +204,26 @@ export function makeFactsLoader(env: Env) {
     if (sectionKey === "realestate") {
       const re = await realEstateFacts(env);
       if (re) parts.push(re);
+    }
+
+    // 태안군청 군정 게시판(공식 일정·공지·정책) 주입
+    if (env.ARCHIVE_DB) {
+      let gov: string[] = [];
+      if (sectionKey === "summary") {
+        gov = await govNotices(env.ARCHIVE_DB, { days: 14, limit: 8 });
+      } else if (sectionKey === "events") {
+        // 공식 주간행사계획 우선 + 행사 키워드
+        const sched = await govNotices(env.ARCHIVE_DB, { boardName: "주간행사계획", days: 21, limit: 4 });
+        const ev = await govNotices(env.ARCHIVE_DB, { keywords: SECTION_KEYWORDS.events, days: 21, limit: 5 });
+        gov = [...sched, ...ev];
+      } else if (sectionKey === "realestate") {
+        gov = await govNotices(env.ARCHIVE_DB, { keywords: ["개발", "도시", "분양", "공고", "투자", "예산", "지원"], days: 30, limit: 5 });
+      } else if (sectionKey === "environment") {
+        gov = await govNotices(env.ARCHIVE_DB, { keywords: SECTION_KEYWORDS.environment, days: 30, limit: 5 });
+      } else if (sectionKey === "tourism_weather") {
+        gov = await govNotices(env.ARCHIVE_DB, { keywords: SECTION_KEYWORDS.tourism_weather, days: 21, limit: 5 });
+      }
+      if (gov.length) parts.push(`[태안군청 군정 소식]\n${gov.join("\n")}`);
     }
 
     return parts.join("\n\n");
