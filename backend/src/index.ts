@@ -20,6 +20,7 @@ import { queryRouter } from "./query/router";
 import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
 import { pushRouter } from "./notifications/router";
+import { govRouter } from "./gov/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -62,6 +63,7 @@ app.route("/api/conditions", envRouter);
 app.route("/api/reports", reportsRouter);
 app.route("/api/admin/reports", adminReportsRouter);
 app.route("/api/push", pushRouter);
+app.route("/api/gov", govRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
@@ -99,6 +101,8 @@ export default {
     } catch (e) {
       console.warn("[cron] 환경 스냅샷 실패:", e instanceof Error ? e.message : e);
     }
+    // 군청 게시판 수집은 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 수행 →
+    // /api/gov/import로 적재. (taean.go.kr 기사 view가 Worker 송신 IP에 500 반환하여 Worker fetch 불가.)
     const { runHourlyAggregation } = await import("./cost/scheduled");
     await runHourlyAggregation(env);
   },
