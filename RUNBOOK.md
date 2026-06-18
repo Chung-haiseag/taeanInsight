@@ -46,7 +46,8 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 | taeannews.co.kr | 뉴스(RSS·목록·전문) | TAEAN_ID/PW | 작동 |
 | data.go.kr 기상청 | 날씨 | DATA_GO_KR_KEY | 작동 |
 | data.go.kr 에어코리아 | 대기질 | 〃 | 작동(태안항 폴백) |
-| data.go.kr TourAPI | 관광·축제 | 〃 | 활용신청 권한 대기 |
+| data.go.kr TourAPI | 관광·축제 | 〃 | 작동(주간리포트 관광·이벤트 섹션) |
+| data.go.kr 국토부 RTMS | 부동산 실거래가(아파트·토지) | 〃 | **활용신청 대기(403)** — 승인 시 자동 활성, LAWD 44825 |
 | 국립해양조사원 바다누리 | 조위 | KHOA_KEY | 미연동 |
 | Google Vision | OCR | GOOGLE_VISION_API_KEY | 작동 |
 | Gemini | 기사분리 | GEMINI_API_KEY | 작동 |

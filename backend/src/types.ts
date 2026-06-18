@@ -16,6 +16,7 @@ export interface Env {
   TAEAN_NX?: string;              // 기상청 격자 X (기본 51)
   TAEAN_NY?: string;              // 기상청 격자 Y (기본 109)
   TAEAN_AIR_STATION?: string;     // 에어코리아 측정소명 (기본 태안읍)
+  TAEAN_LAWD_CD?: string;         // 국토부 실거래가 법정동 시군구코드 (기본 44825 태안군)
 
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색

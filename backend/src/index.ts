@@ -18,6 +18,7 @@ import { ebookReviewRouter } from "./archive/ebook_review";
 import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
 import { envRouter } from "./env/router";
+import { reportsRouter, adminReportsRouter } from "./reports/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -57,13 +58,31 @@ app.route("/api/archive", archiveRouter);
 app.route("/api/copilot", copilotRouter);
 app.route("/api/query", queryRouter);
 app.route("/api/conditions", envRouter);
+app.route("/api/reports", reportsRouter);
+app.route("/api/admin/reports", adminReportsRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
   fetch: app.fetch,
 
-  // 매시간 cron — ① 태안신문 RSS → 아카이브 자동 적재(영구 보존) ② 비용 집계 + 임계값 알림
+  // Cron:
+  //  · "0 13 * * 4" (목 22:00 KST) — 주간 리포트 초안 생성(Workers AI). 발행은 HITL 검토 후 수동.
+  //  · "0 15 * * *" (매일 00:00 KST) — 뉴스 적재 + 환경 스냅샷 + 비용 집계.
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    // ── 주간 리포트 초안 (목 야간) ──
+    if (_event.cron === "0 13 * * 4") {
+      try {
+        if (env.AI && env.ARCHIVE_DB) {
+          const [{ buildWeeklyDraft }] = await Promise.all([import("./reports/scheduled")]);
+          const r = await buildWeeklyDraft(env);
+          console.log(`[cron] 주간 리포트 초안 생성: ${r.weekId} (${r.sections}개 섹션)`);
+        }
+      } catch (e) {
+        console.warn("[cron] 주간 리포트 초안 실패:", e instanceof Error ? e.message : e);
+      }
+      return; // 주간 cron은 초안 생성만 수행
+    }
+
     try {
       const { ingestToArchive } = await import("./news/ingest");
       const r = await ingestToArchive(env);

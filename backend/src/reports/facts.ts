@@ -1,0 +1,181 @@
+// 주간 리포트 사실 자료 로더 — 섹션별로 아카이브(기사) + 환경 스냅샷(env_daily) +
+// 관광 축제/관광지(TourAPI)를 모아 LLM 프롬프트의 [참고 자료]로 주입한다.
+// 외부 호출 실패는 빈 문자열로 격리.
+
+import type { Env } from "../types";
+import type { ReportSectionKey } from "./types";
+import { fetchConditions } from "../env/sources";
+import { fetchTour } from "../env/tour";
+import { fetchRealEstate } from "../env/realestate";
+
+// 섹션별 아카이브 검색 키워드 (LIKE OR)
+const SECTION_KEYWORDS: Record<ReportSectionKey, string[]> = {
+  summary: ["태안", "태안군"],
+  tourism_weather: ["관광", "축제", "안면도", "만리포", "천리포", "해수욕장", "여행", "꽃지", "관광객"],
+  environment: ["환경", "가로림만", "적조", "미세먼지", "해양", "신두리", "갯벌", "오염", "생태"],
+  realestate: ["부동산", "토지", "아파트", "분양", "거래", "매매", "시세", "공시지가", "개발", "임대"],
+  events: ["행사", "축제", "전시", "체험", "공연", "문화", "박람회", "프로그램", "개최"],
+};
+
+// 최근 N일 기사 중 키워드 매칭 제목·발췌
+async function recentArticles(
+  db: D1Database,
+  keywords: string[],
+  days = 45,
+  limit = 10,
+  excerpt = 700,
+): Promise<string[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const likes = keywords.map((_, i) => `(a.title LIKE ?${i + 3} OR a.body LIKE ?${i + 3})`).join(" OR ");
+  try {
+    const res = await db
+      .prepare(
+        `SELECT a.title, a.published_at, substr(a.body,1,?2) AS body
+           FROM archive_articles a
+          WHERE a.published_at >= ?1 AND (${likes})
+          ORDER BY a.published_at DESC LIMIT ${limit}`,
+      )
+      .bind(since, excerpt, ...keywords.map((k) => `%${k}%`))
+      .all<{ title: string; published_at: string; body: string }>();
+    return (res.results ?? []).map(
+      (r) => `· [${String(r.published_at).slice(0, 10)}] ${r.title}\n  ${r.body.replace(/\s+/g, " ").trim()}`,
+    );
+  } catch {
+    return [];
+  }
+}
+
+// 최근 7일 환경 스냅샷 요약 (env_daily)
+async function recentEnv(db: D1Database): Promise<string> {
+  try {
+    const res = await db
+      .prepare(
+        `SELECT date, pm10, pm25, temp, humidity, sky FROM env_daily
+          ORDER BY date DESC LIMIT 7`,
+      )
+      .all<{ date: string; pm10: number | null; pm25: number | null; temp: number | null; humidity: number | null; sky: string | null }>();
+    const rows = res.results ?? [];
+    if (!rows.length) return "";
+    return rows
+      .map((r) => `${r.date}: 기온 ${r.temp ?? "?"}℃, 습도 ${r.humidity ?? "?"}%, PM10 ${r.pm10 ?? "?"}, PM2.5 ${r.pm25 ?? "?"}, 하늘 ${r.sky ?? "?"}`)
+      .join("\n");
+  } catch {
+    return "";
+  }
+}
+
+// 실시간 관측값 한 줄
+async function liveConditions(env: Env): Promise<string> {
+  if (!env.DATA_GO_KR_KEY) return "";
+  try {
+    const cond = await fetchConditions(env);
+    if (!cond.available) return "";
+    const w = cond.weather, a = cond.air;
+    return (
+      `[실시간 관측] 기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, ` +
+      `PM10 ${a.pm10 ?? "?"}, PM2.5 ${a.pm25 ?? "?"}, 통합대기 '${a.grade ?? "?"}'`
+    );
+  } catch {
+    return "";
+  }
+}
+
+// 부동산 실거래가 — 국토부 RTMS (아파트·토지)
+async function realEstateFacts(env: Env): Promise<string> {
+  try {
+    const re = await fetchRealEstate(env);
+    if (!re.available) return "";
+    const parts: string[] = [];
+    if (re.apartments.length) {
+      parts.push(
+        "[아파트 실거래가]\n" +
+          re.apartments
+            .slice(0, 8)
+            .map((a) => `· ${a.ymd} ${a.dong} ${a.name} ${a.area}㎡ ${a.amount}${a.floor ? ` (${a.floor}층)` : ""}`)
+            .join("\n"),
+      );
+    }
+    if (re.lands.length) {
+      parts.push(
+        "[토지 실거래가]\n" +
+          re.lands
+            .slice(0, 8)
+            .map((l) => `· ${l.ymd} ${l.dong} ${l.jimok || "토지"} ${l.area}㎡ ${l.amount}${l.use ? ` (${l.use})` : ""}`)
+            .join("\n"),
+      );
+    }
+    return parts.join("\n\n");
+  } catch {
+    return "";
+  }
+}
+
+// 관광 축제(현재·예정) + 대표 관광지 — TourAPI
+async function tourInfo(env: Env, withAttractions: boolean): Promise<string> {
+  if (!env.DATA_GO_KR_KEY) return "";
+  try {
+    const t = await fetchTour(env);
+    if (!t.available) return "";
+    const parts: string[] = [];
+    if (t.festivals.length) {
+      const fmt = (d: string) => (d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d);
+      parts.push(
+        "[현재·예정 축제]\n" +
+          t.festivals
+            .slice(0, 12)
+            .map((f) => `· ${f.title} (${fmt(f.start)}~${fmt(f.end)}) @ ${f.addr || "태안군"}`)
+            .join("\n"),
+      );
+    }
+    if (withAttractions && t.attractions.length) {
+      parts.push("[대표 관광지]\n" + t.attractions.slice(0, 8).map((a) => `· ${a.title} @ ${a.addr || "태안군"}`).join("\n"));
+    }
+    return parts.join("\n\n");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * env를 받아 WeeklyReportPipeline의 factsLoader로 쓸 함수를 만든다.
+ * (weekId, sectionKey) → "참고 자료" 텍스트.
+ */
+export function makeFactsLoader(env: Env) {
+  return async (_weekId: string, sectionKey: ReportSectionKey): Promise<string> => {
+    const parts: string[] = [];
+
+    // 모든 섹션: 관련 최근 기사
+    if (env.ARCHIVE_DB) {
+      // 요약은 폭넓게(최근 30일 핵심), 나머지는 키워드 매칭
+      const articles =
+        sectionKey === "summary"
+          ? await recentArticles(env.ARCHIVE_DB, SECTION_KEYWORDS.summary, 30, 12, 600)
+          : await recentArticles(env.ARCHIVE_DB, SECTION_KEYWORDS[sectionKey]);
+      if (articles.length) parts.push(`[최근 태안신문 기사]\n${articles.join("\n")}`);
+    }
+
+    // 환경·관광기상: 환경 추세 + 실시간 관측
+    if (sectionKey === "environment" || sectionKey === "tourism_weather") {
+      if (env.ARCHIVE_DB) {
+        const trend = await recentEnv(env.ARCHIVE_DB);
+        if (trend) parts.push(`[최근 7일 환경 추세]\n${trend}`);
+      }
+      const live = await liveConditions(env);
+      if (live) parts.push(live);
+    }
+
+    // 관광기상·이벤트: 축제·관광지(TourAPI)
+    if (sectionKey === "tourism_weather" || sectionKey === "events") {
+      const tour = await tourInfo(env, sectionKey === "tourism_weather");
+      if (tour) parts.push(tour);
+    }
+
+    // 부동산: 국토부 실거래가(아파트·토지)
+    if (sectionKey === "realestate") {
+      const re = await realEstateFacts(env);
+      if (re) parts.push(re);
+    }
+
+    return parts.join("\n\n");
+  };
+}
