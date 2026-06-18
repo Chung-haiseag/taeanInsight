@@ -14,7 +14,8 @@
   },
   "vars": {
     "NEXT_PUBLIC_SITE_NAME": "태안 AI 인텔리전스",
-    "NEXT_PUBLIC_API_BASE_URL": "https://taean-insight-api.chs9182.workers.dev"
+    "NEXT_PUBLIC_API_BASE_URL": "https://taean-insight-api.chs9182.workers.dev",
+    "NEXT_PUBLIC_VAPID_PUBLIC_KEY": "BJQNNKboxF9_fEirY7URccJjXKFnl8t4Qkvu1smt3bFZS1bPNSGSpF2M9OODtQdECAiwC2vhjydB2piJhmhKpJM"
   }
   // 향후 추가 가능:
   // "kv_namespaces":  [...]

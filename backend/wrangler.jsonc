@@ -11,7 +11,10 @@
   "vars": {
     "MONTHLY_COST_LIMIT_KRW": "300000",
     "ALERT_THRESHOLDS": "0.7,0.9,1.0",
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
+    // Web Push VAPID — 공개키·subject는 공개값(개인키는 wrangler secret VAPID_PRIVATE_KEY)
+    "VAPID_PUBLIC_KEY": "BJQNNKboxF9_fEirY7URccJjXKFnl8t4Qkvu1smt3bFZS1bPNSGSpF2M9OODtQdECAiwC2vhjydB2piJhmhKpJM",
+    "VAPID_SUBJECT": "mailto:admin@taeannews.co.kr"
   },
   // 태안신문 아카이브 — 기사 텍스트·검색(D1) + 사진 파일(R2)
   "d1_databases": [

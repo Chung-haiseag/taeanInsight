@@ -19,6 +19,7 @@ import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
 import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
+import { pushRouter } from "./notifications/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -60,6 +61,7 @@ app.route("/api/query", queryRouter);
 app.route("/api/conditions", envRouter);
 app.route("/api/reports", reportsRouter);
 app.route("/api/admin/reports", adminReportsRouter);
+app.route("/api/push", pushRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {

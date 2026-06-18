@@ -13,6 +13,7 @@ import {
 } from "./repository";
 import { LimitExceededError, PreferencesService } from "./service";
 import type { UserSegment, InterestCategory, NotificationChannel } from "./types";
+import { D1WebPushSubscriptionRepo } from "../notifications/repo_d1";
 
 // 모듈 전역 인메모리 store — D1/Postgres 연결 시 교체
 const prefRepo = new InMemoryPreferencesRepo();
@@ -139,6 +140,41 @@ meRouter.post("/favorites", async (c) => {
 meRouter.delete("/favorites/:id", async (c) => {
   const auth = c.get("auth");
   await svc.removeFavorite(auth.sub, c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+// ── Web Push 구독 (W3C 표준) ───────────────────────────────
+const pushSubSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) }),
+});
+
+// POST /api/me/push — 브라우저 PushSubscription 저장(로그인 사용자에 연결)
+meRouter.post("/push", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const parsed = pushSubSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
+  const auth = c.get("auth");
+  const repo = new D1WebPushSubscriptionRepo(c.env.ARCHIVE_DB);
+  await repo.add({
+    userId: auth.sub,
+    endpoint: parsed.data.endpoint,
+    p256dhKey: parsed.data.keys.p256dh,
+    authKey: parsed.data.keys.auth,
+    enabled: true,
+    createdAt: new Date().toISOString(),
+  });
+  return c.json({ ok: true });
+});
+
+// DELETE /api/me/push — 구독 해제
+meRouter.delete("/push", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const body = await c.req.json().catch(() => ({})) as { endpoint?: string };
+  if (!body.endpoint) return c.json({ error: "invalid_input" }, 400);
+  const auth = c.get("auth");
+  const repo = new D1WebPushSubscriptionRepo(c.env.ARCHIVE_DB);
+  await repo.disable(auth.sub, body.endpoint);
   return c.json({ ok: true });
 });
 

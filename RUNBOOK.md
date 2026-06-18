@@ -32,7 +32,7 @@ cd web && npm run deploy:cf
 # D1 마이그레이션
 npx wrangler d1 execute taean-archive --remote --file db/migrations/NNN.sql
 # 시크릿
-npx wrangler secret put <NAME>   # TAEAN_ID/TAEAN_PW(전문), DATA_GO_KR_KEY(날씨·관광)
+npx wrangler secret put <NAME>   # TAEAN_ID/TAEAN_PW(전문), DATA_GO_KR_KEY(날씨·관광·실거래가), VAPID_PRIVATE_KEY(Web Push)
 npx wrangler secret list
 # 수동 트리거
 curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
@@ -47,7 +47,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 | data.go.kr 기상청 | 날씨 | DATA_GO_KR_KEY | 작동 |
 | data.go.kr 에어코리아 | 대기질 | 〃 | 작동(태안항 폴백) |
 | data.go.kr TourAPI | 관광·축제 | 〃 | 작동(주간리포트 관광·이벤트 섹션) |
-| data.go.kr 국토부 RTMS | 부동산 실거래가(아파트·토지) | 〃 | **활용신청 대기(403)** — 승인 시 자동 활성, LAWD 44825 |
+| data.go.kr 국토부 RTMS | 부동산 실거래가(아파트·토지) | 〃 | 작동(주간리포트 부동산 섹션, LAWD 44825) |
 | 국립해양조사원 바다누리 | 조위 | KHOA_KEY | 미연동 |
 | Google Vision | OCR | GOOGLE_VISION_API_KEY | 작동 |
 | Gemini | 기사분리 | GEMINI_API_KEY | 작동 |
@@ -63,7 +63,9 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06 · AI 질의 RAG: 아카이브 근거+출처·날씨/대기질 실시간 통합 · backend/query
 - 2026-06 · 외부 커넥터: 날씨+대기질(작동)·관광(대기) · backend/env, GET /api/conditions
 - 2026-06 · Gemini 기사 재구조화(지면→기사, Vision 재실행 없음) · tools/ebook/restructure-gemini.mjs
-- 2026-06 · 주간리포트 MVP: Workers AI 5섹션 초안(목22시 cron)→HITL 발행→/reports 게이팅 렌더·Web Push 자리 · backend/reports, web/reports, db/009
+- 2026-06 · 주간리포트 MVP: Workers AI 5섹션 초안(목22시 cron)→HITL 발행→/reports 게이팅 렌더 · backend/reports, web/reports, db/009
+- 2026-06 · 주간리포트 facts 강화: 아카이브45일+TourAPI축제+국토부 실거래가(LAWD 44825) 주입 · backend/reports/facts, env/realestate
+- 2026-06 · Web Push 실발송(RFC8291 암호화+VAPID, WebCrypto): 공개 옵트인 /api/push, 발행 시 전구독자 발송 · backend/notifications, db/010
 - 2026-06 · 아카이브 검색 속도·페이지네이션: 전자북 거대 썸네일 제거 + 이전/다음(hasMore, COUNT 회피) · backend/archive, web/archive
 - 2026-06-18 · 전자북 1995~2001 기사 재구조화 **라이브 반영**(면→기사). 프로덕션 옛 면 레코드 삭제 후 jsonl 32,324건 적재 → D1 41,615건이 jsonl과 1:1 일치. 적재 중 D1 7500 중단 대비 내결함성 재적용 추가 · tools/ebook/reapply-d1.mjs
 <!-- 새 기능 추가 시 위에 한 줄 -->

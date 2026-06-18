@@ -5,6 +5,8 @@
 
 import { useEffect, useState } from "react";
 
+import { apiFetch } from "@/lib/api/client";
+
 type Status = "unknown" | "unsupported" | "default" | "granted" | "denied" | "subscribing" | "subscribed" | "error";
 
 interface Props {
@@ -51,7 +53,18 @@ export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
 
-      onSubscribed?.(sub.toJSON());
+      // 백엔드에 구독 저장(공개 옵트인) — 주간 리포트 등 발송 대상
+      const json = sub.toJSON();
+      try {
+        await apiFetch("/api/push/subscribe", {
+          method: "POST",
+          body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+        });
+      } catch {
+        // 저장 실패해도 브라우저 구독은 유지 — 다음 옵트인 때 재시도
+      }
+
+      onSubscribed?.(json);
       setStatus("subscribed");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "구독 실패";
