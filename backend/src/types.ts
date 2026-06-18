@@ -16,6 +16,11 @@ export interface Env {
   TAEAN_NX?: string;              // 기상청 격자 X (기본 51)
   TAEAN_NY?: string;              // 기상청 격자 Y (기본 109)
   TAEAN_AIR_STATION?: string;     // 에어코리아 측정소명 (기본 태안읍)
+  TAEAN_LAWD_CD?: string;         // 국토부 실거래가 법정동 시군구코드 (기본 44825 태안군)
+  VAPID_PUBLIC_KEY?: string;      // Web Push VAPID 공개키(base64url 65바이트)
+  VAPID_PRIVATE_KEY?: string;     // Web Push VAPID 개인키(시크릿, base64url d)
+  VAPID_SUBJECT?: string;         // VAPID sub ("mailto:..." 기본)
+  JWT_SECRET?: string;            // /api/me 인증 서명키
 
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색

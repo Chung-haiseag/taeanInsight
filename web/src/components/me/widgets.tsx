@@ -1,6 +1,8 @@
 // 7개 위젯 컴포넌트 — PRD v1.8 §6 REQ-PRODUCT-005
 // 세그먼트별 가시성·정렬은 widget_registry.tsx에서 결정
 
+import Link from "next/link";
+
 import { AILabelBadge } from "../ai-label-badge";
 import type { UserFavorite, UserPreferences } from "@/lib/types";
 import { CATEGORY_LABELS, REGION_OPTIONS } from "@/lib/types";
@@ -130,11 +132,14 @@ export function PersonalizedReport({ preferences }: { preferences: UserPreferenc
       </div>
       <p className="text-foreground-muted text-sm">
         관심 분야 <strong className="text-brand">{cats || "—"}</strong> 기준으로 재구성된 주간 리포트가
-        매주 금요일 09:00에 발행됩니다.
+        매주 금요일 발행됩니다.
       </p>
-      <p className="text-xs text-foreground-muted mt-2">
-        🚧 발행 파이프라인 연결 대기 (백엔드 #22 완료, API 라우트 연결 예정)
-      </p>
+      <Link
+        href="/reports"
+        className="inline-block mt-3 text-sm font-semibold text-accent hover:underline"
+      >
+        이번 주 리포트 보기 →
+      </Link>
     </section>
   );
 }

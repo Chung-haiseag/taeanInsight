@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import type { Env } from "../types";
 import { fetchConditions, type Conditions } from "./sources";
 import { fetchTour, type TourInfo } from "./tour";
+import { fetchRealEstate } from "./realestate";
 
 export const envRouter = new Hono<{ Bindings: Env }>();
 
@@ -30,12 +31,34 @@ envRouter.get("/taean", async (c) => {
   return c.json(data);
 });
 
+envRouter.get("/_debug_tour", async (c) => {
+  const key = c.env.DATA_GO_KR_KEY;
+  if (!key) return c.json({ error: "no key" });
+  const out: Record<string, unknown> = {};
+  for (const [name, path, extra] of [
+    ["areaCode2", "areaCode2", { areaCode: "34" }],
+    ["searchFestival2", "searchFestival2", { areaCode: "34", arrange: "A", eventStartDate: "20260101", listYN: "Y" }],
+  ] as const) {
+    const sp = new URLSearchParams({ serviceKey: key, MobileOS: "ETC", MobileApp: "TaeanInsight", _type: "json", numOfRows: "3", pageNo: "1", ...extra });
+    const res = await fetch(`https://apis.data.go.kr/B551011/KorService2/${path}?${sp}`);
+    out[name] = { status: res.status, body: (await res.text()).slice(0, 400) };
+  }
+  return c.json(out);
+});
+
+// 부동산 실거래가 디버그 — 권한·응답 확인용
+envRouter.get("/_debug_realestate", async (c) => {
+  const re = await fetchRealEstate(c.env);
+  return c.json({ available: re.available, apt: re.apartments.length, land: re.lands.length, sampleApt: re.apartments.slice(0, 3), sampleLand: re.lands.slice(0, 3) });
+});
+
 // 태안 관광 — 축제(현재·예정) + 대표 관광지 (6시간 캐시)
 envRouter.get("/tour", async (c) => {
   if (tourCache && Date.now() - tourCache.at < TOUR_TTL_MS) return c.json(tourCache.data);
   const data = await fetchTour(c.env);
   if (!data.available) return c.json({ available: false, message: "DATA_GO_KR_KEY 미설정" }, 200);
-  tourCache = { at: Date.now(), data };
+  // 빈 결과(권한 미승인/일시오류)는 캐시하지 않음 — 데이터 있을 때만 캐시
+  if (data.festivals.length || data.attractions.length) tourCache = { at: Date.now(), data };
   return c.json(data);
 });
 
