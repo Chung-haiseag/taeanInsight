@@ -24,21 +24,31 @@ export default function ArchivePage() {
   const [category, setCategory] = useState("");
   const [year, setYear] = useState("");
   const [hits, setHits] = useState<ArchiveHit[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function run(e?: React.FormEvent) {
-    e?.preventDefault();
+  // p 페이지 검색. 새 검색이면 p=1, 페이지 이동이면 해당 페이지.
+  async function load(p: number) {
     setLoading(true);
     setError(null);
     try {
-      const r = await searchArchive({ q, category, year });
+      const r = await searchArchive({ q, category, year, page: p });
       setHits(r.items);
+      setHasMore(r.hasMore ?? false);
+      setPage(p);
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "검색 실패");
     } finally {
       setLoading(false);
     }
+  }
+
+  function run(e?: React.FormEvent) {
+    e?.preventDefault();
+    void load(1); // 새 검색은 1페이지부터
   }
 
   return (
@@ -99,7 +109,9 @@ export default function ArchivePage() {
       {/* 결과 */}
       {hits !== null && (
         <section className="space-y-1">
-          <p className="text-sm text-foreground-muted">{hits.length}건</p>
+          <p className="text-sm text-foreground-muted">
+            {page > 1 || hasMore ? `${page}페이지 · ${hits.length}건` : `${hits.length}건`}
+          </p>
           {hits.length === 0 ? (
             <p className="rounded-lg border border-brand/15 p-6 text-center text-sm text-foreground-muted">
               결과가 없습니다. (아카이브 백필이 아직 적재 중이면 결과가 비어 있을 수 있어요.)
@@ -141,6 +153,29 @@ export default function ArchivePage() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* 페이지 이동 — 전체 건수 대신 이전/다음(거대 COUNT 회피) */}
+          {(page > 1 || hasMore) && (
+            <div className="flex items-center justify-center gap-3 pt-6">
+              <button
+                type="button"
+                onClick={() => load(page - 1)}
+                disabled={page <= 1 || loading}
+                className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
+              >
+                ← 이전
+              </button>
+              <span className="text-sm text-foreground-muted">{page}페이지</span>
+              <button
+                type="button"
+                onClick={() => load(page + 1)}
+                disabled={!hasMore || loading}
+                className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
+              >
+                다음 →
+              </button>
+            </div>
           )}
         </section>
       )}

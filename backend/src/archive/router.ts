@@ -60,23 +60,26 @@ archiveRouter.get("/search", async (c) => {
 
   // 검색 목록 성능: 전자북 기사의 lead_image는 520KB 지면 스캔이라 20개면 ~10MB.
   // 80px 썸네일엔 과대 → 검색 목록에선 제거(상세 페이지의 원본 지면은 그대로). 백필/RSS 썸네일은 유지.
-  const lite = (items: Record<string, unknown>[] = []) =>
-    items.map((it) => {
+  const lite = (items: unknown[] = []) =>
+    (items as Record<string, unknown>[]).map((it) => {
       const n = Number(it.idxno);
       return n >= 90000001 && n <= 90099999 ? { ...it, lead_image: null } : it;
     });
 
+  // 다음 페이지 존재 여부: 이번 페이지가 가득 찼으면(=PAGE_SIZE) 더 있을 수 있음.
+  // COUNT 전체 스캔(특히 2글자 LIKE)을 피하려고 hasMore 방식 사용.
+  const reply = (rows: D1Result, mode: string) => {
+    const items = rows.results ?? [];
+    return c.json({ items: lite(items), page, pageSize: PAGE_SIZE, mode, hasMore: items.length === PAGE_SIZE });
+  };
+
   try {
-    if (!q) {
-      const rows = await listOnly();
-      return c.json({ items: lite(rows.results ?? []), page, pageSize: PAGE_SIZE, mode: "list" });
-    }
+    if (!q) return reply(await listOnly(), "list");
     if (q.length >= 3) {
       const rows = await ftsSearch();
-      if ((rows.results?.length ?? 0) > 0) return c.json({ items: lite(rows.results), page, pageSize: PAGE_SIZE, mode: "fts" });
+      if ((rows.results?.length ?? 0) > 0) return reply(rows, "fts");
     }
-    const rows = await likeSearch(); // 짧은 질의 또는 FTS 0건
-    return c.json({ items: lite(rows.results ?? []), page, pageSize: PAGE_SIZE, mode: "like" });
+    return reply(await likeSearch(), "like"); // 짧은 질의 또는 FTS 0건
   } catch (e) {
     return c.json({ error: "search_failed", detail: e instanceof Error ? e.message : String(e) }, 500);
   }

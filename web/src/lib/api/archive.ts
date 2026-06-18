@@ -20,6 +20,7 @@ export interface ArchiveSearchResult {
   page: number;
   pageSize: number;
   mode?: string;
+  hasMore?: boolean;
   note?: string;
 }
 
