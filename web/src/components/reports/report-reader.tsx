@@ -72,9 +72,20 @@ export function ReportReader({ initialReport }: { initialReport: WeeklyReportVie
         <>
           <div className="flex items-center justify-between border-b border-brand/15 pb-3 mb-6">
             <span className="text-sm font-semibold text-brand">{formatWeek(report.weekId)}</span>
-            <span className="text-xs text-foreground-muted">
-              {new Date(report.publishedAt).toLocaleDateString("ko-KR")} 발행
-            </span>
+            <div className="flex items-center gap-3">
+              {!report.gated && (
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="no-print text-xs font-semibold text-accent hover:underline"
+                >
+                  🖨 PDF로 저장
+                </button>
+              )}
+              <span className="text-xs text-foreground-muted">
+                {new Date(report.publishedAt).toLocaleDateString("ko-KR")} 발행
+              </span>
+            </div>
           </div>
 
           {report.sections.map((s) => (

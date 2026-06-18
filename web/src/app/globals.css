@@ -111,3 +111,27 @@ body {
 h2[id] {
   scroll-margin-top: 7rem;
 }
+
+/* 인쇄/PDF 저장 — 사이트 크롬 숨기고 본문만 깔끔히 (주간 리포트 PDF 다운로드) */
+@media print {
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+  section {
+    break-inside: avoid;
+  }
+}
