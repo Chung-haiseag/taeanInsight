@@ -20,7 +20,19 @@ import { WeeklyReportPipeline } from "./weekly_pipeline";
 import { makeFactsLoader } from "./facts";
 import { WeeklyReportRepo, type StoredReport } from "./repo";
 import { notifyReportPublished } from "./notify";
-import type { ReportSection } from "./types";
+import type { ReportSection, ReportSectionKey } from "./types";
+import { D1PreferencesRepo } from "../preferences/repository_d1";
+import { decideVisibility, type VisibilityTier } from "../preferences/content_filter";
+import type { InterestCategory, UserPreferences } from "../preferences/types";
+
+// 섹션 → 콘텐츠 등급·관심분야 매핑 (개인화 정렬·강조용)
+const SECTION_TIER: Record<ReportSectionKey, { tier: VisibilityTier; category?: InterestCategory }> = {
+  summary: { tier: "critical" },
+  tourism_weather: { tier: "community", category: "tourism" },
+  environment: { tier: "community", category: "environment" },
+  realestate: { tier: "community", category: "realestate" },
+  events: { tier: "community", category: "culture" },
+};
 
 // 프리미엄(전체 열람) 등급 판별 — 비구독/익명은 미리보기
 function isPremium(tier?: string | null): boolean {
@@ -30,6 +42,8 @@ function isPremium(tier?: string | null): boolean {
 interface GatedSection extends ReportSection {
   locked: boolean;
   truncated?: boolean;
+  emphasis?: "show" | "show_small";  // 개인화: 관심사 일치=show, 그 외=show_small
+  matched?: boolean;                  // 내 관심 분야와 일치
 }
 
 interface GatedReport {
@@ -42,6 +56,30 @@ interface GatedReport {
   summary: string;
   gated: boolean;
   sections: GatedSection[];
+  personalized?: boolean;
+  interests?: InterestCategory[];
+}
+
+// 관심사 기준 섹션 재정렬·강조 — summary는 항상 최상단, 관심 분야 일치 섹션 우선
+function personalize(view: GatedReport, prefs: UserPreferences | null): GatedReport {
+  if (!prefs || !prefs.categories?.length) return view;
+  const decorated = view.sections.map((s) => {
+    const meta = SECTION_TIER[s.key] ?? { tier: "community" as VisibilityTier };
+    const d = decideVisibility({ id: s.key, visibilityTier: meta.tier, category: meta.category }, prefs);
+    return { ...s, emphasis: d.visibility === "show" ? ("show" as const) : ("show_small" as const), matched: meta.category ? prefs.categories.includes(meta.category) : false };
+  });
+  const rank = (e?: string) => (e === "show" ? 0 : 1);
+  const summary = decorated.filter((s) => s.key === "summary");
+  const rest = decorated.filter((s) => s.key !== "summary").sort((a, b) => rank(a.emphasis) - rank(b.emphasis));
+  return { ...view, sections: [...summary, ...rest], personalized: true, interests: prefs.categories };
+}
+
+// uid(헤더 X-Taean-Uid 또는 ?uid=)로 저장된 선호도 로드
+async function loadPrefs(c: { env: Env; req: { header: (k: string) => string | undefined; query: (k: string) => string | undefined } }): Promise<UserPreferences | null> {
+  if (!c.env.ARCHIVE_DB) return null;
+  const uid = c.req.header("X-Taean-Uid") || c.req.query("uid");
+  if (!uid) return null;
+  try { return await new D1PreferencesRepo(c.env.ARCHIVE_DB).get(uid); } catch { return null; }
 }
 
 // 구독 게이팅 — 전체 열람권이 없으면 요약 + 둘째 섹션 일부만, 나머지는 잠금
@@ -105,7 +143,39 @@ reportsRouter.get("/latest", async (c) => {
   const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
   const report = await repo.latestPublished();
   if (!report) return c.json({ report: null });
-  return c.json({ report: gate(report, c.req.query("tier")) });
+  const prefs = await loadPrefs(c);
+  const tier = c.req.query("tier") ?? prefs?.segment; // 등급은 선호도(저장된 세그먼트)로
+  return c.json({ report: personalize(gate(report, tier), prefs) });
+});
+
+// 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님
+reportsRouter.get("/:weekId/news", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ news: [] });
+  const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
+  const report = await repo.get(c.req.param("weekId"));
+  // 발행일 기준 8일 창(발행 주 + α). 없으면 최신 발행분 기준.
+  const base = report?.publishedAt || (await repo.latestPublished())?.publishedAt || new Date().toISOString();
+  const until = base.slice(0, 10);
+  // 한 주간(발행일 기준 7일) 태안뉴스 전체 나열
+  const since = new Date(new Date(until).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const r = await c.env.ARCHIVE_DB
+    .prepare(
+      `SELECT idxno, title, published_at, category, section FROM archive_articles
+        WHERE published_at >= ?1 AND published_at <= ?2 || 'T23:59:59'
+        ORDER BY published_at DESC LIMIT 200`,
+    )
+    .bind(since, until)
+    .all<{ idxno: number; title: string; published_at: string; category: string; section: string }>();
+  return c.json({
+    weekId: c.req.param("weekId"),
+    news: (r.results ?? []).map((x) => ({
+      idxno: x.idxno,
+      title: x.title,
+      publishedAt: x.published_at,
+      category: x.category,
+      section: x.section,
+    })),
+  });
 });
 
 reportsRouter.get("/:weekId", async (c) => {
@@ -113,7 +183,9 @@ reportsRouter.get("/:weekId", async (c) => {
   const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
   const report = await repo.get(c.req.param("weekId"));
   if (!report || report.status !== "published") return c.json({ error: "not_found" }, 404);
-  return c.json({ report: gate(report, c.req.query("tier")) });
+  const prefs = await loadPrefs(c);
+  const tier = c.req.query("tier") ?? prefs?.segment;
+  return c.json({ report: personalize(gate(report, tier), prefs) });
 });
 
 // ───────────────────────── 관리자 라우터 ─────────────────────────

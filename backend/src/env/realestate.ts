@@ -17,9 +17,11 @@ const DEFAULT_LAWD = "44825"; // 충남 태안군
 
 export interface RealEstateInfo {
   available: boolean;
-  apartments: Array<{ name: string; area: string; amount: string; ymd: string; dong: string; floor: string }>;
-  lands: Array<{ jimok: string; area: string; amount: string; ymd: string; dong: string; use: string }>;
+  apartments: Array<{ name: string; area: string; amount: string; manwon: number; ymd: string; dong: string; floor: string }>;
+  lands: Array<{ jimok: string; area: string; amount: string; manwon: number; ymd: string; dong: string; use: string }>;
 }
+
+const toManwon = (s: string): number => Number(String(s).replace(/[^0-9]/g, "")) || 0;
 
 // KST 기준 N개월 전 YYYYMM
 function ymOffset(monthsAgo: number): string {
@@ -98,6 +100,7 @@ export async function fetchRealEstate(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD
           name: g(x, "aptNm", "아파트"),
           area: g(x, "excluUseAr", "전용면적"),
           amount: won(g(x, "dealAmount", "거래금액")),
+          manwon: toManwon(g(x, "dealAmount", "거래금액")),
           ymd: ymd(x),
           dong: g(x, "umdNm", "법정동"),
           floor: g(x, "floor", "층"),
@@ -111,6 +114,7 @@ export async function fetchRealEstate(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD
           jimok: g(x, "jimok", "지목"),
           area: g(x, "dealArea", "거래면적"),
           amount: won(g(x, "dealAmount", "거래금액")),
+          manwon: toManwon(g(x, "dealAmount", "거래금액")),
           ymd: ymd(x),
           dong: g(x, "umdNm", "법정동"),
           use: g(x, "landUse", "용도지역", "지역코드"),

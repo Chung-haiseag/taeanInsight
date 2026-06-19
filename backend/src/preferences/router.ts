@@ -5,21 +5,28 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Env } from "../types";
-import { requireAuth, type AuthVariables } from "../auth/middleware";
+import { identifyUser, type AuthVariables } from "../auth/middleware";
 import {
   InMemoryFavoritesRepo,
   InMemoryPreferencesRepo,
   InMemoryB2gMembershipRepo,
 } from "./repository";
+import { D1PreferencesRepo, D1FavoritesRepo } from "./repository_d1";
 import { LimitExceededError, PreferencesService } from "./service";
 import type { UserSegment, InterestCategory, NotificationChannel } from "./types";
 import { D1WebPushSubscriptionRepo } from "../notifications/repo_d1";
 
-// 모듈 전역 인메모리 store — D1/Postgres 연결 시 교체
+// 인메모리 폴백(테스트·D1 미바인딩 시)
 const prefRepo = new InMemoryPreferencesRepo();
 const favRepo = new InMemoryFavoritesRepo();
 const b2gRepo = new InMemoryB2gMembershipRepo();
 const svc = new PreferencesService(prefRepo, favRepo);
+
+// 요청별 서비스 — ARCHIVE_DB 있으면 D1 영속, 없으면 인메모리
+function serviceFor(c: { env: Env }): PreferencesService {
+  const db = c.env.ARCHIVE_DB;
+  return db ? new PreferencesService(new D1PreferencesRepo(db), new D1FavoritesRepo(db)) : svc;
+}
 
 const SEGMENT_VALUES = ["b2c_basic", "b2c_premium", "b2b_basic", "b2b_premium", "b2g"] as const;
 const CATEGORY_VALUES = ["tourism", "environment", "realestate", "policy", "industry", "culture"] as const;
@@ -47,16 +54,16 @@ const addFavoriteSchema = z.object({
 
 export const meRouter = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
-meRouter.use("*", requireAuth((env) => (env as Env & { JWT_SECRET?: string }).JWT_SECRET ?? "dev-secret"));
+meRouter.use("*", identifyUser((env) => (env as Env & { JWT_SECRET?: string }).JWT_SECRET ?? "dev-secret"));
 
 // GET /api/me — 사용자 선호 + 즐겨찾기 + B2G 소속 + 세그먼트별 한도
 meRouter.get("/", async (c) => {
   const auth = c.get("auth");
-  const prefs = await svc.get(auth.sub);
+  const prefs = await serviceFor(c).get(auth.sub);
   if (!prefs) {
     return c.json({ onboarded: false, segment: auth.role });
   }
-  const favorites = await svc.listFavorites(auth.sub);
+  const favorites = await serviceFor(c).listFavorites(auth.sub);
   const b2gMemberships = await b2gRepo.listByUser(auth.sub);
   return c.json({
     onboarded: true,
@@ -73,7 +80,7 @@ meRouter.post("/onboarding", async (c) => {
   if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
 
   try {
-    const prefs = await svc.onboard({
+    const prefs = await serviceFor(c).onboard({
       userId: auth.sub,
       segment: parsed.data.segment as UserSegment,
       regions: parsed.data.regions,
@@ -95,7 +102,7 @@ meRouter.patch("/", async (c) => {
   const parsed = updateSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
   try {
-    const prefs = await svc.update(auth.sub, {
+    const prefs = await serviceFor(c).update(auth.sub, {
       regions: parsed.data.regions,
       categories: parsed.data.categories as InterestCategory[] | undefined,
       notificationChannels: parsed.data.notificationChannels as NotificationChannel[] | undefined,
@@ -115,7 +122,7 @@ meRouter.patch("/", async (c) => {
 // 즐겨찾기
 meRouter.get("/favorites", async (c) => {
   const auth = c.get("auth");
-  const favorites = await svc.listFavorites(auth.sub);
+  const favorites = await serviceFor(c).listFavorites(auth.sub);
   return c.json({ favorites });
 });
 
@@ -124,7 +131,7 @@ meRouter.post("/favorites", async (c) => {
   const parsed = addFavoriteSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
   try {
-    const fav = await svc.addFavorite(auth.sub, parsed.data.kind, parsed.data.refId, {
+    const fav = await serviceFor(c).addFavorite(auth.sub, parsed.data.kind, parsed.data.refId, {
       label: parsed.data.label,
       metadata: parsed.data.metadata,
     });
@@ -139,7 +146,7 @@ meRouter.post("/favorites", async (c) => {
 
 meRouter.delete("/favorites/:id", async (c) => {
   const auth = c.get("auth");
-  await svc.removeFavorite(auth.sub, c.req.param("id"));
+  await serviceFor(c).removeFavorite(auth.sub, c.req.param("id"));
   return c.json({ ok: true });
 });
 

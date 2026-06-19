@@ -33,7 +33,7 @@ app.use(
         ? origin
         : "",
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Taean-Uid"],
     maxAge: 86400,
   }),
 );
@@ -75,6 +75,15 @@ export default {
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     // ── 주간 리포트 초안 (목 야간) ──
     if (_event.cron === "0 13 * * 4") {
+      // 생성 전에 군청 목록(제목·날짜·링크) 먼저 갱신 → 초안에 최신 군정 반영
+      try {
+        const { crawlGovLists } = await import("./gov/list_crawler");
+        const g = await crawlGovLists(env);
+        const n = g.reduce((s, b) => s + b.upserted, 0);
+        if (n) console.log(`[cron] 군청 목록 갱신: ${n}건 (${g.map((b) => `${b.board} ${b.upserted}`).join(", ")})`);
+      } catch (e) {
+        console.warn("[cron] 군청 목록 실패:", e instanceof Error ? e.message : e);
+      }
       try {
         if (env.AI && env.ARCHIVE_DB) {
           const [{ buildWeeklyDraft }] = await Promise.all([import("./reports/scheduled")]);
@@ -101,8 +110,16 @@ export default {
     } catch (e) {
       console.warn("[cron] 환경 스냅샷 실패:", e instanceof Error ? e.message : e);
     }
-    // 군청 게시판 수집은 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 수행 →
-    // /api/gov/import로 적재. (taean.go.kr 기사 view가 Worker 송신 IP에 500 반환하여 Worker fetch 불가.)
+    // 군청 목록(제목·날짜·링크) 매일 자동 갱신 — 목록 페이지는 Worker에서 200으로 열림.
+    // 본문·카드뉴스 이미지는 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 보충(있으면 보존).
+    try {
+      const { crawlGovLists } = await import("./gov/list_crawler");
+      const g = await crawlGovLists(env);
+      const n = g.reduce((s, b) => s + b.upserted, 0);
+      if (n) console.log(`[cron] 군청 목록 갱신: ${n}건`);
+    } catch (e) {
+      console.warn("[cron] 군청 목록 실패:", e instanceof Error ? e.message : e);
+    }
     const { runHourlyAggregation } = await import("./cost/scheduled");
     await runHourlyAggregation(env);
   },
