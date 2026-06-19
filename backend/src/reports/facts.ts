@@ -45,6 +45,21 @@ async function recentArticles(
   }
 }
 
+// 최근 기사 제목만 (요약 섹션용 — 본문 없이 흐름 파악)
+async function recentTitles(db: D1Database, keywords: string[], days = 14, limit = 14): Promise<string[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const likes = keywords.map((_, i) => `(a.title LIKE ?${i + 1})`).join(" OR ");
+  try {
+    const res = await db
+      .prepare(`SELECT a.title, a.published_at FROM archive_articles a WHERE a.published_at >= '${since}' AND (${likes}) ORDER BY a.published_at DESC LIMIT ${limit}`)
+      .bind(...keywords.map((k) => `%${k}%`))
+      .all<{ title: string; published_at: string }>();
+    return (res.results ?? []).map((r) => `· [${String(r.published_at).slice(0, 10)}] ${r.title}`);
+  } catch {
+    return [];
+  }
+}
+
 // 최근 7일 환경 스냅샷 요약 (env_daily)
 async function recentEnv(db: D1Database): Promise<string> {
   try {
@@ -83,7 +98,7 @@ async function liveConditions(env: Env): Promise<string> {
 // 태안군청 군정 게시판(gov_notices) — 보드명/키워드로 최근 글
 async function govNotices(
   db: D1Database,
-  opts: { boardName?: string; keywords?: string[]; days?: number; limit?: number },
+  opts: { boardName?: string; keywords?: string[]; days?: number; limit?: number; titlesOnly?: boolean },
 ): Promise<string[]> {
   const since = new Date(Date.now() - (opts.days ?? 21) * 86_400_000).toISOString().slice(0, 10);
   const where: string[] = ["published_at >= ?1"];
@@ -102,36 +117,44 @@ async function govNotices(
       )
       .bind(...binds)
       .all<{ board_name: string; title: string; dept: string; published_at: string; body: string }>();
-    return (r.results ?? []).map(
-      (x) => `· [${x.published_at}] ${x.title} (${x.board_name}${x.dept ? `·${x.dept}` : ""})\n  ${x.body.replace(/\s+/g, " ").trim()}`,
+    return (r.results ?? []).map((x) =>
+      opts.titlesOnly
+        ? `· [${x.published_at}] ${x.title} (${x.board_name})`
+        : `· [${x.published_at}] ${x.title} (${x.board_name}${x.dept ? `·${x.dept}` : ""})\n  ${x.body.replace(/\s+/g, " ").trim()}`,
     );
   } catch {
     return [];
   }
 }
 
-// 부동산 실거래가 — 국토부 RTMS (아파트·토지)
+// 만원 → "2.1억"/"8,500만원"
+const wonFmt = (n: number): string => (!n ? "?" : n >= 10000 ? `${(n / 10000).toFixed(1)}억` : `${n.toLocaleString()}만원`);
+
+// 부동산 실거래가 — 국토부 RTMS. 집계(건수·평균·최고가)까지 제공해 정량 인사이트 유도.
 async function realEstateFacts(env: Env): Promise<string> {
   try {
     const re = await fetchRealEstate(env);
     if (!re.available) return "";
     const parts: string[] = [];
+
     if (re.apartments.length) {
+      const vals = re.apartments.map((a) => a.manwon).filter((n) => n > 0);
+      const avg = vals.length ? Math.round(vals.reduce((s, n) => s + n, 0) / vals.length) : 0;
+      const top = [...re.apartments].sort((a, b) => b.manwon - a.manwon)[0];
       parts.push(
-        "[아파트 실거래가]\n" +
-          re.apartments
-            .slice(0, 8)
-            .map((a) => `· ${a.ymd} ${a.dong} ${a.name} ${a.area}㎡ ${a.amount}${a.floor ? ` (${a.floor}층)` : ""}`)
-            .join("\n"),
+        `[아파트 실거래 요약] 최근 거래 ${re.apartments.length}건, 평균 ${wonFmt(avg)}, ` +
+          `최고가 ${top.dong} ${top.name} ${top.area}㎡ ${top.amount}(${top.ymd}), 최저 ${wonFmt(Math.min(...vals))}\n` +
+          "[아파트 실거래 상세]\n" +
+          re.apartments.slice(0, 8).map((a) => `· ${a.ymd} ${a.dong} ${a.name} ${a.area}㎡ ${a.amount}${a.floor ? ` (${a.floor}층)` : ""}`).join("\n"),
       );
     }
     if (re.lands.length) {
+      const vals = re.lands.map((l) => l.manwon).filter((n) => n > 0);
+      const top = [...re.lands].sort((a, b) => b.manwon - a.manwon)[0];
       parts.push(
-        "[토지 실거래가]\n" +
-          re.lands
-            .slice(0, 8)
-            .map((l) => `· ${l.ymd} ${l.dong} ${l.jimok || "토지"} ${l.area}㎡ ${l.amount}${l.use ? ` (${l.use})` : ""}`)
-            .join("\n"),
+        `[토지 실거래 요약] 최근 거래 ${re.lands.length}건(총 거래가 기준), 최고가 ${top.dong} ${top.jimok || "토지"} ${top.area}㎡ ${top.amount}, 최저 ${wonFmt(Math.min(...vals))}\n` +
+          "[토지 실거래 상세]\n" +
+          re.lands.slice(0, 8).map((l) => `· ${l.ymd} ${l.dong} ${l.jimok || "토지"} ${l.area}㎡ ${l.amount}${l.use ? ` (${l.use})` : ""}`).join("\n"),
       );
     }
     return parts.join("\n\n");
@@ -174,14 +197,15 @@ export function makeFactsLoader(env: Env) {
   return async (_weekId: string, sectionKey: ReportSectionKey): Promise<string> => {
     const parts: string[] = [];
 
-    // 모든 섹션: 관련 최근 기사
+    // 기사: 요약은 제목만(흐름 파악·중복 방지), 나머지는 본문 발췌
     if (env.ARCHIVE_DB) {
-      // 요약은 폭넓게(최근 30일 핵심), 나머지는 키워드 매칭
-      const articles =
-        sectionKey === "summary"
-          ? await recentArticles(env.ARCHIVE_DB, SECTION_KEYWORDS.summary, 30, 12, 600)
-          : await recentArticles(env.ARCHIVE_DB, SECTION_KEYWORDS[sectionKey]);
-      if (articles.length) parts.push(`[최근 태안신문 기사]\n${articles.join("\n")}`);
+      if (sectionKey === "summary") {
+        const titles = await recentTitles(env.ARCHIVE_DB, SECTION_KEYWORDS.summary, 14, 16);
+        if (titles.length) parts.push(`[이번 주 태안신문 제목]\n${titles.join("\n")}`);
+      } else {
+        const articles = await recentArticles(env.ARCHIVE_DB, SECTION_KEYWORDS[sectionKey]);
+        if (articles.length) parts.push(`[최근 태안신문 기사]\n${articles.join("\n")}`);
+      }
     }
 
     // 환경·관광기상: 환경 추세 + 실시간 관측
@@ -210,7 +234,7 @@ export function makeFactsLoader(env: Env) {
     if (env.ARCHIVE_DB) {
       let gov: string[] = [];
       if (sectionKey === "summary") {
-        gov = await govNotices(env.ARCHIVE_DB, { days: 14, limit: 8 });
+        gov = await govNotices(env.ARCHIVE_DB, { days: 14, limit: 10, titlesOnly: true });
       } else if (sectionKey === "events") {
         // 공식 주간행사계획 우선 + 행사 키워드
         const sched = await govNotices(env.ARCHIVE_DB, { boardName: "주간행사계획", days: 21, limit: 4 });

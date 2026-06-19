@@ -44,7 +44,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 | 소스 | 용도 | 키 | 상태 |
 |---|---|---|---|
 | taeannews.co.kr | 뉴스(RSS·목록·전문) | TAEAN_ID/PW | 작동 |
-| taean.go.kr 군정게시판 | 공지·새소식·주간행사계획 | GOV_IMPORT_TOKEN | 작동(**로컬 크롤러**, 기사view 해외IP 500) |
+| taean.go.kr 군정게시판 | 공지·새소식·주간행사·유관기관·카드뉴스 | GOV_IMPORT_TOKEN | 목록(제목·날짜·링크)=**Worker cron 자동**, 본문·이미지=로컬 크롤러(해외IP가 기사view·이미지 차단) |
 | data.go.kr 기상청 | 날씨 | DATA_GO_KR_KEY | 작동 |
 | data.go.kr 에어코리아 | 대기질 | 〃 | 작동(태안항 폴백) |
 | data.go.kr TourAPI | 관광·축제 | 〃 | 작동(주간리포트 관광·이벤트 섹션) |
@@ -68,8 +68,10 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06 · 주간리포트 facts 강화: 아카이브45일+TourAPI축제+국토부 실거래가(LAWD 44825) 주입 · backend/reports/facts, env/realestate
 - 2026-06 · Web Push 실발송(RFC8291 암호화+VAPID, WebCrypto): 공개 옵트인 /api/push, 발행 시 전구독자 발송 · backend/notifications, db/010
 - 2026-06 · 태안군청 군정 게시판 수집: 한국IP 로컬 크롤러→/api/gov/import(토큰), 주간행사계획 등 주간리포트 facts 강화 · tools/gov, backend/gov, db/011
+- 2026-06 · 군청 목록 Worker 자동수집(제목·날짜·링크): 목록페이지는 Worker 200 → cron 무료·무기기 갱신, 본문·이미지만 로컬 보충 · backend/gov/list_crawler
 - 2026-06 · 아카이브 검색 속도·페이지네이션: 전자북 거대 썸네일 제거 + 이전/다음(hasMore, COUNT 회피) · backend/archive, web/archive
 - 2026-06-18 · 전자북 1995~2001 기사 재구조화 **라이브 반영**(면→기사). 프로덕션 옛 면 레코드 삭제 후 jsonl 32,324건 적재 → D1 41,615건이 jsonl과 1:1 일치. 적재 중 D1 7500 중단 대비 내결함성 재적용 추가 · tools/ebook/reapply-d1.mjs
+- 2026-06-19 · 전자북 **1990(세로쓰기) 디지털화·라이브**. Vision OCR이 세로조판에 깨져 보류였던 1990을 Gemini 멀티모달이 지면이미지 직접 전사+기사분리(노 OCR·노 Claude). 충실도 우선 flash 단독(루프 시 설정 바꿔 8회 재시도, 실패면 정직한 스텁) — pro는 요약·환각 위험으로 미사용. 31개 호 기사 1,684·스텁 46(2.7%) → D1 1990 1,730건/31호, 전자북 총 43,269 · tools/ebook/digitize-gemini-vision.mjs, gv1990.sh
 <!-- 새 기능 추가 시 위에 한 줄 -->
 
 ## 6. 재사용 패턴 (다른 프로젝트로)

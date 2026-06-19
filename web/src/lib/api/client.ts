@@ -1,7 +1,9 @@
 // 백엔드 API 클라이언트 — fetch 기반, JWT Bearer 자동 부착
 // PRD v1.8 §6 REQ-PRODUCT-005
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.insight.taeannews.co.kr";
+// 운영 도메인(api.insight.taeannews.co.kr) 미연결 상태 — 폴백은 실존하는 workers.dev로.
+// env 누락 시에도 동작하도록. 운영 도메인 연결 후 교체.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
 const TOKEN_KEY = "taean-insight-access-token";
 
@@ -36,6 +38,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
   if (token) headers.set("authorization", `Bearer ${token}`);
+  // 비로그인이어도 익명 디바이스 uid로 식별(선호도 영속·개인화)
+  try {
+    const { getUid } = await import("../uid");
+    const uid = getUid();
+    if (uid) headers.set("X-Taean-Uid", uid);
+  } catch { /* 무시 */ }
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {

@@ -12,7 +12,6 @@ import {
   type UserSegment,
 } from "@/lib/types";
 import { submitOnboarding } from "@/lib/api/me";
-import { isMockMode } from "@/lib/mock/me";
 
 const ALL_CATEGORIES: InterestCategory[] = [
   "tourism", "environment", "realestate", "policy", "industry", "culture",
@@ -50,9 +49,8 @@ export default function OnboardingPage() {
     setSubmitting(true);
     setError(null);
     try {
-      if (!isMockMode()) {
-        await submitOnboarding({ segment, regions, categories, notificationChannels: channels });
-      }
+      // 데모(mock)에서도 실제 백엔드(익명 uid)에 저장 → 리포트 개인화 작동
+      await submitOnboarding({ segment, regions, categories, notificationChannels: channels });
       router.push("/me");
     } catch (e) {
       setError(e instanceof Error ? e.message : "온보딩 저장에 실패했습니다");
