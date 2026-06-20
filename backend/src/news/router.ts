@@ -10,6 +10,23 @@ import {
   getNews,
   type NewsCategory,
 } from "./ingest";
+import { D1PreferencesRepo } from "../preferences/repository_d1";
+
+// uid(헤더 X-Taean-Uid 또는 ?uid=)로 저장된 관심 분야 로드
+async function loadInterests(c: {
+  env: Env;
+  req: { header: (k: string) => string | undefined; query: (k: string) => string | undefined };
+}): Promise<string[] | null> {
+  if (!c.env.ARCHIVE_DB) return null;
+  const uid = c.req.header("X-Taean-Uid") || c.req.query("uid");
+  if (!uid) return null;
+  try {
+    const p = await new D1PreferencesRepo(c.env.ARCHIVE_DB).get(uid);
+    return p?.categories?.length ? p.categories : null;
+  } catch {
+    return null;
+  }
+}
 
 const CATEGORY_VALUES: NewsCategory[] = [
   "tourism",
@@ -40,6 +57,18 @@ newsRouter.get("/", async (c) => {
   if (category && CATEGORY_VALUES.includes(category as NewsCategory)) {
     filtered = items.filter((it) => it.category === category);
   }
+
+  // 관심사 개인화 — 카테고리 미선택(기본 뷰)일 때 관심 분야 기사를 앞으로(최신순 유지)
+  const interests = category ? null : await loadInterests(c);
+  let personalized = false;
+  if (interests) {
+    const set = new Set(interests);
+    const primary = filtered.filter((it) => set.has(it.category));
+    const secondary = filtered.filter((it) => !set.has(it.category));
+    filtered = [...primary, ...secondary];
+    personalized = true;
+  }
+
   if (limit > 0) filtered = filtered.slice(0, limit);
 
   // 대표사진: 아카이브(D1)에 백필/수집된 lead_image를 배치 조인해 부착
@@ -67,6 +96,8 @@ newsRouter.get("/", async (c) => {
     counts,
     labels: NEWS_CATEGORY_LABELS,
     source: "주간태안신문 (taeannews.co.kr)",
+    personalized,
+    interests: interests ?? [],
   });
 });
 

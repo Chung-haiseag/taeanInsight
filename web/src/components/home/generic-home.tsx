@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { AILabelBadge } from "@/components/ai-label-badge";
+import { PersonalizedNewsStrip } from "@/components/home/personalized-news";
 
 export function GenericHome() {
   return (
@@ -96,6 +97,9 @@ export function GenericHome() {
           </p>
         </div>
       </section>
+
+      {/* 개인화 뉴스 스트립 (관심사 있으면 맞춤, 없으면 최신) */}
+      <PersonalizedNewsStrip />
     </div>
   );
 }
