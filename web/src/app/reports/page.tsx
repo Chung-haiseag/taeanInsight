@@ -3,10 +3,22 @@ import type { Metadata } from "next";
 import { ReportReader } from "@/components/reports/report-reader";
 import { fetchLatestReport, fetchWeeklyNews, fetchGovNotices, fetchCardNews, fetchReportMetrics } from "@/lib/api/reports";
 
-export const metadata: Metadata = {
-  title: "주간 인사이트 리포트",
-  description: "매주 금요일 발행되는 태안 관광·환경·부동산 예측 리포트",
-};
+// 공유 미리보기(카톡·SNS) — 최신 발행분의 그 주 요약을 동적 description으로
+export async function generateMetadata(): Promise<Metadata> {
+  const report = await fetchLatestReport().catch(() => null);
+  const m = report?.weekId.match(/^(\d{4})-W(\d{2})$/);
+  const week = m ? `${m[1]}년 ${Number(m[2])}주차` : "";
+  const title = week ? `주간 인사이트 리포트 · ${week}` : "주간 인사이트 리포트";
+  const description =
+    report?.summary?.replace(/\s+/g, " ").trim().slice(0, 140) ||
+    "매주 발행되는 태안 관광·환경·부동산 예측 리포트";
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "article", locale: "ko_KR", siteName: "태안 AI 인텔리전스" },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 // 발행분은 5분 ISR — 서버는 익명 미리보기를 렌더(SEO·빠른 페인트),
 // 클라이언트(ReportReader)가 로그인 구독 등급을 감지해 전체본으로 교체.
