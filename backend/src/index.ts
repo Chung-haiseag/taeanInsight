@@ -96,6 +96,18 @@ export default {
       return; // 주간 cron은 초안 생성만 수행
     }
 
+    // ── 30분마다 — 리포트 metrics 스냅샷 갱신(요청 경로 외부 API 팬아웃 제거) ──
+    if (_event.cron === "*/30 * * * *") {
+      try {
+        const { refreshMetricsSnapshot } = await import("./reports/metrics_cache");
+        const r = await refreshMetricsSnapshot(env);
+        if (r.ok) console.log("[cron] metrics 스냅샷 갱신");
+      } catch (e) {
+        console.warn("[cron] metrics 스냅샷 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
     // ── 아침(07:00 KST) — 환경·안전 자동 알림(위험 임계 초과 시 통합 푸시) ──
     if (_event.cron === "0 22 * * *") {
       try {

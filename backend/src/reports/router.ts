@@ -156,7 +156,10 @@ reportsRouter.get("/metrics", async (c) => {
   const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
-  const metrics = await loadReportMetrics(c.env);
+  // 1) cron이 미리 채운 D1 스냅샷이 신선하면 즉시 서빙(외부 API 팬아웃 회피)
+  // 2) 없으면 라이브 계산(첫 부팅·스냅샷 만료 대비)
+  const { getFreshSnapshot } = await import("./metrics_cache");
+  const metrics = (await getFreshSnapshot(c.env)) ?? (await loadReportMetrics(c.env));
   const res = c.json({ metrics });
   res.headers.set("Cache-Control", "public, s-maxage=300");
   c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
@@ -206,6 +209,12 @@ reportsRouter.get("/:weekId", async (c) => {
 // ───────────────────────── 관리자 라우터 ─────────────────────────
 // ⚠️ PoC: 인증 미적용(reviewRouter와 동일). 운영 전 requireAuth/requireRole 적용.
 export const adminReportsRouter = new Hono<{ Bindings: Env }>();
+
+// metrics 스냅샷 수동 갱신(워밍) — cron과 동일. 배포 직후 즉시 채울 때.
+adminReportsRouter.get("/refresh-metrics", async (c) => {
+  const { refreshMetricsSnapshot } = await import("./metrics_cache");
+  return c.json(await refreshMetricsSnapshot(c.env));
+});
 
 // 수요지수 백테스트 조회(예측 vs 실측 정확도) — 데이터 누적 후 의미. ?fill=1로 실측 즉시 적재.
 adminReportsRouter.get("/backtest", async (c) => {
