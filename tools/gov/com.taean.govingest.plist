@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 군청 군정·카드뉴스 로컬 수집 자동화(macOS launchd). 6시간마다 + 로그인 시 1회.
+     설치: cp tools/gov/com.taean.govingest.plist ~/Library/LaunchAgents/
+           launchctl load ~/Library/LaunchAgents/com.taean.govingest.plist
+     해제: launchctl unload ~/Library/LaunchAgents/com.taean.govingest.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.taean.govingest</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Applications/taean/tools/gov/run-gov-ingest.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>21600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Applications/taean/tools/gov/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Applications/taean/tools/gov/launchd.err.log</string>
+</dict>
+</plist>

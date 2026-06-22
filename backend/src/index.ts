@@ -98,6 +98,23 @@ export default {
       return; // 주간 cron은 초안 생성만 수행
     }
 
+    // ── 6시간마다 — 뉴스 수집 + 군청 목록·카드뉴스 갱신(속보성↑) ──
+    if (_event.cron === "0 */6 * * *") {
+      try {
+        const { ingestToArchive } = await import("./news/ingest");
+        const r = await ingestToArchive(env);
+        if (r.inserted || r.upgraded) console.log(`[cron6h] 뉴스: 신규 ${r.inserted}·전문화 ${r.upgraded}/${r.fetched}`);
+      } catch (e) { console.warn("[cron6h] 뉴스 실패:", e instanceof Error ? e.message : e); }
+      try {
+        const { crawlGovLists } = await import("./gov/list_crawler");
+        const g = await crawlGovLists(env);
+        const n = g.reduce((s, b) => s + b.upserted, 0);
+        if (n) console.log(`[cron6h] 군청 목록: ${n}건`);
+      } catch (e) { console.warn("[cron6h] 군청 목록 실패:", e instanceof Error ? e.message : e); }
+      // 카드뉴스 이미지는 군청이 Worker(데이터센터) IP의 상세페이지를 차단 → 로컬 크롤러(launchd)가 담당.
+      return;
+    }
+
     // ── 30분마다 — 리포트 metrics 스냅샷 갱신(요청 경로 외부 API 팬아웃 제거) ──
     if (_event.cron === "*/30 * * * *") {
       try {

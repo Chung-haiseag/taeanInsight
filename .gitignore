@@ -62,3 +62,7 @@ tools/ebook/ocr_vision
 
 # 로컬 디지털화 소스 심볼릭 링크(비포터블)
 tools/ebook/src1990
+
+# 군청 로컬 크롤러 토큰·로그(자동화)
+tools/gov/.token
+tools/gov/*.log

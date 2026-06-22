@@ -66,6 +66,12 @@ govRouter.post("/import", async (c) => {
   return c.json({ ok: true, received: parsed.data.notices.length, inserted });
 });
 
+// 카드뉴스 자동 수집 수동 트리거(테스트) — Worker가 군청 상세·이미지에 도달 가능한지 확인
+govRouter.get("/crawl-cardnews", async (c) => {
+  const { crawlCardNews } = await import("./card_crawler");
+  return c.json(await crawlCardNews(c.env, { force: c.req.query("force") === "1" }));
+});
+
 // 카드뉴스 이미지 R2 업로드 — 로컬 크롤러(KR IP)가 군청 이미지를 받아 올려둠.
 //   PUT /api/gov/photo/<key>  (GOV_IMPORT_TOKEN). 서빙은 /api/archive/photo/<key>(R2, 1년 캐시).
 govRouter.put("/photo/:key{.+}", async (c) => {
