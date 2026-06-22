@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { ReportReader } from "@/components/reports/report-reader";
-import { fetchLatestReport, fetchWeeklyNews, fetchGovNotices, fetchCardNews } from "@/lib/api/reports";
+import { fetchLatestReport, fetchWeeklyNews, fetchGovNotices, fetchCardNews, fetchReportMetrics } from "@/lib/api/reports";
 
 export const metadata: Metadata = {
   title: "주간 인사이트 리포트",
@@ -20,8 +20,8 @@ export default async function ReportsPage({
   // ?tier= 수동 오버라이드(데모/테스트) 지원 — 없으면 익명 미리보기
   const { tier } = await searchParams;
   const report = await fetchLatestReport(tier);
-  const [news, govNotices, cardNews] = report
-    ? await Promise.all([fetchWeeklyNews(report.weekId), fetchGovNotices(14), fetchCardNews(6)])
-    : [[], [], []];
-  return <ReportReader initialReport={report} news={news} govNotices={govNotices} cardNews={cardNews} />;
+  const [news, govNotices, cardNews, metrics] = report
+    ? await Promise.all([fetchWeeklyNews(report.weekId), fetchGovNotices(14), fetchCardNews(6), fetchReportMetrics()])
+    : [[], [], [], null];
+  return <ReportReader initialReport={report} metrics={metrics} news={news} govNotices={govNotices} cardNews={cardNews} />;
 }

@@ -38,7 +38,8 @@
   //       Secrets: ANTHROPIC_API_KEY, TOGETHER_API_KEY, SLACK_WEBHOOK_URL
   "triggers": {
     // 매일 자정(한국시간) — 뉴스 수집 + 비용 집계. Cron은 UTC 기준: 15:00 UTC = 00:00 KST
+    // 매일 정오(한국시간) 03:00 UTC = 12:00 KST — 환경 스냅샷만 갱신(낮 대표값으로 env_daily 덮어쓰기)
     // 목 22:00 KST(13:00 UTC) — 주간 리포트 초안 생성(Workers AI). 발행은 HITL 검토 후 수동.
-    "crons": ["0 15 * * *", "0 13 * * 4"]
+    "crons": ["0 15 * * *", "0 3 * * *", "0 13 * * 4"]
   }
 }

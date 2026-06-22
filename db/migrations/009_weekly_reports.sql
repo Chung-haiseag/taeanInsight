@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
   ai_label         TEXT NOT NULL DEFAULT 'ai_assisted',    -- human | ai_assisted | ai_generated
   hitl_reviewer_id TEXT,                                   -- 발행 승인한 검토자 (HITL)
   visibility_tier  TEXT NOT NULL DEFAULT 'community',      -- critical | community | personal
-  premium_only     INTEGER NOT NULL DEFAULT 1,             -- 1이면 비구독자에겐 미리보기만
+  premium_only     INTEGER NOT NULL DEFAULT 0,             -- 0=기본 공개(로그인 없이 전체), 1이면 비구독자 미리보기만
   pdf_url          TEXT,                                   -- (향후) PDF 렌더 결과
   generated_at     TEXT,                                   -- LLM 초안 생성 시각(ISO)
   published_at     TEXT,                                   -- 발행 확정 시각(ISO, 미발행 NULL)

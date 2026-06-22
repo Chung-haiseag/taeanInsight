@@ -111,7 +111,7 @@ export class WeeklyReportPipeline {
       sections,
       aiLabel: this.deps.aiLabel ?? "ai_assisted",
       hitlReviewerId: this.deps.hitlReviewerId,
-      premiumOnly: true,         // 기본은 Premium 전용 (Basic은 미리보기만)
+      premiumOnly: false,        // 기본 공개 — 로그인·구독 없이 전체 열람
       visibilityTier: "community",  // 주간 리포트는 보통 community 등급
     };
   }

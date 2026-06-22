@@ -45,7 +45,7 @@ async function fetchWeather(key: string, nx: string, ny: string): Promise<Condit
       else if (it.category === "REH") out.humidity = Number(it.obsrValue);
       else if (it.category === "PTY") out.pty = PTY[it.obsrValue] ?? null;
     }
-    if (items.length) out.at = new Date(now).toISOString();
+    if (items.length) out.at = new Date().toISOString(); // 실제 UTC 관측시각(now는 KST 보정값이라 사용 금지)
   } catch { /* 부분 데이터 허용 */ }
   // 하늘상태(맑음/구름/흐림)는 초단기예보 SKY에서
   try {

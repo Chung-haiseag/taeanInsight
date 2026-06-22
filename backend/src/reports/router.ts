@@ -19,6 +19,7 @@ import { WorkersAiLlmClient } from "../llm/workers_ai";
 import { WeeklyReportPipeline } from "./weekly_pipeline";
 import { makeFactsLoader } from "./facts";
 import { WeeklyReportRepo, type StoredReport } from "./repo";
+import { loadReportMetrics } from "./metrics";
 import { notifyReportPublished } from "./notify";
 import type { ReportSection, ReportSectionKey } from "./types";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
@@ -146,6 +147,12 @@ reportsRouter.get("/latest", async (c) => {
   const prefs = await loadPrefs(c);
   const tier = c.req.query("tier") ?? prefs?.segment; // 등급은 선호도(저장된 세그먼트)로
   return c.json({ report: personalize(gate(report, tier), prefs) });
+});
+
+// 리포트 섹션 시각화용 정형 지표(대기질 추세·실거래 집계·축제) — 산문과 별개로 차트/표 렌더
+reportsRouter.get("/metrics", async (c) => {
+  const metrics = await loadReportMetrics(c.env);
+  return c.json({ metrics });
 });
 
 // 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님

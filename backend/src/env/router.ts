@@ -8,6 +8,7 @@ import type { Env } from "../types";
 import { fetchConditions, type Conditions } from "./sources";
 import { fetchTour, type TourInfo } from "./tour";
 import { fetchRealEstate } from "./realestate";
+import { forecastDemand, type DemandForecast } from "../tour/demand";
 
 export const envRouter = new Hono<{ Bindings: Env }>();
 
@@ -15,6 +16,8 @@ const TTL_MS = 30 * 60 * 1000;
 let cache: { at: number; data: Conditions } | null = null;
 let tourCache: { at: number; data: TourInfo } | null = null;
 const TOUR_TTL_MS = 6 * 3600 * 1000; // 관광 정보는 자주 안 바뀜 — 6시간 캐시
+let demandCache: { at: number; data: DemandForecast } | null = null;
+const DEMAND_TTL_MS = 3 * 3600 * 1000; // 수요지수 — 예보 갱신 주기 고려 3시간 캐시
 
 async function cached(env: Env): Promise<Conditions> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
@@ -46,6 +49,12 @@ envRouter.get("/_debug_tour", async (c) => {
   return c.json(out);
 });
 
+// 해변 해양기상(파고·수온·조석) — 태안 대표 해수욕장
+envRouter.get("/marine", async (c) => {
+  const { loadMarine } = await import("../tour/marine");
+  return c.json(await loadMarine(c.env));
+});
+
 // 부동산 실거래가 디버그 — 권한·응답 확인용
 envRouter.get("/_debug_realestate", async (c) => {
   const re = await fetchRealEstate(c.env);
@@ -59,6 +68,14 @@ envRouter.get("/tour", async (c) => {
   if (!data.available) return c.json({ available: false, message: "DATA_GO_KR_KEY 미설정" }, 200);
   // 빈 결과(권한 미승인/일시오류)는 캐시하지 않음 — 데이터 있을 때만 캐시
   if (data.festivals.length || data.attractions.length) tourCache = { at: Date.now(), data };
+  return c.json(data);
+});
+
+// 다가오는 주말 관광 수요지수(0~100) + 기여요인 — 규칙기반(날씨·연휴·축제·계절)
+envRouter.get("/demand", async (c) => {
+  if (demandCache && Date.now() - demandCache.at < DEMAND_TTL_MS) return c.json(demandCache.data);
+  const data = await forecastDemand(c.env);
+  if (data.available) demandCache = { at: Date.now(), data };
   return c.json(data);
 });
 

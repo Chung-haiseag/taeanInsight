@@ -96,6 +96,19 @@ export default {
       return; // 주간 cron은 초안 생성만 수행
     }
 
+    // ── 정오(12:00 KST) — 환경 스냅샷만 갱신해 그날 env_daily를 낮 대표값으로 덮어씀 ──
+    // (자정 스냅샷은 전날 23시 관측이라 습도가 과대평가됨 → 정오값으로 보정)
+    if (_event.cron === "0 3 * * *") {
+      try {
+        const { snapshotEnv } = await import("./env/router");
+        const s = await snapshotEnv(env);
+        if (s.stored) console.log("[cron] 환경 스냅샷(정오) 갱신됨");
+      } catch (e) {
+        console.warn("[cron] 환경 스냅샷(정오) 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
     try {
       const { ingestToArchive } = await import("./news/ingest");
       const r = await ingestToArchive(env);
@@ -109,6 +122,14 @@ export default {
       if (s.stored) console.log("[cron] 환경 스냅샷 저장됨");
     } catch (e) {
       console.warn("[cron] 환경 스냅샷 실패:", e instanceof Error ? e.message : e);
+    }
+    // 관광 수요지수 로그 — 다가오는 주말 지수를 누적 저장(예보 갱신 추적·백테스트 기반)
+    try {
+      const { logDemand } = await import("./tour/demand_log");
+      const r = await logDemand(env);
+      if (r.logged) console.log(`[cron] 관광 수요지수: ${r.weekend} ${r.index}점(${r.level})`);
+    } catch (e) {
+      console.warn("[cron] 수요지수 로그 실패:", e instanceof Error ? e.message : e);
     }
     // 군청 목록(제목·날짜·링크) 매일 자동 갱신 — 목록 페이지는 Worker에서 200으로 열림.
     // 본문·카드뉴스 이미지는 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 보충(있으면 보존).
