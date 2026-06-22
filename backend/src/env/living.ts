@@ -2,6 +2,7 @@
 //   getUVIdxV5: 06/18시 발표, h0~h78의 3시간 간격 예보값. 오늘 낮 최고치를 노출.
 
 import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
 
 const UV_URL = "https://apis.data.go.kr/1360000/LivingWthrIdxServiceV5/getUVIdxV5";
 const TAEAN_AREA = REGION.uvAreaNo; // 행정구역코드(지역 설정)
@@ -22,7 +23,7 @@ function kstYmd(): string {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-export async function fetchUV(env: { DATA_GO_KR_KEY?: string }): Promise<UVInfo | null> {
+async function fetchUVImpl(env: { DATA_GO_KR_KEY?: string }): Promise<UVInfo | null> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return null;
   const ymd = kstYmd();
@@ -47,3 +48,6 @@ export async function fetchUV(env: { DATA_GO_KR_KEY?: string }): Promise<UVInfo 
     return null;
   }
 }
+
+// 3시간 캐시 (자외선은 06/18시 발표)
+export const fetchUV = makeTtlCache(fetchUVImpl, 3 * 3600_000);

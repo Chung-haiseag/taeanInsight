@@ -3,6 +3,7 @@
 // 키 없으면 available:false. 모든 호출 실패에 관대.
 
 import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
 
 const TOUR_BASE = "https://apis.data.go.kr/B551011/KorService2";
 const AREA_CHUNGNAM = REGION.tourAreaCode; // TourAPI 지역코드(지역 설정)
@@ -40,7 +41,7 @@ async function taeanSigungu(key: string): Promise<string | null> {
   return code;
 }
 
-export async function fetchTour(env: { DATA_GO_KR_KEY?: string }): Promise<TourInfo> {
+async function fetchTourImpl(env: { DATA_GO_KR_KEY?: string }): Promise<TourInfo> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, festivals: [], attractions: [] };
   const sigungu = await taeanSigungu(key);
@@ -67,3 +68,6 @@ export async function fetchTour(env: { DATA_GO_KR_KEY?: string }): Promise<TourI
 
   return { available: true, festivals, attractions };
 }
+
+// 6시간 캐시 + dedup (축제는 자주 안 바뀜; 축제·수요지수 양쪽에서 호출)
+export const fetchTour = makeTtlCache(fetchTourImpl, 6 * 3600_000);

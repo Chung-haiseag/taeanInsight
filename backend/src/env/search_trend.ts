@@ -3,6 +3,7 @@
 //   절대 검색수는 비공개. 비율의 주간 증감(WoW)을 사용.
 
 import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
 
 const DATALAB = "https://openapi.naver.com/v1/datalab/search";
 const KEYWORDS = REGION.searchKeywords;
@@ -18,7 +19,7 @@ function ymd(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-export async function fetchSearchTrend(env: { NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string }): Promise<SearchTrend | null> {
+async function fetchSearchTrendImpl(env: { NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string }): Promise<SearchTrend | null> {
   if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return null;
   const now = new Date(Date.now() + 9 * 3600 * 1000);
   const start = new Date(now.getTime() - 70 * 86400000); // 약 10주
@@ -49,3 +50,6 @@ export async function fetchSearchTrend(env: { NAVER_CLIENT_ID?: string; NAVER_CL
     return null;
   }
 }
+
+// 60분 캐시 + 동시호출 dedup (수요지수·트렌드 스트립에서 중복 호출)
+export const fetchSearchTrend = makeTtlCache(fetchSearchTrendImpl, 60 * 60_000);

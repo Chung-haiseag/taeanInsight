@@ -3,6 +3,7 @@
 //   태안 시군구 단위는 무료 API에 없어 충남 평균 + 전국 대비로 제공.
 
 import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
 
 const SIDO_URL = "https://www.opinet.co.kr/api/avgSidoPrice.do";
 const CHUNGNAM = REGION.opinetSido; // 시도코드(지역 설정)
@@ -15,7 +16,7 @@ export interface OilPrices { date: string; gasoline: OilItem | null; diesel: Oil
 interface Row { SIDOCD: string; SIDONM: string; PRODCD: string; PRICE: number | string; DIFF: number | string }
 const n = (v: number | string) => (typeof v === "number" ? v : Number(String(v).replace(/[^0-9.\-]/g, "")) || 0);
 
-export async function fetchOil(env: { OPINET_KEY?: string }): Promise<OilPrices | null> {
+async function fetchOilImpl(env: { OPINET_KEY?: string }): Promise<OilPrices | null> {
   const key = env.OPINET_KEY;
   if (!key) return null;
   try {
@@ -40,3 +41,6 @@ export async function fetchOil(env: { OPINET_KEY?: string }): Promise<OilPrices 
     return null;
   }
 }
+
+// 6시간 캐시 (유가는 하루 단위로 갱신)
+export const fetchOil = makeTtlCache(fetchOilImpl, 6 * 3600_000);

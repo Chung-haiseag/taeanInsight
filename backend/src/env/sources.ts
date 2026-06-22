@@ -4,6 +4,7 @@
 // 키(DATA_GO_KR_KEY) 없으면 available:false 로 안전 반환. 모든 호출 실패에 관대(부분 데이터 OK).
 
 import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
 
 const KMA_BASE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
 const AIR_BASE = "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc";
@@ -87,7 +88,7 @@ async function fetchAir(key: string, stationHint: string): Promise<Conditions["a
   return out;
 }
 
-export async function fetchConditions(env: {
+async function fetchConditionsImpl(env: {
   DATA_GO_KR_KEY?: string;
   TAEAN_NX?: string;
   TAEAN_NY?: string;
@@ -102,3 +103,6 @@ export async function fetchConditions(env: {
   const { at, ...weather } = w;
   return { available: true, observedAt: at, weather, air };
 }
+
+// 15분 캐시 + dedup (초단기실황은 매시 정시 발표; 라우터 /taean 캐시와 별개로 함수 레벨)
+export const fetchConditions = makeTtlCache(fetchConditionsImpl, 15 * 60_000);

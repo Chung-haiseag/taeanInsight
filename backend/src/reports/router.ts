@@ -150,9 +150,17 @@ reportsRouter.get("/latest", async (c) => {
 });
 
 // 리포트 섹션 시각화용 정형 지표(대기질 추세·실거래 집계·축제) — 산문과 별개로 차트/표 렌더
+// 엣지 캐시(Cache API) 5분: 외부 API 10여 개 팬아웃을 colo당 5분 1회로 제한(요청 간 재사용).
 reportsRouter.get("/metrics", async (c) => {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
   const metrics = await loadReportMetrics(c.env);
-  return c.json({ metrics });
+  const res = c.json({ metrics });
+  res.headers.set("Cache-Control", "public, s-maxage=300");
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
 });
 
 // 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님

@@ -5,6 +5,7 @@
 //   조석(밀물/썰물)은 KMA 빈값이라 별도(KHOA 조석예보 활용신청 시 추가).
 
 import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
 
 const KMA_BASE = "https://apis.data.go.kr/1360000/BeachInfoservice";
 const KHOA_BEACHIDX = "https://apis.data.go.kr/1192136/fcstBeachv2/GetFcstBeachApiServicev2";
@@ -224,7 +225,7 @@ async function fetchSurf(key: string): Promise<SurfInfo | null> {
   }
 }
 
-export async function loadMarine(env: { DATA_GO_KR_KEY?: string }): Promise<MarineInfo> {
+async function loadMarineImpl(env: { DATA_GO_KR_KEY?: string }): Promise<MarineInfo> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, beaches: [], tide: null, sun: null, mudflat: [], surf: null };
   const [khoa, tide, surf, ...kma] = await Promise.all([
@@ -241,3 +242,6 @@ export async function loadMarine(env: { DATA_GO_KR_KEY?: string }): Promise<Mari
   const available = beaches.some((b) => b.waterTemp != null || b.waveHeight != null || b.beachIndex != null) || !!tide || !!surf;
   return { available, beaches: available ? beaches : [], tide, sun, mudflat, surf };
 }
+
+// 20분 캐시 + 동시호출 dedup(해양 API 7개 묶음이라 비쌈)
+export const loadMarine = makeTtlCache(loadMarineImpl, 20 * 60_000);

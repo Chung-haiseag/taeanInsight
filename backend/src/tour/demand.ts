@@ -144,7 +144,11 @@ function levelOf(i: number): DemandForecast["level"] {
   return "매우낮음";
 }
 
-export async function forecastDemand(env: { DATA_GO_KR_KEY?: string; TAEAN_NX?: string; TAEAN_NY?: string; NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string }): Promise<DemandForecast> {
+// prefetch: 상위(loadReportMetrics)에서 이미 받은 marine·search를 넘기면 중복 호출을 피한다.
+export async function forecastDemand(
+  env: { DATA_GO_KR_KEY?: string; TAEAN_NX?: string; TAEAN_NY?: string; NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string },
+  prefetch?: { marine?: { beaches: Array<{ waterTemp: number | null; waveHeight: number | null; beachIndex: string | null }> }; search?: { deltaPct: number } | null },
+): Promise<DemandForecast> {
   const empty: DemandForecast = {
     available: false, weekend: { sat: "", sun: "" }, index: 0, level: "보통",
     headline: "예보 데이터 없음", factors: [], weather: { sat: null, sun: null }, festivals: [], holidays: [],
@@ -157,13 +161,21 @@ export async function forecastDemand(env: { DATA_GO_KR_KEY?: string; TAEAN_NX?: 
   const { sat, sun } = upcomingWeekend(now);
   const month = sat.getUTCMonth() + 1;
 
+  // marine·search는 prefetch가 있으면 재사용(중복 호출 방지), 없으면 직접 호출
+  const marineP = prefetch?.marine
+    ? Promise.resolve(prefetch.marine)
+    : loadMarine(env).catch(() => ({ available: false, beaches: [] as Array<{ waterTemp: number | null; waveHeight: number | null; beachIndex: string | null }> }));
+  const searchP = prefetch && "search" in prefetch
+    ? Promise.resolve(prefetch.search ?? null)
+    : fetchSearchTrend(env).catch(() => null);
+
   const [weather, holThis, holNext, tour, marine, search] = await Promise.all([
     fetchWeekendWeather(key, nx, ny, sat, sun),
     fetchHolidays(key, sat.getUTCFullYear(), month),
     fetchHolidays(key, sun.getUTCFullYear(), sun.getUTCMonth() + 1),
     fetchTour(env as { DATA_GO_KR_KEY?: string }).catch(() => ({ available: false, festivals: [] as Array<{ title: string; start: string; end: string }> })),
-    loadMarine(env).catch(() => ({ available: false, beaches: [] as Array<{ waterTemp: number | null; waveHeight: number | null; beachIndex: string | null }> })),
-    fetchSearchTrend(env).catch(() => null),
+    marineP,
+    searchP,
   ]);
   const holidays = [...holThis, ...holNext].filter((h, i, a) => a.findIndex((x) => x.date === h.date) === i);
 
