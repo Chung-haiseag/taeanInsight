@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
-import { fetchReportMetrics } from "@/lib/api/reports";
+import Link from "next/link";
+
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherCards, AirQualityTrend, MarineCard,
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
@@ -15,8 +17,13 @@ export const metadata: Metadata = {
 // 실시간성 위주 — 1분 ISR(metrics는 백엔드 스냅샷이 30분 주기로 신선)
 export const revalidate = 60;
 
+function decodeEntities(s: string): string {
+  return s.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#039;/g, "'");
+}
+
 export default async function LivePage() {
-  const metrics = await fetchReportMetrics();
+  const [metrics, latest] = await Promise.all([fetchReportMetrics(), fetchLatestReport()]);
+  const news = latest ? await fetchWeeklyNews(latest.weekId) : [];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -74,8 +81,27 @@ export default async function LivePage() {
             <OilCard oil={metrics.oil} />
           </section>
 
+          {/* 최신 태안뉴스 */}
+          {news.length > 0 && (
+            <section>
+              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📰</span>최신 태안뉴스</h2>
+              <span className="accent-rule mt-3" aria-hidden />
+              <ul className="mt-4 divide-y divide-brand/10">
+                {news.slice(0, 12).map((n) => (
+                  <li key={n.idxno}>
+                    <Link href={`/news/${n.idxno}`} className="group flex items-baseline gap-3 py-3 transition-colors hover:bg-brand/5">
+                      <time className="w-16 shrink-0 text-xs tabular-nums text-foreground-muted">{n.publishedAt.slice(5, 10).replace("-", ".")}</time>
+                      <span className="flex-1 text-[0.97rem] leading-snug text-foreground group-hover:text-brand">{decodeEntities(n.title)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/news" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">태안뉴스 전체 보기 →</Link>
+            </section>
+          )}
+
           <p className="hairline pt-6 text-center text-xs text-foreground-muted">
-            출처 기상청·에어코리아·국립해양조사원·국토교통부·오피넷 · 무료 공공데이터
+            출처 기상청·에어코리아·국립해양조사원·국토교통부·오피넷·태안신문 · 무료 공공데이터
           </p>
         </div>
       )}

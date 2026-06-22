@@ -167,15 +167,19 @@ reportsRouter.get("/metrics", async (c) => {
 });
 
 // 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님
+// 최신 리포트 조회 시 '지금'까지의 최신 기사를 보여줌(발행일에 고정 X) — 실시간성 확보.
+// 과거 리포트(weekId가 최신이 아님) 조회면 그 주 창으로 한정.
 reportsRouter.get("/:weekId/news", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ news: [] });
   const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
-  const report = await repo.get(c.req.param("weekId"));
-  // 발행일 기준 8일 창(발행 주 + α). 없으면 최신 발행분 기준.
-  const base = report?.publishedAt || (await repo.latestPublished())?.publishedAt || new Date().toISOString();
-  const until = base.slice(0, 10);
-  // 한 주간(발행일 기준 7일) 태안뉴스 전체 나열
-  const since = new Date(new Date(until).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const weekId = c.req.param("weekId");
+  const report = await repo.get(weekId);
+  const latest = await repo.latestPublished();
+  const isLatest = !report || !latest || report.weekId === latest.weekId;
+  // 최신 리포트면 오늘 기준, 과거 리포트면 그 발행일 기준. 창은 14일(주간지 간격 여유).
+  const todayKst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const until = isLatest ? todayKst : (report!.publishedAt || todayKst).slice(0, 10);
+  const since = new Date(new Date(until).getTime() - 14 * 86_400_000).toISOString().slice(0, 10);
   const r = await c.env.ARCHIVE_DB
     .prepare(
       `SELECT idxno, title, published_at, category, section FROM archive_articles
