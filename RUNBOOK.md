@@ -84,6 +84,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-21 · 서핑지수(국립해양조사원 fcstSurfingv2, 만리포): 등급별(초급/중급/상급) 지수+파고·주기·풍속·수온. 해변 카드 · tour/marine.ts fetchSurf
 - 2026-06-21 · 자외선지수(기상청 LivingWthrIdxServiceV5 getUVIdxV5, 태안군 areaNo 4482500000): 오늘 낮 최고치·등급. 인포그래픽 타일 · backend/env/living.ts fetchUV
 - 2026-06-22 · 검색 관심도 선행지표(네이버 데이터랩 검색어트렌드, NAVER_CLIENT_ID/SECRET): 태안 키워드 주간 추세. 지난주대비 스트립 "검색관심도 ▲▼" + 수요지수 요인(급증/급감) · backend/env/search_trend.ts
+- 2026-06-22 · 지역설정 중앙화(region.ts) + 안정화: 지역상수 1파일·포팅가이드(docs/REGION_PORTING.md), 외부 API 프로미스캐시 dedup + /api/reports/metrics 엣지캐시 5분(colo당 팬아웃 1회) · backend/lib/cache.ts
 - 2026-06 · 주간리포트 facts 강화: 아카이브45일+TourAPI축제+국토부 실거래가(LAWD 44825) 주입 · backend/reports/facts, env/realestate
 - 2026-06 · Web Push 실발송(RFC8291 암호화+VAPID, WebCrypto): 공개 옵트인 /api/push, 발행 시 전구독자 발송 · backend/notifications, db/010
 - 2026-06 · 태안군청 군정 게시판 수집: 한국IP 로컬 크롤러→/api/gov/import(토큰), 주간행사계획 등 주간리포트 facts 강화 · tools/gov, backend/gov, db/011
