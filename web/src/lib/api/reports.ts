@@ -194,6 +194,19 @@ export async function fetchWeeklyNews(weekId: string): Promise<WeeklyNewsItem[]>
   }
 }
 
+// "N년 전 오늘 태안" — 아카이브 회고(같은 MM-DD 과거 기사)
+export interface OnThisDayItem { idxno: number; title: string; year: number; yearsAgo: number; category?: string; leadImage?: string | null }
+export async function fetchOnThisDay(limit = 6): Promise<OnThisDayItem[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/archive/on-this-day?limit=${limit}`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { items: OnThisDayItem[] };
+    return data.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
 // 발행분 목록(최신순).
 export async function listReports(): Promise<ReportListItem[]> {
   try {

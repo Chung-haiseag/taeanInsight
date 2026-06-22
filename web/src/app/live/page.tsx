@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherCards, AirQualityTrend, MarineCard,
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
@@ -22,7 +22,7 @@ function decodeEntities(s: string): string {
 }
 
 export default async function LivePage() {
-  const [metrics, latest] = await Promise.all([fetchReportMetrics(), fetchLatestReport()]);
+  const [metrics, latest, onThisDay] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(6)]);
   const news = latest ? await fetchWeeklyNews(latest.weekId) : [];
 
   return (
@@ -97,6 +97,25 @@ export default async function LivePage() {
                 ))}
               </ul>
               <Link href="/news" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">태안뉴스 전체 보기 →</Link>
+            </section>
+          )}
+
+          {/* N년 전 오늘 태안 — 아카이브 회고 */}
+          {onThisDay.length > 0 && (
+            <section>
+              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📜</span>N년 전 오늘, 태안</h2>
+              <span className="accent-rule mt-3" aria-hidden />
+              <ul className="mt-4 divide-y divide-brand/10">
+                {onThisDay.map((a) => (
+                  <li key={a.idxno}>
+                    <Link href={`/news/${a.idxno}`} className="group flex items-baseline gap-3 py-3 transition-colors hover:bg-brand/5">
+                      <span className="w-20 shrink-0 text-xs font-semibold tabular-nums text-accent">{a.yearsAgo}년 전 · {a.year}</span>
+                      <span className="flex-1 text-[0.97rem] leading-snug text-foreground group-hover:text-brand">{decodeEntities(a.title)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/archive" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">아카이브 전체 보기 →</Link>
             </section>
           )}
 

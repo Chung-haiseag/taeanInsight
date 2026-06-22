@@ -94,6 +94,35 @@ const REL_STOP = new Set([
   "전국", "최대", "최초", "처음", "기념", "예정", "결정", "촉구", "주민", "지역",
 ]);
 
+// 오늘 날짜(MM-DD)의 과거 기사 — "N년 전 오늘 태안" 회고용
+archiveRouter.get("/on-this-day", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ items: [] });
+  const kst = new Date(Date.now() + 9 * 3600 * 1000);
+  const mmdd = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+  const curYear = kst.getUTCFullYear();
+  const limit = Math.min(20, Number(c.req.query("limit") || "8") || 8);
+  try {
+    const r = await db
+      .prepare(
+        `SELECT idxno, title, published_at, year, category, lead_image FROM archive_articles
+          WHERE substr(published_at, 6, 5) = ?1 AND year < ?2
+          ORDER BY year DESC, published_at DESC LIMIT ?3`,
+      )
+      .bind(mmdd, curYear, limit)
+      .all<{ idxno: number; title: string; published_at: string; year: number; category: string; lead_image: string | null }>();
+    return c.json({
+      date: mmdd,
+      items: (r.results ?? []).map((x) => ({
+        idxno: x.idxno, title: x.title, year: x.year,
+        yearsAgo: curYear - x.year, category: x.category, leadImage: x.lead_image ?? null,
+      })),
+    });
+  } catch {
+    return c.json({ items: [] });
+  }
+});
+
 archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ items: [] });
