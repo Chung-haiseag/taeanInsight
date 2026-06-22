@@ -86,6 +86,9 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-22 · 검색 관심도 선행지표(네이버 데이터랩 검색어트렌드, NAVER_CLIENT_ID/SECRET): 태안 키워드 주간 추세. 지난주대비 스트립 "검색관심도 ▲▼" + 수요지수 요인(급증/급감) · backend/env/search_trend.ts
 - 2026-06-22 · 지역설정 중앙화(region.ts) + 안정화: 지역상수 1파일·포팅가이드(docs/REGION_PORTING.md), 외부 API 프로미스캐시 dedup + /api/reports/metrics 엣지캐시 5분(colo당 팬아웃 1회) · backend/lib/cache.ts
 - 2026-06-22 · 프론트 지역값(제철먹거리) lib/region.ts 분리 · 수요지수 백테스트 골격(예측 vs 실측 MAE·MAPE·상관, fillActuals 일일적재, GET /api/admin/reports/backtest) · backend/reports/backtest.ts
+- 2026-06-22 · 환경·안전 자동 알림(대기질·자외선·파고·기온·해수욕지수 임계, 아침 07KST cron, env_alert_log 멱등) · backend/notifications/env_alerts.ts, db/012
+- 2026-06-22 · metrics 사전계산 D1 스냅샷+30분 워밍 cron(콜드 9~16s→0.7s, 전 colo) · backend/reports/metrics_cache.ts, db/013
+- 2026-06-22 · 리포트 공유 미리보기 OG/트위터 동적 메타(그 주 요약) · web/app/reports/page.tsx generateMetadata
 - 2026-06 · 주간리포트 facts 강화: 아카이브45일+TourAPI축제+국토부 실거래가(LAWD 44825) 주입 · backend/reports/facts, env/realestate
 - 2026-06 · Web Push 실발송(RFC8291 암호화+VAPID, WebCrypto): 공개 옵트인 /api/push, 발행 시 전구독자 발송 · backend/notifications, db/010
 - 2026-06 · 태안군청 군정 게시판 수집: 한국IP 로컬 크롤러→/api/gov/import(토큰), 주간행사계획 등 주간리포트 facts 강화 · tools/gov, backend/gov, db/011
