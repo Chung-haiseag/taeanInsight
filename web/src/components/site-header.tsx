@@ -6,6 +6,7 @@ import { useAccessibility } from "./accessibility-provider";
 import { AdminHeader } from "./admin-header";
 
 const NAV_ITEMS = [
+  { href: "/live", label: "지금 태안" },
   { href: "/news", label: "태안뉴스" },
   { href: "/archive", label: "아카이브" },
   { href: "/reports", label: "주간 리포트" },
