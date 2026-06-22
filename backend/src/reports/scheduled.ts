@@ -1,5 +1,5 @@
-// 주간 리포트 초안 자동 생성 — cron("0 4 * * 5", 금 13:00 KST)에서 호출.
-// Workers AI 5섹션 초안을 draft로 저장. 발행은 편집부 검토(HITL) 후 수동(admin API, 목표 금 17시).
+// 주간 리포트 초안 자동 생성 — cron("0 7 * * 5", 금 16:00 KST)에서 호출.
+// Workers AI 5섹션 초안을 draft로 저장. 검토·발행은 금 17:00 편집부 수동(HITL, admin API).
 
 import type { Env } from "../types";
 import { buildPipeline } from "./router";
