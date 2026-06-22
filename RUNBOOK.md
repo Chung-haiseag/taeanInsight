@@ -117,3 +117,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - **콘텐츠 충실도 가드**: 생성/추출 텍스트 vs 원문 n-gram 겹침, 낮으면 경고/폐기. 공백 무시.
 
 - 2026-06-22 · 관리자 주간리포트 검수·발행 탭(초안 미리보기·거버넌스 사전검사·발행/회수) + 회수 API · web/admin, GET /api/admin/reports/current, POST .../unpublish
+
+- 2026-06-22 · 홈 라이브 요약(GenericHome) + "N년 전 오늘 태안" 회고(/live, GET /api/archive/on-this-day) · web/home, archive/router
