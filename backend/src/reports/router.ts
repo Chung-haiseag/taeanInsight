@@ -207,6 +207,16 @@ reportsRouter.get("/:weekId", async (c) => {
 // ⚠️ PoC: 인증 미적용(reviewRouter와 동일). 운영 전 requireAuth/requireRole 적용.
 export const adminReportsRouter = new Hono<{ Bindings: Env }>();
 
+// 수요지수 백테스트 조회(예측 vs 실측 정확도) — 데이터 누적 후 의미. ?fill=1로 실측 즉시 적재.
+adminReportsRouter.get("/backtest", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const { computeBacktest, fillActuals } = await import("./backtest");
+  let filled: number | undefined;
+  if (c.req.query("fill") === "1") filled = (await fillActuals(c.env)).filled;
+  const result = await computeBacktest(c.env.ARCHIVE_DB);
+  return c.json(filled !== undefined ? { ...result, filled } : result);
+});
+
 const generateSchema = z.object({ weekId: z.string().regex(/^\d{4}-W\d{2}$/).optional() });
 
 adminReportsRouter.post("/generate", async (c) => {

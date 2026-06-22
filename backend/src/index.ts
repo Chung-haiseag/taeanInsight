@@ -131,6 +131,14 @@ export default {
     } catch (e) {
       console.warn("[cron] 수요지수 로그 실패:", e instanceof Error ? e.message : e);
     }
+    // 백테스트 실측 채우기 — 지난 주말의 검색관심도를 actual_search에 적재
+    try {
+      const { fillActuals } = await import("./reports/backtest");
+      const r = await fillActuals(env);
+      if (r.filled) console.log(`[cron] 백테스트 실측 적재: ${r.filled}주`);
+    } catch (e) {
+      console.warn("[cron] 백테스트 실측 적재 실패:", e instanceof Error ? e.message : e);
+    }
     // 군청 목록(제목·날짜·링크) 매일 자동 갱신 — 목록 페이지는 Worker에서 200으로 열림.
     // 본문·카드뉴스 이미지는 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 보충(있으면 보존).
     try {
