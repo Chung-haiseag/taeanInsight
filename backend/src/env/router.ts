@@ -55,6 +55,12 @@ envRouter.get("/marine", async (c) => {
   return c.json(await loadMarine(c.env));
 });
 
+// 현재 환경·안전 경보 미리보기(발송 안 함) — 점검·상태 표시용
+envRouter.get("/alerts", async (c) => {
+  const { collectAlerts } = await import("../notifications/env_alerts");
+  return c.json({ alerts: await collectAlerts(c.env) });
+});
+
 // 부동산 실거래가 디버그 — 권한·응답 확인용
 envRouter.get("/_debug_realestate", async (c) => {
   const re = await fetchRealEstate(c.env);

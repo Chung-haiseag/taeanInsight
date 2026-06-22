@@ -96,6 +96,18 @@ export default {
       return; // 주간 cron은 초안 생성만 수행
     }
 
+    // ── 아침(07:00 KST) — 환경·안전 자동 알림(위험 임계 초과 시 통합 푸시) ──
+    if (_event.cron === "0 22 * * *") {
+      try {
+        const { runEnvAlerts } = await import("./notifications/env_alerts");
+        const r = await runEnvAlerts(env);
+        console.log(`[cron] 환경·안전 알림: 경보 ${r.alerts}건, 발송 ${r.sent}${r.skipped ? ` (${r.skipped})` : ""}`);
+      } catch (e) {
+        console.warn("[cron] 환경·안전 알림 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
     // ── 정오(12:00 KST) — 환경 스냅샷만 갱신해 그날 env_daily를 낮 대표값으로 덮어씀 ──
     // (자정 스냅샷은 전날 23시 관측이라 습도가 과대평가됨 → 정오값으로 보정)
     if (_event.cron === "0 3 * * *") {
