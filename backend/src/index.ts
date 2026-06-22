@@ -98,20 +98,6 @@ export default {
       return;
     }
 
-    // ── 주간 리포트 자동 발행 (금 17:00 KST) — 거버넌스 게이트 통과 시 발행+알림 ──
-    if (_event.cron === "0 8 * * 5") {
-      try {
-        if (env.ARCHIVE_DB) {
-          const { autoPublishWeekly } = await import("./reports/scheduled");
-          const r = await autoPublishWeekly(env);
-          console.log(`[cron] 주간 리포트 자동발행: ${r.weekId} ${r.published ? "발행됨" : `보류(${r.reason})`}`);
-        }
-      } catch (e) {
-        console.warn("[cron] 주간 리포트 자동발행 실패:", e instanceof Error ? e.message : e);
-      }
-      return;
-    }
-
     // ── 12시간마다 — 뉴스 수집 + 군청 목록 갱신(하루 2회) ──
     if (_event.cron === "0 */12 * * *") {
       try {

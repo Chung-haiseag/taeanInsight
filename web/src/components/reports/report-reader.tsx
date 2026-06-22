@@ -302,7 +302,7 @@ export function ReportReader({
       <EmailSignup />
 
       <div className="hairline mt-16 pt-6 text-center text-xs text-foreground-muted">
-        태안 인사이트 · AI가 작성하고 자동 거버넌스 검수를 거쳐 매주 금요일 발행됩니다.
+        태안 인사이트 · AI가 작성하고 편집부 검토(HITL)를 거쳐 매주 금요일 발행됩니다.
       </div>
     </div>
   );
