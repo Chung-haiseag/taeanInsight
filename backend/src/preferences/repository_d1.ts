@@ -2,7 +2,7 @@
 // InMemory 구현체와 동일 인터페이스 → 라우터에서 교체만.
 
 import type { PreferencesRepository, FavoritesRepository } from "./repository";
-import type { UserPreferences, UserFavorite, InterestCategory, NotificationChannel, UserSegment } from "./types";
+import type { UserPreferences, UserFavorite, InterestCategory, NotificationChannel, UserSegment, ShopProfile } from "./types";
 
 const parseArr = <T>(s: string | null): T[] => {
   if (!s) return [];
@@ -15,6 +15,7 @@ interface PrefRow {
   regions: string;
   categories: string;
   notification_channels: string;
+  shop_profile: string | null;
   onboarded_at: string | null;
   updated_at: string;
 }
@@ -31,6 +32,7 @@ export class D1PreferencesRepo implements PreferencesRepository {
       regions: parseArr<string>(r.regions),
       categories: parseArr<InterestCategory>(r.categories),
       notificationChannels: parseArr<NotificationChannel>(r.notification_channels),
+      shopProfile: r.shop_profile ? (JSON.parse(r.shop_profile) as ShopProfile) : undefined,
       onboardedAt: r.onboarded_at ?? undefined,
       updatedAt: r.updated_at,
     };
@@ -39,16 +41,17 @@ export class D1PreferencesRepo implements PreferencesRepository {
   async upsert(prefs: UserPreferences): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO user_preferences (user_id, segment, regions, categories, notification_channels, onboarded_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7)
+        `INSERT INTO user_preferences (user_id, segment, regions, categories, notification_channels, shop_profile, onboarded_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8)
          ON CONFLICT(user_id) DO UPDATE SET
            segment=excluded.segment, regions=excluded.regions, categories=excluded.categories,
-           notification_channels=excluded.notification_channels, onboarded_at=excluded.onboarded_at,
-           updated_at=excluded.updated_at`,
+           notification_channels=excluded.notification_channels, shop_profile=excluded.shop_profile,
+           onboarded_at=excluded.onboarded_at, updated_at=excluded.updated_at`,
       )
       .bind(
         prefs.userId, prefs.segment, JSON.stringify(prefs.regions), JSON.stringify(prefs.categories),
-        JSON.stringify(prefs.notificationChannels), prefs.onboardedAt ?? null, new Date().toISOString(),
+        JSON.stringify(prefs.notificationChannels), prefs.shopProfile ? JSON.stringify(prefs.shopProfile) : null,
+        prefs.onboardedAt ?? null, new Date().toISOString(),
       )
       .run();
   }

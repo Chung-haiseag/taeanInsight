@@ -8,12 +8,22 @@ export type InterestCategory =
 
 export type NotificationChannel = "email" | "webpush" | "kakao";
 
+// 사장님 초개인화용 가게 프로필 — OwnerHome 실행 제안을 업종/지역 맞춤으로.
+export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "other";
+export interface ShopProfile {
+  industry: ShopIndustry;
+  eupMyeon?: string;                // 가게 읍·면 코드(없으면 regions[0] 사용)
+  capacity?: number;               // 객실/좌석 수(선택)
+  name?: string;                   // 상호(선택)
+}
+
 export interface UserPreferences {
   userId: string;
   segment: UserSegment;
   regions: string[];                // 읍·면 코드 (anmyeon·geunheung 등)
   categories: InterestCategory[];
   notificationChannels: NotificationChannel[];
+  shopProfile?: ShopProfile;        // 사장님 가게 정보(초개인화)
   onboardedAt?: string;             // ISO 8601, 미설정 = 온보딩 미완료
   updatedAt: string;
 }

@@ -39,10 +39,18 @@ const onboardSchema = z.object({
   notificationChannels: z.array(z.enum(CHANNEL_VALUES)).min(0),
 });
 
+const shopProfileSchema = z.object({
+  industry: z.enum(["lodging", "food", "cafe", "leisure", "retail", "other"]),
+  eupMyeon: z.string().max(40).optional(),
+  capacity: z.number().int().min(0).max(100000).optional(),
+  name: z.string().max(60).optional(),
+});
+
 const updateSchema = z.object({
   regions: z.array(z.string()).optional(),
   categories: z.array(z.enum(CATEGORY_VALUES)).optional(),
   notificationChannels: z.array(z.enum(CHANNEL_VALUES)).optional(),
+  shopProfile: shopProfileSchema.optional(),
 });
 
 const addFavoriteSchema = z.object({
@@ -71,6 +79,14 @@ meRouter.get("/", async (c) => {
     favorites,
     b2gMemberships,
   });
+});
+
+// GET /api/me/owner-brief — 사장님 초개인화 브리프(수요·날씨·물때·실행제안·상권)
+meRouter.get("/owner-brief", async (c) => {
+  const auth = c.get("auth");
+  const prefs = await serviceFor(c).get(auth.sub);
+  const { loadOwnerBrief } = await import("../owner/brief");
+  return c.json(await loadOwnerBrief(c.env, prefs));
 });
 
 // POST /api/me/onboarding
@@ -106,6 +122,7 @@ meRouter.patch("/", async (c) => {
       regions: parsed.data.regions,
       categories: parsed.data.categories as InterestCategory[] | undefined,
       notificationChannels: parsed.data.notificationChannels as NotificationChannel[] | undefined,
+      shopProfile: parsed.data.shopProfile,
     });
     return c.json(prefs);
   } catch (e) {
