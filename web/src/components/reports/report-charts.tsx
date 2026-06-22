@@ -2,6 +2,7 @@
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
 import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices } from "@/lib/api/reports";
+import { FRONT_REGION } from "@/lib/region";
 
 // 만원 → "2.1억" / "8,500만원"
 function wonFmt(n: number): string {
@@ -222,29 +223,16 @@ function Pill({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ── 이달의 태안 제철 먹거리 (정적 데이터, API 불요) ──
-const TAEAN_SEAFOOD: Array<{ name: string; emoji: string; months: number[] }> = [
-  { name: "꽃게", emoji: "🦀", months: [4, 5, 6, 9, 10, 11] },
-  { name: "바지락", emoji: "🐚", months: [3, 4, 5, 6] },
-  { name: "주꾸미", emoji: "🐙", months: [3, 4, 5] },
-  { name: "갑오징어", emoji: "🦑", months: [4, 5, 6] },
-  { name: "대하", emoji: "🦐", months: [9, 10, 11] },
-  { name: "천일염", emoji: "🧂", months: [5, 6, 7, 8] },
-  { name: "6쪽마늘", emoji: "🧄", months: [6, 7] },
-  { name: "키조개", emoji: "🥢", months: [12, 1, 2, 3, 4, 5] },
-  { name: "굴", emoji: "🦪", months: [11, 12, 1, 2] },
-  { name: "감태", emoji: "🌿", months: [12, 1, 2] },
-  { name: "곱창김", emoji: "🍙", months: [12, 1, 2, 3] },
-];
+// ── 이달의 제철 먹거리 (정적 데이터, API 불요) — 지역값은 lib/region.ts ──
 export function SeasonalFoodCard() {
   // KST 기준 현재 월
   const month = new Date(Date.now() + 9 * 3600 * 1000).getUTCMonth() + 1;
-  const items = TAEAN_SEAFOOD.filter((f) => f.months.includes(month));
+  const items = FRONT_REGION.seasonalFoods.filter((f) => f.months.includes(month));
   if (!items.length) return null;
   return (
     <div className="mt-6 rounded-2xl border border-brand/10 bg-white/60 p-5 shadow-soft">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🍽 {month}월 제철 태안 먹거리</span>
+        <span className="text-sm font-semibold text-brand">🍽 {month}월 제철 {FRONT_REGION.name} 먹거리</span>
         <span className="text-[0.7rem] text-foreground-muted">지역 특산</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
