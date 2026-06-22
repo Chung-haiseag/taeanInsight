@@ -7,6 +7,7 @@
 import { fetchTour } from "../env/tour";
 import { loadMarine } from "./marine";
 import { fetchSearchTrend } from "../env/search_trend";
+import { REGION } from "../region";
 
 const KMA_BASE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
 const HOLIDAY_BASE = "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
@@ -150,8 +151,8 @@ export async function forecastDemand(env: { DATA_GO_KR_KEY?: string; TAEAN_NX?: 
   };
   const key = env.DATA_GO_KR_KEY;
   if (!key) return empty;
-  const nx = env.TAEAN_NX || "51";
-  const ny = env.TAEAN_NY || "109";
+  const nx = env.TAEAN_NX || REGION.grid.nx;
+  const ny = env.TAEAN_NY || REGION.grid.ny;
   const now = kstNow();
   const { sat, sun } = upcomingWeekend(now);
   const month = sat.getUTCMonth() + 1;

@@ -2,8 +2,10 @@
 //   avgSidoPrice.do: 시도별 현재 평균가(전일 대비 DIFF 포함). 전국(00)·충남(05) 행 사용.
 //   태안 시군구 단위는 무료 API에 없어 충남 평균 + 전국 대비로 제공.
 
+import { REGION } from "../region";
+
 const SIDO_URL = "https://www.opinet.co.kr/api/avgSidoPrice.do";
-const CHUNGNAM = "05";
+const CHUNGNAM = REGION.opinetSido; // 시도코드(지역 설정)
 const NATION = "00";
 const PROD = { gasoline: "B027", diesel: "D047" } as const; // 휘발유·경유
 

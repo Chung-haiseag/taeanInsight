@@ -1,8 +1,10 @@
 // 생활기상지수 — 기상청 LivingWthrIdxServiceV5(data.go.kr). 자외선지수(태안군).
 //   getUVIdxV5: 06/18시 발표, h0~h78의 3시간 간격 예보값. 오늘 낮 최고치를 노출.
 
+import { REGION } from "../region";
+
 const UV_URL = "https://apis.data.go.kr/1360000/LivingWthrIdxServiceV5/getUVIdxV5";
-const TAEAN_AREA = "4482500000"; // 태안군
+const TAEAN_AREA = REGION.uvAreaNo; // 행정구역코드(지역 설정)
 
 export interface UVInfo { todayMax: number | null; level: string; peakHour: string | null }
 

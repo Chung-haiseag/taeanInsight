@@ -4,17 +4,16 @@
 //      최대파고·수온·기온·풍속·개장상태(당일 예보). KHOA지만 data.go.kr 키로 호출.
 //   조석(밀물/썰물)은 KMA 빈값이라 별도(KHOA 조석예보 활용신청 시 추가).
 
+import { REGION } from "../region";
+
 const KMA_BASE = "https://apis.data.go.kr/1360000/BeachInfoservice";
 const KHOA_BEACHIDX = "https://apis.data.go.kr/1192136/fcstBeachv2/GetFcstBeachApiServicev2";
 const KHOA_TIDE = "https://apis.data.go.kr/1192136/tideFcstHghLw/GetTideFcstHghLwApiService";
 const KHOA_SURF = "https://apis.data.go.kr/1192136/fcstSurfingv2/GetFcstSurfingApiServicev2";
-const TIDE_OBS = "DT_0067"; // 안흥(태안 해역 조석 예보지점)
+const TIDE_OBS = REGION.tideObs; // 조석 예보지점(지역 설정)
 
-// 기상청 해수욕장 날씨 대상(beach_num) — 태안 대표
-const KMA_BEACHES: Array<{ num: string; name: string }> = [
-  { num: "70", name: "만리포" },
-  { num: "44", name: "꽃지" },
-];
+// 기상청 해수욕장 날씨 대상(beach_num) — 지역 설정
+const KMA_BEACHES = REGION.beaches;
 
 export interface BeachMarine {
   name: string;
@@ -29,9 +28,9 @@ export interface BeachMarine {
   source: "기상청" | "해양조사원";
 }
 
-// ── 일출·일몰 (NOAA Sunrise equation, API 불요) — 태안 중심 좌표 ──
-const TAEAN_LAT = 36.745;
-const TAEAN_LON = 126.298;
+// ── 일출·일몰 (NOAA Sunrise equation, API 불요) — 지역 중심 좌표 ──
+const TAEAN_LAT = REGION.center.lat;
+const TAEAN_LON = REGION.center.lon;
 
 function sunTimes(y: number, m: number, d: number, lat: number, lonEast: number): { sunrise: string; sunset: string } | null {
   const rad = Math.PI / 180;
@@ -138,8 +137,9 @@ async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
     if (!res.ok) return [];
     const j = (await res.json()) as { body?: { items?: { item?: Item[] } } };
     const all = j.body?.items?.item ?? [];
-    // 태안 위경도 박스
-    const taean = all.filter((x) => { const la = num(x.lat), lo = num(x.lot); return la != null && lo != null && la >= 36.55 && la <= 37.1 && lo >= 126.05 && lo <= 126.5; });
+    // 지역 위경도 박스
+    const b = REGION.box;
+    const taean = all.filter((x) => { const la = num(x.lat), lo = num(x.lot); return la != null && lo != null && la >= b.latMin && la <= b.latMax && lo >= b.lonMin && lo <= b.lonMax; });
     const byBeach = new Map<string, Item>();
     for (const r of taean) {
       // 오늘 예보 중 오후 우선, 없으면 오전/최신
@@ -186,7 +186,7 @@ async function fetchTide(key: string): Promise<TideInfo | null> {
       })
       .filter((e) => e.time)
       .sort((a, b) => a.time.localeCompare(b.time));
-    return events.length ? { station: String(items[0].obsvtrNm ?? "안흥"), date: iso, events } : null;
+    return events.length ? { station: String(items[0].obsvtrNm ?? REGION.name), date: iso, events } : null;
   } catch {
     return null;
   }
@@ -201,7 +201,7 @@ async function fetchSurf(key: string): Promise<SurfInfo | null> {
     if (!res.ok) return null;
     const j = (await res.json()) as { body?: { items?: { item?: Item[] } } };
     const all = j.body?.items?.item ?? [];
-    const spot = all.filter((r) => String(r.surfPlcNm ?? "").includes("만리포"));
+    const spot = all.filter((r) => String(r.surfPlcNm ?? "").includes(REGION.surfSpotMatch));
     if (!spot.length) return null;
     // 오늘 우선, 오전 우선(없으면 가용 시간대)
     const today = spot.filter((r) => String(r.predcYmd) === iso);
@@ -211,7 +211,7 @@ async function fetchSurf(key: string): Promise<SurfInfo | null> {
     if (!rows.length) return null;
     const f = rows[0];
     return {
-      spot: "만리포",
+      spot: REGION.surfSpotName,
       noon: String(noon),
       wave: num(f.avgWvhgt),
       period: num(f.avgWvpd),

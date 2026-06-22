@@ -13,7 +13,8 @@ const APT_URLS = [
 const LAND_URLS = [
   "https://apis.data.go.kr/1613000/RTMSDataSvcLandTrade/getRTMSDataSvcLandTrade",
 ];
-const DEFAULT_LAWD = "44825"; // 충남 태안군
+import { REGION } from "../region";
+const DEFAULT_LAWD = REGION.lawdCd; // 시군구 법정동코드(지역 설정)
 
 export interface RealEstateInfo {
   available: boolean;

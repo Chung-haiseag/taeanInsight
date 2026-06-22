@@ -2,8 +2,10 @@
 //   "태안/꽃지/만리포/안면도" 주간 검색량 추세 → 관광 수요의 선행 신호.
 //   절대 검색수는 비공개. 비율의 주간 증감(WoW)을 사용.
 
+import { REGION } from "../region";
+
 const DATALAB = "https://openapi.naver.com/v1/datalab/search";
-const KEYWORDS = ["태안", "꽃지", "만리포", "안면도", "안면도여행"];
+const KEYWORDS = REGION.searchKeywords;
 
 export interface SearchTrend {
   latest: number;          // 최근 주 비율
@@ -30,7 +32,7 @@ export async function fetchSearchTrend(env: { NAVER_CLIENT_ID?: string; NAVER_CL
       },
       body: JSON.stringify({
         startDate: ymd(start), endDate: ymd(now), timeUnit: "week",
-        keywordGroups: [{ groupName: "태안관광", keywords: KEYWORDS }],
+        keywordGroups: [{ groupName: REGION.searchGroupName, keywords: KEYWORDS }],
       }),
       signal: AbortSignal.timeout(8000),
     });
