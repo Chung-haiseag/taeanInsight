@@ -55,6 +55,12 @@ envRouter.get("/marine", async (c) => {
   return c.json(await loadMarine(c.env));
 });
 
+// 도로 실시간 CCTV(ITS) — 태안 인근 카메라 목록(HLS 스트림)
+envRouter.get("/cctv", async (c) => {
+  const { fetchCctv } = await import("./cctv");
+  return c.json(await fetchCctv(c.env));
+});
+
 // 현재 환경·안전 경보 미리보기(발송 안 함) — 점검·상태 표시용
 envRouter.get("/alerts", async (c) => {
   const { collectAlerts } = await import("../notifications/env_alerts");

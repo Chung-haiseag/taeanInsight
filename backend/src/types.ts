@@ -25,6 +25,7 @@ export interface Env {
   OPINET_KEY?: string;            // 오피넷 유가정보 certkey (충남 주유 평균가)
   NAVER_CLIENT_ID?: string;       // 네이버 데이터랩 검색어트렌드
   NAVER_CLIENT_SECRET?: string;
+  ITS_API_KEY?: string;           // 국가교통정보센터(ITS) 실시간 CCTV
 
   // 태안신문 아카이브 바인딩
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색
