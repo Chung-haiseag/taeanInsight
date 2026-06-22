@@ -11,6 +11,7 @@ import { AILabelBadge } from "@/components/ai-label-badge";
 import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGauge, MarineCard, SummaryInfographic, SeasonalFoodCard, OilCard } from "@/components/reports/report-charts";
 import { ReportTTS } from "@/components/reports/report-tts";
 import { ReportPushButton } from "@/components/reports/report-push";
+import { EmailSignup } from "@/components/reports/email_signup";
 import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -297,6 +298,8 @@ export function ReportReader({
           </Link>
         </section>
       )}
+
+      <EmailSignup />
 
       <div className="hairline mt-16 pt-6 text-center text-xs text-foreground-muted">
         태안 인사이트 · 모든 AI 콘텐츠는 편집부 검토(HITL)를 거쳐 발행됩니다.

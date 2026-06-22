@@ -21,6 +21,7 @@ import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
 import { pushRouter } from "./notifications/router";
 import { govRouter } from "./gov/router";
+import { emailRouter } from "./email/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -64,6 +65,7 @@ app.route("/api/reports", reportsRouter);
 app.route("/api/admin/reports", adminReportsRouter);
 app.route("/api/push", pushRouter);
 app.route("/api/gov", govRouter);
+app.route("/api/email", emailRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
