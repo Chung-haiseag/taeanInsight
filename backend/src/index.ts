@@ -75,27 +75,41 @@ export default {
   //  · "0 13 * * 4" (목 22:00 KST) — 주간 리포트 초안 생성(Workers AI). 발행은 HITL 검토 후 수동.
   //  · "0 15 * * *" (매일 00:00 KST) — 뉴스 적재 + 환경 스냅샷 + 비용 집계.
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    // ── 주간 리포트 초안 (목 야간) ──
-    if (_event.cron === "0 13 * * 4") {
+    // ── 주간 리포트 초안 (금 13:00 KST) ──
+    if (_event.cron === "0 4 * * 5") {
       // 생성 전에 군청 목록(제목·날짜·링크) 먼저 갱신 → 초안에 최신 군정 반영
       try {
         const { crawlGovLists } = await import("./gov/list_crawler");
         const g = await crawlGovLists(env);
         const n = g.reduce((s, b) => s + b.upserted, 0);
-        if (n) console.log(`[cron] 군청 목록 갱신: ${n}건 (${g.map((b) => `${b.board} ${b.upserted}`).join(", ")})`);
+        if (n) console.log(`[cron] 군청 목록 갱신: ${n}건`);
       } catch (e) {
         console.warn("[cron] 군청 목록 실패:", e instanceof Error ? e.message : e);
       }
       try {
         if (env.AI && env.ARCHIVE_DB) {
-          const [{ buildWeeklyDraft }] = await Promise.all([import("./reports/scheduled")]);
+          const { buildWeeklyDraft } = await import("./reports/scheduled");
           const r = await buildWeeklyDraft(env);
           console.log(`[cron] 주간 리포트 초안 생성: ${r.weekId} (${r.sections}개 섹션)`);
         }
       } catch (e) {
         console.warn("[cron] 주간 리포트 초안 실패:", e instanceof Error ? e.message : e);
       }
-      return; // 주간 cron은 초안 생성만 수행
+      return;
+    }
+
+    // ── 주간 리포트 자동 발행 (금 17:00 KST) — 거버넌스 게이트 통과 시 발행+알림 ──
+    if (_event.cron === "0 8 * * 5") {
+      try {
+        if (env.ARCHIVE_DB) {
+          const { autoPublishWeekly } = await import("./reports/scheduled");
+          const r = await autoPublishWeekly(env);
+          console.log(`[cron] 주간 리포트 자동발행: ${r.weekId} ${r.published ? "발행됨" : `보류(${r.reason})`}`);
+        }
+      } catch (e) {
+        console.warn("[cron] 주간 리포트 자동발행 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
     }
 
     // ── 12시간마다 — 뉴스 수집 + 군청 목록 갱신(하루 2회) ──
