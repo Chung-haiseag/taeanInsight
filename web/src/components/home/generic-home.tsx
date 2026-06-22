@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { PersonalizedNewsStrip } from "@/components/home/personalized-news";
+import { LiveSummaryStrip } from "@/components/home/live-summary";
 
 export function GenericHome() {
   return (
@@ -36,6 +37,9 @@ export function GenericHome() {
           </Link>
         </div>
       </section>
+
+      {/* 지금 태안 — 라이브 핵심 지표 */}
+      <LiveSummaryStrip />
 
       {/* 4대 상품 카드 */}
       <section aria-labelledby="products-heading">
