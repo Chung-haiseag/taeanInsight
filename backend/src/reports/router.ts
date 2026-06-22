@@ -22,6 +22,7 @@ import { WeeklyReportRepo, type StoredReport } from "./repo";
 import { loadReportMetrics } from "./metrics";
 import { notifyReportPublished } from "./notify";
 import type { ReportSection, ReportSectionKey } from "./types";
+import { getIsoWeekId } from "./types";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
 import { decideVisibility, type VisibilityTier } from "../preferences/content_filter";
 import type { InterestCategory, UserPreferences } from "../preferences/types";
@@ -228,6 +229,34 @@ adminReportsRouter.get("/backtest", async (c) => {
   if (c.req.query("fill") === "1") filled = (await fillActuals(c.env)).filled;
   const result = await computeBacktest(c.env.ARCHIVE_DB);
   return c.json(filled !== undefined ? { ...result, filled } : result);
+});
+
+// 검수 화면용 — 이번 주차 리포트(초안/발행) 전문 + 거버넌스 사전검사(발행 안 함).
+adminReportsRouter.get("/current", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
+  const report = (await repo.get(getIsoWeekId())) ?? (await repo.latestPublished());
+  if (!report) return c.json({ report: null, governance: null });
+  let governance: { approved: boolean; reasons: string[] } = { approved: true, reasons: [] };
+  try {
+    const review = await buildPipeline(c.env).validateForPublish({ ...report, hitlReviewerId: "preview" });
+    governance = { approved: review.approved, reasons: review.reasons };
+  } catch { /* 거버넌스 검사 실패는 무시(미리보기) */ }
+  return c.json({
+    report: { weekId: report.weekId, status: report.status, aiLabel: report.aiLabel, publishedAt: report.publishedAt, summary: report.summary, sections: report.sections },
+    governance,
+  });
+});
+
+// 발행 회수(unpublish) — published → draft. 오발행 시 즉시 비공개.
+adminReportsRouter.post("/:weekId/unpublish", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const weekId = c.req.param("weekId");
+  const r = await c.env.ARCHIVE_DB
+    .prepare(`UPDATE weekly_reports SET status='draft', published_at=NULL, updated_at=datetime('now') WHERE week_id=?1 AND status='published'`)
+    .bind(weekId)
+    .run();
+  return c.json({ ok: !!r.meta.changes, weekId, reverted: !!r.meta.changes });
 });
 
 const generateSchema = z.object({ weekId: z.string().regex(/^\d{4}-W\d{2}$/).optional() });
