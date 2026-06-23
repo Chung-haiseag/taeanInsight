@@ -6,7 +6,7 @@ import Link from "next/link";
 import { renderWidgets } from "@/components/me/widget_registry";
 import { ToneToggleBar, useToneToggle } from "@/components/me/tone_toggle";
 import { PushOptInButton } from "@/components/me/push_opt_in";
-import { canToggleTone, preferredTone, type MeResponse } from "@/lib/types";
+import { canToggleTone, preferredTone, REGION_OPTIONS, SEGMENT_LIMITS, type MeResponse } from "@/lib/types";
 import { getMe } from "@/lib/api/me";
 import { getMockMeResponse, isMockMode } from "@/lib/mock/me";
 
@@ -56,38 +56,50 @@ function MeDashboard({ data }: { data: MeResponse }) {
     [data.b2gMemberships, data.favorites, preferences, tone],
   );
 
+  const regionLabels = preferences.regions
+    .map((c) => REGION_OPTIONS.find((r) => r.code === c)?.label ?? c)
+    .filter(Boolean);
+  const segLabel = SEGMENT_LIMITS[preferences.segment]?.label ?? preferences.segment;
+
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-brand">내 페이지</h1>
-          <p className="text-sm text-foreground-muted">
-            관심사 기반 초개인화 · 발행 콘텐츠는 모두 편집부 검토(HITL) 완료
-          </p>
+    <div className="mx-auto max-w-4xl space-y-10">
+      {/* 에디토리얼 헤더 */}
+      <header className="pt-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow"><span className="inline-block w-6 h-px bg-accent" aria-hidden /> My Page · 초개인화</p>
+            <h1 className="mt-4 font-display text-display-sm text-brand">내 관심사로 본 태안</h1>
+          </div>
+          {showToneToggle && <ToneToggleBar tone={tone} onChange={setTone} />}
         </div>
-        {showToneToggle && <ToneToggleBar tone={tone} onChange={setTone} />}
+        <span className="accent-rule mt-5" aria-hidden />
+        <div className="mt-4 flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-brand/5 border border-brand/10 px-3 py-1 text-xs font-medium text-foreground-muted">{segLabel}</span>
+          {regionLabels.map((r) => (
+            <span key={r} className="rounded-full bg-accent-subtle/40 border border-accent/20 px-3 py-1 text-xs font-medium text-brand">{r}</span>
+          ))}
+          <Link href="/me/onboarding" className="ml-1 text-xs font-semibold text-accent hover:underline">관심사 수정</Link>
+        </div>
+        <p className="mt-3 text-sm text-foreground-muted">발행 콘텐츠는 모두 편집부 검토(HITL)를 거칩니다.</p>
       </header>
 
       {/* Push 옵트인 — 알림 채널에 webpush 있으면 노출 */}
       {preferences.notificationChannels.includes("webpush") && (
-        <PushOptInButton
-          vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-        />
+        <PushOptInButton vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
       )}
 
-      <div className="grid gap-6">
+      {/* 위젯 — 통일된 카드로 감싸 일관된 디자인 */}
+      <div className="grid gap-5">
         {widgets.map(({ key, node }) => (
-          <div key={key}>{node}</div>
+          <section key={key} className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
+            {node}
+          </section>
         ))}
       </div>
 
-      <footer className="pt-6 border-t border-brand/10 text-sm text-foreground-muted flex justify-between">
-        <Link href="/me/onboarding" className="hover:text-brand">
-          관심사 다시 설정
-        </Link>
-        <Link href="/" className="hover:text-brand">
-          홈으로
-        </Link>
+      <footer className="hairline pt-6 text-sm text-foreground-muted flex justify-between">
+        <Link href="/me/onboarding" className="hover:text-brand">관심사 다시 설정</Link>
+        <Link href="/" className="hover:text-brand">홈으로</Link>
       </footer>
     </div>
   );

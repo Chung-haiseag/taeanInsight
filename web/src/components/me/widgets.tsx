@@ -117,10 +117,7 @@ interface GovResp {
 export function WelcomeBanner({ preferences }: { preferences: UserPreferences }) {
   const regionList = preferences.regions.map(regionLabel).join(" · ");
   return (
-    <section
-      aria-labelledby="welcome-heading"
-      className="rounded-lg bg-accent-subtle/40 border border-accent/30 p-6"
-    >
+    <section aria-labelledby="welcome-heading">
       <h2 id="welcome-heading" className="text-xl font-bold text-brand">
         오늘도 어서 오세요 ☀️
       </h2>
@@ -155,7 +152,7 @@ export function TodayConditions({ preferences }: { preferences: UserPreferences 
   }
 
   return (
-    <section aria-labelledby="today-heading" className="rounded-lg border border-brand/15 bg-background p-5">
+    <section aria-labelledby="today-heading">
       <div className="flex items-center justify-between mb-3">
         <h2 id="today-heading" className="text-lg font-bold text-brand">
           오늘의 {regionList}
@@ -326,10 +323,7 @@ export function PersonalizedReport({ preferences }: { preferences: UserPreferenc
   const report = data?.report;
 
   return (
-    <section
-      aria-labelledby="report-heading"
-      className="border-l-4 border-accent bg-brand/5 rounded-lg p-5"
-    >
+    <section aria-labelledby="report-heading" className="-mx-5 -my-5 rounded-2xl border-l-4 border-accent bg-accent-subtle/20 p-5 sm:-mx-6 sm:-my-6 sm:p-6">
       <div className="flex items-center justify-between mb-2">
         <h2 id="report-heading" className="text-lg font-bold text-brand">
           내 맞춤 주간 리포트{report ? ` · ${report.weekId}` : ""}
@@ -454,10 +448,7 @@ export function B2gDepartmentSpace() {
 
 export function UsagePanel({ preferences }: { preferences: UserPreferences }) {
   return (
-    <section
-      aria-labelledby="usage-heading"
-      className="border border-brand/10 rounded-lg p-4 bg-background"
-    >
+    <section aria-labelledby="usage-heading">
       <h2 id="usage-heading" className="text-sm font-semibold text-brand mb-2">
         구독 · 사용량
       </h2>

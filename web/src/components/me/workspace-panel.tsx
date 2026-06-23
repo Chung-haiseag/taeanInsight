@@ -19,12 +19,10 @@ export function WorkspacePanel({ kind }: { kind: "team" | "dept" }) {
   }
   useEffect(() => { void load(); }, []);
 
-  const wrap = kind === "dept" ? "border-2 border-accent bg-accent-subtle/20" : "border border-brand/20 bg-background";
-
-  if (!view) return <section className={`rounded-lg p-5 ${wrap}`}><p className="text-sm text-foreground-muted">불러오는 중…</p></section>;
+  if (!view) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
 
   if (!view.workspace) {
-    return <NoWorkspace kind={kind} label={label} wrap={wrap} busy={busy} setBusy={setBusy} err={err} setErr={setErr} onDone={load} />;
+    return <NoWorkspace kind={kind} label={label} busy={busy} setBusy={setBusy} err={err} setErr={setErr} onDone={load} />;
   }
 
   const ws = view.workspace;
@@ -36,7 +34,7 @@ export function WorkspacePanel({ kind }: { kind: "team" | "dept" }) {
   }
 
   return (
-    <section aria-labelledby="ws-heading" className={`rounded-lg p-5 space-y-4 ${wrap}`}>
+    <section aria-labelledby="ws-heading" className="space-y-4">
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h2 id="ws-heading" className="text-lg font-bold text-brand">{label} · {ws.name}</h2>
@@ -117,8 +115,8 @@ function WsNotes({ view, busy, act }: { view: WSView; busy: boolean; act: (fn: (
   );
 }
 
-function NoWorkspace({ kind, label, wrap, busy, setBusy, err, setErr, onDone }: {
-  kind: "team" | "dept"; label: string; wrap: string; busy: boolean;
+function NoWorkspace({ kind, label, busy, setBusy, err, setErr, onDone }: {
+  kind: "team" | "dept"; label: string; busy: boolean;
   setBusy: (v: boolean) => void; err: string | null; setErr: (v: string | null) => void; onDone: () => void;
 }) {
   const [name, setName] = useState("");
@@ -141,7 +139,7 @@ function NoWorkspace({ kind, label, wrap, busy, setBusy, err, setErr, onDone }: 
   }
 
   return (
-    <section className={`rounded-lg p-5 space-y-4 ${wrap}`}>
+    <section className="space-y-4">
       <div>
         <h2 className="text-lg font-bold text-brand">{label}</h2>
         <p className="mt-1 text-sm text-foreground-muted">
