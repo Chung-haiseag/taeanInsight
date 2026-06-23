@@ -165,6 +165,35 @@ export async function getNews(force = false): Promise<NewsItem[]> {
   return items;
 }
 
+// ── D1 캐시(stale-while-revalidate) — workers.dev는 엣지캐시 불가, 콜드 isolate 매번 느림 대응 ──
+const NEWS_CACHE_TTL_MS = 15 * 60 * 1000;
+
+export async function readNewsCache(db: D1Database): Promise<{ items: NewsItem[]; ageMs: number } | null> {
+  try {
+    const r = await db.prepare("SELECT items, updated_at FROM news_cache WHERE id=1").first<{ items: string; updated_at: string }>();
+    if (!r) return null;
+    return { items: JSON.parse(r.items) as NewsItem[], ageMs: Date.now() - Date.parse(r.updated_at) };
+  } catch { return null; }
+}
+
+export async function writeNewsCache(db: D1Database, items: NewsItem[]): Promise<void> {
+  try {
+    await db.prepare("INSERT INTO news_cache (id, items, updated_at) VALUES (1, ?1, ?2) ON CONFLICT(id) DO UPDATE SET items=excluded.items, updated_at=excluded.updated_at")
+      .bind(JSON.stringify(items), new Date().toISOString()).run();
+  } catch { /* 캐시 실패는 무시 */ }
+}
+
+// 캐시 우선 — 있으면 즉시 반환(오래되면 호출측에서 백그라운드 갱신), 없으면 라이브 수집.
+export async function getNewsFast(db: D1Database | undefined): Promise<{ items: NewsItem[]; stale: boolean }> {
+  if (db) {
+    const cached = await readNewsCache(db);
+    if (cached && cached.items.length) return { items: cached.items, stale: cached.ageMs > NEWS_CACHE_TTL_MS };
+  }
+  const items = await getNews();          // 콜드(캐시 없음) — 라이브 수집
+  if (db) await writeNewsCache(db, items);
+  return { items, stale: false };
+}
+
 export function categoryCounts(items: NewsItem[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const it of items) counts[it.category] = (counts[it.category] ?? 0) + 1;

@@ -8,6 +8,8 @@ import {
   NEWS_CATEGORY_LABELS,
   categoryCounts,
   getNews,
+  getNewsFast,
+  writeNewsCache,
   type NewsCategory,
 } from "./ingest";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
@@ -42,15 +44,23 @@ export const newsRouter = new Hono<{ Bindings: Env }>();
 
 // 뉴스 목록 (?category=&limit=) + 카테고리 집계 + 라벨
 newsRouter.get("/", async (c) => {
+  const category = c.req.query("category");
+  const limit = Number(c.req.query("limit") ?? "0");
+
+  // D1 캐시 우선(즉시 응답) — 오래되면 백그라운드 갱신(stale-while-revalidate).
   let items;
   try {
-    items = await getNews();
+    const { items: fast, stale } = await getNewsFast(c.env.ARCHIVE_DB);
+    items = fast;
+    if (stale && c.env.ARCHIVE_DB) {
+      const db = c.env.ARCHIVE_DB;
+      c.executionCtx.waitUntil((async () => { try { await writeNewsCache(db, await getNews(true)); } catch { /* */ } })());
+    }
   } catch (e) {
     return c.json({ error: "rss_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
   }
 
-  const category = c.req.query("category");
-  const limit = Number(c.req.query("limit") ?? "0");
+  const interests = category ? null : await loadInterests(c);
   const counts = categoryCounts(items);
 
   let filtered = items;
@@ -59,7 +69,6 @@ newsRouter.get("/", async (c) => {
   }
 
   // 관심사 개인화 — 카테고리 미선택(기본 뷰)일 때 관심 분야 기사를 앞으로(최신순 유지)
-  const interests = category ? null : await loadInterests(c);
   let personalized = false;
   if (interests) {
     const set = new Set(interests);

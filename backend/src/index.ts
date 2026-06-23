@@ -124,6 +124,16 @@ export default {
       } catch (e) {
         console.warn("[cron] metrics 스냅샷 실패:", e instanceof Error ? e.message : e);
       }
+      // 태안뉴스 목록 캐시 워밍(첫 방문 콜드 3s 방지)
+      try {
+        if (env.ARCHIVE_DB) {
+          const { getNews, writeNewsCache } = await import("./news/ingest");
+          await writeNewsCache(env.ARCHIVE_DB, await getNews(true));
+          console.log("[cron] 뉴스 캐시 워밍");
+        }
+      } catch (e) {
+        console.warn("[cron] 뉴스 캐시 워밍 실패:", e instanceof Error ? e.message : e);
+      }
       return;
     }
 
