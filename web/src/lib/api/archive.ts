@@ -46,6 +46,15 @@ export async function searchArchive(params: {
   return apiFetch<ArchiveSearchResult>(`/api/archive/search${qs ? `?${qs}` : ""}`);
 }
 
+export interface ArchiveStats { total: number; minYear: number | null; maxYear: number | null }
+export async function getArchiveStats(): Promise<ArchiveStats> {
+  try {
+    return await apiFetch<ArchiveStats>("/api/archive/stats");
+  } catch {
+    return { total: 0, minYear: null, maxYear: null };
+  }
+}
+
 export async function getArchiveArticle(idxno: number): Promise<ArchiveArticle> {
   return apiFetch<ArchiveArticle>(`/api/archive/${idxno}`);
 }

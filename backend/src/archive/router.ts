@@ -107,6 +107,21 @@ const ON_THIS_DAY_MAJOR = `(
   AND title NOT GLOB '[0-9][0-9][0-9][0-9]*면'   -- 'YYYY... NN면' 제목 누락 아티팩트 제외
 )`;
 
+// 아카이브 전체 통계 — 총 건수·연도 범위(엣지 1시간 캐시).
+archiveRouter.get("/stats", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ total: 0, minYear: null, maxYear: null });
+  try {
+    const r = await db.prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles").first<{ total: number; minYear: number | null; maxYear: number | null }>();
+    return c.json(
+      { total: r?.total ?? 0, minYear: r?.minYear ?? null, maxYear: r?.maxYear ?? null },
+      { headers: { "cache-control": "public, max-age=3600" } },
+    );
+  } catch {
+    return c.json({ total: 0, minYear: null, maxYear: null });
+  }
+});
+
 archiveRouter.get("/on-this-day", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ items: [] });
