@@ -134,6 +134,14 @@ export default {
       } catch (e) {
         console.warn("[cron] 뉴스 캐시 워밍 실패:", e instanceof Error ? e.message : e);
       }
+      // 해무 스틸컷 캐시 워밍(외부 API ~9s 콜드 방지)
+      try {
+        const { refreshSeafogCache } = await import("./env/seafog");
+        await refreshSeafogCache(env);
+        console.log("[cron] 해무 캐시 워밍");
+      } catch (e) {
+        console.warn("[cron] 해무 캐시 워밍 실패:", e instanceof Error ? e.message : e);
+      }
       return;
     }
 

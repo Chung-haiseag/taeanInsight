@@ -55,10 +55,12 @@ envRouter.get("/marine", async (c) => {
   return c.json(await loadMarine(c.env));
 });
 
-// 해무 CCTV 스틸컷(국립해양조사원) — 태안 인근 관측소 최신 이미지
+// 해무 CCTV 스틸컷(국립해양조사원) — D1 캐시 우선(즉시), 오래되면 백그라운드 갱신.
 envRouter.get("/seafog", async (c) => {
-  const { fetchSeafog } = await import("./seafog");
-  return c.json(await fetchSeafog(c.env));
+  const { loadSeafogFast, refreshSeafogCache } = await import("./seafog");
+  const { result, stale } = await loadSeafogFast(c.env);
+  if (stale) c.executionCtx.waitUntil(refreshSeafogCache(c.env).then(() => {}));
+  return c.json(result);
 });
 
 // 도로 실시간 CCTV — D1 미러 서빙(로컬 크롤러가 ITS에서 적재)

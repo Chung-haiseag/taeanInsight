@@ -123,6 +123,37 @@ archiveRouter.get("/stats", async (c) => {
   }
 });
 
+type OtdRow = { idxno: number; title: string; published_at: string; year: number; category: string; exact: number };
+
+// 후보 풀(오늘 ±3일 주요뉴스)을 D1 캐시 — 매 요청 substr 스캔(~1.4s) 회피. 무작위 선택은 JS.
+async function loadOtdPool(db: D1Database, kst: Date, curYear: number): Promise<OtdRow[]> {
+  const today = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+  const { readCache, writeCache } = await import("../lib/api_cache");
+  const cached = await readCache<OtdRow[]>(db, `otd:${today}`);
+  if (cached && cached.value.length && cached.ageMs < 6 * 3600_000) return cached.value;
+
+  const mmdds = new Set<string>();
+  for (let d = -3; d <= 3; d++) {
+    const t = new Date(kst.getTime() + d * 86400000);
+    mmdds.add(`${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`);
+  }
+  const list = [...mmdds];
+  const ph = list.map((_, i) => `?${i + 1}`).join(",");
+  const r = await db
+    .prepare(
+      `SELECT idxno,title,published_at,year,category,
+              (substr(published_at,6,5)=?${list.length + 2}) AS exact
+       FROM archive_articles
+       WHERE substr(published_at,6,5) IN (${ph}) AND year < ?${list.length + 1} AND ${ON_THIS_DAY_MAJOR}
+       ORDER BY exact DESC LIMIT 200`,
+    )
+    .bind(...list, curYear, today)
+    .all<OtdRow>();
+  const pool = r.results ?? [];
+  await writeCache(db, `otd:${today}`, pool);
+  return pool;
+}
+
 archiveRouter.get("/on-this-day", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ items: [] });
@@ -131,49 +162,26 @@ archiveRouter.get("/on-this-day", async (c) => {
   const limit = Math.min(20, Math.max(1, Number(c.req.query("limit") || "8") || 8));
   const today = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
 
-  type Row = { idxno: number; title: string; published_at: string; year: number; category: string; lead_image: string | null };
-  const toItems = (rows: Row[]) => rows.map((x) => ({
-    idxno: x.idxno, title: x.title, year: x.year,
-    yearsAgo: curYear - x.year, category: x.category, leadImage: x.lead_image ?? null, date: x.published_at.slice(5, 10),
-  }));
-
-  // 연도별 1건씩(특정 해 쏠림 방지) — 랜덤. dateCond/binds로 정확일자/±N일 모두 처리.
-  const pickPerYear = async (dateCond: string, dateBinds: string[]): Promise<Row[]> => {
-    const n = dateBinds.length;
-    const r = await db
-      .prepare(
-        `WITH cand AS (
-           SELECT idxno,title,published_at,year,category,lead_image,
-                  ROW_NUMBER() OVER (PARTITION BY year ORDER BY RANDOM()) rn
-           FROM archive_articles
-           WHERE ${dateCond} AND year < ?${n + 1} AND ${ON_THIS_DAY_MAJOR}
-         )
-         SELECT idxno,title,published_at,year,category,lead_image FROM cand WHERE rn <= 1
-         ORDER BY RANDOM() LIMIT ?${n + 2}`,
-      )
-      .bind(...dateBinds, curYear, limit)
-      .all<Row>();
-    return r.results ?? [];
-  };
-  const byYearAsc = (a: Row[]) => a.sort((x, y) => x.year - y.year || x.published_at.localeCompare(y.published_at));
-
   try {
-    // 1) 정확히 같은 일자 — 연도별 1건
-    let rows = await pickPerYear("substr(published_at,6,5)=?1", [today]);
-    // 2) 해가 부족하면 ±3일로 보강(이미 나온 연도는 제외 → 연도 다양성↑)
-    if (rows.length < limit) {
-      const mmdds = new Set<string>();
-      for (let d = -3; d <= 3; d++) {
-        const t = new Date(kst.getTime() + d * 86400000);
-        mmdds.add(`${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`);
-      }
-      const list = [...mmdds];
-      const ph = list.map((_, i) => `?${i + 1}`).join(",");
-      const wide = await pickPerYear(`substr(published_at,6,5) IN (${ph})`, list);
-      const years = new Set(rows.map((r) => r.year));
-      rows = [...rows, ...wide.filter((r) => !years.has(r.year))].slice(0, limit);
+    const pool = await loadOtdPool(db, kst, curYear);
+    // 연도별 후보 그룹 → 연도당 1건 무작위(정확 일자 우선) → 연도 다양하게 8개 → 과거순 정렬
+    const byYear = new Map<number, OtdRow[]>();
+    for (const row of pool) { const a = byYear.get(row.year) ?? []; a.push(row); byYear.set(row.year, a); }
+    const picks: OtdRow[] = [];
+    for (const [, rows] of byYear) {
+      const exact = rows.filter((r) => r.exact);
+      const from = exact.length ? exact : rows;
+      picks.push(from[Math.floor(Math.random() * from.length)]);
     }
-    return c.json({ date: today, items: toItems(byYearAsc(rows)) });
+    for (let i = picks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [picks[i], picks[j]] = [picks[j], picks[i]]; }
+    const chosen = picks.slice(0, limit).sort((a, b) => a.year - b.year || a.published_at.localeCompare(b.published_at));
+    return c.json({
+      date: today,
+      items: chosen.map((x) => ({
+        idxno: x.idxno, title: x.title, year: x.year,
+        yearsAgo: curYear - x.year, category: x.category, leadImage: null, date: x.published_at.slice(5, 10),
+      })),
+    });
   } catch {
     return c.json({ items: [] });
   }

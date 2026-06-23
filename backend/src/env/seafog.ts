@@ -3,8 +3,11 @@
 //   이미지 uri는 khoa.go.kr https jpeg(<img>로 표시, CORS 무관).
 
 import { makeTtlCache } from "../lib/cache";
+import { readCache, writeCache } from "../lib/api_cache";
 
 const URL_BASE = "https://apis.data.go.kr/1192136/seafogCctv/GetSeafogCctvApiService";
+const CACHE_KEY = "seafog";
+const STALE_MS = 12 * 60_000; // 원본 10분 단위 → 12분 후 갱신
 // 태안 해안과 같은 서해 해역(가로림만·당진) 관측소만 노출
 const NEAR_TAEAN = ["대산항", "평택당진항"];
 
@@ -38,5 +41,25 @@ async function fetchSeafogImpl(env: { DATA_GO_KR_KEY?: string }): Promise<{ avai
   }
 }
 
-// 10분 캐시(원본이 10분 단위 갱신)
+// in-memory 10분 캐시(isolate 내)
 export const fetchSeafog = makeTtlCache(fetchSeafogImpl, 10 * 60_000);
+
+export type SeafogResult = { available: boolean; stills: SeafogStill[] };
+
+// 강제 라이브 수집 후 D1 캐시 기록 — cron 워밍·백그라운드 갱신용.
+export async function refreshSeafogCache(env: { DATA_GO_KR_KEY?: string; ARCHIVE_DB?: D1Database }): Promise<SeafogResult> {
+  const r = await fetchSeafogImpl(env);
+  if (env.ARCHIVE_DB && r.available) await writeCache(env.ARCHIVE_DB, CACHE_KEY, r);
+  return r;
+}
+
+// D1 캐시 우선(즉시) — 오래되면 호출측에서 백그라운드 갱신. 캐시 없으면 라이브.
+export async function loadSeafogFast(
+  env: { DATA_GO_KR_KEY?: string; ARCHIVE_DB?: D1Database },
+): Promise<{ result: SeafogResult; stale: boolean }> {
+  if (env.ARCHIVE_DB) {
+    const cached = await readCache<SeafogResult>(env.ARCHIVE_DB, CACHE_KEY);
+    if (cached && cached.value.available) return { result: cached.value, stale: cached.ageMs > STALE_MS };
+  }
+  return { result: await refreshSeafogCache(env), stale: false };
+}

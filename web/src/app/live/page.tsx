@@ -23,8 +23,15 @@ function decodeEntities(s: string): string {
 }
 
 export default async function LivePage() {
-  const [metrics, latest, onThisDay, cctv, seafog] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(8), fetchCctv(), fetchSeafog()]);
-  const news = latest ? await fetchWeeklyNews(latest.weekId) : [];
+  // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
+  const latest = await fetchLatestReport();
+  const [metrics, onThisDay, cctv, seafog, news] = await Promise.all([
+    fetchReportMetrics(),
+    fetchOnThisDay(8),
+    fetchCctv(),
+    fetchSeafog(),
+    latest ? fetchWeeklyNews(latest.weekId) : Promise.resolve([]),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
