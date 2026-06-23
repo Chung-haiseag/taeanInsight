@@ -21,6 +21,9 @@ import {
   type SubmitResult,
 } from "@/lib/api/copilot";
 
+const DRAFT_KEY = "taean-citizen-draft";
+const TITLE_MAX = 100;
+
 export default function CopilotEditorPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -29,7 +32,48 @@ export default function CopilotEditorPage() {
   const [check, setCheck] = useState<CheckResult | null>(null);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loaded = useRef(false);
+
+  // 임시저장 복구(최초 1회)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as { title?: string; body?: string; aiLabel?: AiLabel; source?: string; at?: string };
+        if (d.title || d.body) {
+          setTitle(d.title ?? ""); setBody(d.body ?? "");
+          setAiLabel(d.aiLabel ?? "human"); setSource(d.source ?? "");
+          setSavedAt(d.at ?? null); setRestored(true);
+        }
+      }
+    } catch { /* 무시 */ }
+    loaded.current = true;
+  }, []);
+
+  // 임시저장 자동 저장(디바운스)
+  useEffect(() => {
+    if (!loaded.current) return;
+    const t = setTimeout(() => {
+      try {
+        if (title || body) {
+          const at = new Date().toISOString();
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, body, aiLabel, source, at }));
+          setSavedAt(at);
+        }
+      } catch { /* 무시 */ }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [title, body, aiLabel, source]);
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ }
+    setTitle(""); setBody(""); setAiLabel("human"); setSource("");
+    setSavedAt(null); setRestored(false); setResult(null);
+  }
 
   // 디바운스 실시간 점검
   useEffect(() => {
@@ -62,6 +106,7 @@ export default function CopilotEditorPage() {
         reporterId: "cr-01",
       });
       setResult(r);
+      if (r.queued) { try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ } setSavedAt(null); setRestored(false); }
     } catch (e) {
       setResult({
         ok: false,
@@ -94,24 +139,57 @@ export default function CopilotEditorPage() {
         </p>
       </header>
 
+      {/* 임시저장 상태 바 */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand/10 bg-brand/[0.02] px-3 py-2 text-xs">
+        <span className="text-foreground-muted">
+          {restored ? "📄 임시저장 글을 불러왔습니다 · " : ""}
+          {savedAt ? `자동 저장됨 ${new Date(savedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}` : "작성하면 자동으로 임시저장됩니다"}
+        </span>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setPreview((v) => !v)} className="font-semibold text-accent hover:underline">
+            {preview ? "✏️ 작성으로" : "👁 미리보기"}
+          </button>
+          {(title || body) && (
+            <button type="button" onClick={() => { if (window.confirm("작성 중인 내용을 모두 지울까요?")) clearDraft(); }} className="text-foreground-muted hover:text-red-600">초기화</button>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* 에디터 */}
+        {/* 에디터 / 미리보기 */}
         <div className="space-y-4">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="기사 제목"
-            aria-label="기사 제목"
-            className="w-full border-b-2 border-brand/15 bg-transparent pb-2 text-2xl font-bold text-brand outline-none focus:border-accent"
-          />
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="본문을 입력하세요. 작성하는 동안 개인정보·민감주제를 실시간으로 확인합니다."
-            aria-label="기사 본문"
-            rows={18}
-            className="w-full resize-y rounded-lg border border-brand/15 bg-background p-4 leading-relaxed outline-none focus:border-accent"
-          />
+          {preview ? (
+            <article className="min-h-[40vh] rounded-lg border border-brand/15 bg-background p-5">
+              <h2 className="text-2xl font-bold text-brand">{title || "(제목 없음)"}</h2>
+              <p className="mt-2 text-xs text-foreground-muted">미리보기 · 발행 시 편집부 검토를 거칩니다</p>
+              <div className="mt-4 whitespace-pre-wrap leading-relaxed text-foreground">{body || "(본문 없음)"}</div>
+            </article>
+          ) : (
+          <>
+          <div>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, TITLE_MAX))}
+              placeholder="기사 제목"
+              aria-label="기사 제목"
+              className="w-full border-b-2 border-brand/15 bg-transparent pb-2 text-2xl font-bold text-brand outline-none focus:border-accent"
+            />
+            <p className={`mt-1 text-right text-[11px] ${title.length >= TITLE_MAX ? "text-red-600" : "text-foreground-muted"}`}>{title.length}/{TITLE_MAX}</p>
+          </div>
+          <div>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="본문을 입력하세요. 작성하는 동안 개인정보·민감주제를 실시간으로 확인합니다."
+              aria-label="기사 본문"
+              className="min-h-[40vh] w-full resize-y rounded-lg border border-brand/15 bg-background p-4 leading-relaxed outline-none focus:border-accent lg:min-h-[55vh]"
+            />
+            <p className="mt-1 text-right text-[11px] text-foreground-muted">
+              {body.length.toLocaleString()}자{body.length > 0 && body.length < 300 && " · 권장 300자 이상"}
+            </p>
+          </div>
+          </>
+          )}
 
           {/* AI 라벨 + 출처 */}
           <div className="rounded-lg border border-brand/15 bg-background p-4 space-y-3">
@@ -152,10 +230,12 @@ export default function CopilotEditorPage() {
             )}
           </div>
 
-          <button type="button" onClick={submit} disabled={!canSubmit} className="btn-accent disabled:opacity-50">
-            {submitting ? "제출 중…" : "편집부에 제출 (HITL 검수)"}
-          </button>
-          {needSource && <p className="text-xs text-amber-600">AI 보조·생성 기사는 출처가 필요합니다.</p>}
+          <div className="sticky bottom-2 z-10 -mx-1 rounded-xl bg-background/90 px-1 py-2 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
+            <button type="button" onClick={submit} disabled={!canSubmit} className="btn-accent w-full disabled:opacity-50 lg:w-auto">
+              {submitting ? "제출 중…" : "편집부에 제출 (HITL 검수)"}
+            </button>
+            {needSource && <p className="mt-1 text-xs text-amber-600">AI 보조·생성 기사는 출처가 필요합니다.</p>}
+          </div>
 
           {result && <SubmitPanel result={result} />}
         </div>
