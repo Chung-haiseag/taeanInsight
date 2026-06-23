@@ -114,6 +114,22 @@ copilotRouter.post("/draft", async (c) => {
   }
 });
 
+// ── 이미지 업로드 → R2 (시민기자 기사 사진). 서빙은 /api/archive/photo/<key> ──
+// PoC: 무인증(에디터와 동일). 타입·용량 가드만. 운영 시 reporter 인증 추가.
+copilotRouter.post("/upload", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "photos_unbound" }, 503);
+  const ct = c.req.header("content-type") || "";
+  if (!ct.startsWith("image/")) return c.json({ error: "invalid_type", message: "이미지 파일만 업로드할 수 있습니다" }, 400);
+  const buf = await c.req.arrayBuffer();
+  if (buf.byteLength > 10 * 1024 * 1024) return c.json({ error: "too_large", message: "10MB 이하만 가능합니다" }, 413);
+  if (buf.byteLength < 64) return c.json({ error: "empty" }, 400);
+  const ext = (ct.split("/")[1] || "jpg").replace("jpeg", "jpg").replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
+  const key = `citizen/${crypto.randomUUID()}.${ext}`;
+  await c.env.ARCHIVE_PHOTOS.put(key, buf, { httpMetadata: { contentType: ct } });
+  const origin = new URL(c.req.url).origin;
+  return c.json({ ok: true, key, url: `${origin}/api/archive/photo/${key}` });
+});
+
 // ── 제출 → 거버넌스 적용 → AI 라벨 산정 → 검수 큐 등록 ───────
 const submitSchema = z.object({
   title: z.string().min(1),

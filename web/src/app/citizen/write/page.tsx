@@ -13,6 +13,7 @@ import {
   copilotAssist,
   copilotCheck,
   copilotDraft,
+  copilotUploadImage,
   copilotSubmit,
   PII_LABELS,
   SENSITIVE_LABELS,
@@ -39,6 +40,9 @@ export default function CopilotEditorPage() {
   const [keywords, setKeywords] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [draftErr, setDraftErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loaded = useRef(false);
 
@@ -87,6 +91,23 @@ export default function CopilotEditorPage() {
       setDraftErr(e instanceof Error ? e.message : "초안 생성 실패");
     } finally {
       setDrafting(false);
+    }
+  }
+
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 같은 파일 재선택 허용
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setUploadErr("이미지 파일만 가능합니다."); return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadErr("10MB 이하만 가능합니다."); return; }
+    setUploading(true); setUploadErr(null);
+    try {
+      const { url } = await copilotUploadImage(file);
+      setBody((b) => `${b}${b && !b.endsWith("\n") ? "\n\n" : ""}![사진 설명을 적어주세요](${url})\n\n`);
+    } catch (err) {
+      setUploadErr(err instanceof Error ? err.message : "업로드 실패");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -203,7 +224,7 @@ export default function CopilotEditorPage() {
             <article className="min-h-[40vh] rounded-lg border border-brand/15 bg-background p-5">
               <h2 className="text-2xl font-bold text-brand">{title || "(제목 없음)"}</h2>
               <p className="mt-2 text-xs text-foreground-muted">미리보기 · 발행 시 편집부 검토를 거칩니다</p>
-              <div className="mt-4 whitespace-pre-wrap leading-relaxed text-foreground">{body || "(본문 없음)"}</div>
+              <div className="mt-4 leading-relaxed text-foreground"><BodyPreview body={body} /></div>
             </article>
           ) : (
           <>
@@ -225,9 +246,19 @@ export default function CopilotEditorPage() {
               aria-label="기사 본문"
               className="min-h-[40vh] w-full resize-y rounded-lg border border-brand/15 bg-background p-4 leading-relaxed outline-none focus:border-accent lg:min-h-[55vh]"
             />
-            <p className="mt-1 text-right text-[11px] text-foreground-muted">
-              {body.length.toLocaleString()}자{body.length > 0 && body.length < 300 && " · 권장 300자 이상"}
-            </p>
+            <div className="mt-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input ref={fileInput} type="file" accept="image/*" onChange={onPickImage} className="hidden" />
+                <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
+                  className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5 disabled:opacity-50">
+                  {uploading ? "업로드 중…" : "🖼 사진 추가"}
+                </button>
+                {uploadErr && <span className="text-[11px] text-red-600">{uploadErr}</span>}
+              </div>
+              <p className="text-[11px] text-foreground-muted">
+                {body.length.toLocaleString()}자{body.length > 0 && body.length < 300 && " · 권장 300자↑"}
+              </p>
+            </div>
           </div>
           </>
           )}
@@ -288,6 +319,30 @@ export default function CopilotEditorPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+// 본문 미리보기 — 마크다운 이미지 ![alt](url)는 사진으로, 나머지는 텍스트로 렌더
+function BodyPreview({ body }: { body: string }) {
+  if (!body) return <span className="text-foreground-muted">(본문 없음)</span>;
+  const parts = body.split(/(!\[[^\]]*\]\([^)]+\))/g);
+  return (
+    <>
+      {parts.map((p, i) => {
+        const m = p.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+        if (m) {
+          const alt = m[1] || "사진";
+          return (
+            <figure key={i} className="my-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={m[2]} alt={alt} className="w-full rounded-lg border border-brand/10" loading="lazy" />
+              {m[1] && <figcaption className="mt-1 text-center text-xs text-foreground-muted">{m[1]}</figcaption>}
+            </figure>
+          );
+        }
+        return <span key={i} className="whitespace-pre-wrap">{p}</span>;
+      })}
+    </>
   );
 }
 

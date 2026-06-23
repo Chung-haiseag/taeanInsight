@@ -41,6 +41,21 @@ export async function copilotDraft(keywords: string): Promise<{ ok: boolean; tit
   return apiFetch("/api/copilot/draft", { method: "POST", body: JSON.stringify({ keywords }) });
 }
 
+// 이미지 업로드(R2) → 서빙 URL. apiFetch는 JSON 전용이라 바이너리는 직접 fetch.
+const COPILOT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
+export async function copilotUploadImage(file: File): Promise<{ url: string; key: string }> {
+  const res = await fetch(`${COPILOT_API_BASE}/api/copilot/upload`, {
+    method: "POST",
+    headers: { "content-type": file.type || "image/jpeg" },
+    body: file,
+  });
+  if (!res.ok) {
+    const e = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(e.message ?? `업로드 실패(${res.status})`);
+  }
+  return res.json();
+}
+
 export async function copilotSubmit(input: {
   title: string;
   body: string;
