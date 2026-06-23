@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { Env } from "../types";
 import { identifyUser, type AuthVariables } from "../auth/middleware";
+import { workspaceRouter } from "../workspace/router";
 import {
   InMemoryFavoritesRepo,
   InMemoryPreferencesRepo,
@@ -64,6 +65,9 @@ const addFavoriteSchema = z.object({
 export const meRouter = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 meRouter.use("*", identifyUser((env) => (env as Env & { JWT_SECRET?: string }).JWT_SECRET ?? "dev-secret"));
+
+// 팀·부서 공유 워크스페이스(identifyUser 미들웨어 상속)
+meRouter.route("/workspace", workspaceRouter);
 
 // GET /api/me — 사용자 선호 + 즐겨찾기 + B2G 소속 + 세그먼트별 한도
 meRouter.get("/", async (c) => {

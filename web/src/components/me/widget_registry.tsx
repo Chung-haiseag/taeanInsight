@@ -4,38 +4,94 @@
 import type { ReactNode } from "react";
 import type { UserPreferences, UserSegment, B2gMembership, UserFavorite } from "@/lib/types";
 import {
+  ArchivePicks,
   B2gDepartmentSpace,
   FavoritesList,
+  GovNotices,
   KpiCards,
+  MyNews,
   PersonalizedReport,
   TeamWorkspace,
+  TodayConditions,
   UsagePanel,
   WelcomeBanner,
 } from "./widgets";
 
 export type WidgetKey =
+  | "today_conditions"
   | "welcome_banner"
   | "kpi_cards"
+  | "my_news"
   | "favorites_list"
   | "personalized_report"
+  | "archive_picks"
+  | "gov_notices"
   | "team_workspace"
   | "b2g_department_space"
   | "usage_panel";
 
 // 세그먼트별 노출 + 정렬 (상단부터)
 const WIDGET_ORDER: Record<UserSegment, WidgetKey[]> = {
-  b2c_basic: ["welcome_banner", "favorites_list", "usage_panel", "kpi_cards"],
-  b2c_premium: ["welcome_banner", "personalized_report", "favorites_list", "usage_panel", "kpi_cards"],
-  b2b_basic: ["kpi_cards", "personalized_report", "favorites_list", "team_workspace", "usage_panel"],
-  b2b_premium: ["kpi_cards", "personalized_report", "favorites_list", "team_workspace", "usage_panel"],
-  b2g: ["kpi_cards", "b2g_department_space", "personalized_report", "favorites_list", "usage_panel"],
+  b2c_basic: [
+    "today_conditions",
+    "welcome_banner",
+    "my_news",
+    "favorites_list",
+    "gov_notices",
+    "archive_picks",
+    "usage_panel",
+  ],
+  b2c_premium: [
+    "today_conditions",
+    "welcome_banner",
+    "personalized_report",
+    "my_news",
+    "favorites_list",
+    "gov_notices",
+    "archive_picks",
+    "usage_panel",
+    "kpi_cards",
+  ],
+  b2b_basic: [
+    "today_conditions",
+    "kpi_cards",
+    "personalized_report",
+    "my_news",
+    "archive_picks",
+    "favorites_list",
+    "gov_notices",
+    "team_workspace",
+    "usage_panel",
+  ],
+  b2b_premium: [
+    "today_conditions",
+    "kpi_cards",
+    "personalized_report",
+    "my_news",
+    "archive_picks",
+    "favorites_list",
+    "gov_notices",
+    "team_workspace",
+    "usage_panel",
+  ],
+  b2g: [
+    "today_conditions",
+    "kpi_cards",
+    "b2g_department_space",
+    "gov_notices",
+    "personalized_report",
+    "my_news",
+    "archive_picks",
+    "favorites_list",
+    "usage_panel",
+  ],
 };
 
 export interface WidgetRegistryProps {
   preferences: UserPreferences;
   favorites: UserFavorite[];
   b2gMemberships?: B2gMembership[];
-  tone?: "warm" | "tool";              // B2C Premium 토글 결과 (기본은 segment 기반)
+  tone?: "warm" | "tool"; // B2C Premium 토글 결과 (기본은 segment 기반)
 }
 
 export function renderWidgets({
@@ -46,10 +102,18 @@ export function renderWidgets({
 }: WidgetRegistryProps): Array<{ key: WidgetKey; node: ReactNode }> {
   const order = WIDGET_ORDER[preferences.segment];
 
-  // B2C Premium에서 tone="tool"이면 B2B 톤처럼 kpi_cards를 위로
+  // B2C Premium에서 tone="tool"이면 B2B 톤처럼 지표·리포트를 위로
   let final: WidgetKey[] = [...order];
   if (preferences.segment === "b2c_premium" && tone === "tool") {
-    final = ["kpi_cards", "personalized_report", "favorites_list", "usage_panel"];
+    final = [
+      "today_conditions",
+      "kpi_cards",
+      "personalized_report",
+      "my_news",
+      "archive_picks",
+      "favorites_list",
+      "usage_panel",
+    ];
   }
 
   return final.map((key) => {
@@ -65,25 +129,32 @@ function renderOne(
   b2gMemberships?: B2gMembership[],
 ): ReactNode {
   switch (key) {
+    case "today_conditions":
+      return <TodayConditions preferences={preferences} />;
     case "welcome_banner":
       return <WelcomeBanner preferences={preferences} />;
     case "kpi_cards":
       // B2C는 하단 노출, B2B/B2G는 상단
       return (
         <KpiCards
-          position={
-            preferences.segment.startsWith("b2c") ? "bottom" : "top"
-          }
+          position={preferences.segment.startsWith("b2c") ? "bottom" : "top"}
+          preferences={preferences}
         />
       );
+    case "my_news":
+      return <MyNews preferences={preferences} />;
     case "favorites_list":
       return <FavoritesList segment={preferences.segment} favorites={favorites} />;
     case "personalized_report":
       return <PersonalizedReport preferences={preferences} />;
+    case "archive_picks":
+      return <ArchivePicks preferences={preferences} />;
+    case "gov_notices":
+      return <GovNotices />;
     case "team_workspace":
       return <TeamWorkspace />;
     case "b2g_department_space":
-      return <B2gDepartmentSpace orgName={b2gMemberships?.[0]?.orgName} />;
+      return <B2gDepartmentSpace />;
     case "usage_panel":
       return <UsagePanel preferences={preferences} />;
     default:
