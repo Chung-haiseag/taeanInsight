@@ -19,8 +19,11 @@ import {
 import {
   getReporters,
   paySettlement,
+  getCitizenSubmissions,
+  decideCitizenSubmission,
   SETTLEMENT_STATUS_LABELS,
   type CitizenSummary,
+  type CitizenSubmission,
   type ReporterSummary,
   type SettlementStatus,
 } from "@/lib/api/citizen";
@@ -475,6 +478,51 @@ function regionLabel(code: string): string {
   return REGION_OPTIONS.find((r) => r.code === code)?.label ?? code;
 }
 
+// 제출된 시민기자 기사 검수 — 승인(발행)/반려(사유). D1 실데이터.
+function CitizenSubmissionsReview() {
+  const [items, setItems] = useState<CitizenSubmission[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function load() { try { setItems(await getCitizenSubmissions()); } catch { setItems([]); } }
+  useEffect(() => { void load(); }, []);
+
+  async function decide(id: string, decision: "approved" | "rejected") {
+    let notes: string | undefined;
+    if (decision === "rejected") { const v = window.prompt("반려 사유(기자에게 표시):") ?? ""; notes = v.trim() || undefined; }
+    setBusy(id);
+    try { await decideCitizenSubmission(id, decision, notes); setItems((prev) => (prev ?? []).filter((x) => x.id !== id)); }
+    catch { /* 무시 */ } finally { setBusy(null); }
+  }
+
+  if (!items) return null;
+  return (
+    <div className="rounded-lg border border-accent/30 bg-accent-subtle/15 p-4">
+      <p className="text-sm font-bold text-brand">📝 제출 기사 검수 {items.length > 0 && <span className="text-accent">({items.length})</span>}</p>
+      {items.length === 0 ? (
+        <p className="mt-2 text-xs text-foreground-muted">검수 대기 중인 제출 기사가 없습니다.</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {items.map((a) => (
+            <li key={a.id} className="rounded-lg border border-brand/10 bg-background p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-brand truncate">{a.title || "(제목 없음)"}</p>
+                  <p className="mt-0.5 text-xs text-foreground-muted">기자 {a.reporter} · {a.aiLabel}{a.submittedAt ? ` · ${new Date(a.submittedAt).toLocaleString("ko-KR")}` : ""}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{a.excerpt}</p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <button type="button" onClick={() => decide(a.id, "approved")} disabled={busy === a.id} className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50">승인·발행</button>
+                  <button type="button" onClick={() => decide(a.id, "rejected")} disabled={busy === a.id} className="rounded border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">반려</button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function CitizenOpsSection() {
   const [reporters, setReporters] = useState<ReporterSummary[]>([]);
   const [summary, setSummary] = useState<CitizenSummary | null>(null);
@@ -531,8 +579,11 @@ function CitizenOpsSection() {
         )}
       </div>
       <p className="text-sm text-foreground-muted">
-        ℹ️ 실제 모집은 2026년 7월 중순 예정 — 아래는 운영 화면 <strong>예시 데이터</strong>입니다.
+        ℹ️ 실제 모집은 2026년 7월 중순 예정 — 기자 목록·정산은 운영 화면 <strong>예시 데이터</strong>이고, 아래 제출 기사 검수는 실데이터입니다.
       </p>
+
+      {/* 제출 기사 검수(실데이터) */}
+      <CitizenSubmissionsReview />
 
       {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
       {error && (
