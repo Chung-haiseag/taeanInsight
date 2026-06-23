@@ -198,7 +198,7 @@ export async function fetchWeeklyNews(weekId: string): Promise<WeeklyNewsItem[]>
 export interface OnThisDayItem { idxno: number; title: string; year: number; yearsAgo: number; category?: string; leadImage?: string | null; date?: string }
 export async function fetchOnThisDay(limit = 30): Promise<OnThisDayItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/archive/on-this-day?limit=${limit}`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${API_BASE}/api/archive/on-this-day?limit=${limit}`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = (await res.json()) as { items: OnThisDayItem[] };
     return data.items ?? [];

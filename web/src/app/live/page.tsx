@@ -23,7 +23,7 @@ function decodeEntities(s: string): string {
 }
 
 export default async function LivePage() {
-  const [metrics, latest, onThisDay, cctv, seafog] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(30), fetchCctv(), fetchSeafog()]);
+  const [metrics, latest, onThisDay, cctv, seafog] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(8), fetchCctv(), fetchSeafog()]);
   const news = latest ? await fetchWeeklyNews(latest.weekId) : [];
 
   return (
@@ -131,12 +131,12 @@ export default async function LivePage() {
             </section>
           )}
 
-          {/* 지난 이맘때, 태안 — 아카이브 회고(±1주, 2년 전~창간호 주요뉴스) */}
+          {/* 역대 오늘, 태안 — 같은 날짜 과거 주요뉴스 랜덤 */}
           {onThisDay.length > 0 && (
             <section>
-              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📜</span>지난 이맘때, 태안</h2>
+              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📜</span>역대 오늘, 태안</h2>
               <span className="accent-rule mt-3" aria-hidden />
-              <p className="mt-2 text-sm text-foreground-muted">오늘 전후 한 주 · 2년 전부터 창간호까지 그해의 주요 뉴스</p>
+              <p className="mt-2 text-sm text-foreground-muted">오늘과 같은 날짜, 창간호까지 거슬러 그해의 주요 뉴스 · 새로고침마다 다르게</p>
               <ul className="mt-4 divide-y divide-brand/10">
                 {onThisDay.map((a) => (
                   <li key={a.idxno}>

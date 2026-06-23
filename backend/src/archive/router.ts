@@ -94,60 +94,63 @@ const REL_STOP = new Set([
   "전국", "최대", "최초", "처음", "기념", "예정", "결정", "촉구", "주민", "지역",
 ]);
 
-// "지난 이맘때, 태안" — 오늘 ±1주 범위로 2년 전부터 창간호(1990)까지 주요 뉴스만.
+// "역대 오늘, 태안" — 정확히 오늘과 같은 일자(MM-DD)의 과거 주요 뉴스를 랜덤으로.
 //   주요 신호: 옛 지면 01~03면(1면·종합), 현대 정치·자치행정, 또는 사진(lead_image) 보유.
-//   연도별 상위 N건만(기본 2) → 긴 회고 타임라인.
+//   같은 일자가 너무 적으면(주간지라 발행일 편차) ±3일로 자동 보강. 새로고침마다 셔플.
+// 광고 배제: 옛 지면은 01~03면(1면·종합)만, 현대는 뉴스>/라이프> 섹션만(이미지-광고 제외).
+const ON_THIS_DAY_MAJOR = `(
+  (section LIKE '%01면%' OR section LIKE '%02면%' OR section LIKE '%03면%'
+   OR section LIKE '뉴스>%' OR section LIKE '라이프>%')
+  AND title NOT LIKE '%급전%' AND title NOT LIKE '%대출%' AND title NOT LIKE '%무제한%' AND title NOT LIKE '%■%'
+)`;
+
 archiveRouter.get("/on-this-day", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ items: [] });
   const kst = new Date(Date.now() + 9 * 3600 * 1000);
   const curYear = kst.getUTCFullYear();
-  const maxYear = curYear - 2;                // 최소 2년 전부터
-  const perYear = Math.min(4, Math.max(1, Number(c.req.query("perYear") || "2") || 2));
-  const cap = Math.min(60, Number(c.req.query("limit") || "30") || 30);
+  const limit = Math.min(20, Math.max(1, Number(c.req.query("limit") || "8") || 8));
+  const today = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
 
-  // 오늘 ±7일의 MM-DD 집합(월·연 경계 안전)
-  const mmdds = new Set<string>();
-  for (let d = -7; d <= 7; d++) {
-    const t = new Date(kst.getTime() + d * 86400000);
-    mmdds.add(`${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`);
-  }
-  const list = [...mmdds];
-  const ph = list.map((_, i) => `?${i + 1}`).join(",");
-  const pMax = `?${list.length + 1}`;
+  type Row = { idxno: number; title: string; published_at: string; year: number; category: string; lead_image: string | null };
+  const toItems = (rows: Row[]) => rows.map((x) => ({
+    idxno: x.idxno, title: x.title, year: x.year,
+    yearsAgo: curYear - x.year, category: x.category, leadImage: x.lead_image ?? null, date: x.published_at.slice(5, 10),
+  }));
 
-  // 주요도 점수: 1면>종합>정치/자치행정>사진
-  const scoreSql = `(CASE
-      WHEN section LIKE '%01면%' THEN 5
-      WHEN section LIKE '%02면%' OR section LIKE '%03면%' THEN 4
-      WHEN section LIKE '뉴스>정치%' OR section LIKE '뉴스>자치행정%' THEN 3
-      WHEN lead_image IS NOT NULL AND lead_image <> '' THEN 2
-      ELSE 0 END)`;
   try {
-    const r = await db
+    // 1) 정확히 같은 일자, 랜덤
+    const exact = await db
       .prepare(
-        `WITH cand AS (
-           SELECT idxno, title, published_at, year, category, lead_image, section,
-                  ${scoreSql} AS score,
-                  ROW_NUMBER() OVER (PARTITION BY year ORDER BY ${scoreSql} DESC, published_at DESC) AS rn
-           FROM archive_articles
-           WHERE substr(published_at,6,5) IN (${ph}) AND year BETWEEN 1990 AND ${pMax}
-             AND ${scoreSql} > 0
-         )
-         SELECT idxno, title, published_at, year, category, lead_image, score
-         FROM cand WHERE rn <= ${perYear}
-         ORDER BY year DESC, score DESC, published_at DESC
-         LIMIT ${cap}`,
+        `SELECT idxno,title,published_at,year,category,lead_image FROM archive_articles
+          WHERE substr(published_at,6,5)=?1 AND year < ?2 AND ${ON_THIS_DAY_MAJOR}
+          ORDER BY RANDOM() LIMIT ?3`,
       )
-      .bind(...list, maxYear)
-      .all<{ idxno: number; title: string; published_at: string; year: number; category: string; lead_image: string | null; score: number }>();
-    return c.json({
-      items: (r.results ?? []).map((x) => ({
-        idxno: x.idxno, title: x.title, year: x.year,
-        yearsAgo: curYear - x.year, category: x.category, leadImage: x.lead_image ?? null,
-        date: x.published_at.slice(5, 10),
-      })),
-    });
+      .bind(today, curYear, limit)
+      .all<Row>();
+    let rows = exact.results ?? [];
+
+    // 2) 너무 적으면 ±3일로 보강(중복 제외)
+    if (rows.length < 5) {
+      const mmdds = new Set<string>();
+      for (let d = -3; d <= 3; d++) {
+        const t = new Date(kst.getTime() + d * 86400000);
+        mmdds.add(`${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`);
+      }
+      const list = [...mmdds];
+      const ph = list.map((_, i) => `?${i + 1}`).join(",");
+      const wide = await db
+        .prepare(
+          `SELECT idxno,title,published_at,year,category,lead_image FROM archive_articles
+            WHERE substr(published_at,6,5) IN (${ph}) AND year < ?${list.length + 1} AND ${ON_THIS_DAY_MAJOR}
+            ORDER BY RANDOM() LIMIT ?${list.length + 2}`,
+        )
+        .bind(...list, curYear, limit)
+        .all<Row>();
+      const seen = new Set(rows.map((r) => r.idxno));
+      rows = [...rows, ...(wide.results ?? []).filter((r) => !seen.has(r.idxno))].slice(0, limit);
+    }
+    return c.json({ date: today, items: toItems(rows) });
   } catch {
     return c.json({ items: [] });
   }
