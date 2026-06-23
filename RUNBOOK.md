@@ -141,3 +141,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 시민기자 에디터 UX: 임시저장(localStorage)·미리보기·글자수·모바일(sticky 제출) · web/citizen/write
 
 - 2026-06-23 · 시민기자 키워드→AI 초안 생성(POST /api/copilot/draft, Workers AI, 날조방지 [확인필요] 마커) → 기자 수정·HITL · backend/copilot, web/citizen/write
+
+- 2026-06-23 · 시민기자 사진 업로드(R2, POST /api/copilot/upload, citizen/ 키) + 본문 ![](url) 삽입·미리보기 렌더 · backend/copilot, web/citizen/write
