@@ -12,6 +12,7 @@ import Link from "next/link";
 import {
   copilotAssist,
   copilotCheck,
+  copilotDraft,
   copilotSubmit,
   PII_LABELS,
   SENSITIVE_LABELS,
@@ -35,6 +36,9 @@ export default function CopilotEditorPage() {
   const [preview, setPreview] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
+  const [keywords, setKeywords] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [draftErr, setDraftErr] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loaded = useRef(false);
 
@@ -68,6 +72,23 @@ export default function CopilotEditorPage() {
     }, 800);
     return () => clearTimeout(t);
   }, [title, body, aiLabel, source]);
+
+  async function generateDraft() {
+    if (!keywords.trim()) { setDraftErr("키워드를 입력하세요."); return; }
+    if ((title || body) && !window.confirm("현재 작성 중인 제목·본문을 AI 초안으로 덮어쓸까요?")) return;
+    setDrafting(true); setDraftErr(null);
+    try {
+      const r = await copilotDraft(keywords.trim());
+      if (r.title) setTitle(r.title.slice(0, TITLE_MAX));
+      setBody(r.body);
+      setAiLabel("ai_generated"); // AI 초안 → 기자 수정 후 라벨 조정
+      setPreview(false);
+    } catch (e) {
+      setDraftErr(e instanceof Error ? e.message : "초안 생성 실패");
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   function clearDraft() {
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ }
@@ -154,6 +175,26 @@ export default function CopilotEditorPage() {
           )}
         </div>
       </div>
+
+      {/* 키워드로 AI 초안 생성 */}
+      <section className="rounded-2xl border border-accent/30 bg-accent-subtle/20 p-4 space-y-2">
+        <p className="text-sm font-bold text-brand">✨ 키워드로 초안 생성</p>
+        <p className="text-xs text-foreground-muted">핵심 키워드 몇 개만 넣으면 AI가 기사 골격을 만들어 드립니다. <strong className="text-brand">초안을 직접 확인·수정</strong>하고, 수치·인용 등 <code className="rounded bg-brand/5 px-1">[확인 필요]</code> 부분을 취재로 채우세요.</p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={keywords}
+            onChange={(e) => setKeywords(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") generateDraft(); }}
+            placeholder="예: 만리포 해수욕장 개장, 피서객, 주차 대책"
+            aria-label="키워드"
+            className="flex-1 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+          <button type="button" onClick={generateDraft} disabled={drafting} className="btn-accent shrink-0 disabled:opacity-50">
+            {drafting ? "생성 중…" : "초안 생성"}
+          </button>
+        </div>
+        {draftErr && <p className="text-xs text-red-600">{draftErr}</p>}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* 에디터 / 미리보기 */}

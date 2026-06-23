@@ -36,6 +36,11 @@ export async function copilotAssist(mode: AssistMode, text: string): Promise<{ r
   return apiFetch("/api/copilot/assist", { method: "POST", body: JSON.stringify({ mode, text }) });
 }
 
+// 키워드 → 기사 초안(시민기자가 수정). 사실은 [확인 필요] 자리표시로 비워둠.
+export async function copilotDraft(keywords: string): Promise<{ ok: boolean; title: string; body: string; model: string }> {
+  return apiFetch("/api/copilot/draft", { method: "POST", body: JSON.stringify({ keywords }) });
+}
+
 export async function copilotSubmit(input: {
   title: string;
   body: string;
