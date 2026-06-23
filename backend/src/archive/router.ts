@@ -97,11 +97,14 @@ const REL_STOP = new Set([
 // "역대 오늘, 태안" — 정확히 오늘과 같은 일자(MM-DD)의 과거 주요 뉴스를 랜덤으로.
 //   주요 신호: 옛 지면 01~03면(1면·종합), 현대 정치·자치행정, 또는 사진(lead_image) 보유.
 //   같은 일자가 너무 적으면(주간지라 발행일 편차) ±3일로 자동 보강. 새로고침마다 셔플.
-// 광고 배제: 옛 지면은 01~03면(1면·종합)만, 현대는 뉴스>/라이프> 섹션만(이미지-광고 제외).
+// 주요뉴스만: 옛 01~03면(1면·종합)·현대 뉴스/라이프 섹션 + 본문 500자↑(광고·단신 배제).
 const ON_THIS_DAY_MAJOR = `(
   (section LIKE '%01면%' OR section LIKE '%02면%' OR section LIKE '%03면%'
    OR section LIKE '뉴스>%' OR section LIKE '라이프>%')
+  AND body IS NOT NULL AND LENGTH(body) >= 500
   AND title NOT LIKE '%급전%' AND title NOT LIKE '%대출%' AND title NOT LIKE '%무제한%' AND title NOT LIKE '%■%'
+  AND title NOT LIKE '%광고%'
+  AND title NOT GLOB '[0-9][0-9][0-9][0-9]*면'   -- 'YYYY... NN면' 제목 누락 아티팩트 제외
 )`;
 
 archiveRouter.get("/on-this-day", async (c) => {
