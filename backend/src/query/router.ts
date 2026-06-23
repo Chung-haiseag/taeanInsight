@@ -121,17 +121,34 @@ queryRouter.post("/", async (c) => {
       }
     }
 
-    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가
+    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터)
     if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
       const re = await fetchRealEstate(c.env);
       if (re.available && (re.apartments.length || re.lands.length)) {
-        const aptAvg = re.apartments.length ? Math.round(re.apartments.reduce((s, x) => s + x.manwon, 0) / re.apartments.length) : null;
-        const aptLine = re.apartments.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
-        const landLine = re.lands.slice(0, 6).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
-        const text =
-          `태안 최근 실거래(국토교통부) — 아파트 ${re.apartments.length}건${aptAvg ? `, 평균 ${aptAvg.toLocaleString()}만원` : ""}` +
-          `${aptLine ? `: ${aptLine}` : ""}${landLine ? ` / 토지: ${landLine}` : ""}`;
-        parts.push({ text, source: { title: "국토교통부 실거래가(최근 거래)", url: null } });
+        // 질문/위치에서 읍·면 감지(dong이 "읍면 리" 형식이라 문자열 필터 가능). 안면도→안면읍.
+        const EUPMYEON = ["태안읍", "안면읍", "고남면", "근흥면", "남면", "소원면", "원북면", "이원면"];
+        const hay = `${query} ${location ?? ""}`;
+        const eup = EUPMYEON.find((e) => hay.includes(e)) ?? (/안면도/.test(hay) ? "안면읍" : null);
+        const inEup = (d: string) => !eup || (d ?? "").includes(eup);
+        const apts = re.apartments.filter((x) => inEup(x.dong));
+        const lands = re.lands.filter((x) => inEup(x.dong));
+        const scope = eup ?? "태안군";
+        const hasLocal = apts.length + lands.length > 0;
+        const aptLine = apts.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
+        const landLine = lands.slice(0, 6).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
+        let text: string;
+        if (eup && !hasLocal) {
+          // 해당 읍·면 거래 없음 → 명시하고 태안군 전체를 참고로
+          const allApt = re.apartments.slice(0, 5).map((x) => `${x.dong} ${x.name} ${x.amount}(${x.ymd})`).join("; ");
+          const allLand = re.lands.slice(0, 5).map((x) => `${x.dong} ${x.jimok} ${x.amount}(${x.ymd})`).join("; ");
+          text = `${eup}의 최근(3개월) 국토교통부 실거래 기록이 없습니다. 참고로 태안군 전체 최근 거래 — 아파트: ${allApt || "없음"} / 토지: ${allLand || "없음"}`;
+        } else {
+          const aptAvg = apts.length ? Math.round(apts.reduce((s, x) => s + x.manwon, 0) / apts.length) : null;
+          text =
+            `${scope} 최근 실거래(국토교통부) — 아파트 ${apts.length}건${aptAvg ? `, 평균 ${aptAvg.toLocaleString()}만원` : ""}` +
+            `${aptLine ? `: ${aptLine}` : ""}${landLine ? ` / 토지: ${landLine}` : ""}`;
+        }
+        parts.push({ text, source: { title: `국토교통부 실거래가 · ${scope}`, url: null } });
       }
     }
 
