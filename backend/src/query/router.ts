@@ -17,7 +17,7 @@ import { DefaultCostRecorder, InMemoryCostStore } from "../cost/recorder";
 import { HybridLlmRouter } from "../llm/hybrid_router";
 import { WorkersAiLlmClient } from "../llm/workers_ai";
 import { fetchConditions } from "../env/sources";
-import { fetchRealEstate } from "../env/realestate";
+import { fetchRealEstateDeep } from "../env/realestate";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
@@ -121,34 +121,56 @@ queryRouter.post("/", async (c) => {
       }
     }
 
-    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터)
+    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터 + ㎡당 단가·월별 추이·전체 대비)
     if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
-      const re = await fetchRealEstate(c.env);
+      const re = await fetchRealEstateDeep(c.env);
       if (re.available && (re.apartments.length || re.lands.length)) {
-        // 질문/위치에서 읍·면 감지(dong이 "읍면 리" 형식이라 문자열 필터 가능). 안면도→안면읍.
         const EUPMYEON = ["태안읍", "안면읍", "고남면", "근흥면", "남면", "소원면", "원북면", "이원면"];
         const hay = `${query} ${location ?? ""}`;
         const eup = EUPMYEON.find((e) => hay.includes(e)) ?? (/안면도/.test(hay) ? "안면읍" : null);
         const inEup = (d: string) => !eup || (d ?? "").includes(eup);
-        const apts = re.apartments.filter((x) => inEup(x.dong));
-        const lands = re.lands.filter((x) => inEup(x.dong));
         const scope = eup ?? "태안군";
-        const hasLocal = apts.length + lands.length > 0;
-        const aptLine = apts.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
-        const landLine = lands.slice(0, 6).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
-        let text: string;
-        if (eup && !hasLocal) {
-          // 해당 읍·면 거래 없음 → 명시하고 태안군 전체를 참고로
-          const allApt = re.apartments.slice(0, 5).map((x) => `${x.dong} ${x.name} ${x.amount}(${x.ymd})`).join("; ");
-          const allLand = re.lands.slice(0, 5).map((x) => `${x.dong} ${x.jimok} ${x.amount}(${x.ymd})`).join("; ");
-          text = `${eup}의 최근(3개월) 국토교통부 실거래 기록이 없습니다. 참고로 태안군 전체 최근 거래 — 아파트: ${allApt || "없음"} / 토지: ${allLand || "없음"}`;
-        } else {
-          const aptAvg = apts.length ? Math.round(apts.reduce((s, x) => s + x.manwon, 0) / apts.length) : null;
-          text =
-            `${scope} 최근 실거래(국토교통부) — 아파트 ${apts.length}건${aptAvg ? `, 평균 ${aptAvg.toLocaleString()}만원` : ""}` +
-            `${aptLine ? `: ${aptLine}` : ""}${landLine ? ` / 토지: ${landLine}` : ""}`;
+
+        // 토지/아파트 표본 통계 — ㎡당 단가(만원), 건수, 기간, 월별 추이
+        type Item = { manwon: number; area: string; ymd: string };
+        const stat = (items: Item[]) => {
+          const v = items.filter((x) => x.manwon > 0 && Number(x.area) > 0);
+          if (!v.length) return null;
+          const unit = v.map((x) => x.manwon / Number(x.area)); // 만원/㎡
+          const avgU = unit.reduce((s, u) => s + u, 0) / unit.length;
+          const ymds = v.map((x) => x.ymd).filter(Boolean).sort();
+          // 월별 평균 ㎡단가
+          const byMon = new Map<string, number[]>();
+          for (const x of v) { const m = x.ymd.slice(0, 7); const a = byMon.get(m) ?? []; a.push(x.manwon / Number(x.area)); byMon.set(m, a); }
+          const monthly = [...byMon.entries()].sort().map(([m, us]) => `${m}: ㎡당 ${(us.reduce((s, u) => s + u, 0) / us.length).toFixed(1)}만원(${us.length}건)`).join(", ");
+          return { n: v.length, avgU: avgU.toFixed(1), minU: Math.min(...unit).toFixed(1), maxU: Math.max(...unit).toFixed(1), from: ymds[0], to: ymds[ymds.length - 1], monthly };
+        };
+
+        const landsLoc = re.lands.filter((x) => inEup(x.dong));
+        const aptsLoc = re.apartments.filter((x) => inEup(x.dong));
+        const landStat = stat(landsLoc), aptStat = stat(aptsLoc);
+        const countyLand = stat(re.lands), countyApt = stat(re.apartments);
+
+        const lines: string[] = [`[${scope} 부동산 실거래 분석 · 국토교통부 최근 6개월]`];
+        if (landStat) {
+          lines.push(`· 토지: ${landStat.n}건(${landStat.from}~${landStat.to}), ㎡당 평균 ${landStat.avgU}만원(범위 ${landStat.minU}~${landStat.maxU}). 월별 추이 — ${landStat.monthly}`);
+          lines.push(`  개별: ${landsLoc.slice(0, 8).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
         }
-        parts.push({ text, source: { title: `국토교통부 실거래가 · ${scope}`, url: null } });
+        if (aptStat) {
+          lines.push(`· 아파트: ${aptStat.n}건, ㎡당 평균 ${aptStat.avgU}만원. 월별 — ${aptStat.monthly}`);
+          lines.push(`  개별: ${aptsLoc.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
+        }
+        if (eup && !landStat && !aptStat) {
+          lines.push(`· ${eup}의 최근 6개월 실거래 기록이 없습니다.`);
+        }
+        // 태안군 전체 대비(읍면 질문일 때 비교 기준). 읍·면 표본이 적으면 전체 월별 추이까지 제공.
+        if (eup && countyLand) {
+          const sparse = (landStat?.n ?? 0) < 3;
+          lines.push(`· (참고) 태안군 전체 토지 ㎡당 평균 ${countyLand.avgU}만원(${countyLand.n}건, ${countyLand.from}~${countyLand.to})${countyApt ? `, 아파트 ㎡당 평균 ${countyApt.avgU}만원` : ""}`);
+          if (sparse) lines.push(`  ${eup} 표본이 적어 추세 단정이 어렵습니다. 태안군 전체 토지 월별 추이 — ${countyLand.monthly}`);
+        }
+
+        parts.push({ text: lines.join("\n"), source: { title: `국토교통부 실거래가 · ${scope}(6개월)`, url: null } });
       }
     }
 
@@ -170,10 +192,11 @@ queryRouter.post("/", async (c) => {
           {
             role: "system",
             content:
-              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·태안신문 기사)를 근거로 한국어로 답하라.\n" +
-              "- 근거에서 질문과 관련된 내용을 최대한 종합해 구체적으로 답하라(수치·이름·날짜 포함).\n" +
+              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·국토부 실거래·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n" +
+              "- 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 한 줄로 끝내지 마라.\n" +
+              "- 부동산 질문이면 ㎡당 평균 단가·거래 건수·기간·월별 추이·태안군 전체 대비를 종합해 '시세 흐름'을 설명하라.\n" +
+              "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
               "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
-              "- 일부만 있으면 그 부분을 답하고 '확인된 범위는 여기까지'처럼 한계를 덧붙여라.\n" +
               "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
               "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
           },
