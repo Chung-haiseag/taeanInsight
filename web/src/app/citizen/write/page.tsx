@@ -6,15 +6,17 @@
 //  · 제출 → 거버넌스 적용 → AI 라벨 산정 → HITL 검수 큐
 // AI 글쓰기 보조(다듬기·요약·관련기사)는 다음 단계(Workers AI/Claude·아카이브 RAG)
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+
+import { createArticle, getMyArticle, submitArticle, updateArticle } from "@/lib/api/citizen-articles";
 
 import {
   copilotAssist,
   copilotCheck,
   copilotDraft,
   copilotUploadImage,
-  copilotSubmit,
   PII_LABELS,
   SENSITIVE_LABELS,
   type AiLabel,
@@ -26,7 +28,15 @@ import {
 const DRAFT_KEY = "taean-citizen-draft";
 const TITLE_MAX = 100;
 
-export default function CopilotEditorPage() {
+export default function CopilotEditorPageWrapper() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-sm text-foreground-muted">에디터를 불러오는 중…</div>}>
+      <CopilotEditorPage />
+    </Suspense>
+  );
+}
+
+function CopilotEditorPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [aiLabel, setAiLabel] = useState<AiLabel>("human");
@@ -42,25 +52,39 @@ export default function CopilotEditorPage() {
   const [draftErr, setDraftErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [articleId, setArticleId] = useState<string | null>(null);
+  const [serverSaving, setServerSaving] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loaded = useRef(false);
+  const editId = useSearchParams().get("id");
 
-  // 임시저장 복구(최초 1회)
+  // 로드: ?id=면 서버 기사 불러오기(수정), 아니면 localStorage 임시저장 복구
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const d = JSON.parse(raw) as { title?: string; body?: string; aiLabel?: AiLabel; source?: string; at?: string };
-        if (d.title || d.body) {
-          setTitle(d.title ?? ""); setBody(d.body ?? "");
-          setAiLabel(d.aiLabel ?? "human"); setSource(d.source ?? "");
-          setSavedAt(d.at ?? null); setRestored(true);
-        }
+    (async () => {
+      if (editId) {
+        try {
+          const a = await getMyArticle(editId);
+          setArticleId(a.id); setTitle(a.title); setBody(a.body); setAiLabel(a.aiLabel);
+          setSource(a.sources[0]?.title ?? "");
+        } catch { /* 없으면 새 글로 */ }
+        loaded.current = true;
+        return;
       }
-    } catch { /* 무시 */ }
-    loaded.current = true;
-  }, []);
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (raw) {
+          const d = JSON.parse(raw) as { title?: string; body?: string; aiLabel?: AiLabel; source?: string; at?: string };
+          if (d.title || d.body) {
+            setTitle(d.title ?? ""); setBody(d.body ?? "");
+            setAiLabel(d.aiLabel ?? "human"); setSource(d.source ?? "");
+            setSavedAt(d.at ?? null); setRestored(true);
+          }
+        }
+      } catch { /* 무시 */ }
+      loaded.current = true;
+    })();
+  }, [editId]);
 
   // 임시저장 자동 저장(디바운스)
   useEffect(() => {
@@ -136,29 +160,39 @@ export default function CopilotEditorPage() {
     };
   }, [title, body]);
 
+  // 서버에 초안 저장(생성 or 수정) → 기사 id 반환
+  async function saveServer(): Promise<string | null> {
+    const input = { title, body, aiLabel, sources: source ? [{ title: source }] : [] };
+    if (articleId) { await updateArticle(articleId, input); return articleId; }
+    const r = await createArticle(input);
+    setArticleId(r.id);
+    return r.id;
+  }
+
+  async function onSaveDraft() {
+    setServerSaving(true);
+    try { await saveServer(); setSavedAt(new Date().toISOString()); setRestored(false); }
+    catch (e) { setUploadErr(e instanceof Error ? e.message : "저장 실패"); }
+    finally { setServerSaving(false); }
+  }
+
   async function submit() {
     setSubmitting(true);
     setResult(null);
     try {
-      const r = await copilotSubmit({
-        title,
-        body,
-        aiLabel,
-        sources: source ? [{ title: source }] : [],
-        reporterId: "cr-01",
+      const id = await saveServer();
+      if (!id) throw new Error("저장 실패");
+      const r = await submitArticle(id);
+      setResult({
+        ok: r.ok, queued: r.queued, reviewId: r.reviewId,
+        aiLabel, aiLabelText: r.aiLabelText, publishAllowed: r.publishAllowed,
+        reasons: r.reasons, message: r.message,
       });
-      setResult(r);
       if (r.queued) { try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ } setSavedAt(null); setRestored(false); }
     } catch (e) {
       setResult({
-        ok: false,
-        queued: false,
-        reviewId: "",
-        aiLabel,
-        aiLabelText: "",
-        publishAllowed: false,
-        reasons: [e instanceof Error ? e.message : "제출 실패"],
-        message: "제출에 실패했습니다.",
+        ok: false, queued: false, reviewId: "", aiLabel, aiLabelText: "",
+        publishAllowed: false, reasons: [e instanceof Error ? e.message : "제출 실패"], message: "제출에 실패했습니다.",
       });
     } finally {
       setSubmitting(false);
@@ -187,7 +221,11 @@ export default function CopilotEditorPage() {
           {restored ? "📄 임시저장 글을 불러왔습니다 · " : ""}
           {savedAt ? `자동 저장됨 ${new Date(savedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}` : "작성하면 자동으로 임시저장됩니다"}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <Link href="/citizen/articles" className="text-foreground-muted hover:text-brand">📑 내 기사</Link>
+          <button type="button" onClick={onSaveDraft} disabled={serverSaving || (!title && !body)} className="font-semibold text-brand hover:underline disabled:opacity-40">
+            {serverSaving ? "저장 중…" : "💾 초안 저장"}
+          </button>
           <button type="button" onClick={() => setPreview((v) => !v)} className="font-semibold text-accent hover:underline">
             {preview ? "✏️ 작성으로" : "👁 미리보기"}
           </button>
