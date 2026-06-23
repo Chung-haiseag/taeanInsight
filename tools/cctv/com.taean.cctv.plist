@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 도로 CCTV 로컬 수집 자동화(macOS launchd). 30분마다 + 로그인 시 1회.
+     스트림 토큰이 ~120분 유효하므로 30분 주기로 갱신.
+     설치: cp tools/cctv/com.taean.cctv.plist ~/Library/LaunchAgents/
+           launchctl load ~/Library/LaunchAgents/com.taean.cctv.plist
+     해제: launchctl unload ~/Library/LaunchAgents/com.taean.cctv.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.taean.cctv</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Applications/taean/tools/cctv/run-cctv.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>1800</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Applications/taean/tools/cctv/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Applications/taean/tools/cctv/launchd.err.log</string>
+</dict>
+</plist>

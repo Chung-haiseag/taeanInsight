@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherCards, AirQualityTrend, MarineCard,
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
 } from "@/components/reports/report-charts";
+import { CctvPlayer } from "@/components/reports/cctv-player";
 
 export const metadata: Metadata = {
   title: "지금 태안",
@@ -22,7 +23,7 @@ function decodeEntities(s: string): string {
 }
 
 export default async function LivePage() {
-  const [metrics, latest, onThisDay] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(6)]);
+  const [metrics, latest, onThisDay, cctv] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(6), fetchCctv()]);
   const news = latest ? await fetchWeeklyNews(latest.weekId) : [];
 
   return (
@@ -80,6 +81,15 @@ export default async function LivePage() {
             <span className="accent-rule mt-3" aria-hidden />
             <OilCard oil={metrics.oil} />
           </section>
+
+          {/* 도로 실시간 CCTV */}
+          {cctv.available && (
+            <section>
+              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📹</span>도로 실시간 CCTV</h2>
+              <span className="accent-rule mt-3" aria-hidden />
+              <div className="mt-4"><CctvPlayer cameras={cctv.cameras} updatedAt={cctv.updatedAt} /></div>
+            </section>
+          )}
 
           {/* 최신 태안뉴스 */}
           {news.length > 0 && (

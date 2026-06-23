@@ -207,6 +207,18 @@ export async function fetchOnThisDay(limit = 6): Promise<OnThisDayItem[]> {
   }
 }
 
+// 도로 실시간 CCTV(ITS, D1 미러) — 태안 국도 카메라(HLS)
+export interface CctvCamera { name: string; url: string; lat: number; lon: number; road: string }
+export async function fetchCctv(): Promise<{ available: boolean; cameras: CctvCamera[]; updatedAt: string | null }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/cctv`, { next: { revalidate: 300 } });
+    if (!res.ok) return { available: false, cameras: [], updatedAt: null };
+    return (await res.json()) as { available: boolean; cameras: CctvCamera[]; updatedAt: string | null };
+  } catch {
+    return { available: false, cameras: [], updatedAt: null };
+  }
+}
+
 // 발행분 목록(최신순).
 export async function listReports(): Promise<ReportListItem[]> {
   try {

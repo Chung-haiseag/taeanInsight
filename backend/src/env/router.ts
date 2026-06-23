@@ -55,10 +55,22 @@ envRouter.get("/marine", async (c) => {
   return c.json(await loadMarine(c.env));
 });
 
-// 도로 실시간 CCTV(ITS) — 태안 인근 카메라 목록(HLS 스트림)
+// 도로 실시간 CCTV — D1 미러 서빙(로컬 크롤러가 ITS에서 적재)
 envRouter.get("/cctv", async (c) => {
-  const { fetchCctv } = await import("./cctv");
-  return c.json(await fetchCctv(c.env));
+  const { loadCctv } = await import("./cctv");
+  return c.json(await loadCctv(c.env));
+});
+
+// 로컬 크롤러 적재 — 공유 토큰(GOV_IMPORT_TOKEN). 전량 교체.
+envRouter.post("/cctv/ingest", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const token = c.env.GOV_IMPORT_TOKEN;
+  if (!token || c.req.header("authorization") !== `Bearer ${token}`) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { cameras?: unknown };
+  if (!Array.isArray(body.cameras)) return c.json({ error: "invalid_input" }, 400);
+  const { ingestCctv } = await import("./cctv");
+  const n = await ingestCctv(c.env.ARCHIVE_DB, body.cameras as Parameters<typeof ingestCctv>[1]);
+  return c.json({ ok: true, count: n });
 });
 
 // 현재 환경·안전 경보 미리보기(발송 안 함) — 점검·상태 표시용

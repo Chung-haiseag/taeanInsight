@@ -1,46 +1,34 @@
-// 도로 실시간 CCTV — 국가교통정보센터(ITS) Open API. ITS_API_KEY 필요(data.go.kr 키와 별개).
-//   NCCTVInfo: type=ex(고속도로)·its(국도), cctvType=1(HLS 스트리밍). 태안 위경도 박스로 조회.
-//   결과: { name, url(.m3u8), lat, lon }. 키 없으면 빈 배열(graceful).
-//   ⚠️ 태안은 국도 위주라 카메라 수가 적을 수 있음(고속도로 미통과).
-
-import { REGION } from "../region";
-import { makeTtlCache } from "../lib/cache";
-
-const NCCTV = "https://openapi.its.go.kr/api/NCCTVInfo";
+// 도로 실시간 CCTV — D1 미러 서빙. ITS는 9443 포트라 Worker가 직접 못 닿아,
+// 한국IP 로컬 크롤러(tools/cctv/refresh-cctv.mjs)가 ITS cctvInfo를 받아 /ingest로 적재.
+// Worker는 cctv_cameras에서 서빙(스트림 URL은 https, 토큰 ~120분 유효 → 크롤러가 주기 갱신).
 
 export interface CctvItem { name: string; url: string; lat: number; lon: number; road: string }
 
-async function fetchType(key: string, type: "ex" | "its"): Promise<CctvItem[]> {
-  const b = REGION.box;
-  const sp = new URLSearchParams({
-    apiKey: key, type, cctvType: "1", getType: "json",
-    minX: String(b.lonMin), maxX: String(b.lonMax), minY: String(b.latMin), maxY: String(b.latMax),
-  });
-  try {
-    const res = await fetch(`${NCCTV}?${sp}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const j = (await res.json()) as { response?: { data?: Array<Record<string, string>> } };
-    const data = j.response?.data ?? [];
-    return data
-      .filter((d) => d.cctvurl)
-      .map((d) => ({
-        name: String(d.cctvname ?? "도로 CCTV"),
-        url: String(d.cctvurl),
-        lat: Number(d.coordy), lon: Number(d.coordx),
-        road: type === "ex" ? "고속도로" : "국도",
-      }));
-  } catch {
-    return [];
+export async function loadCctv(env: { ARCHIVE_DB?: D1Database }): Promise<{ available: boolean; cameras: CctvItem[]; updatedAt: string | null }> {
+  if (!env.ARCHIVE_DB) return { available: false, cameras: [], updatedAt: null };
+  const r = await env.ARCHIVE_DB
+    .prepare("SELECT name, road, lat, lon, stream_url, updated_at FROM cctv_cameras ORDER BY name")
+    .all<{ name: string; road: string | null; lat: number; lon: number; stream_url: string; updated_at: string }>();
+  const rows = r.results ?? [];
+  return {
+    available: rows.length > 0,
+    cameras: rows.map((x) => ({ name: x.name, url: x.stream_url, lat: x.lat, lon: x.lon, road: x.road ?? "국도" })),
+    updatedAt: rows[0]?.updated_at ?? null,
+  };
+}
+
+export interface CctvIngestRow { id?: string; name: string; road?: string; lat: number; lon: number; url: string }
+
+// 로컬 크롤러 적재 — 전량 교체(스트림 URL 갱신).
+export async function ingestCctv(db: D1Database, cameras: CctvIngestRow[]): Promise<number> {
+  const now = new Date().toISOString();
+  await db.prepare("DELETE FROM cctv_cameras").run();
+  let n = 0;
+  for (const c of cameras) {
+    if (!c.url || !Number.isFinite(c.lat) || !Number.isFinite(c.lon)) continue;
+    await db.prepare("INSERT OR REPLACE INTO cctv_cameras (id,name,road,lat,lon,stream_url,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7)")
+      .bind(c.id || c.name, c.name, c.road ?? "국도", c.lat, c.lon, c.url, now).run();
+    n++;
   }
+  return n;
 }
-
-async function fetchCctvImpl(env: { ITS_API_KEY?: string }): Promise<{ available: boolean; cameras: CctvItem[] }> {
-  const key = env.ITS_API_KEY;
-  if (!key) return { available: false, cameras: [] };
-  const [its, ex] = await Promise.all([fetchType(key, "its"), fetchType(key, "ex")]);
-  const cameras = [...its, ...ex].filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lon));
-  return { available: cameras.length > 0, cameras };
-}
-
-// 10분 캐시(스트림 URL은 자주 안 바뀜)
-export const fetchCctv = makeTtlCache(fetchCctvImpl, 10 * 60_000);

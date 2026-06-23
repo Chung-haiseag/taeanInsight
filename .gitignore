@@ -66,3 +66,6 @@ tools/ebook/src1990
 # 군청 로컬 크롤러 토큰·로그(자동화)
 tools/gov/.token
 tools/gov/*.log
+
+tools/cctv/.its_key
+tools/cctv/*.log
