@@ -127,3 +127,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 사장님 실행제안 규칙엔진 고도화(추세·주말강수·파고·대기질·기온·시간대·업종세분화 + 우선순위/태그) · backend/owner/brief.ts
 
 - 2026-06-23 · 팀(B2B)·부서(B2G) 공유 워크스페이스(공유코드 가입·멤버·공유자료·공유메모) placeholder→실구현 · backend/workspace, db/017, web/me/workspace-panel
+
+- 2026-06-23 · 도로 실시간 CCTV(ITS) 라이브: 태안 국도 39곳, /live HLS 플레이어. ITS 9443포트는 Worker 불가→로컬 크롤러(launchd 30분) D1 미러 · tools/cctv, GET /api/conditions/cctv, db/018
