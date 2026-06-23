@@ -21,6 +21,7 @@ import { fetchRealEstateDeep } from "../env/realestate";
 import { fetchTour } from "../env/tour";
 import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
+import { fetchMidForecast } from "../env/midforecast";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -135,22 +136,40 @@ queryRouter.post("/", async (c) => {
           `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
         parts.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
       }
-      // 예보·주말·내일 질문이면 주말 예보(forecastDemand의 sat/sun 단기예보)도 추가
+      // 예보·주말·내일 질문이면 주말/다가오는 날 예보 — 단기(±3일) 우선, 범위 밖이면 중기(3~10일)
       if (/예보|주말|다음\s?주|내일|모레|이번\s?주/.test(query)) {
         try {
-          const dem = await forecastDemand(c.env);
-          const fc = (w: { date: string; tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
+          const [dem, mid] = await Promise.all([forecastDemand(c.env), fetchMidForecast(c.env)]);
+          const shortFc = (w: { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
             if (!w) return null;
             const p: string[] = [];
             if (w.tmax != null) p.push(`최고 ${w.tmax}℃`);
             if (w.pop != null) p.push(`강수확률 ${w.pop}%`);
             if (w.sky) p.push(`하늘 ${w.sky}`);
             if (w.pty && w.pty !== "없음") p.push(w.pty);
-            return p.length ? `${w.date} ${p.join(", ")}` : null;
+            return p.length ? `${p.join(", ")} (단기예보)` : null;
           };
-          const sat = fc(dem?.weather?.sat ?? null), sun = fc(dem?.weather?.sun ?? null);
+          const midFc = (date: string) => {
+            const m = mid.available ? mid.days[date] : null;
+            if (!m) return null;
+            const p: string[] = [];
+            if (m.tmax != null) p.push(`최고 ${m.tmax}℃`);
+            if (m.tmin != null) p.push(`최저 ${m.tmin}℃`);
+            if (m.pop != null) p.push(`강수확률 ${m.pop}%`);
+            if (m.sky) p.push(m.sky);
+            return p.length ? `${p.join(", ")} (중기예보)` : null;
+          };
+          const wk = dem?.weekend;
+          type SW = { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null | undefined;
+          const dayLine = (label: string, date: string | undefined, sw: SW) => {
+            if (!date) return null;
+            const s = shortFc(sw ?? null) ?? midFc(date);
+            return s ? `${label}(${date.slice(5)}) ${s}` : null;
+          };
+          const sat = dayLine("토", wk?.sat, dem?.weather?.sat);
+          const sun = dayLine("일", wk?.sun, dem?.weather?.sun);
           if (sat || sun) {
-            parts.push({ text: `태안 주말 기상예보(기상청 단기예보) — ${[sat && `토 ${sat}`, sun && `일 ${sun}`].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기예보(주말)", url: null } });
+            parts.push({ text: `태안 주말 기상예보 — ${[sat, sun].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기·중기예보", url: null } });
           }
         } catch { /* 무시 */ }
       }
