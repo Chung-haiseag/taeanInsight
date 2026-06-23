@@ -125,3 +125,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 온보딩에 가게 프로필 스텝 추가(사장님·기관 유형 조건부, 업종·상호) → owner-brief 맞춤 · web/me/onboarding, backend/preferences
 
 - 2026-06-23 · 사장님 실행제안 규칙엔진 고도화(추세·주말강수·파고·대기질·기온·시간대·업종세분화 + 우선순위/태그) · backend/owner/brief.ts
+
+- 2026-06-23 · 팀(B2B)·부서(B2G) 공유 워크스페이스(공유코드 가입·멤버·공유자료·공유메모) placeholder→실구현 · backend/workspace, db/017, web/me/workspace-panel
