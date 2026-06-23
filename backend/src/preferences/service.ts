@@ -29,6 +29,7 @@ export interface OnboardInput {
   regions: string[];
   categories: InterestCategory[];
   notificationChannels: NotificationChannel[];
+  shopProfile?: import("./types").ShopProfile;
 }
 
 export class PreferencesService {
@@ -52,6 +53,7 @@ export class PreferencesService {
       regions: dedupe(input.regions),
       categories: dedupe(input.categories),
       notificationChannels: dedupe(input.notificationChannels),
+      shopProfile: input.shopProfile,
       onboardedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

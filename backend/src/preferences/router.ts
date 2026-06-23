@@ -32,18 +32,19 @@ const SEGMENT_VALUES = ["b2c_basic", "b2c_premium", "b2b_basic", "b2b_premium", 
 const CATEGORY_VALUES = ["tourism", "environment", "realestate", "policy", "industry", "culture"] as const;
 const CHANNEL_VALUES = ["email", "webpush", "kakao"] as const;
 
-const onboardSchema = z.object({
-  segment: z.enum(SEGMENT_VALUES),
-  regions: z.array(z.string()).min(1),
-  categories: z.array(z.enum(CATEGORY_VALUES)).min(1),
-  notificationChannels: z.array(z.enum(CHANNEL_VALUES)).min(0),
-});
-
 const shopProfileSchema = z.object({
   industry: z.enum(["lodging", "food", "cafe", "leisure", "retail", "other"]),
   eupMyeon: z.string().max(40).optional(),
   capacity: z.number().int().min(0).max(100000).optional(),
   name: z.string().max(60).optional(),
+});
+
+const onboardSchema = z.object({
+  segment: z.enum(SEGMENT_VALUES),
+  regions: z.array(z.string()).min(1),
+  categories: z.array(z.enum(CATEGORY_VALUES)).min(1),
+  notificationChannels: z.array(z.enum(CHANNEL_VALUES)).min(0),
+  shopProfile: shopProfileSchema.optional(),
 });
 
 const updateSchema = z.object({
@@ -102,6 +103,7 @@ meRouter.post("/onboarding", async (c) => {
       regions: parsed.data.regions,
       categories: parsed.data.categories as InterestCategory[],
       notificationChannels: parsed.data.notificationChannels as NotificationChannel[],
+      shopProfile: parsed.data.shopProfile,
     });
     return c.json(prefs);
   } catch (e) {
