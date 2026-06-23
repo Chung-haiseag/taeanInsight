@@ -137,3 +137,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 태안뉴스 로딩 가속: D1 캐시(news_cache, SWR)+30분 워밍 cron(3.5s→0.85s, workers.dev 엣지캐시 불가 대응) · backend/news, db/019
 
 - 2026-06-23 · 성능: 해무/역대오늘 D1 캐시(api_cache, db/020)+30분 워밍, /live 병렬화 → /live 3.0s→1.5s·해무 9.5s→0.7s · backend/lib/api_cache.ts
+
+- 2026-06-23 · 시민기자 에디터 UX: 임시저장(localStorage)·미리보기·글자수·모바일(sticky 제출) · web/citizen/write
