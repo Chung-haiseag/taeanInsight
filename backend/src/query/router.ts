@@ -30,6 +30,8 @@ const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당
 const TOURISM_RE = /관광|수요|축제|행사|방문객|관광객|피서|성수기|혼잡|여행객|놀러|나들이|붐비/;
 // 바다·해변 질문이면 일출몰·물때·수온·파고·해수욕지수·서핑을 근거로 추가
 const MARINE_RE = /일몰|일출|해넘이|해돋이|노을|물때|밀물|썰물|만조|간조|조석|수온|파고|물높이|해수욕|갯벌|서핑|바다|해변|해안|선셋/;
+// 행사·일정·군정 질문이면 태안군청 군정소식·주간행사계획을 근거로 추가
+const EVENT_RE = /행사|일정|이벤트|공지|군정|군청|새소식|소식|주간|개최|열리|열린/;
 // YYYYMMDD → 오늘 기준 D-day(KST)
 function ymd8Dday(s: string): number {
   if (!/^\d{8}$/.test(s)) return 9999;
@@ -249,6 +251,27 @@ queryRouter.post("/", async (c) => {
       } catch { /* 무시 */ }
     }
 
+    // (a-5) 행사·일정·군정 질문이면 태안군청 군정소식·주간행사계획 주입(이번 주 행사의 정본)
+    if (EVENT_RE.test(query) && c.env.ARCHIVE_DB) {
+      try {
+        const r = await c.env.ARCHIVE_DB
+          .prepare(
+            `SELECT board_name, title, dept, published_at, substr(body,1,700) AS body FROM gov_notices
+             ORDER BY (board_name='주간행사계획') DESC, published_at DESC, ntt_id DESC LIMIT 10`,
+          )
+          .all<{ board_name: string; title: string; dept: string | null; published_at: string; body: string | null }>();
+        const rows = r.results ?? [];
+        if (rows.length) {
+          const text = "[태안군청 군정 소식·주간행사계획]\n" + rows.map((n) => {
+            const head = `· [${n.board_name}] ${n.title} (${String(n.published_at).slice(0, 10)}${n.dept ? `, ${n.dept}` : ""})`;
+            // 주간행사계획은 본문에 실제 일정이 있어 함께 제공
+            return n.board_name === "주간행사계획" && n.body ? `${head}\n  ${n.body.replace(/\s+/g, " ").trim()}` : head;
+          }).join("\n");
+          parts.push({ text, source: { title: "태안군청 군정 소식·주간행사계획", url: null } });
+        }
+      } catch { /* 무시 */ }
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query)) {
       const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
@@ -273,7 +296,9 @@ queryRouter.post("/", async (c) => {
               "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
               "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
               "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
-              "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
+              "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
+              "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
+              "- '이번 주/다음 주' 행사는 군청 주간행사계획·축제 일정을 우선 사용하고, 이미 끝난 과거 행사는 답에 넣지 마라.",
           },
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
@@ -281,13 +306,16 @@ queryRouter.post("/", async (c) => {
       // 출처는 답변이 실제로 사용한 것만 노출(무관 기사 더미 방지).
       const answer = res.content;
       const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
+      const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
       let sources = parts.map((p) => p.source);
       if (notFound) {
-        // 못 찾음 → 공식 실시간·실거래 근거(url 없음)만 남기고 무관 기사 출처 제거
-        sources = parts.filter((p) => p.source.url === null).map((p) => p.source);
+        // 못 찾음 → 공식 근거만 남기고 무관 기사 출처 제거
+        sources = liveParts.map((p) => p.source);
       } else {
         const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
         if (cited.size) sources = parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source);
+        else if (liveParts.length) sources = liveParts.map((p) => p.source); // 인용 없음 → 주입한 공식 근거만(무관 기사 더미 방지)
+        // 공식 근거가 없으면(순수 아카이브 질문) 검색 기사 유지
       }
       return c.json({
         answer,
