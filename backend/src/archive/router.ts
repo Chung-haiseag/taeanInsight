@@ -139,7 +139,7 @@ archiveRouter.get("/on-this-day", async (c) => {
       .all<Row>();
     return r.results ?? [];
   };
-  const shuffle = (a: Row[]) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const byYearAsc = (a: Row[]) => a.sort((x, y) => x.year - y.year || x.published_at.localeCompare(y.published_at));
 
   try {
     // 1) 정확히 같은 일자 — 연도별 1건
@@ -157,7 +157,7 @@ archiveRouter.get("/on-this-day", async (c) => {
       const years = new Set(rows.map((r) => r.year));
       rows = [...rows, ...wide.filter((r) => !years.has(r.year))].slice(0, limit);
     }
-    return c.json({ date: today, items: toItems(shuffle(rows)) });
+    return c.json({ date: today, items: toItems(byYearAsc(rows)) });
   } catch {
     return c.json({ items: [] });
   }
