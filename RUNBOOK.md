@@ -145,3 +145,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 시민기자 사진 업로드(R2, POST /api/copilot/upload, citizen/ 키) + 본문 ![](url) 삽입·미리보기 렌더 · backend/copilot, web/citizen/write
 
 - 2026-06-23 · 시민기자 기사 CRUD/목록(D1 citizen_articles, /api/citizen/articles, uid 소유)+내 기사 페이지+에디터 초안저장/수정 연동 · backend/citizen/articles_router, db/021, web/citizen/articles
+
+- 2026-06-23 · 시민기자 검수 루프 완성: 관리자 제출기사 검수(승인→published/반려→rejected+사유)→내 기사 반영 · backend/citizen/router(submissions), web/admin
