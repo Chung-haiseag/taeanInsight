@@ -121,20 +121,31 @@ archiveRouter.get("/on-this-day", async (c) => {
     yearsAgo: curYear - x.year, category: x.category, leadImage: x.lead_image ?? null, date: x.published_at.slice(5, 10),
   }));
 
-  try {
-    // 1) 정확히 같은 일자, 랜덤
-    const exact = await db
+  // 연도별 1건씩(특정 해 쏠림 방지) — 랜덤. dateCond/binds로 정확일자/±N일 모두 처리.
+  const pickPerYear = async (dateCond: string, dateBinds: string[]): Promise<Row[]> => {
+    const n = dateBinds.length;
+    const r = await db
       .prepare(
-        `SELECT idxno,title,published_at,year,category,lead_image FROM archive_articles
-          WHERE substr(published_at,6,5)=?1 AND year < ?2 AND ${ON_THIS_DAY_MAJOR}
-          ORDER BY RANDOM() LIMIT ?3`,
+        `WITH cand AS (
+           SELECT idxno,title,published_at,year,category,lead_image,
+                  ROW_NUMBER() OVER (PARTITION BY year ORDER BY RANDOM()) rn
+           FROM archive_articles
+           WHERE ${dateCond} AND year < ?${n + 1} AND ${ON_THIS_DAY_MAJOR}
+         )
+         SELECT idxno,title,published_at,year,category,lead_image FROM cand WHERE rn <= 1
+         ORDER BY RANDOM() LIMIT ?${n + 2}`,
       )
-      .bind(today, curYear, limit)
+      .bind(...dateBinds, curYear, limit)
       .all<Row>();
-    let rows = exact.results ?? [];
+    return r.results ?? [];
+  };
+  const shuffle = (a: Row[]) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-    // 2) 너무 적으면 ±3일로 보강(중복 제외)
-    if (rows.length < 5) {
+  try {
+    // 1) 정확히 같은 일자 — 연도별 1건
+    let rows = await pickPerYear("substr(published_at,6,5)=?1", [today]);
+    // 2) 해가 부족하면 ±3일로 보강(이미 나온 연도는 제외 → 연도 다양성↑)
+    if (rows.length < limit) {
       const mmdds = new Set<string>();
       for (let d = -3; d <= 3; d++) {
         const t = new Date(kst.getTime() + d * 86400000);
@@ -142,18 +153,11 @@ archiveRouter.get("/on-this-day", async (c) => {
       }
       const list = [...mmdds];
       const ph = list.map((_, i) => `?${i + 1}`).join(",");
-      const wide = await db
-        .prepare(
-          `SELECT idxno,title,published_at,year,category,lead_image FROM archive_articles
-            WHERE substr(published_at,6,5) IN (${ph}) AND year < ?${list.length + 1} AND ${ON_THIS_DAY_MAJOR}
-            ORDER BY RANDOM() LIMIT ?${list.length + 2}`,
-        )
-        .bind(...list, curYear, limit)
-        .all<Row>();
-      const seen = new Set(rows.map((r) => r.idxno));
-      rows = [...rows, ...(wide.results ?? []).filter((r) => !seen.has(r.idxno))].slice(0, limit);
+      const wide = await pickPerYear(`substr(published_at,6,5) IN (${ph})`, list);
+      const years = new Set(rows.map((r) => r.year));
+      rows = [...rows, ...wide.filter((r) => !years.has(r.year))].slice(0, limit);
     }
-    return c.json({ date: today, items: toItems(rows) });
+    return c.json({ date: today, items: toItems(shuffle(rows)) });
   } catch {
     return c.json({ items: [] });
   }
