@@ -55,6 +55,12 @@ envRouter.get("/marine", async (c) => {
   return c.json(await loadMarine(c.env));
 });
 
+// 해무 CCTV 스틸컷(국립해양조사원) — 태안 인근 관측소 최신 이미지
+envRouter.get("/seafog", async (c) => {
+  const { fetchSeafog } = await import("./seafog");
+  return c.json(await fetchSeafog(c.env));
+});
+
 // 도로 실시간 CCTV — D1 미러 서빙(로컬 크롤러가 ITS에서 적재)
 envRouter.get("/cctv", async (c) => {
   const { loadCctv } = await import("./cctv");

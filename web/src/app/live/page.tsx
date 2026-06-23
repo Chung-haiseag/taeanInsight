@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherCards, AirQualityTrend, MarineCard,
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
@@ -23,7 +23,7 @@ function decodeEntities(s: string): string {
 }
 
 export default async function LivePage() {
-  const [metrics, latest, onThisDay, cctv] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(6), fetchCctv()]);
+  const [metrics, latest, onThisDay, cctv, seafog] = await Promise.all([fetchReportMetrics(), fetchLatestReport(), fetchOnThisDay(6), fetchCctv(), fetchSeafog()]);
   const news = latest ? await fetchWeeklyNews(latest.weekId) : [];
 
   return (
@@ -88,6 +88,27 @@ export default async function LivePage() {
               <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📹</span>도로 실시간 CCTV</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <div className="mt-4"><CctvPlayer cameras={cctv.cameras} updatedAt={cctv.updatedAt} /></div>
+            </section>
+          )}
+
+          {/* 해무 관측 스틸컷 */}
+          {seafog.available && (
+            <section>
+              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>🌫</span>해안 해무 관측</h2>
+              <span className="accent-rule mt-3" aria-hidden />
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {seafog.stills.map((s) => (
+                  <figure key={s.station} className="overflow-hidden rounded-2xl border border-brand/15 bg-black">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.url} alt={`${s.station} 해무 CCTV`} className="aspect-video w-full object-cover" loading="lazy" />
+                    <figcaption className="flex items-center justify-between bg-background px-3 py-2 text-xs">
+                      <span className="font-semibold text-brand">{s.station}</span>
+                      <span className="text-foreground-muted">{s.imgDt.slice(5)} 기준</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-foreground-muted">국립해양조사원 해무관측소 · 10분 단위 · 태안 인근 서해</p>
             </section>
           )}
 

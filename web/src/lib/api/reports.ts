@@ -219,6 +219,18 @@ export async function fetchCctv(): Promise<{ available: boolean; cameras: CctvCa
   }
 }
 
+// 해무 CCTV 스틸컷(국립해양조사원) — 태안 인근 관측소(대산항·평택당진항) 최신 이미지
+export interface SeafogStill { station: string; imgDt: string; url: string }
+export async function fetchSeafog(): Promise<{ available: boolean; stills: SeafogStill[] }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/seafog`, { next: { revalidate: 300 } });
+    if (!res.ok) return { available: false, stills: [] };
+    return (await res.json()) as { available: boolean; stills: SeafogStill[] };
+  } catch {
+    return { available: false, stills: [] };
+  }
+}
+
 // 발행분 목록(최신순).
 export async function listReports(): Promise<ReportListItem[]> {
   try {
