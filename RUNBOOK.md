@@ -151,3 +151,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · B2B 대시보드 정체성 확립+실재화: 지역 데이터 분석(시계열·기간필터·CSV). GET /api/dashboard/series·export · backend/dashboard, web/dashboard
 
 - 2026-06-23 · IA 중첩 정리(feat/ia-cleanup): 화면 역할 경계 명확화 — 정본+딥링크 교차링크(/me↔live·dashboard, live↔dashboard, reports→live) · web 다수
+
+- 2026-06-23 · AI질의 RAG 근거 확장: 실거래(읍면필터·추이)·관광수요·축제·바다(일출몰·물때·수온) 주입 + bm25·출처정제·충실프롬프트 · backend/query/router
