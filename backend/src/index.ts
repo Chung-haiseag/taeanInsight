@@ -12,6 +12,8 @@ import { addonsRouter } from "./payments/addons_router";
 import { reviewRouter } from "./governance/review_router";
 import { rulesRouter } from "./governance/rules_router";
 import { citizenRouter } from "./citizen/router";
+import { citizenArticlesRouter } from "./citizen/articles_router";
+import { dashboardRouter } from "./dashboard/router";
 import { newsRouter } from "./news/router";
 import { archiveRouter } from "./archive/router";
 import { ebookReviewRouter } from "./archive/ebook_review";
@@ -21,6 +23,7 @@ import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
 import { pushRouter } from "./notifications/router";
 import { govRouter } from "./gov/router";
+import { emailRouter } from "./email/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -54,9 +57,11 @@ app.route("/api/addons", addonsRouter);
 app.route("/api/admin/review", reviewRouter);
 app.route("/api/admin/rules", rulesRouter);
 app.route("/api/admin/citizen", citizenRouter);
+app.route("/api/citizen/articles", citizenArticlesRouter);
 app.route("/api/admin/ebook", ebookReviewRouter);
 app.route("/api/news", newsRouter);
 app.route("/api/archive", archiveRouter);
+app.route("/api/dashboard", dashboardRouter);
 app.route("/api/copilot", copilotRouter);
 app.route("/api/query", queryRouter);
 app.route("/api/conditions", envRouter);
@@ -64,6 +69,7 @@ app.route("/api/reports", reportsRouter);
 app.route("/api/admin/reports", adminReportsRouter);
 app.route("/api/push", pushRouter);
 app.route("/api/gov", govRouter);
+app.route("/api/email", emailRouter);
 
 // HTTP 요청 핸들러 + Scheduled 핸들러
 export default {
@@ -73,27 +79,99 @@ export default {
   //  · "0 13 * * 4" (목 22:00 KST) — 주간 리포트 초안 생성(Workers AI). 발행은 HITL 검토 후 수동.
   //  · "0 15 * * *" (매일 00:00 KST) — 뉴스 적재 + 환경 스냅샷 + 비용 집계.
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    // ── 주간 리포트 초안 (목 야간) ──
-    if (_event.cron === "0 13 * * 4") {
+    // ── 주간 리포트 초안 (금 16:00 KST) — 검토·발행은 17시 편집부 수동 ──
+    if (_event.cron === "0 7 * * 5") {
       // 생성 전에 군청 목록(제목·날짜·링크) 먼저 갱신 → 초안에 최신 군정 반영
       try {
         const { crawlGovLists } = await import("./gov/list_crawler");
         const g = await crawlGovLists(env);
         const n = g.reduce((s, b) => s + b.upserted, 0);
-        if (n) console.log(`[cron] 군청 목록 갱신: ${n}건 (${g.map((b) => `${b.board} ${b.upserted}`).join(", ")})`);
+        if (n) console.log(`[cron] 군청 목록 갱신: ${n}건`);
       } catch (e) {
         console.warn("[cron] 군청 목록 실패:", e instanceof Error ? e.message : e);
       }
       try {
         if (env.AI && env.ARCHIVE_DB) {
-          const [{ buildWeeklyDraft }] = await Promise.all([import("./reports/scheduled")]);
+          const { buildWeeklyDraft } = await import("./reports/scheduled");
           const r = await buildWeeklyDraft(env);
           console.log(`[cron] 주간 리포트 초안 생성: ${r.weekId} (${r.sections}개 섹션)`);
         }
       } catch (e) {
         console.warn("[cron] 주간 리포트 초안 실패:", e instanceof Error ? e.message : e);
       }
-      return; // 주간 cron은 초안 생성만 수행
+      return;
+    }
+
+    // ── 12시간마다 — 뉴스 수집 + 군청 목록 갱신(하루 2회) ──
+    if (_event.cron === "0 */12 * * *") {
+      try {
+        const { ingestToArchive } = await import("./news/ingest");
+        const r = await ingestToArchive(env);
+        if (r.inserted || r.upgraded) console.log(`[cron12h] 뉴스: 신규 ${r.inserted}·전문화 ${r.upgraded}/${r.fetched}`);
+      } catch (e) { console.warn("[cron12h] 뉴스 실패:", e instanceof Error ? e.message : e); }
+      try {
+        const { crawlGovLists } = await import("./gov/list_crawler");
+        const g = await crawlGovLists(env);
+        const n = g.reduce((s, b) => s + b.upserted, 0);
+        if (n) console.log(`[cron12h] 군청 목록: ${n}건`);
+      } catch (e) { console.warn("[cron12h] 군청 목록 실패:", e instanceof Error ? e.message : e); }
+      // 카드뉴스 이미지는 군청이 Worker(데이터센터) IP의 상세페이지를 차단 → 로컬 크롤러(launchd)가 담당.
+      return;
+    }
+
+    // ── 30분마다 — 리포트 metrics 스냅샷 갱신(요청 경로 외부 API 팬아웃 제거) ──
+    if (_event.cron === "*/30 * * * *") {
+      try {
+        const { refreshMetricsSnapshot } = await import("./reports/metrics_cache");
+        const r = await refreshMetricsSnapshot(env);
+        if (r.ok) console.log("[cron] metrics 스냅샷 갱신");
+      } catch (e) {
+        console.warn("[cron] metrics 스냅샷 실패:", e instanceof Error ? e.message : e);
+      }
+      // 태안뉴스 목록 캐시 워밍(첫 방문 콜드 3s 방지)
+      try {
+        if (env.ARCHIVE_DB) {
+          const { getNews, writeNewsCache } = await import("./news/ingest");
+          await writeNewsCache(env.ARCHIVE_DB, await getNews(true));
+          console.log("[cron] 뉴스 캐시 워밍");
+        }
+      } catch (e) {
+        console.warn("[cron] 뉴스 캐시 워밍 실패:", e instanceof Error ? e.message : e);
+      }
+      // 해무 스틸컷 캐시 워밍(외부 API ~9s 콜드 방지)
+      try {
+        const { refreshSeafogCache } = await import("./env/seafog");
+        await refreshSeafogCache(env);
+        console.log("[cron] 해무 캐시 워밍");
+      } catch (e) {
+        console.warn("[cron] 해무 캐시 워밍 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
+    // ── 아침(07:00 KST) — 환경·안전 자동 알림(위험 임계 초과 시 통합 푸시) ──
+    if (_event.cron === "0 22 * * *") {
+      try {
+        const { runEnvAlerts } = await import("./notifications/env_alerts");
+        const r = await runEnvAlerts(env);
+        console.log(`[cron] 환경·안전 알림: 경보 ${r.alerts}건, 발송 ${r.sent}${r.skipped ? ` (${r.skipped})` : ""}`);
+      } catch (e) {
+        console.warn("[cron] 환경·안전 알림 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
+    // ── 정오(12:00 KST) — 환경 스냅샷만 갱신해 그날 env_daily를 낮 대표값으로 덮어씀 ──
+    // (자정 스냅샷은 전날 23시 관측이라 습도가 과대평가됨 → 정오값으로 보정)
+    if (_event.cron === "0 3 * * *") {
+      try {
+        const { snapshotEnv } = await import("./env/router");
+        const s = await snapshotEnv(env);
+        if (s.stored) console.log("[cron] 환경 스냅샷(정오) 갱신됨");
+      } catch (e) {
+        console.warn("[cron] 환경 스냅샷(정오) 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
     }
 
     try {
@@ -109,6 +187,22 @@ export default {
       if (s.stored) console.log("[cron] 환경 스냅샷 저장됨");
     } catch (e) {
       console.warn("[cron] 환경 스냅샷 실패:", e instanceof Error ? e.message : e);
+    }
+    // 관광 수요지수 로그 — 다가오는 주말 지수를 누적 저장(예보 갱신 추적·백테스트 기반)
+    try {
+      const { logDemand } = await import("./tour/demand_log");
+      const r = await logDemand(env);
+      if (r.logged) console.log(`[cron] 관광 수요지수: ${r.weekend} ${r.index}점(${r.level})`);
+    } catch (e) {
+      console.warn("[cron] 수요지수 로그 실패:", e instanceof Error ? e.message : e);
+    }
+    // 백테스트 실측 채우기 — 지난 주말의 검색관심도를 actual_search에 적재
+    try {
+      const { fillActuals } = await import("./reports/backtest");
+      const r = await fillActuals(env);
+      if (r.filled) console.log(`[cron] 백테스트 실측 적재: ${r.filled}주`);
+    } catch (e) {
+      console.warn("[cron] 백테스트 실측 적재 실패:", e instanceof Error ? e.message : e);
     }
     // 군청 목록(제목·날짜·링크) 매일 자동 갱신 — 목록 페이지는 Worker에서 200으로 열림.
     // 본문·카드뉴스 이미지는 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 보충(있으면 보존).

@@ -3,13 +3,15 @@
 // 아카이브 검색 — 태안신문 1990년 창간호~최신 기사 전문/발췌 검색.
 // 백필→D1 적재 후 채워짐. 데이터 없으면 빈 결과(안내).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import {
   searchArchive,
+  getArchiveStats,
   ARCHIVE_CATEGORY_LABELS,
   type ArchiveHit,
+  type ArchiveStats,
 } from "@/lib/api/archive";
 import { decodeEntities } from "@/lib/html";
 
@@ -28,6 +30,9 @@ export default function ArchivePage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<ArchiveStats | null>(null);
+
+  useEffect(() => { getArchiveStats().then(setStats).catch(() => {}); }, []);
 
   // p 페이지 검색. 새 검색이면 p=1, 페이지 이동이면 해당 페이지.
   async function load(p: number) {
@@ -60,6 +65,12 @@ export default function ArchivePage() {
         </p>
         <h1 className="mt-4 text-display-sm font-bold text-brand">태안신문 아카이브</h1>
         <p className="mt-2 text-foreground-muted">1990년 창간호부터 최신까지 한 번에 검색하세요.</p>
+        {stats && stats.total > 0 && (
+          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand/[0.03] px-4 py-1.5 text-sm">
+            <span className="font-semibold text-brand">총 {stats.total.toLocaleString()}건</span>
+            <span className="text-foreground-muted">· {stats.minYear}~{stats.maxYear}년 디지털 아카이브</span>
+          </p>
+        )}
       </header>
 
       {/* 검색 폼 */}

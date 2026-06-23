@@ -8,7 +8,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
-import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem } from "@/lib/api/reports";
+import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGauge, MarineCard, SummaryInfographic, SeasonalFoodCard, OilCard } from "@/components/reports/report-charts";
+import { ReportTTS } from "@/components/reports/report-tts";
+import { ReportPushButton } from "@/components/reports/report-push";
+import { EmailSignup } from "@/components/reports/email_signup";
+import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
 
@@ -41,13 +45,48 @@ const SECTION_ICON: Record<string, string> = {
 const FILLER =
   "이 섹션은 구독자에게 제공되는 상세 분석입니다. 수치와 출처, 다음 주 전망이 담겨 있습니다. 태안 지역의 환경·관광·부동산 흐름을 한눈에 정리했습니다. 구독하시면 전체 내용을 보실 수 있어요.";
 
+// 섹션 키 → 해당 섹션 아래에 붙일 시각화(차트·표·카드). 잠금/미리보기 섹션엔 미표시.
+function SectionVisual({ sectionKey, metrics }: { sectionKey: string; metrics: ReportMetrics | null }) {
+  if (!metrics) return null;
+  switch (sectionKey) {
+    case "tourism_weather":
+      return (
+        <>
+          <DemandGauge demand={metrics.tourism.demand} />
+          <WeatherCards env={metrics.environment} />
+          <MarineCard marine={metrics.tourism.marine} />
+        </>
+      );
+    case "environment":
+      return <AirQualityTrend env={metrics.environment} />;
+    case "realestate":
+      return (
+        <>
+          <RealEstatePanel re={metrics.realestate} />
+          <OilCard oil={metrics.oil} />
+        </>
+      );
+    case "events":
+      return (
+        <>
+          <FestivalList tour={metrics.tourism} />
+          <SeasonalFoodCard />
+        </>
+      );
+    default:
+      return null;
+  }
+}
+
 export function ReportReader({
   initialReport,
+  metrics = null,
   news = [],
   govNotices = [],
   cardNews = [],
 }: {
   initialReport: WeeklyReportView | null;
+  metrics?: ReportMetrics | null;
   news?: WeeklyNewsItem[];
   govNotices?: GovNoticeItem[];
   cardNews?: GovNoticeItem[];
@@ -78,6 +117,12 @@ export function ReportReader({
     );
   }
 
+  // 음성 브리핑 텍스트 — 잠금 안 된 섹션(요약·미리보기) 본문을 제목과 함께 이어붙임
+  const briefing = [
+    `${formatWeek(report.weekId)} 태안 인사이트 리포트입니다.`,
+    ...report.sections.filter((s) => !s.locked && s.content.trim()).map((s) => `${s.title}. ${s.content}`),
+  ].join("\n");
+
   return (
     <div className="mx-auto max-w-3xl">
       <Masthead
@@ -86,6 +131,11 @@ export function ReportReader({
         aiLabel={report.aiLabel}
         gated={report.gated}
       />
+
+      <div className="no-print mt-4 flex flex-wrap justify-end gap-1">
+        <ReportPushButton />
+        <ReportTTS text={briefing} label="리포트 듣기" />
+      </div>
 
       {report.personalized && report.interests?.length ? (
         <div className="no-print mt-6 flex items-center gap-2 rounded-xl bg-accent-subtle/30 px-4 py-2.5 text-sm">
@@ -133,7 +183,9 @@ export function ReportReader({
               </div>
             ) : (
               <div className="mt-5">
-                <p className="whitespace-pre-line text-[1.05rem] leading-[1.85] text-foreground">{s.content}</p>
+                {s.key === "summary" && <SummaryInfographic metrics={metrics} govCount={textNotices.length + cardNews.length} />}
+                <p className={`whitespace-pre-line text-[1.05rem] leading-[1.85] text-foreground ${s.key === "summary" ? "mt-6" : ""}`}>{s.content}</p>
+                {!s.truncated && <SectionVisual sectionKey={s.key} metrics={metrics} />}
                 {s.truncated && (
                   <Link href="/me" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
                     … 이어 보기 (구독)
@@ -247,8 +299,10 @@ export function ReportReader({
         </section>
       )}
 
+      <EmailSignup />
+
       <div className="hairline mt-16 pt-6 text-center text-xs text-foreground-muted">
-        태안 인사이트 · 모든 AI 콘텐츠는 편집부 검토(HITL)를 거쳐 발행됩니다.
+        태안 인사이트 · AI가 작성하고 편집부 검토(HITL)를 거쳐 매주 금요일 발행됩니다.
       </div>
     </div>
   );

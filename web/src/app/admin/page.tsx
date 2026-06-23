@@ -19,8 +19,11 @@ import {
 import {
   getReporters,
   paySettlement,
+  getCitizenSubmissions,
+  decideCitizenSubmission,
   SETTLEMENT_STATUS_LABELS,
   type CitizenSummary,
+  type CitizenSubmission,
   type ReporterSummary,
   type SettlementStatus,
 } from "@/lib/api/citizen";
@@ -32,6 +35,13 @@ import {
   type ClassifyTestResult,
   type ManagedRule,
 } from "@/lib/api/rules";
+import {
+  getCurrentReport,
+  generateDraft,
+  publishReport,
+  unpublishReport,
+  type AdminReport,
+} from "@/lib/api/admin-reports";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import {
@@ -45,9 +55,10 @@ import {
   type EbookIssue,
 } from "@/lib/api/ebook-review";
 
-type AdminTab = "cost" | "review" | "citizen" | "governance" | "ebook";
+type AdminTab = "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
   { key: "cost", label: "💰 비용" },
+  { key: "report", label: "📅 주간 리포트" },
   { key: "review", label: "🛡 AI 검수" },
   { key: "citizen", label: "🧑‍💻 시민기자" },
   { key: "governance", label: "📏 민감규칙" },
@@ -103,6 +114,7 @@ export default function AdminPage() {
       </div>
 
       <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
+      <div className={tab === "report" ? "" : "hidden"}><ReportPublishSection /></div>
       <div className={tab === "review" ? "" : "hidden"}><ReviewQueueSection /></div>
       <div className={tab === "citizen" ? "" : "hidden"}><CitizenOpsSection /></div>
       <div className={tab === "governance" ? "" : "hidden"}><GovernanceSection /></div>
@@ -177,6 +189,136 @@ function CostMonitorSection() {
             )}
           </div>
         </>
+      )}
+    </section>
+  );
+}
+
+// ── 주간 리포트 검수·발행 (HITL, 금 17시 목표) ────────────────
+function ReportPublishSection() {
+  const [report, setReport] = useState<AdminReport | null>(null);
+  const [gov, setGov] = useState<{ approved: boolean; reasons: string[] } | null>(null);
+  const [reviewer, setReviewer] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await getCurrentReport();
+      setReport(r.report);
+      setGov(r.governance);
+    } catch (e) {
+      setMsg({ kind: "err", text: e instanceof Error ? e.message : "불러오기 실패" });
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { void load(); }, []);
+
+  async function onGenerate() {
+    setBusy("gen"); setMsg(null);
+    try { await generateDraft(); await load(); setMsg({ kind: "ok", text: "초안을 새로 생성했습니다." }); }
+    catch (e) { setMsg({ kind: "err", text: e instanceof Error ? e.message : "생성 실패" }); }
+    finally { setBusy(null); }
+  }
+  async function onPublish() {
+    if (!report) return;
+    if (!reviewer.trim()) { setMsg({ kind: "err", text: "검토자 이름을 입력하세요." }); return; }
+    if (!window.confirm(`${report.weekId} 리포트를 발행합니다. 구독자에게 알림이 발송됩니다. 계속할까요?`)) return;
+    setBusy("pub"); setMsg(null);
+    try {
+      const r = await publishReport(report.weekId, reviewer.trim());
+      if (r.ok) { await load(); setMsg({ kind: "ok", text: "발행 완료 — 구독자 알림 발송됨." }); }
+      else setMsg({ kind: "err", text: `발행 차단: ${r.error}${r.reasons?.length ? ` (${r.reasons.join(", ")})` : ""}` });
+    } catch (e) { setMsg({ kind: "err", text: e instanceof Error ? e.message : "발행 실패" }); }
+    finally { setBusy(null); }
+  }
+  async function onUnpublish() {
+    if (!report) return;
+    if (!window.confirm(`${report.weekId} 발행을 회수(비공개)합니다. 계속할까요?`)) return;
+    setBusy("unpub"); setMsg(null);
+    try { await unpublishReport(report.weekId); await load(); setMsg({ kind: "ok", text: "발행을 회수했습니다(초안으로 전환)." }); }
+    catch (e) { setMsg({ kind: "err", text: e instanceof Error ? e.message : "회수 실패" }); }
+    finally { setBusy(null); }
+  }
+
+  return (
+    <section aria-labelledby="report-heading" className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 id="report-heading" className="text-xl font-bold text-brand">📅 주간 리포트 검수·발행</h2>
+        <span className="text-xs text-foreground-muted">초안 금 16:00 자동 생성 · 발행 목표 금 17:00</span>
+      </div>
+
+      {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+      {msg && (
+        <p className={`text-sm rounded p-3 border ${msg.kind === "ok" ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-700"}`}>{msg.text}</p>
+      )}
+
+      {!loading && !report && (
+        <div className="border border-brand/15 rounded-lg p-6 text-center space-y-3">
+          <p className="text-sm text-foreground-muted">이번 주차 초안이 아직 없습니다.</p>
+          <button type="button" onClick={onGenerate} disabled={busy === "gen"} className="bg-brand text-background px-4 py-2 rounded text-sm font-semibold disabled:opacity-60">
+            {busy === "gen" ? "생성 중…" : "초안 생성"}
+          </button>
+        </div>
+      )}
+
+      {report && (
+        <div className="space-y-3">
+          {/* 상태 바 */}
+          <div className="flex items-center gap-2 flex-wrap border border-brand/15 rounded-lg p-3 bg-background">
+            <span className="font-semibold text-brand">{report.weekId}</span>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${report.status === "published" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+              {report.status === "published" ? "발행됨" : "초안"}
+            </span>
+            <AILabelBadge kind={report.aiLabel} />
+            {report.status === "published" && report.publishedAt && (
+              <span className="text-xs text-foreground-muted">{new Date(report.publishedAt).toLocaleString("ko-KR")}</span>
+            )}
+            <a href="/reports" target="_blank" rel="noreferrer" className="ml-auto text-xs text-accent underline">독자 화면 ↗</a>
+          </div>
+
+          {/* 거버넌스 사전검사 */}
+          {gov && (
+            <div className={`rounded-lg p-3 text-sm border ${gov.approved ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-700"}`}>
+              {gov.approved ? "✅ 거버넌스 검사 통과 — 발행 가능" : `⛔ 거버넌스 경고: ${gov.reasons.join(", ")}`}
+            </div>
+          )}
+
+          {/* 섹션 미리보기 */}
+          <div className="space-y-2">
+            {report.sections.map((s) => (
+              <article key={s.key} className="border border-brand/15 rounded-lg p-4 bg-background">
+                <h3 className="font-semibold text-brand">{s.title}</h3>
+                <p className="mt-1 text-sm text-foreground-muted whitespace-pre-line line-clamp-4">{s.content}</p>
+              </article>
+            ))}
+          </div>
+
+          {/* 액션 */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-brand/10 pt-3">
+            <input
+              value={reviewer}
+              onChange={(e) => setReviewer(e.target.value)}
+              placeholder="검토자 이름"
+              className="border border-brand/20 rounded px-3 py-2 text-sm"
+            />
+            {report.status !== "published" ? (
+              <button type="button" onClick={onPublish} disabled={busy === "pub"} className="bg-brand text-background px-4 py-2 rounded text-sm font-semibold disabled:opacity-60">
+                {busy === "pub" ? "발행 중…" : "발행하기"}
+              </button>
+            ) : (
+              <button type="button" onClick={onUnpublish} disabled={busy === "unpub"} className="border border-red-300 text-red-600 px-4 py-2 rounded text-sm font-semibold disabled:opacity-60">
+                {busy === "unpub" ? "회수 중…" : "발행 회수"}
+              </button>
+            )}
+            <button type="button" onClick={onGenerate} disabled={busy === "gen"} className="border border-brand/30 text-brand px-4 py-2 rounded text-sm font-semibold disabled:opacity-60">
+              {busy === "gen" ? "생성 중…" : "초안 다시 생성"}
+            </button>
+          </div>
+        </div>
       )}
     </section>
   );
@@ -336,6 +478,51 @@ function regionLabel(code: string): string {
   return REGION_OPTIONS.find((r) => r.code === code)?.label ?? code;
 }
 
+// 제출된 시민기자 기사 검수 — 승인(발행)/반려(사유). D1 실데이터.
+function CitizenSubmissionsReview() {
+  const [items, setItems] = useState<CitizenSubmission[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function load() { try { setItems(await getCitizenSubmissions()); } catch { setItems([]); } }
+  useEffect(() => { void load(); }, []);
+
+  async function decide(id: string, decision: "approved" | "rejected") {
+    let notes: string | undefined;
+    if (decision === "rejected") { const v = window.prompt("반려 사유(기자에게 표시):") ?? ""; notes = v.trim() || undefined; }
+    setBusy(id);
+    try { await decideCitizenSubmission(id, decision, notes); setItems((prev) => (prev ?? []).filter((x) => x.id !== id)); }
+    catch { /* 무시 */ } finally { setBusy(null); }
+  }
+
+  if (!items) return null;
+  return (
+    <div className="rounded-lg border border-accent/30 bg-accent-subtle/15 p-4">
+      <p className="text-sm font-bold text-brand">📝 제출 기사 검수 {items.length > 0 && <span className="text-accent">({items.length})</span>}</p>
+      {items.length === 0 ? (
+        <p className="mt-2 text-xs text-foreground-muted">검수 대기 중인 제출 기사가 없습니다.</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {items.map((a) => (
+            <li key={a.id} className="rounded-lg border border-brand/10 bg-background p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-brand truncate">{a.title || "(제목 없음)"}</p>
+                  <p className="mt-0.5 text-xs text-foreground-muted">기자 {a.reporter} · {a.aiLabel}{a.submittedAt ? ` · ${new Date(a.submittedAt).toLocaleString("ko-KR")}` : ""}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{a.excerpt}</p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <button type="button" onClick={() => decide(a.id, "approved")} disabled={busy === a.id} className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50">승인·발행</button>
+                  <button type="button" onClick={() => decide(a.id, "rejected")} disabled={busy === a.id} className="rounded border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">반려</button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function CitizenOpsSection() {
   const [reporters, setReporters] = useState<ReporterSummary[]>([]);
   const [summary, setSummary] = useState<CitizenSummary | null>(null);
@@ -392,8 +579,11 @@ function CitizenOpsSection() {
         )}
       </div>
       <p className="text-sm text-foreground-muted">
-        ℹ️ 실제 모집은 2026년 7월 중순 예정 — 아래는 운영 화면 <strong>예시 데이터</strong>입니다.
+        ℹ️ 실제 모집은 2026년 7월 중순 예정 — 기자 목록·정산은 운영 화면 <strong>예시 데이터</strong>이고, 아래 제출 기사 검수는 실데이터입니다.
       </p>
+
+      {/* 제출 기사 검수(실데이터) */}
+      <CitizenSubmissionsReview />
 
       {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
       {error && (

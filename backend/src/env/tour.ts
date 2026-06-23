@@ -2,8 +2,11 @@
 //   축제(현재·예정) + 대표 관광지. 태안군 시군구코드는 areaCode2로 런타임 조회(하드코딩 회피).
 // 키 없으면 available:false. 모든 호출 실패에 관대.
 
+import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
+
 const TOUR_BASE = "https://apis.data.go.kr/B551011/KorService2";
-const AREA_CHUNGNAM = "34"; // TourAPI 지역코드: 충청남도
+const AREA_CHUNGNAM = REGION.tourAreaCode; // TourAPI 지역코드(지역 설정)
 
 export interface TourInfo {
   available: boolean;
@@ -32,13 +35,13 @@ async function taeanSigungu(key: string): Promise<string | null> {
   let code: string | null = null;
   try {
     const it = itemsOf(await tourGet("areaCode2", key, { areaCode: AREA_CHUNGNAM }));
-    code = it.find((x) => (x.name || "").includes("태안"))?.code ?? null;
+    code = it.find((x) => (x.name || "").includes(REGION.name))?.code ?? null;
   } catch { /* 못 찾으면 시군구 없이 전체 충남 */ }
   cachedSigungu = { at: Date.now(), code };
   return code;
 }
 
-export async function fetchTour(env: { DATA_GO_KR_KEY?: string }): Promise<TourInfo> {
+async function fetchTourImpl(env: { DATA_GO_KR_KEY?: string }): Promise<TourInfo> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, festivals: [], attractions: [] };
   const sigungu = await taeanSigungu(key);
@@ -65,3 +68,6 @@ export async function fetchTour(env: { DATA_GO_KR_KEY?: string }): Promise<TourI
 
   return { available: true, festivals, attractions };
 }
+
+// 6시간 캐시 + dedup (축제는 자주 안 바뀜; 축제·수요지수 양쪽에서 호출)
+export const fetchTour = makeTtlCache(fetchTourImpl, 6 * 3600_000);

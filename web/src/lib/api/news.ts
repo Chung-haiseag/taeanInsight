@@ -28,6 +28,8 @@ export interface NewsResponse {
   counts: Record<string, number>;
   labels: Record<string, string>;
   source: string;
+  personalized?: boolean;
+  interests?: string[];
 }
 
 export async function getNews(category?: string, limit?: number): Promise<NewsResponse> {

@@ -19,8 +19,10 @@ import { WorkersAiLlmClient } from "../llm/workers_ai";
 import { WeeklyReportPipeline } from "./weekly_pipeline";
 import { makeFactsLoader } from "./facts";
 import { WeeklyReportRepo, type StoredReport } from "./repo";
+import { loadReportMetrics } from "./metrics";
 import { notifyReportPublished } from "./notify";
 import type { ReportSection, ReportSectionKey } from "./types";
+import { getIsoWeekId } from "./types";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
 import { decideVisibility, type VisibilityTier } from "../preferences/content_filter";
 import type { InterestCategory, UserPreferences } from "../preferences/types";
@@ -148,16 +150,37 @@ reportsRouter.get("/latest", async (c) => {
   return c.json({ report: personalize(gate(report, tier), prefs) });
 });
 
+// 리포트 섹션 시각화용 정형 지표(대기질 추세·실거래 집계·축제) — 산문과 별개로 차트/표 렌더
+// 엣지 캐시(Cache API) 5분: 외부 API 10여 개 팬아웃을 colo당 5분 1회로 제한(요청 간 재사용).
+reportsRouter.get("/metrics", async (c) => {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+  // 1) cron이 미리 채운 D1 스냅샷이 신선하면 즉시 서빙(외부 API 팬아웃 회피)
+  // 2) 없으면 라이브 계산(첫 부팅·스냅샷 만료 대비)
+  const { getFreshSnapshot } = await import("./metrics_cache");
+  const metrics = (await getFreshSnapshot(c.env)) ?? (await loadReportMetrics(c.env));
+  const res = c.json({ metrics });
+  res.headers.set("Cache-Control", "public, s-maxage=300");
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+});
+
 // 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님
+// 최신 리포트 조회 시 '지금'까지의 최신 기사를 보여줌(발행일에 고정 X) — 실시간성 확보.
+// 과거 리포트(weekId가 최신이 아님) 조회면 그 주 창으로 한정.
 reportsRouter.get("/:weekId/news", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ news: [] });
   const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
-  const report = await repo.get(c.req.param("weekId"));
-  // 발행일 기준 8일 창(발행 주 + α). 없으면 최신 발행분 기준.
-  const base = report?.publishedAt || (await repo.latestPublished())?.publishedAt || new Date().toISOString();
-  const until = base.slice(0, 10);
-  // 한 주간(발행일 기준 7일) 태안뉴스 전체 나열
-  const since = new Date(new Date(until).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const weekId = c.req.param("weekId");
+  const report = await repo.get(weekId);
+  const latest = await repo.latestPublished();
+  const isLatest = !report || !latest || report.weekId === latest.weekId;
+  // 최신 리포트면 오늘 기준, 과거 리포트면 그 발행일 기준. 창은 14일(주간지 간격 여유).
+  const todayKst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const until = isLatest ? todayKst : (report!.publishedAt || todayKst).slice(0, 10);
+  const since = new Date(new Date(until).getTime() - 14 * 86_400_000).toISOString().slice(0, 10);
   const r = await c.env.ARCHIVE_DB
     .prepare(
       `SELECT idxno, title, published_at, category, section FROM archive_articles
@@ -191,6 +214,50 @@ reportsRouter.get("/:weekId", async (c) => {
 // ───────────────────────── 관리자 라우터 ─────────────────────────
 // ⚠️ PoC: 인증 미적용(reviewRouter와 동일). 운영 전 requireAuth/requireRole 적용.
 export const adminReportsRouter = new Hono<{ Bindings: Env }>();
+
+// metrics 스냅샷 수동 갱신(워밍) — cron과 동일. 배포 직후 즉시 채울 때.
+adminReportsRouter.get("/refresh-metrics", async (c) => {
+  const { refreshMetricsSnapshot } = await import("./metrics_cache");
+  return c.json(await refreshMetricsSnapshot(c.env));
+});
+
+// 수요지수 백테스트 조회(예측 vs 실측 정확도) — 데이터 누적 후 의미. ?fill=1로 실측 즉시 적재.
+adminReportsRouter.get("/backtest", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const { computeBacktest, fillActuals } = await import("./backtest");
+  let filled: number | undefined;
+  if (c.req.query("fill") === "1") filled = (await fillActuals(c.env)).filled;
+  const result = await computeBacktest(c.env.ARCHIVE_DB);
+  return c.json(filled !== undefined ? { ...result, filled } : result);
+});
+
+// 검수 화면용 — 이번 주차 리포트(초안/발행) 전문 + 거버넌스 사전검사(발행 안 함).
+adminReportsRouter.get("/current", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
+  const report = (await repo.get(getIsoWeekId())) ?? (await repo.latestPublished());
+  if (!report) return c.json({ report: null, governance: null });
+  let governance: { approved: boolean; reasons: string[] } = { approved: true, reasons: [] };
+  try {
+    const review = await buildPipeline(c.env).validateForPublish({ ...report, hitlReviewerId: "preview" });
+    governance = { approved: review.approved, reasons: review.reasons };
+  } catch { /* 거버넌스 검사 실패는 무시(미리보기) */ }
+  return c.json({
+    report: { weekId: report.weekId, status: report.status, aiLabel: report.aiLabel, publishedAt: report.publishedAt, summary: report.summary, sections: report.sections },
+    governance,
+  });
+});
+
+// 발행 회수(unpublish) — published → draft. 오발행 시 즉시 비공개.
+adminReportsRouter.post("/:weekId/unpublish", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const weekId = c.req.param("weekId");
+  const r = await c.env.ARCHIVE_DB
+    .prepare(`UPDATE weekly_reports SET status='draft', published_at=NULL, updated_at=datetime('now') WHERE week_id=?1 AND status='published'`)
+    .bind(weekId)
+    .run();
+  return c.json({ ok: !!r.meta.changes, weekId, reverted: !!r.meta.changes });
+});
 
 const generateSchema = z.object({ weekId: z.string().regex(/^\d{4}-W\d{2}$/).optional() });
 

@@ -13,7 +13,9 @@ const APT_URLS = [
 const LAND_URLS = [
   "https://apis.data.go.kr/1613000/RTMSDataSvcLandTrade/getRTMSDataSvcLandTrade",
 ];
-const DEFAULT_LAWD = "44825"; // 충남 태안군
+import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
+const DEFAULT_LAWD = REGION.lawdCd; // 시군구 법정동코드(지역 설정)
 
 export interface RealEstateInfo {
   available: boolean;
@@ -82,7 +84,7 @@ const ymd = (x: Record<string, string>): string => {
   return y ? `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}` : "";
 };
 
-export async function fetchRealEstate(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD?: string }): Promise<RealEstateInfo> {
+async function fetchRealEstateImpl(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD?: string }): Promise<RealEstateInfo> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, apartments: [], lands: [] };
   const lawd = env.TAEAN_LAWD_CD || DEFAULT_LAWD;
@@ -128,3 +130,6 @@ export async function fetchRealEstate(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD
   lands.sort((a, b) => b.ymd.localeCompare(a.ymd));
   return { available: any, apartments: apartments.slice(0, 12), lands: lands.slice(0, 12) };
 }
+
+// 6시간 캐시 (실거래는 일 단위 갱신)
+export const fetchRealEstate = makeTtlCache(fetchRealEstateImpl, 6 * 3600_000);

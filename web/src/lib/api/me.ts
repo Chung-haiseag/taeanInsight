@@ -15,11 +15,14 @@ export async function getMe(): Promise<MeResponse> {
   return apiFetch<MeResponse>("/api/me");
 }
 
+import type { ShopProfile } from "./owner";
+
 export interface OnboardInput {
   segment: UserSegment;
   regions: string[];
   categories: InterestCategory[];
   notificationChannels: NotificationChannel[];
+  shopProfile?: ShopProfile;
 }
 
 export async function submitOnboarding(input: OnboardInput): Promise<UserPreferences> {

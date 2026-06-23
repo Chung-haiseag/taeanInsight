@@ -40,6 +40,17 @@ export async function paySettlement(reporterId: string): Promise<{ ok: boolean; 
   return apiFetch(`/api/admin/citizen/settlements/${reporterId}/pay`, { method: "POST" });
 }
 
+// 제출된 시민기자 기사 검수(D1)
+export interface CitizenSubmission {
+  id: string; title: string; aiLabel: string; status: string; submittedAt: string | null; reporter: string; excerpt: string;
+}
+export async function getCitizenSubmissions(): Promise<CitizenSubmission[]> {
+  return apiFetch<{ items: CitizenSubmission[] }>("/api/admin/citizen/submissions").then((d) => d.items);
+}
+export async function decideCitizenSubmission(id: string, decision: "approved" | "rejected", notes?: string): Promise<{ ok: boolean; status: string }> {
+  return apiFetch(`/api/admin/citizen/submissions/${id}/decision`, { method: "POST", body: JSON.stringify({ decision, notes }) });
+}
+
 export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   pending: "이체 대기",
   processing: "이체 중",

@@ -3,6 +3,8 @@
 
 import Link from "next/link";
 import { AILabelBadge } from "@/components/ai-label-badge";
+import { PersonalizedNewsStrip } from "@/components/home/personalized-news";
+import { LiveSummaryStrip } from "@/components/home/live-summary";
 
 export function GenericHome() {
   return (
@@ -35,6 +37,9 @@ export function GenericHome() {
           </Link>
         </div>
       </section>
+
+      {/* 지금 태안 — 라이브 핵심 지표 */}
+      <LiveSummaryStrip />
 
       {/* 4대 상품 카드 */}
       <section aria-labelledby="products-heading">
@@ -96,6 +101,9 @@ export function GenericHome() {
           </p>
         </div>
       </section>
+
+      {/* 개인화 뉴스 스트립 (관심사 있으면 맞춤, 없으면 최신) */}
+      <PersonalizedNewsStrip />
     </div>
   );
 }

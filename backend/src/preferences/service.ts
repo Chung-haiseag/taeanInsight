@@ -29,6 +29,7 @@ export interface OnboardInput {
   regions: string[];
   categories: InterestCategory[];
   notificationChannels: NotificationChannel[];
+  shopProfile?: import("./types").ShopProfile;
 }
 
 export class PreferencesService {
@@ -52,6 +53,7 @@ export class PreferencesService {
       regions: dedupe(input.regions),
       categories: dedupe(input.categories),
       notificationChannels: dedupe(input.notificationChannels),
+      shopProfile: input.shopProfile,
       onboardedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -65,7 +67,7 @@ export class PreferencesService {
 
   async update(
     userId: string,
-    patch: Partial<Pick<UserPreferences, "regions" | "categories" | "notificationChannels">>,
+    patch: Partial<Pick<UserPreferences, "regions" | "categories" | "notificationChannels" | "shopProfile">>,
   ): Promise<UserPreferences> {
     const existing = await this.prefsRepo.get(userId);
     if (!existing) throw new Error("preferences_not_found_run_onboarding_first");
@@ -77,6 +79,7 @@ export class PreferencesService {
       notificationChannels: patch.notificationChannels
         ? dedupe(patch.notificationChannels)
         : existing.notificationChannels,
+      shopProfile: patch.shopProfile ?? existing.shopProfile,
       updatedAt: new Date().toISOString(),
     };
 

@@ -33,10 +33,14 @@ export default function NewsPage() {
     return active === "all" ? data.items : data.items.filter((i) => i.category === active);
   }, [data, active]);
 
+  const interests = useMemo(() => new Set(data?.interests ?? []), [data]);
+
   const tabs = useMemo(() => {
     if (!data) return [];
-    return CATEGORY_ORDER.filter((c) => (data.counts[c] ?? 0) > 0);
-  }, [data]);
+    const avail = CATEGORY_ORDER.filter((c) => (data.counts[c] ?? 0) > 0);
+    // 관심 분야 탭을 앞으로
+    return [...avail].sort((a, b) => Number(interests.has(b)) - Number(interests.has(a)));
+  }, [data, interests]);
 
   return (
     <div className="space-y-8">
@@ -59,13 +63,22 @@ export default function NewsPage() {
 
       {data && (
         <>
+          {data.personalized && data.interests?.length ? (
+            <div className="flex items-center gap-2 rounded-xl bg-accent-subtle/30 px-4 py-2.5 text-sm">
+              <span aria-hidden>⭐</span>
+              <span className="text-brand">
+                <strong>{data.interests.map((c) => data.labels[c] ?? c).join("·")}</strong> 관심사 기사를 먼저 보여드려요
+              </span>
+            </div>
+          ) : null}
+
           {/* 카테고리 탭 */}
           <div className="flex flex-wrap gap-2 border-b border-brand/10 pb-3">
             <Tab label={`전체 ${data.total}`} active={active === "all"} onClick={() => setActive("all")} />
             {tabs.map((c) => (
               <Tab
                 key={c}
-                label={`${data.labels[c]} ${data.counts[c]}`}
+                label={`${interests.has(c) ? "⭐ " : ""}${data.labels[c]} ${data.counts[c]}`}
                 active={active === c}
                 onClick={() => setActive(c)}
               />

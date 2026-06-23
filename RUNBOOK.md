@@ -65,6 +65,35 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06 · 외부 커넥터: 날씨+대기질(작동)·관광(대기) · backend/env, GET /api/conditions
 - 2026-06 · Gemini 기사 재구조화(지면→기사, Vision 재실행 없음) · tools/ebook/restructure-gemini.mjs
 - 2026-06 · 주간리포트 MVP: Workers AI 5섹션 초안(목22시 cron)→HITL 발행→/reports 게이팅 렌더 · backend/reports, web/reports, db/009
+- 2026-06-20 · 주간리포트 기본 공개 전환(로그인·구독 없이 전체 열람): 파이프라인/스키마 기본값 premiumOnly=0, 기존 발행분 UPDATE · backend/reports/weekly_pipeline.ts, db/010
+- 2026-06-20 · 주간리포트 섹션 시각화: 대기질 7일 막대·실시간 스탯카드·실거래 집계/표/레인지바·축제 불릿(라이브러리 무, CSS/SVG) · GET /api/reports/metrics, web/components/reports/report-charts.tsx
+- 2026-06-20 · 기상 관측 교정: observedAt 시각 +9h 버그 수정, 정오(12 KST=03 UTC) 환경 스냅샷 cron 추가(자정값 과대습도 보정) · env/sources.ts, index.ts, wrangler crons
+- 2026-06-20 · 관광 수요지수 v1(규칙기반: 날씨예보·연휴·축제·계절): 새 키 불요(DATA_GO_KR_KEY) · GET /api/conditions/demand, backend/tour/demand.ts, db/011(백테스트 로그)
+- 2026-06-20 · 리포트 관광 섹션에 주말 수요지수 게이지 카드(지수·레벨·주말날씨·기여요인 칩) · reports/metrics.ts→tourism.demand, report-charts.tsx DemandGauge
+- 2026-06-20 · 해변 바다 정보(수온·파고): 기상청 해수욕장 서비스(BeachInfoservice, 기존 키·15102239 활용신청). 만리포70·꽃지44. 조석은 KMA 빈값이라 KHOA 대기 · GET /api/conditions/marine, tour/marine.ts, report-charts.tsx MarineCard
+- 2026-06-20 · 수요지수에 수온·파고 반영(해수욕 적합도·안전, 6~9월 가중↑): 수온≥24 +12·차가움 −5, 파고≥2.5m −15 등 · tour/demand.ts
+- 2026-06-20 · 해수욕지수(국립해양조사원, data.go.kr 1192136/fcstBeachv2·type=json) 추가: 신두리·학암포 지수(5단계)·최대파고·수온·기온·풍속·개장상태. MarineCard 배지+demand 요인(매우좋음+15~매우나쁨−13) · tour/marine.ts
+- 2026-06-20 · 밀물/썰물(조석) 완성: 국립해양조사원 조석예보 고저조(data.go.kr 1192136/tideFcstHghLw, obsCode 안흥=DT_0067, extrSe 홀수=고조). MarineCard "오늘의 물때" 블록(만조/간조 시각·조위) · tour/marine.ts
+- 2026-06-20 · "이번 주 한눈에 보기" 인포그래픽: 수요지수·기온·대기질·바다수온/파고·다음물때·아파트평균가·축제·군청소식 핵심지표 타일(요약 섹션 상단) · report-charts.tsx SummaryInfographic
+- 2026-06-20 · 리포트 음성 듣기(TTS): 브라우저 Web Speech API(무료·서버無), 잠금 안 된 섹션 본문 ko-KR 낭독·문장청크 큐·자연스러운 보이스 우선선택 · report-tts.tsx ReportTTS
+- 2026-06-20 · 지난주 대비 추세(▲▼): 인포그래픽 하단 스트립. env_daily 대기질·기온(7+7일, 부족시 절반비교)·tour_demand_log 수요지수(최근 두 주말) · metrics.ts weeklyTrends, report-charts.tsx TrendStrip
+- 2026-06-20 · 일출·일몰(NOAA 천문계산, API無)+갯벌체험 추천(간조 기준): 해변 카드에 표시 · tour/marine.ts computeSun/mudflat
+- 2026-06-20 · 이달의 제철 태안 먹거리(정적 월별, 꽃게·바지락·천일염 등): 이벤트 섹션 카드 · report-charts.tsx SeasonalFoodCard
+- 2026-06-21 · 리포트 발행 알림 구독 버튼(Web Push): 기존 notifications 인프라 재사용, 독자 옵트인→발행 시 자동 발송 · report-push.tsx ReportPushButton
+- 2026-06-21 · 충남 주유 평균가(오피넷 avgSidoPrice, OPINET_KEY 시크릿): 휘발유·경유, 전일·전국대비. 부동산·지역경제 섹션 카드 · backend/env/oil.ts, report-charts.tsx OilCard
+- 2026-06-21 · 서핑지수(국립해양조사원 fcstSurfingv2, 만리포): 등급별(초급/중급/상급) 지수+파고·주기·풍속·수온. 해변 카드 · tour/marine.ts fetchSurf
+- 2026-06-21 · 자외선지수(기상청 LivingWthrIdxServiceV5 getUVIdxV5, 태안군 areaNo 4482500000): 오늘 낮 최고치·등급. 인포그래픽 타일 · backend/env/living.ts fetchUV
+- 2026-06-22 · 검색 관심도 선행지표(네이버 데이터랩 검색어트렌드, NAVER_CLIENT_ID/SECRET): 태안 키워드 주간 추세. 지난주대비 스트립 "검색관심도 ▲▼" + 수요지수 요인(급증/급감) · backend/env/search_trend.ts
+- 2026-06-22 · 지역설정 중앙화(region.ts) + 안정화: 지역상수 1파일·포팅가이드(docs/REGION_PORTING.md), 외부 API 프로미스캐시 dedup + /api/reports/metrics 엣지캐시 5분(colo당 팬아웃 1회) · backend/lib/cache.ts
+- 2026-06-22 · 프론트 지역값(제철먹거리) lib/region.ts 분리 · 수요지수 백테스트 골격(예측 vs 실측 MAE·MAPE·상관, fillActuals 일일적재, GET /api/admin/reports/backtest) · backend/reports/backtest.ts
+- 2026-06-22 · 환경·안전 자동 알림(대기질·자외선·파고·기온·해수욕지수 임계, 아침 07KST cron, env_alert_log 멱등) · backend/notifications/env_alerts.ts, db/012
+- 2026-06-22 · metrics 사전계산 D1 스냅샷+30분 워밍 cron(콜드 9~16s→0.7s, 전 colo) · backend/reports/metrics_cache.ts, db/013
+- 2026-06-22 · 리포트 공유 미리보기 OG/트위터 동적 메타(그 주 요약) · web/app/reports/page.tsx generateMetadata
+- 2026-06-22 · 이메일 뉴스레터 구독 수집 토대(email_subscribers, /api/email/subscribe·unsubscribe, 리포트 구독폼). 발송은 도메인온보딩+발송수단(ESP/트랜잭션) 결정 후 · backend/email, db/015
+- 2026-06-22 · "지금 태안"(/live) 실시간 현황 공개 페이지(metrics 재사용)+nav 추가. CCTV(ITS/data.go.kr 15040466)는 키 후 추가 예정 · web/app/live
+- 2026-06-22 · 뉴스 실시간화: 리포트 뉴스 창을 발행일 고정→최신 리포트는 오늘 기준 14일. /live 최신 태안뉴스 목록 · reports/router.ts
+- 2026-06-22 · 수집 빈도↑: 뉴스·군청목록 6시간→12시간 cron(0 */12). 카드뉴스 이미지=군청이 Worker IP 차단→로컬 크롤러 launchd 자동화(tools/gov, 6h)
+- 2026-06-22 · 주간 리포트: 초안 금 16시(0 7 * * 5) 자동 생성, 발행은 편집부 검토(HITL) 후 수동(목표 금 17시)
 - 2026-06 · 주간리포트 facts 강화: 아카이브45일+TourAPI축제+국토부 실거래가(LAWD 44825) 주입 · backend/reports/facts, env/realestate
 - 2026-06 · Web Push 실발송(RFC8291 암호화+VAPID, WebCrypto): 공개 옵트인 /api/push, 발행 시 전구독자 발송 · backend/notifications, db/010
 - 2026-06 · 태안군청 군정 게시판 수집: 한국IP 로컬 크롤러→/api/gov/import(토큰), 주간행사계획 등 주간리포트 facts 강화 · tools/gov, backend/gov, db/011
@@ -72,6 +101,8 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06 · 아카이브 검색 속도·페이지네이션: 전자북 거대 썸네일 제거 + 이전/다음(hasMore, COUNT 회피) · backend/archive, web/archive
 - 2026-06-18 · 전자북 1995~2001 기사 재구조화 **라이브 반영**(면→기사). 프로덕션 옛 면 레코드 삭제 후 jsonl 32,324건 적재 → D1 41,615건이 jsonl과 1:1 일치. 적재 중 D1 7500 중단 대비 내결함성 재적용 추가 · tools/ebook/reapply-d1.mjs
 - 2026-06-19 · 전자북 **1990(세로쓰기) 디지털화·라이브**. Vision OCR이 세로조판에 깨져 보류였던 1990을 Gemini 멀티모달이 지면이미지 직접 전사+기사분리(노 OCR·노 Claude). 충실도 우선 flash 단독(루프 시 설정 바꿔 8회 재시도, 실패면 정직한 스텁) — pro는 요약·환각 위험으로 미사용. 31개 호 기사 1,684·스텁 46(2.7%) → D1 1990 1,730건/31호, 전자북 총 43,269 · tools/ebook/digitize-gemini-vision.mjs, gv1990.sh
+- 2026-06-19 · 내 페이지(/me) 초개인화 위젯 실데이터화: 오늘의태안(날씨·대기질)·내분야뉴스·맞춤리포트요약·아카이브픽·군정소식 + KPI 실값(— 제거). 위젯별 로딩·에러 격리, 세그먼트별 배치 · web/components/me/widgets,widget_registry
+- 2026-06-19 · CORS allowHeaders에 X-Taean-Uid 추가(익명 디바이스 식별 헤더 preflight 차단 → Failed to fetch 해결) · backend/src/index.ts
 <!-- 새 기능 추가 시 위에 한 줄 -->
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
@@ -84,3 +115,37 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - **cron 수집기**: 외부 소스마다 커넥터 1개 → 정규화 → D1. RSS 정체 대비 목록 스크랩 병합.
 - **해외IP 차단 소스**: 일부 관공서(taean.go.kr 기사view)는 데이터센터/해외 IP에 500 → Worker fetch 불가. 한국 IP 로컬 크롤러가 수집·파싱 후 토큰 API로 적재(수집=로컬, 쓰기=Worker).
 - **콘텐츠 충실도 가드**: 생성/추출 텍스트 vs 원문 n-gram 겹침, 낮으면 경고/폐기. 공백 무시.
+
+- 2026-06-22 · 관리자 주간리포트 검수·발행 탭(초안 미리보기·거버넌스 사전검사·발행/회수) + 회수 API · web/admin, GET /api/admin/reports/current, POST .../unpublish
+
+- 2026-06-22 · 홈 라이브 요약(GenericHome) + "N년 전 오늘 태안" 회고(/live, GET /api/archive/on-this-day) · web/home, archive/router
+
+- 2026-06-23 · 초개인화: 사장님 홈(OwnerHome) 실데이터화 + 가게 프로필(업종·읍면). owner-brief 룰엔진(수요×날씨×물때×업종) · backend/owner/brief.ts, db/016, web/home/owner-home
+
+- 2026-06-23 · 온보딩에 가게 프로필 스텝 추가(사장님·기관 유형 조건부, 업종·상호) → owner-brief 맞춤 · web/me/onboarding, backend/preferences
+
+- 2026-06-23 · 사장님 실행제안 규칙엔진 고도화(추세·주말강수·파고·대기질·기온·시간대·업종세분화 + 우선순위/태그) · backend/owner/brief.ts
+
+- 2026-06-23 · 팀(B2B)·부서(B2G) 공유 워크스페이스(공유코드 가입·멤버·공유자료·공유메모) placeholder→실구현 · backend/workspace, db/017, web/me/workspace-panel
+
+- 2026-06-23 · 도로 실시간 CCTV(ITS) 라이브: 태안 국도 39곳, /live HLS 플레이어. ITS 9443포트는 Worker 불가→로컬 크롤러(launchd 30분) D1 미러 · tools/cctv, GET /api/conditions/cctv, db/018
+
+- 2026-06-23 · 해안 해무 CCTV 스틸컷(국립해양조사원 seafogCctv, 대산항·평택당진항 10분 단위) · /live, GET /api/conditions/seafog, backend/env/seafog.ts
+
+- 2026-06-23 · "역대 오늘, 태안": 같은 일자(MM-DD) 과거 주요뉴스 랜덤(±3일 보강·광고배제) · GET /api/archive/on-this-day
+
+- 2026-06-23 · 태안뉴스 로딩 가속: D1 캐시(news_cache, SWR)+30분 워밍 cron(3.5s→0.85s, workers.dev 엣지캐시 불가 대응) · backend/news, db/019
+
+- 2026-06-23 · 성능: 해무/역대오늘 D1 캐시(api_cache, db/020)+30분 워밍, /live 병렬화 → /live 3.0s→1.5s·해무 9.5s→0.7s · backend/lib/api_cache.ts
+
+- 2026-06-23 · 시민기자 에디터 UX: 임시저장(localStorage)·미리보기·글자수·모바일(sticky 제출) · web/citizen/write
+
+- 2026-06-23 · 시민기자 키워드→AI 초안 생성(POST /api/copilot/draft, Workers AI, 날조방지 [확인필요] 마커) → 기자 수정·HITL · backend/copilot, web/citizen/write
+
+- 2026-06-23 · 시민기자 사진 업로드(R2, POST /api/copilot/upload, citizen/ 키) + 본문 ![](url) 삽입·미리보기 렌더 · backend/copilot, web/citizen/write
+
+- 2026-06-23 · 시민기자 기사 CRUD/목록(D1 citizen_articles, /api/citizen/articles, uid 소유)+내 기사 페이지+에디터 초안저장/수정 연동 · backend/citizen/articles_router, db/021, web/citizen/articles
+
+- 2026-06-23 · 시민기자 검수 루프 완성: 관리자 제출기사 검수(승인→published/반려→rejected+사유)→내 기사 반영 · backend/citizen/router(submissions), web/admin
+
+- 2026-06-23 · B2B 대시보드 정체성 확립+실재화: 지역 데이터 분석(시계열·기간필터·CSV). GET /api/dashboard/series·export · backend/dashboard, web/dashboard

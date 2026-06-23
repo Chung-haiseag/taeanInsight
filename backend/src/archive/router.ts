@@ -45,12 +45,13 @@ archiveRouter.get("/search", async (c) => {
       `WHERE ${where} ORDER BY a.published_at DESC LIMIT ? OFFSET ?`;
     return adb.prepare(sql).bind(q, ...binds, PAGE_SIZE, offset).all();
   }
+  // 짧은 질의(2글자) 폴백 — 본문 LIKE 풀스캔(~104k행, 2s+)을 피해 제목만 검색.
+  // 3글자↑ 본문 매칭은 FTS가 담당하므로 LIKE는 제목 한정으로 충분히 빠름.
   async function likeSearch() {
-    const where = ["(a.title LIKE ? OR a.body LIKE ?)", ...filters].join(" AND ");
-    const like = `%${q}%`;
+    const where = ["a.title LIKE ?", ...filters].join(" AND ");
     const sql =
       `SELECT ${cols} FROM archive_articles a WHERE ${where} ORDER BY published_at DESC LIMIT ? OFFSET ?`;
-    return adb.prepare(sql).bind(like, like, ...binds, PAGE_SIZE, offset).all();
+    return adb.prepare(sql).bind(`%${q}%`, ...binds, PAGE_SIZE, offset).all();
   }
   async function listOnly() {
     const where = filters.length ? "WHERE " + filters.join(" AND ") : "";
@@ -93,6 +94,98 @@ const REL_STOP = new Set([
   "전면", "착용", "의무화", "확대", "강화", "재검토", "선정", "모집", "안내", "협약", "체결",
   "전국", "최대", "최초", "처음", "기념", "예정", "결정", "촉구", "주민", "지역",
 ]);
+
+// "역대 오늘, 태안" — 정확히 오늘과 같은 일자(MM-DD)의 과거 주요 뉴스를 랜덤으로.
+//   주요 신호: 옛 지면 01~03면(1면·종합), 현대 정치·자치행정, 또는 사진(lead_image) 보유.
+//   같은 일자가 너무 적으면(주간지라 발행일 편차) ±3일로 자동 보강. 새로고침마다 셔플.
+// 주요뉴스만: 옛 01~03면(1면·종합)·현대 뉴스/라이프 섹션 + 본문 500자↑(광고·단신 배제).
+const ON_THIS_DAY_MAJOR = `(
+  (section LIKE '%01면%' OR section LIKE '%02면%' OR section LIKE '%03면%'
+   OR section LIKE '뉴스>%' OR section LIKE '라이프>%')
+  AND body IS NOT NULL AND LENGTH(body) >= 500
+  AND title NOT LIKE '%급전%' AND title NOT LIKE '%대출%' AND title NOT LIKE '%무제한%' AND title NOT LIKE '%■%'
+  AND title NOT LIKE '%광고%'
+  AND title NOT GLOB '[0-9][0-9][0-9][0-9]*면'   -- 'YYYY... NN면' 제목 누락 아티팩트 제외
+)`;
+
+// 아카이브 전체 통계 — 총 건수·연도 범위(엣지 1시간 캐시).
+archiveRouter.get("/stats", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ total: 0, minYear: null, maxYear: null });
+  try {
+    const r = await db.prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles").first<{ total: number; minYear: number | null; maxYear: number | null }>();
+    return c.json(
+      { total: r?.total ?? 0, minYear: r?.minYear ?? null, maxYear: r?.maxYear ?? null },
+      { headers: { "cache-control": "public, max-age=3600" } },
+    );
+  } catch {
+    return c.json({ total: 0, minYear: null, maxYear: null });
+  }
+});
+
+type OtdRow = { idxno: number; title: string; published_at: string; year: number; category: string; exact: number };
+
+// 후보 풀(오늘 ±3일 주요뉴스)을 D1 캐시 — 매 요청 substr 스캔(~1.4s) 회피. 무작위 선택은 JS.
+async function loadOtdPool(db: D1Database, kst: Date, curYear: number): Promise<OtdRow[]> {
+  const today = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+  const { readCache, writeCache } = await import("../lib/api_cache");
+  const cached = await readCache<OtdRow[]>(db, `otd:${today}`);
+  if (cached && cached.value.length && cached.ageMs < 6 * 3600_000) return cached.value;
+
+  const mmdds = new Set<string>();
+  for (let d = -3; d <= 3; d++) {
+    const t = new Date(kst.getTime() + d * 86400000);
+    mmdds.add(`${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`);
+  }
+  const list = [...mmdds];
+  const ph = list.map((_, i) => `?${i + 1}`).join(",");
+  const r = await db
+    .prepare(
+      `SELECT idxno,title,published_at,year,category,
+              (substr(published_at,6,5)=?${list.length + 2}) AS exact
+       FROM archive_articles
+       WHERE substr(published_at,6,5) IN (${ph}) AND year < ?${list.length + 1} AND ${ON_THIS_DAY_MAJOR}
+       ORDER BY exact DESC LIMIT 200`,
+    )
+    .bind(...list, curYear, today)
+    .all<OtdRow>();
+  const pool = r.results ?? [];
+  await writeCache(db, `otd:${today}`, pool);
+  return pool;
+}
+
+archiveRouter.get("/on-this-day", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ items: [] });
+  const kst = new Date(Date.now() + 9 * 3600 * 1000);
+  const curYear = kst.getUTCFullYear();
+  const limit = Math.min(20, Math.max(1, Number(c.req.query("limit") || "8") || 8));
+  const today = `${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+
+  try {
+    const pool = await loadOtdPool(db, kst, curYear);
+    // 연도별 후보 그룹 → 연도당 1건 무작위(정확 일자 우선) → 연도 다양하게 8개 → 과거순 정렬
+    const byYear = new Map<number, OtdRow[]>();
+    for (const row of pool) { const a = byYear.get(row.year) ?? []; a.push(row); byYear.set(row.year, a); }
+    const picks: OtdRow[] = [];
+    for (const [, rows] of byYear) {
+      const exact = rows.filter((r) => r.exact);
+      const from = exact.length ? exact : rows;
+      picks.push(from[Math.floor(Math.random() * from.length)]);
+    }
+    for (let i = picks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [picks[i], picks[j]] = [picks[j], picks[i]]; }
+    const chosen = picks.slice(0, limit).sort((a, b) => a.year - b.year || a.published_at.localeCompare(b.published_at));
+    return c.json({
+      date: today,
+      items: chosen.map((x) => ({
+        idxno: x.idxno, title: x.title, year: x.year,
+        yearsAgo: curYear - x.year, category: x.category, leadImage: null, date: x.published_at.slice(5, 10),
+      })),
+    });
+  } catch {
+    return c.json({ items: [] });
+  }
+});
 
 archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
   const db = c.env.ARCHIVE_DB;

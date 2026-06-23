@@ -3,6 +3,9 @@
 //   ② 에어코리아 대기오염정보(측정소별 실시간) → 미세먼지·오존·통합지수
 // 키(DATA_GO_KR_KEY) 없으면 available:false 로 안전 반환. 모든 호출 실패에 관대(부분 데이터 OK).
 
+import { REGION } from "../region";
+import { makeTtlCache } from "../lib/cache";
+
 const KMA_BASE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
 const AIR_BASE = "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc";
 
@@ -45,7 +48,7 @@ async function fetchWeather(key: string, nx: string, ny: string): Promise<Condit
       else if (it.category === "REH") out.humidity = Number(it.obsrValue);
       else if (it.category === "PTY") out.pty = PTY[it.obsrValue] ?? null;
     }
-    if (items.length) out.at = new Date(now).toISOString();
+    if (items.length) out.at = new Date().toISOString(); // 실제 UTC 관측시각(now는 KST 보정값이라 사용 금지)
   } catch { /* 부분 데이터 허용 */ }
   // 하늘상태(맑음/구름/흐림)는 초단기예보 SKY에서
   try {
@@ -63,12 +66,12 @@ async function fetchAir(key: string, stationHint: string): Promise<Conditions["a
   const out = { pm10: null as number | null, pm25: null as number | null, o3: null as number | null, khaiGrade: null as number | null, grade: null as string | null, station: null as string | null };
   const num = (v?: string) => (v && v !== "-" && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
   try {
-    // 시도별 실시간 — 충남 측정소 전체 후 '태안' 포함 측정소 선택 (없으면 hint 일치)
-    const sp = new URLSearchParams({ serviceKey: key, returnType: "json", sidoName: "충남", numOfRows: "100", pageNo: "1", ver: "1.5" });
+    // 시도별 실시간 — 시도 측정소 전체 후 지역명 포함 측정소 선택 (없으면 hint 일치)
+    const sp = new URLSearchParams({ serviceKey: key, returnType: "json", sidoName: REGION.airSido, numOfRows: "100", pageNo: "1", ver: "1.5" });
     const res = await fetch(`${AIR_BASE}/getCtprvnRltmMesureDnsty?${sp}`, { signal: AbortSignal.timeout(8000) });
     const j = (await res.json()) as { response?: { body?: { items?: Array<Record<string, string>> } } };
     const items = j.response?.body?.items ?? [];
-    const taean = items.filter((x) => (x.stationName || "").includes("태안"));
+    const taean = items.filter((x) => (x.stationName || "").includes(REGION.airStationMatch));
     const hasData = (x: Record<string, string>) => num(x.pm10Value) !== null || num(x.pm25Value) !== null || num(x.khaiGrade) !== null;
     // 태안 측정소 중 데이터 있는 것 우선(태안읍 통신장애 시 태안항으로 폴백)
     const it = taean.find(hasData) ?? taean[0] ?? items.find((x) => (x.stationName || "").includes(stationHint));
@@ -85,7 +88,7 @@ async function fetchAir(key: string, stationHint: string): Promise<Conditions["a
   return out;
 }
 
-export async function fetchConditions(env: {
+async function fetchConditionsImpl(env: {
   DATA_GO_KR_KEY?: string;
   TAEAN_NX?: string;
   TAEAN_NY?: string;
@@ -93,10 +96,13 @@ export async function fetchConditions(env: {
 }): Promise<Conditions> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, observedAt: null, weather: { temp: null, humidity: null, sky: null, pty: null }, air: { pm10: null, pm25: null, o3: null, khaiGrade: null, grade: null, station: null } };
-  const nx = env.TAEAN_NX || "51"; // 태안군 기상청 격자 (기본값, 필요시 조정)
-  const ny = env.TAEAN_NY || "109";
-  const station = env.TAEAN_AIR_STATION || "태안읍";
+  const nx = env.TAEAN_NX || REGION.grid.nx; // 기상청 격자 (지역 설정, env로 override 가능)
+  const ny = env.TAEAN_NY || REGION.grid.ny;
+  const station = env.TAEAN_AIR_STATION || REGION.airStationMatch;
   const [w, air] = await Promise.all([fetchWeather(key, nx, ny), fetchAir(key, station)]);
   const { at, ...weather } = w;
   return { available: true, observedAt: at, weather, air };
 }
+
+// 15분 캐시 + dedup (초단기실황은 매시 정시 발표; 라우터 /taean 캐시와 별개로 함수 레벨)
+export const fetchConditions = makeTtlCache(fetchConditionsImpl, 15 * 60_000);

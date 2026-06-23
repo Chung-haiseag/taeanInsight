@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { Env } from "../types";
 import { identifyUser, type AuthVariables } from "../auth/middleware";
+import { workspaceRouter } from "../workspace/router";
 import {
   InMemoryFavoritesRepo,
   InMemoryPreferencesRepo,
@@ -32,17 +33,26 @@ const SEGMENT_VALUES = ["b2c_basic", "b2c_premium", "b2b_basic", "b2b_premium", 
 const CATEGORY_VALUES = ["tourism", "environment", "realestate", "policy", "industry", "culture"] as const;
 const CHANNEL_VALUES = ["email", "webpush", "kakao"] as const;
 
+const shopProfileSchema = z.object({
+  industry: z.enum(["lodging", "food", "cafe", "leisure", "retail", "other"]),
+  eupMyeon: z.string().max(40).optional(),
+  capacity: z.number().int().min(0).max(100000).optional(),
+  name: z.string().max(60).optional(),
+});
+
 const onboardSchema = z.object({
   segment: z.enum(SEGMENT_VALUES),
   regions: z.array(z.string()).min(1),
   categories: z.array(z.enum(CATEGORY_VALUES)).min(1),
   notificationChannels: z.array(z.enum(CHANNEL_VALUES)).min(0),
+  shopProfile: shopProfileSchema.optional(),
 });
 
 const updateSchema = z.object({
   regions: z.array(z.string()).optional(),
   categories: z.array(z.enum(CATEGORY_VALUES)).optional(),
   notificationChannels: z.array(z.enum(CHANNEL_VALUES)).optional(),
+  shopProfile: shopProfileSchema.optional(),
 });
 
 const addFavoriteSchema = z.object({
@@ -55,6 +65,9 @@ const addFavoriteSchema = z.object({
 export const meRouter = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 meRouter.use("*", identifyUser((env) => (env as Env & { JWT_SECRET?: string }).JWT_SECRET ?? "dev-secret"));
+
+// 팀·부서 공유 워크스페이스(identifyUser 미들웨어 상속)
+meRouter.route("/workspace", workspaceRouter);
 
 // GET /api/me — 사용자 선호 + 즐겨찾기 + B2G 소속 + 세그먼트별 한도
 meRouter.get("/", async (c) => {
@@ -73,6 +86,14 @@ meRouter.get("/", async (c) => {
   });
 });
 
+// GET /api/me/owner-brief — 사장님 초개인화 브리프(수요·날씨·물때·실행제안·상권)
+meRouter.get("/owner-brief", async (c) => {
+  const auth = c.get("auth");
+  const prefs = await serviceFor(c).get(auth.sub);
+  const { loadOwnerBrief } = await import("../owner/brief");
+  return c.json(await loadOwnerBrief(c.env, prefs));
+});
+
 // POST /api/me/onboarding
 meRouter.post("/onboarding", async (c) => {
   const auth = c.get("auth");
@@ -86,6 +107,7 @@ meRouter.post("/onboarding", async (c) => {
       regions: parsed.data.regions,
       categories: parsed.data.categories as InterestCategory[],
       notificationChannels: parsed.data.notificationChannels as NotificationChannel[],
+      shopProfile: parsed.data.shopProfile,
     });
     return c.json(prefs);
   } catch (e) {
@@ -106,6 +128,7 @@ meRouter.patch("/", async (c) => {
       regions: parsed.data.regions,
       categories: parsed.data.categories as InterestCategory[] | undefined,
       notificationChannels: parsed.data.notificationChannels as NotificationChannel[] | undefined,
+      shopProfile: parsed.data.shopProfile,
     });
     return c.json(prefs);
   } catch (e) {

@@ -78,6 +78,58 @@ copilotRouter.post("/assist", async (c) => {
   }
 });
 
+// ── 키워드 → 기사 초안 생성 (Workers AI) — 시민기자가 수정하는 출발점 ──
+// 뉴스 날조 방지: 구체 사실(수치·날짜·이름·인용)은 지어내지 말고 [확인 필요] 마커로.
+const DRAFT_SYSTEM = `너는 충남 태안 지역신문의 기사 초안 보조작가다. 기자가 준 키워드로 한국어 기사 '초안 골격'을 쓴다.
+엄격한 규칙:
+- 반드시 한국어만 사용한다(외국어·한자 혼용 금지).
+- 절대 사실을 지어내지 마라: 수치·날짜·인명·기관명·통계는 모르면 [확인 필요: 무엇] 자리표시로 남긴다.
+- 인용(따옴표)은 절대 창작하지 마라. "관계자는 …라고 말했다" 같은 가짜 발언 금지. 인용이 필요하면 [관계자 인용 확인 필요]로만 표기한다.
+- 확인되지 않은 내용을 단정하지 말고, 취재로 채울 부분을 자리표시로 비워둔다.
+- 신문체(객관적·간결)로 제목 1개 + 본문(리드 1문단 + 3~4문단 골격)을 쓴다.
+- 출력 형식: 첫 줄에 제목만, 그다음 빈 줄, 그다음 본문. 설명·머리말 없이 기사만 출력한다.`;
+
+copilotRouter.post("/draft", async (c) => {
+  if (!c.env.AI) return c.json({ error: "ai_unbound" }, 503);
+  const body = await c.req.json().catch(() => ({}));
+  const keywords = typeof body?.keywords === "string" ? body.keywords.trim() : "";
+  if (!keywords) return c.json({ error: "empty_keywords" }, 400);
+
+  try {
+    const res = (await c.env.AI.run(ASSIST_MODEL as never, {
+      messages: [
+        { role: "system", content: DRAFT_SYSTEM },
+        { role: "user", content: `키워드: ${keywords.slice(0, 500)}` },
+      ],
+      max_tokens: 900,
+    } as never)) as { response?: string };
+    const text = (res.response ?? "").trim();
+    const lines = text.split("\n");
+    let titleLine = (lines.shift() ?? "").replace(/^제목[:：]\s*/, "").replace(/^#+\s*/, "").trim();
+    if (titleLine.length > 100) { lines.unshift(titleLine); titleLine = ""; }
+    const draftBody = lines.join("\n").trim();
+    return c.json({ ok: true, model: ASSIST_MODEL, title: titleLine, body: draftBody || text });
+  } catch (e) {
+    return c.json({ error: "draft_failed", detail: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
+
+// ── 이미지 업로드 → R2 (시민기자 기사 사진). 서빙은 /api/archive/photo/<key> ──
+// PoC: 무인증(에디터와 동일). 타입·용량 가드만. 운영 시 reporter 인증 추가.
+copilotRouter.post("/upload", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "photos_unbound" }, 503);
+  const ct = c.req.header("content-type") || "";
+  if (!ct.startsWith("image/")) return c.json({ error: "invalid_type", message: "이미지 파일만 업로드할 수 있습니다" }, 400);
+  const buf = await c.req.arrayBuffer();
+  if (buf.byteLength > 10 * 1024 * 1024) return c.json({ error: "too_large", message: "10MB 이하만 가능합니다" }, 413);
+  if (buf.byteLength < 64) return c.json({ error: "empty" }, 400);
+  const ext = (ct.split("/")[1] || "jpg").replace("jpeg", "jpg").replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
+  const key = `citizen/${crypto.randomUUID()}.${ext}`;
+  await c.env.ARCHIVE_PHOTOS.put(key, buf, { httpMetadata: { contentType: ct } });
+  const origin = new URL(c.req.url).origin;
+  return c.json({ ok: true, key, url: `${origin}/api/archive/photo/${key}` });
+});
+
 // ── 제출 → 거버넌스 적용 → AI 라벨 산정 → 검수 큐 등록 ───────
 const submitSchema = z.object({
   title: z.string().min(1),
