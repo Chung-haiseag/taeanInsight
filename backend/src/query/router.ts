@@ -256,7 +256,7 @@ queryRouter.post("/", async (c) => {
       try {
         const r = await c.env.ARCHIVE_DB
           .prepare(
-            `SELECT board_name, title, dept, published_at, substr(body,1,700) AS body FROM gov_notices
+            `SELECT board_name, title, dept, published_at, substr(body,1,2200) AS body FROM gov_notices
              ORDER BY (board_name='주간행사계획') DESC, published_at DESC, ntt_id DESC LIMIT 10`,
           )
           .all<{ board_name: string; title: string; dept: string | null; published_at: string; body: string | null }>();
@@ -307,15 +307,18 @@ queryRouter.post("/", async (c) => {
       const answer = res.content;
       const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
       const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
-      let sources = parts.map((p) => p.source);
+      const liveSrc = liveParts.map((p) => p.source);
+      const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
+      let sources: typeof liveSrc;
       if (notFound) {
-        // 못 찾음 → 공식 근거만 남기고 무관 기사 출처 제거
-        sources = liveParts.map((p) => p.source);
+        sources = liveSrc; // 못 찾음 → 공식 근거만(무관 기사 제거)
+      } else if (liveParts.length) {
+        // 주입한 공식 근거는 항상 표시(모델 인용 누락 대비) + 인용된 아카이브 기사만 추가
+        const citedArchive = parts.filter((p, i) => cited.has(i + 1) && p.source.url).map((p) => p.source);
+        sources = [...liveSrc, ...citedArchive];
       } else {
-        const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
-        if (cited.size) sources = parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source);
-        else if (liveParts.length) sources = liveParts.map((p) => p.source); // 인용 없음 → 주입한 공식 근거만(무관 기사 더미 방지)
-        // 공식 근거가 없으면(순수 아카이브 질문) 검색 기사 유지
+        // 순수 아카이브 질문 — 인용분만, 없으면 전체
+        sources = cited.size ? parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source) : parts.map((p) => p.source);
       }
       return c.json({
         answer,
