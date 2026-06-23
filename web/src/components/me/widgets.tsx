@@ -168,6 +168,9 @@ export function TodayConditions({ preferences }: { preferences: UserPreferences 
           </article>
         ))}
       </div>
+      <Link href="/live" className="mt-3 inline-block text-xs font-semibold text-accent hover:underline">
+        실시간 현황 전체 보기 →
+      </Link>
     </section>
   );
 }
@@ -259,6 +262,9 @@ export function KpiCards({
           </article>
         ))}
       </div>
+      <Link href="/dashboard" className="mt-3 inline-block text-xs font-semibold text-accent hover:underline">
+        지역 데이터 분석(추세·CSV) →
+      </Link>
     </section>
   );
 }

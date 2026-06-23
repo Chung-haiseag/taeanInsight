@@ -183,7 +183,14 @@ export function ReportReader({
               </div>
             ) : (
               <div className="mt-5">
-                {s.key === "summary" && <SummaryInfographic metrics={metrics} govCount={textNotices.length + cardNews.length} />}
+                {s.key === "summary" && (
+                  <>
+                    <SummaryInfographic metrics={metrics} govCount={textNotices.length + cardNews.length} />
+                    <p className="mt-2 text-right text-xs text-foreground-muted">
+                      지표는 발행 시점 기준 · <Link href="/live" className="font-semibold text-accent hover:underline">실시간 현재값 → 지금 태안</Link>
+                    </p>
+                  </>
+                )}
                 <p className={`whitespace-pre-line text-[1.05rem] leading-[1.85] text-foreground ${s.key === "summary" ? "mt-6" : ""}`}>{s.content}</p>
                 {!s.truncated && <SectionVisual sectionKey={s.key} metrics={metrics} />}
                 {s.truncated && (

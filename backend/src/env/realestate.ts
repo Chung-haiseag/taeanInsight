@@ -84,11 +84,15 @@ const ymd = (x: Record<string, string>): string => {
   return y ? `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}` : "";
 };
 
-async function fetchRealEstateImpl(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD?: string }): Promise<RealEstateInfo> {
+async function fetchRealEstateImpl(
+  env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD?: string },
+  monthsCount = 3,
+  cap = 12,
+): Promise<RealEstateInfo> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, apartments: [], lands: [] };
   const lawd = env.TAEAN_LAWD_CD || DEFAULT_LAWD;
-  const months = [ymOffset(0), ymOffset(1), ymOffset(2)];
+  const months = Array.from({ length: monthsCount }, (_, i) => ymOffset(i));
 
   const apartments: RealEstateInfo["apartments"] = [];
   const lands: RealEstateInfo["lands"] = [];
@@ -128,8 +132,10 @@ async function fetchRealEstateImpl(env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD
   // 최신순 정렬 + 상한
   apartments.sort((a, b) => b.ymd.localeCompare(a.ymd));
   lands.sort((a, b) => b.ymd.localeCompare(a.ymd));
-  return { available: any, apartments: apartments.slice(0, 12), lands: lands.slice(0, 12) };
+  return { available: any, apartments: apartments.slice(0, cap), lands: lands.slice(0, cap) };
 }
 
 // 6시간 캐시 (실거래는 일 단위 갱신)
-export const fetchRealEstate = makeTtlCache(fetchRealEstateImpl, 6 * 3600_000);
+export const fetchRealEstate = makeTtlCache((env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD?: string }) => fetchRealEstateImpl(env, 3, 12), 6 * 3600_000);
+// 질의 RAG용 깊은 조회(6개월·상한↑) — 시세 추이 분석에 충분한 표본
+export const fetchRealEstateDeep = makeTtlCache((env: { DATA_GO_KR_KEY?: string; TAEAN_LAWD_CD?: string }) => fetchRealEstateImpl(env, 6, 250), 6 * 3600_000);

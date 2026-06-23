@@ -56,6 +56,9 @@ export default async function LivePage() {
           {/* 핵심 지표 */}
           <section className="mt-6">
             <SummaryInfographic metrics={metrics} />
+            <p className="mt-3 text-right text-sm">
+              <Link href="/dashboard" className="font-semibold text-accent hover:underline">기간별 추세·CSV 다운로드 → 지역 데이터 분석</Link>
+            </p>
           </section>
 
           {/* 날씨·대기질 */}

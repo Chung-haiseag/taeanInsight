@@ -17,9 +17,26 @@ import { DefaultCostRecorder, InMemoryCostStore } from "../cost/recorder";
 import { HybridLlmRouter } from "../llm/hybrid_router";
 import { WorkersAiLlmClient } from "../llm/workers_ai";
 import { fetchConditions } from "../env/sources";
+import { fetchRealEstateDeep } from "../env/realestate";
+import { fetchTour } from "../env/tour";
+import { forecastDemand } from "../tour/demand";
+import { loadMarine } from "../tour/marine";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
-const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
+const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
+// 부동산·실거래 질문이면 국토부 실거래가를 근거로 추가
+const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당|매매|전세|임대|분양|집값/;
+// 관광 수요·축제·행사 질문이면 수요예측+축제를 근거로 추가
+const TOURISM_RE = /관광|수요|축제|행사|방문객|관광객|피서|성수기|혼잡|여행객|놀러|나들이|붐비/;
+// 바다·해변 질문이면 일출몰·물때·수온·파고·해수욕지수·서핑을 근거로 추가
+const MARINE_RE = /일몰|일출|해넘이|해돋이|노을|물때|밀물|썰물|만조|간조|조석|수온|파고|물높이|해수욕|갯벌|서핑|바다|해변|해안|선셋/;
+// YYYYMMDD → 오늘 기준 D-day(KST)
+function ymd8Dday(s: string): number {
+  if (!/^\d{8}$/.test(s)) return 9999;
+  const target = Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8));
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  return Math.round((target - Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate())) / 86400000);
+}
 // 순수 날씨 질문 판별 — 날씨 용어·지명·시간어 외에 다른 내용 키워드가 없으면 true(기사 출처 생략)
 const PLACE_TIME = new Set(["태안", "태안군", "안면도", "안면", "오늘", "지금", "현재", "요즘", "내일", "오전", "오후", "이번", "어때", "어떄", "정도", "수준", "농도", "상태"]);
 function isPureWeather(query: string): boolean {
@@ -60,7 +77,7 @@ async function retrieveArchive(
       const r = await db
         .prepare(
           `SELECT ${cols} FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid ` +
-            `WHERE archive_fts MATCH ? ORDER BY a.published_at DESC LIMIT 6`,
+            `WHERE archive_fts MATCH ? ORDER BY bm25(archive_fts) LIMIT 5`, // 관련도순(최신순 아님)
         )
         .bind(ftsTokens.join(" OR "))
         .all<{ idxno: number; title: string; published_at: string; body: string }>();
@@ -116,6 +133,120 @@ queryRouter.post("/", async (c) => {
           `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
         parts.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
       }
+      // 예보·주말·내일 질문이면 주말 예보(forecastDemand의 sat/sun 단기예보)도 추가
+      if (/예보|주말|다음\s?주|내일|모레|이번\s?주/.test(query)) {
+        try {
+          const dem = await forecastDemand(c.env);
+          const fc = (w: { date: string; tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
+            if (!w) return null;
+            const p: string[] = [];
+            if (w.tmax != null) p.push(`최고 ${w.tmax}℃`);
+            if (w.pop != null) p.push(`강수확률 ${w.pop}%`);
+            if (w.sky) p.push(`하늘 ${w.sky}`);
+            if (w.pty && w.pty !== "없음") p.push(w.pty);
+            return p.length ? `${w.date} ${p.join(", ")}` : null;
+          };
+          const sat = fc(dem?.weather?.sat ?? null), sun = fc(dem?.weather?.sun ?? null);
+          if (sat || sun) {
+            parts.push({ text: `태안 주말 기상예보(기상청 단기예보) — ${[sat && `토 ${sat}`, sun && `일 ${sun}`].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기예보(주말)", url: null } });
+          }
+        } catch { /* 무시 */ }
+      }
+    }
+
+    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터 + ㎡당 단가·월별 추이·전체 대비)
+    if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
+      const re = await fetchRealEstateDeep(c.env);
+      if (re.available && (re.apartments.length || re.lands.length)) {
+        const EUPMYEON = ["태안읍", "안면읍", "고남면", "근흥면", "남면", "소원면", "원북면", "이원면"];
+        const hay = `${query} ${location ?? ""}`;
+        const eup = EUPMYEON.find((e) => hay.includes(e)) ?? (/안면도/.test(hay) ? "안면읍" : null);
+        const inEup = (d: string) => !eup || (d ?? "").includes(eup);
+        const scope = eup ?? "태안군";
+
+        // 토지/아파트 표본 통계 — ㎡당 단가(만원), 건수, 기간, 월별 추이
+        type Item = { manwon: number; area: string; ymd: string };
+        const stat = (items: Item[]) => {
+          const v = items.filter((x) => x.manwon > 0 && Number(x.area) > 0);
+          if (!v.length) return null;
+          const unit = v.map((x) => x.manwon / Number(x.area)); // 만원/㎡
+          const avgU = unit.reduce((s, u) => s + u, 0) / unit.length;
+          const ymds = v.map((x) => x.ymd).filter(Boolean).sort();
+          // 월별 평균 ㎡단가
+          const byMon = new Map<string, number[]>();
+          for (const x of v) { const m = x.ymd.slice(0, 7); const a = byMon.get(m) ?? []; a.push(x.manwon / Number(x.area)); byMon.set(m, a); }
+          const monthly = [...byMon.entries()].sort().map(([m, us]) => `${m}: ㎡당 ${(us.reduce((s, u) => s + u, 0) / us.length).toFixed(1)}만원(${us.length}건)`).join(", ");
+          return { n: v.length, avgU: avgU.toFixed(1), minU: Math.min(...unit).toFixed(1), maxU: Math.max(...unit).toFixed(1), from: ymds[0], to: ymds[ymds.length - 1], monthly };
+        };
+
+        const landsLoc = re.lands.filter((x) => inEup(x.dong));
+        const aptsLoc = re.apartments.filter((x) => inEup(x.dong));
+        const landStat = stat(landsLoc), aptStat = stat(aptsLoc);
+        const countyLand = stat(re.lands), countyApt = stat(re.apartments);
+
+        const lines: string[] = [`[${scope} 부동산 실거래 분석 · 국토교통부 최근 6개월]`];
+        if (landStat) {
+          lines.push(`· 토지: ${landStat.n}건(${landStat.from}~${landStat.to}), ㎡당 평균 ${landStat.avgU}만원(범위 ${landStat.minU}~${landStat.maxU}). 월별 추이 — ${landStat.monthly}`);
+          lines.push(`  개별: ${landsLoc.slice(0, 8).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
+        }
+        if (aptStat) {
+          lines.push(`· 아파트: ${aptStat.n}건, ㎡당 평균 ${aptStat.avgU}만원. 월별 — ${aptStat.monthly}`);
+          lines.push(`  개별: ${aptsLoc.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
+        }
+        if (eup && !landStat && !aptStat) {
+          lines.push(`· ${eup}의 최근 6개월 실거래 기록이 없습니다.`);
+        }
+        // 태안군 전체 대비(읍면 질문일 때 비교 기준). 읍·면 표본이 적으면 전체 월별 추이까지 제공.
+        if (eup && countyLand) {
+          const sparse = (landStat?.n ?? 0) < 3;
+          lines.push(`· (참고) 태안군 전체 토지 ㎡당 평균 ${countyLand.avgU}만원(${countyLand.n}건, ${countyLand.from}~${countyLand.to})${countyApt ? `, 아파트 ㎡당 평균 ${countyApt.avgU}만원` : ""}`);
+          if (sparse) lines.push(`  ${eup} 표본이 적어 추세 단정이 어렵습니다. 태안군 전체 토지 월별 추이 — ${countyLand.monthly}`);
+        }
+
+        parts.push({ text: lines.join("\n"), source: { title: `국토교통부 실거래가 · ${scope}(6개월)`, url: null } });
+      }
+    }
+
+    // (a-3) 관광 수요·축제 질문이면 수요예측 + 축제 일정을 근거에 추가
+    if (TOURISM_RE.test(query)) {
+      const lines: string[] = [];
+      try {
+        const t = await fetchTour(c.env);
+        const fests = (t.festivals ?? [])
+          .map((f) => ({ ...f, dday: ymd8Dday(f.start) }))
+          .filter((f) => f.dday >= -3)
+          .sort((a, b) => a.dday - b.dday)
+          .slice(0, 8);
+        if (fests.length) {
+          lines.push("축제·행사: " + fests.map((f) => `${f.title}(${f.start}~${f.end}${f.dday >= 0 && f.dday <= 60 ? `, D-${f.dday}` : ""}${f.addr ? `, ${f.addr}` : ""})`).join("; "));
+        }
+      } catch { /* 무시 */ }
+      if (c.env.DATA_GO_KR_KEY) {
+        try {
+          const dem = await forecastDemand(c.env);
+          if (dem?.available) {
+            const fac = (dem.factors ?? []).map((f) => `${f.label} ${f.effect > 0 ? "+" : ""}${f.effect}(${f.detail})`).join(", ");
+            lines.push(`주말 관광 수요지수: ${dem.index}점 '${dem.level}' (${dem.weekend.sat}~${dem.weekend.sun}). ${dem.headline}. 기여 요인 — ${fac}`);
+          }
+        } catch { /* 무시 */ }
+      }
+      if (lines.length) parts.push({ text: `[태안 관광 수요·행사]\n${lines.join("\n")}`, source: { title: "관광 수요예측·축제(TourAPI·기상 기반)", url: null } });
+    }
+
+    // (a-4) 바다·해변 질문이면 일출몰·물때·수온·파고·서핑을 근거에 추가(실시간/천문계산)
+    if (MARINE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
+      try {
+        const m = await loadMarine(c.env);
+        if (m.available) {
+          const seg: string[] = [];
+          if (m.sun) seg.push(`오늘 일출 ${m.sun.sunrise}, 일몰 ${m.sun.sunset} (태안 기준 천문계산)`);
+          if (m.tide?.events?.length) seg.push(`오늘 물때(${m.tide.station}): ${m.tide.events.map((e) => `${e.type === "고조" ? "만조" : "간조"} ${e.time}`).join(", ")}`);
+          if (m.beaches?.length) seg.push(`해변: ${m.beaches.map((b) => `${b.name} 수온 ${b.waterTemp ?? "?"}℃·파고 ${b.waveHeight ?? "?"}m${b.beachIndex ? `·해수욕지수 ${b.beachIndex}` : ""}`).join("; ")}`);
+          if (m.surf) seg.push(`서핑(${m.surf.spot}): 파고 ${m.surf.wave ?? "?"}m·수온 ${m.surf.waterTemp ?? "?"}℃`);
+          if (m.mudflat?.length) seg.push(`갯벌체험 적기: ${m.mudflat.join(", ")}`);
+          if (seg.length) parts.push({ text: `[태안 바다·해변 실시간]\n${seg.join("\n")}`, source: { title: "국립해양조사원·일출몰 천문계산(실시간)", url: null } });
+        }
+      } catch { /* 무시 */ }
     }
 
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
@@ -136,23 +267,35 @@ queryRouter.post("/", async (c) => {
           {
             role: "system",
             content:
-              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·태안신문 기사)를 근거로 한국어로 답하라.\n" +
-              "- 근거에서 질문과 관련된 내용을 최대한 종합해 구체적으로 답하라(수치·이름·날짜 포함).\n" +
+              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·국토부 실거래·관광 수요·축제·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n" +
+              "- 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 한 줄로 끝내지 마라.\n" +
+              "- 부동산 질문이면 ㎡당 평균 단가·거래 건수·기간·월별 추이·태안군 전체 대비를 종합해 '시세 흐름'을 설명하라.\n" +
+              "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
               "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
-              "- 일부만 있으면 그 부분을 답하고 '확인된 범위는 여기까지'처럼 한계를 덧붙여라.\n" +
               "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
               "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
           },
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
       });
+      // 출처는 답변이 실제로 사용한 것만 노출(무관 기사 더미 방지).
+      const answer = res.content;
+      const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
+      let sources = parts.map((p) => p.source);
+      if (notFound) {
+        // 못 찾음 → 공식 실시간·실거래 근거(url 없음)만 남기고 무관 기사 출처 제거
+        sources = parts.filter((p) => p.source.url === null).map((p) => p.source);
+      } else {
+        const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
+        if (cited.size) sources = parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source);
+      }
       return c.json({
-        answer: res.content,
+        answer,
         intent: "archive_rag",
         confidence: 0.9,
         fromCache: false,
         llmCalls: 1,
-        sources: parts.map((p) => p.source),
+        sources,
         model: client.model,
       });
     }
