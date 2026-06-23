@@ -20,6 +20,7 @@ import { fetchConditions } from "../env/sources";
 import { fetchRealEstateDeep } from "../env/realestate";
 import { fetchTour } from "../env/tour";
 import { forecastDemand } from "../tour/demand";
+import { loadMarine } from "../tour/marine";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
@@ -27,6 +28,8 @@ const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세
 const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당|매매|전세|임대|분양|집값/;
 // 관광 수요·축제·행사 질문이면 수요예측+축제를 근거로 추가
 const TOURISM_RE = /관광|수요|축제|행사|방문객|관광객|피서|성수기|혼잡|여행객|놀러|나들이|붐비/;
+// 바다·해변 질문이면 일출몰·물때·수온·파고·해수욕지수·서핑을 근거로 추가
+const MARINE_RE = /일몰|일출|해넘이|해돋이|노을|물때|밀물|썰물|만조|간조|조석|수온|파고|물높이|해수욕|갯벌|서핑|바다|해변|해안|선셋/;
 // YYYYMMDD → 오늘 기준 D-day(KST)
 function ymd8Dday(s: string): number {
   if (!/^\d{8}$/.test(s)) return 9999;
@@ -209,6 +212,22 @@ queryRouter.post("/", async (c) => {
         } catch { /* 무시 */ }
       }
       if (lines.length) parts.push({ text: `[태안 관광 수요·행사]\n${lines.join("\n")}`, source: { title: "관광 수요예측·축제(TourAPI·기상 기반)", url: null } });
+    }
+
+    // (a-4) 바다·해변 질문이면 일출몰·물때·수온·파고·서핑을 근거에 추가(실시간/천문계산)
+    if (MARINE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
+      try {
+        const m = await loadMarine(c.env);
+        if (m.available) {
+          const seg: string[] = [];
+          if (m.sun) seg.push(`오늘 일출 ${m.sun.sunrise}, 일몰 ${m.sun.sunset} (태안 기준 천문계산)`);
+          if (m.tide?.events?.length) seg.push(`오늘 물때(${m.tide.station}): ${m.tide.events.map((e) => `${e.type === "고조" ? "만조" : "간조"} ${e.time}`).join(", ")}`);
+          if (m.beaches?.length) seg.push(`해변: ${m.beaches.map((b) => `${b.name} 수온 ${b.waterTemp ?? "?"}℃·파고 ${b.waveHeight ?? "?"}m${b.beachIndex ? `·해수욕지수 ${b.beachIndex}` : ""}`).join("; ")}`);
+          if (m.surf) seg.push(`서핑(${m.surf.spot}): 파고 ${m.surf.wave ?? "?"}m·수온 ${m.surf.waterTemp ?? "?"}℃`);
+          if (m.mudflat?.length) seg.push(`갯벌체험 적기: ${m.mudflat.join(", ")}`);
+          if (seg.length) parts.push({ text: `[태안 바다·해변 실시간]\n${seg.join("\n")}`, source: { title: "국립해양조사원·일출몰 천문계산(실시간)", url: null } });
+        }
+      } catch { /* 무시 */ }
     }
 
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
