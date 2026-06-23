@@ -131,3 +131,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 도로 실시간 CCTV(ITS) 라이브: 태안 국도 39곳, /live HLS 플레이어. ITS 9443포트는 Worker 불가→로컬 크롤러(launchd 30분) D1 미러 · tools/cctv, GET /api/conditions/cctv, db/018
 
 - 2026-06-23 · 해안 해무 CCTV 스틸컷(국립해양조사원 seafogCctv, 대산항·평택당진항 10분 단위) · /live, GET /api/conditions/seafog, backend/env/seafog.ts
+
+- 2026-06-23 · "역대 오늘, 태안": 같은 일자(MM-DD) 과거 주요뉴스 랜덤(±3일 보강·광고배제) · GET /api/archive/on-this-day
