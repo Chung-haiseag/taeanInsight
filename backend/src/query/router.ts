@@ -23,7 +23,7 @@ import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
-const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
+const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
 // 부동산·실거래 질문이면 국토부 실거래가를 근거로 추가
 const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당|매매|전세|임대|분양|집값/;
 // 관광 수요·축제·행사 질문이면 수요예측+축제를 근거로 추가
@@ -132,6 +132,25 @@ queryRouter.post("/", async (c) => {
           `미세먼지(PM10) ${a.pm10 ?? "?"}㎍/㎥, 초미세(PM2.5) ${a.pm25 ?? "?"}㎍/㎥, 오존 ${a.o3 ?? "?"}ppm, ` +
           `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
         parts.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
+      }
+      // 예보·주말·내일 질문이면 주말 예보(forecastDemand의 sat/sun 단기예보)도 추가
+      if (/예보|주말|다음\s?주|내일|모레|이번\s?주/.test(query)) {
+        try {
+          const dem = await forecastDemand(c.env);
+          const fc = (w: { date: string; tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
+            if (!w) return null;
+            const p: string[] = [];
+            if (w.tmax != null) p.push(`최고 ${w.tmax}℃`);
+            if (w.pop != null) p.push(`강수확률 ${w.pop}%`);
+            if (w.sky) p.push(`하늘 ${w.sky}`);
+            if (w.pty && w.pty !== "없음") p.push(w.pty);
+            return p.length ? `${w.date} ${p.join(", ")}` : null;
+          };
+          const sat = fc(dem?.weather?.sat ?? null), sun = fc(dem?.weather?.sun ?? null);
+          if (sat || sun) {
+            parts.push({ text: `태안 주말 기상예보(기상청 단기예보) — ${[sat && `토 ${sat}`, sun && `일 ${sun}`].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기예보(주말)", url: null } });
+          }
+        } catch { /* 무시 */ }
       }
     }
 
