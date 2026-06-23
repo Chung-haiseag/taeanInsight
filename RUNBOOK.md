@@ -123,3 +123,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · 초개인화: 사장님 홈(OwnerHome) 실데이터화 + 가게 프로필(업종·읍면). owner-brief 룰엔진(수요×날씨×물때×업종) · backend/owner/brief.ts, db/016, web/home/owner-home
 
 - 2026-06-23 · 온보딩에 가게 프로필 스텝 추가(사장님·기관 유형 조건부, 업종·상호) → owner-brief 맞춤 · web/me/onboarding, backend/preferences
+
+- 2026-06-23 · 사장님 실행제안 규칙엔진 고도화(추세·주말강수·파고·대기질·기온·시간대·업종세분화 + 우선순위/태그) · backend/owner/brief.ts
