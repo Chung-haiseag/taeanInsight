@@ -17,9 +17,12 @@ import { DefaultCostRecorder, InMemoryCostStore } from "../cost/recorder";
 import { HybridLlmRouter } from "../llm/hybrid_router";
 import { WorkersAiLlmClient } from "../llm/workers_ai";
 import { fetchConditions } from "../env/sources";
+import { fetchRealEstate } from "../env/realestate";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
+// 부동산·실거래 질문이면 국토부 실거래가를 근거로 추가
+const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당|매매|전세|임대|분양|집값/;
 // 순수 날씨 질문 판별 — 날씨 용어·지명·시간어 외에 다른 내용 키워드가 없으면 true(기사 출처 생략)
 const PLACE_TIME = new Set(["태안", "태안군", "안면도", "안면", "오늘", "지금", "현재", "요즘", "내일", "오전", "오후", "이번", "어때", "어떄", "정도", "수준", "농도", "상태"]);
 function isPureWeather(query: string): boolean {
@@ -60,7 +63,7 @@ async function retrieveArchive(
       const r = await db
         .prepare(
           `SELECT ${cols} FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid ` +
-            `WHERE archive_fts MATCH ? ORDER BY a.published_at DESC LIMIT 6`,
+            `WHERE archive_fts MATCH ? ORDER BY bm25(archive_fts) LIMIT 5`, // 관련도순(최신순 아님)
         )
         .bind(ftsTokens.join(" OR "))
         .all<{ idxno: number; title: string; published_at: string; body: string }>();
@@ -118,6 +121,20 @@ queryRouter.post("/", async (c) => {
       }
     }
 
+    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가
+    if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
+      const re = await fetchRealEstate(c.env);
+      if (re.available && (re.apartments.length || re.lands.length)) {
+        const aptAvg = re.apartments.length ? Math.round(re.apartments.reduce((s, x) => s + x.manwon, 0) / re.apartments.length) : null;
+        const aptLine = re.apartments.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
+        const landLine = re.lands.slice(0, 6).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ");
+        const text =
+          `태안 최근 실거래(국토교통부) — 아파트 ${re.apartments.length}건${aptAvg ? `, 평균 ${aptAvg.toLocaleString()}만원` : ""}` +
+          `${aptLine ? `: ${aptLine}` : ""}${landLine ? ` / 토지: ${landLine}` : ""}`;
+        parts.push({ text, source: { title: "국토교통부 실거래가(최근 거래)", url: null } });
+      }
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query)) {
       const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
@@ -146,13 +163,24 @@ queryRouter.post("/", async (c) => {
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
       });
+      // 출처는 답변이 실제로 사용한 것만 노출(무관 기사 더미 방지).
+      const answer = res.content;
+      const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
+      let sources = parts.map((p) => p.source);
+      if (notFound) {
+        // 못 찾음 → 공식 실시간·실거래 근거(url 없음)만 남기고 무관 기사 출처 제거
+        sources = parts.filter((p) => p.source.url === null).map((p) => p.source);
+      } else {
+        const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
+        if (cited.size) sources = parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source);
+      }
       return c.json({
-        answer: res.content,
+        answer,
         intent: "archive_rag",
         confidence: 0.9,
         fromCache: false,
         llmCalls: 1,
-        sources: parts.map((p) => p.source),
+        sources,
         model: client.model,
       });
     }
