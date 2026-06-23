@@ -72,7 +72,10 @@ function OwnerLive() {
               <article key={i} className="card-lift flex gap-4 rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">
                 <span className="text-2xl" aria-hidden>{a.icon}</span>
                 <div>
-                  <p className="font-semibold text-brand">{a.text}</p>
+                  <p className="font-semibold text-brand">
+                    {a.text}
+                    {a.tag && <span className={`ml-2 align-middle rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${a.tag === "안전" ? "bg-red-100 text-red-700" : a.tag === "매출" ? "bg-accent/20 text-accent" : "bg-brand/10 text-brand"}`}>{a.tag}</span>}
+                  </p>
                   <p className="mt-1 text-sm text-foreground-muted">{a.why}</p>
                 </div>
               </article>

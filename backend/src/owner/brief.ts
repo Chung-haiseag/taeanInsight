@@ -6,7 +6,7 @@ import type { ShopIndustry, UserPreferences } from "../preferences/types";
 import { getFreshSnapshot } from "../reports/metrics_cache";
 import { loadReportMetrics, type ReportMetrics } from "../reports/metrics";
 
-export interface OwnerAction { icon: string; text: string; why: string }
+export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -35,46 +35,75 @@ function ymd8ToDday(s: string): number {
   return Math.round((target - today) / 86400000);
 }
 
-// 업종 × 수요등급 × 날씨 × 물때 × 자외선 → 실행 제안(우선순위 순, 최대 5)
+// 업종 × 수요·추세 × 날씨 × 바다 × 시간대 → 실행 제안(우선순위 정렬, 최대 6).
+//   priority: 1=안전/긴급, 2=매출(수요), 3=날씨/추세, 4=기회(물때·축제·자외선). 낮을수록 먼저.
 function buildActions(industry: ShopIndustry | null, m: ReportMetrics): OwnerAction[] {
   const out: OwnerAction[] = [];
+  const ind = industry ?? "other";
+  const food = ind === "food" || ind === "cafe";
+  const beachLinked = ind === "leisure" || ind === "lodging" || ind === "food";
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  const hour = k.getUTCHours();
+  const morning = hour < 11;        // 오전: 오늘 준비 / 오후: 내일·주말 대비
+
   const demand = m.tourism.demand;
   const lv = demand?.level;
   const high = lv === "높음" || lv === "매우높음";
   const low = lv === "낮음" || lv === "매우낮음";
   const w = m.environment.live;
-  const rain = !!(w && w.sky === "흐림");
-  const ind = industry ?? "other";
 
-  // 수요
+  // ── 1) 안전·긴급 ──
+  const wave = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.waveHeight ?? 0));
+  if (wave >= 2 && beachLinked) {
+    out.push({ icon: "🌊", text: `파고 ${wave.toFixed(1)}m — 해변·해상 활동 자제 안내`, why: "높은 파고", tag: "안전", priority: 1 });
+  }
+  if (w?.grade === "나쁨" || w?.grade === "매우나쁨") {
+    out.push({ icon: "😷", text: `대기질 '${w.grade}' — 실내 좌석·환기, 민감군 안내`, why: `PM10 ${w.pm10 ?? "—"}`, tag: "안전", priority: 1 });
+  }
+  if (w?.temp != null && w.temp >= 31) {
+    out.push({ icon: "🥵", text: food ? "시원한 메뉴·냉방 점검, 야외석 차양" : "냉방·그늘·생수 비치", why: `기온 ${w.temp}℃`, tag: "안전", priority: 1 });
+  } else if (w?.temp != null && w.temp <= 0) {
+    out.push({ icon: "🧊", text: "난방·온수·결빙 대비", why: `기온 ${w.temp}℃`, tag: "안전", priority: 1 });
+  }
+
+  // ── 2) 매출(수요) — 업종 세분화 ──
   if (high) {
-    if (ind === "lodging") out.push({ icon: "🛏", text: "객실 풀가동 준비 · 주말 요금 상향 검토", why: `수요 '${lv}'` });
-    else if (ind === "food" || ind === "cafe") out.push({ icon: "📦", text: "재료·인력 보강, 대기 동선 준비", why: `수요 '${lv}'` });
-    else out.push({ icon: "📈", text: "주말 방문객 증가 대비(재고·인력)", why: `수요 '${lv}'` });
+    if (ind === "lodging") out.push({ icon: "🛏", text: morning ? "객실 풀가동 준비 · 노쇼 대비 예약금 안내" : "주말 요금 상향·만실 대비 예약 마감 점검", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    else if (ind === "food") out.push({ icon: "🍽", text: morning ? "식자재 추가 발주·인력 보강" : "피크 회전율·예약/웨이팅 동선 준비", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    else if (ind === "cafe") out.push({ icon: "☕", text: "음료·디저트 재고 보강, 테이크아웃 동선 준비", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    else if (ind === "leisure") out.push({ icon: "🎟", text: "예약 슬롯 확대·안전요원/장비 점검", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    else if (ind === "retail") out.push({ icon: "🛍", text: "인기 품목 재고 보강·영업시간 연장 검토", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    else out.push({ icon: "📈", text: "주말 방문객 증가 대비(재고·인력)", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
   } else if (low) {
-    out.push({ icon: "🏷", text: ind === "lodging" ? "빈 객실 막판 할인·연박 프로모션" : "한산 시간대 프로모션·SNS 노출", why: `수요 '${lv}'` });
+    out.push({ icon: "🏷", text: ind === "lodging" ? "빈 객실 막판 할인·연박 프로모션" : "한산 시간대 프로모션·SNS·세트 할인", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
   }
 
-  // 날씨
-  if (rain) {
-    if (ind === "lodging") out.push({ icon: "☔", text: "우천 환불·일정변경 문의 대비", why: "흐림/강수" });
-    else out.push({ icon: "☔", text: "실내석 정비 · 우천 메뉴/포장 안내", why: "흐림/강수" });
+  // ── 3) 추세(전주 대비)·주말 날씨 ──
+  const t = m.trends;
+  if (t?.interest && t.interest.delta >= 20) {
+    out.push({ icon: "🔎", text: "검색 관심도 급증 — 예약·문의 응대 대비, 게시물 노출↑", why: `검색 전주 대비 +${Math.round(t.interest.delta)}%`, tag: "추세", priority: 3 });
   }
-  if (m.uv && m.uv.todayMax != null && m.uv.todayMax >= 8 && (ind === "cafe" || ind === "food" || ind === "leisure")) {
-    out.push({ icon: "🔆", text: "야외석 그늘막·자외선 안내(지수 " + m.uv.todayMax + ")", why: "자외선 매우높음" });
+  if (t?.demand && t.demand.delta >= 10) {
+    out.push({ icon: "📊", text: "수요 상승세 — 주말 인력·재고 미리 확보", why: `수요 전주 대비 +${Math.round(t.demand.delta)}`, tag: "추세", priority: 3 });
+  }
+  // 주말 강수 확률(데이터랩보다 정확) — 환불/실내 대비
+  const wkRain = [demand?.weather?.sat, demand?.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  if (wkRain) {
+    out.push({ icon: "☔", text: ind === "lodging" ? "주말 우천 — 환불·일정변경 문의 대비, 실내 프로그램 안내" : "주말 우천 — 실내석·포장/배달·우천 메뉴 준비", why: "주말 강수확률 60%+", tag: "날씨", priority: 3 });
   }
 
-  // 물때(간조) — 갯벌·해변 연계 업종
+  // ── 4) 기회(물때·자외선·축제) ──
+  if (m.uv?.todayMax != null && m.uv.todayMax >= 8 && (food || ind === "leisure")) {
+    out.push({ icon: "🔆", text: `자외선 매우높음(지수 ${m.uv.todayMax}) — 야외석 그늘막·선케어 안내`, why: m.uv.peakHour ? `최고 ${m.uv.peakHour}` : "한낮 주의", tag: "기회", priority: 4 });
+  }
   const lowTide = (m.tourism.marine?.tide?.events ?? []).find((e) => e.type === "저조" && e.time >= "08:00" && e.time <= "18:00");
-  if (lowTide && (ind === "leisure" || ind === "lodging" || ind === "food")) {
-    out.push({ icon: "🦪", text: `갯벌체험 적기 ${lowTide.time} 전후 — 손님 안내`, why: "낮 간조" });
+  if (lowTide && beachLinked) {
+    out.push({ icon: "🦪", text: `갯벌체험 적기 ${lowTide.time} 전후 — 손님 안내`, why: "낮 간조", tag: "기회", priority: 4 });
   }
-
-  // 축제 임박
   const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) })).filter((f) => f.dday >= 0 && f.dday <= 7).sort((a, b) => a.dday - b.dday)[0];
-  if (fest) out.push({ icon: "🎉", text: `${fest.title} D-${fest.dday} — 방문객 유입 대비`, why: "인근 축제" });
+  if (fest) out.push({ icon: "🎉", text: `${fest.title} D-${fest.dday} — 방문객 유입 대비`, why: "인근 축제", tag: "기회", priority: 4 });
 
-  return out.slice(0, 5);
+  return out.sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9)).slice(0, 6);
 }
 
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
