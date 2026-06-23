@@ -19,13 +19,14 @@ if (!TOKEN) { console.error("환경변수 TAEAN_GOV_TOKEN 필요 (Worker secret 
 
 const BASE = "https://www.taean.go.kr";
 const UA = "Mozilla/5.0 (compatible; TaeanInsightBot/1.0; +https://taean-insight.chs9182.workers.dev; local-news-archive) AppleWebKit/537.36 Chrome/126.0 Safari/537.36";
+const BOARD_FILTER = (process.argv.find((a) => a.startsWith("--board=")) || "").split("=")[1] || ""; // 일부만 수집(예: --board=주간)
 const BOARDS = [
   { id: "BBSMSTR_000000000036", name: "공지사항" },
   { id: "BBSMSTR_000000000058", name: "새소식" },
   { id: "BBSMSTR_000000000038", name: "주간행사계획" },
   { id: "BBSMSTR_000000000043", name: "유관기관소식" },
   { id: "BBSMSTR_000000000502", name: "카드뉴스" },
-];
+].filter((b) => !BOARD_FILTER || b.name.includes(BOARD_FILTER) || b.id.includes(BOARD_FILTER));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,6 +44,34 @@ async function fetchText(url, referer, attempt = 0) {
 
 const listUrl = (b, p = 1) => `${BASE}/cop/bbs/${b}/selectBoardList.do?pageIndex=${p}`;
 const articleUrl = (b, ntt) => `${BASE}/cop/bbs/${b}/selectBoardArticle.do?nttId=${ntt}`;
+
+// 주간행사계획 등 — 본문이 PDF 첨부일 때 PDF 텍스트 추출(pdftotext -layout 필요, 로컬).
+//   fn_egov_downFile('FILE_...','0') → /cmm/fms/FileDown.do 다운로드 → pdftotext.
+async function extractPdfText(html, referer) {
+  const m = html.match(/fn_egov_downFile\('([^']+)','(\d+)'\)/);
+  if (!m) return "";
+  try {
+    const { execFileSync } = await import("node:child_process");
+    const { writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const res = await fetch(`${BASE}/cmm/fms/FileDown.do?atchFileId=${m[1]}&fileSn=${m[2]}`, {
+      headers: { "User-Agent": UA, Referer: referer || BASE }, signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) return "";
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.slice(0, 4).toString() !== "%PDF") return ""; // PDF만
+    const tmp = join(tmpdir(), `gov-${Date.now()}.pdf`);
+    writeFileSync(tmp, buf);
+    let text = "";
+    try { text = execFileSync("pdftotext", ["-layout", tmp, "-"], { encoding: "utf8", maxBuffer: 8 << 20 }); }
+    finally { rmSync(tmp, { force: true }); }
+    return text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000);
+  } catch (e) {
+    console.warn(`  · PDF 추출 실패: ${e.message}`);
+    return "";
+  }
+}
 
 function parseNttIds(html) {
   const seen = new Set();
@@ -153,6 +182,11 @@ async function importNotices(notices) {
           const html = await fetchText(articleUrl(board.id, nttId), listUrl(board.id, 1));
           const art = parseArticle(html);
           if (!art) { console.warn(`  · ${nttId} 파싱 실패`); continue; }
+          // 주간행사계획은 세부 일정이 PDF 첨부 → PDF 텍스트로 본문 보강
+          if (board.name === "주간행사계획" && (art.body ?? "").length < 120) {
+            const pdf = await extractPdfText(html, articleUrl(board.id, nttId));
+            if (pdf) { art.body = pdf; console.log(`    ↳ PDF 일정 ${pdf.length}자 추출`); }
+          }
           // 이미지를 R2로 미리 올려둠(빠른 CDN 서빙, 매번 군청 안 거침)
           if (art.images?.length) {
             const mirrored = [];

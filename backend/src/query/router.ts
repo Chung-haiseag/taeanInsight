@@ -21,6 +21,7 @@ import { fetchRealEstateDeep } from "../env/realestate";
 import { fetchTour } from "../env/tour";
 import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
+import { fetchMidForecast } from "../env/midforecast";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -30,6 +31,8 @@ const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당
 const TOURISM_RE = /관광|수요|축제|행사|방문객|관광객|피서|성수기|혼잡|여행객|놀러|나들이|붐비/;
 // 바다·해변 질문이면 일출몰·물때·수온·파고·해수욕지수·서핑을 근거로 추가
 const MARINE_RE = /일몰|일출|해넘이|해돋이|노을|물때|밀물|썰물|만조|간조|조석|수온|파고|물높이|해수욕|갯벌|서핑|바다|해변|해안|선셋/;
+// 행사·일정·군정 질문이면 태안군청 군정소식·주간행사계획을 근거로 추가
+const EVENT_RE = /행사|일정|이벤트|공지|군정|군청|새소식|소식|주간|개최|열리|열린/;
 // YYYYMMDD → 오늘 기준 D-day(KST)
 function ymd8Dday(s: string): number {
   if (!/^\d{8}$/.test(s)) return 9999;
@@ -133,22 +136,40 @@ queryRouter.post("/", async (c) => {
           `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
         parts.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
       }
-      // 예보·주말·내일 질문이면 주말 예보(forecastDemand의 sat/sun 단기예보)도 추가
+      // 예보·주말·내일 질문이면 주말/다가오는 날 예보 — 단기(±3일) 우선, 범위 밖이면 중기(3~10일)
       if (/예보|주말|다음\s?주|내일|모레|이번\s?주/.test(query)) {
         try {
-          const dem = await forecastDemand(c.env);
-          const fc = (w: { date: string; tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
+          const [dem, mid] = await Promise.all([forecastDemand(c.env), fetchMidForecast(c.env)]);
+          const shortFc = (w: { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
             if (!w) return null;
             const p: string[] = [];
             if (w.tmax != null) p.push(`최고 ${w.tmax}℃`);
             if (w.pop != null) p.push(`강수확률 ${w.pop}%`);
             if (w.sky) p.push(`하늘 ${w.sky}`);
             if (w.pty && w.pty !== "없음") p.push(w.pty);
-            return p.length ? `${w.date} ${p.join(", ")}` : null;
+            return p.length ? `${p.join(", ")} (단기예보)` : null;
           };
-          const sat = fc(dem?.weather?.sat ?? null), sun = fc(dem?.weather?.sun ?? null);
+          const midFc = (date: string) => {
+            const m = mid.available ? mid.days[date] : null;
+            if (!m) return null;
+            const p: string[] = [];
+            if (m.tmax != null) p.push(`최고 ${m.tmax}℃`);
+            if (m.tmin != null) p.push(`최저 ${m.tmin}℃`);
+            if (m.pop != null) p.push(`강수확률 ${m.pop}%`);
+            if (m.sky) p.push(m.sky);
+            return p.length ? `${p.join(", ")} (중기예보)` : null;
+          };
+          const wk = dem?.weekend;
+          type SW = { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null | undefined;
+          const dayLine = (label: string, date: string | undefined, sw: SW) => {
+            if (!date) return null;
+            const s = shortFc(sw ?? null) ?? midFc(date);
+            return s ? `${label}(${date.slice(5)}) ${s}` : null;
+          };
+          const sat = dayLine("토", wk?.sat, dem?.weather?.sat);
+          const sun = dayLine("일", wk?.sun, dem?.weather?.sun);
           if (sat || sun) {
-            parts.push({ text: `태안 주말 기상예보(기상청 단기예보) — ${[sat && `토 ${sat}`, sun && `일 ${sun}`].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기예보(주말)", url: null } });
+            parts.push({ text: `태안 주말 기상예보 — ${[sat, sun].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기·중기예보", url: null } });
           }
         } catch { /* 무시 */ }
       }
@@ -249,6 +270,27 @@ queryRouter.post("/", async (c) => {
       } catch { /* 무시 */ }
     }
 
+    // (a-5) 행사·일정·군정 질문이면 태안군청 군정소식·주간행사계획 주입(이번 주 행사의 정본)
+    if (EVENT_RE.test(query) && c.env.ARCHIVE_DB) {
+      try {
+        const r = await c.env.ARCHIVE_DB
+          .prepare(
+            `SELECT board_name, title, dept, published_at, substr(body,1,2200) AS body FROM gov_notices
+             ORDER BY (board_name='주간행사계획') DESC, published_at DESC, ntt_id DESC LIMIT 10`,
+          )
+          .all<{ board_name: string; title: string; dept: string | null; published_at: string; body: string | null }>();
+        const rows = r.results ?? [];
+        if (rows.length) {
+          const text = "[태안군청 군정 소식·주간행사계획]\n" + rows.map((n) => {
+            const head = `· [${n.board_name}] ${n.title} (${String(n.published_at).slice(0, 10)}${n.dept ? `, ${n.dept}` : ""})`;
+            // 주간행사계획은 본문에 실제 일정이 있어 함께 제공
+            return n.board_name === "주간행사계획" && n.body ? `${head}\n  ${n.body.replace(/\s+/g, " ").trim()}` : head;
+          }).join("\n");
+          parts.push({ text, source: { title: "태안군청 군정 소식·주간행사계획", url: null } });
+        }
+      } catch { /* 무시 */ }
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query)) {
       const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
@@ -273,7 +315,9 @@ queryRouter.post("/", async (c) => {
               "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
               "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
               "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
-              "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.",
+              "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
+              "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
+              "- '이번 주/다음 주' 행사는 군청 주간행사계획·축제 일정을 우선 사용하고, 이미 끝난 과거 행사는 답에 넣지 마라.",
           },
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
@@ -281,13 +325,19 @@ queryRouter.post("/", async (c) => {
       // 출처는 답변이 실제로 사용한 것만 노출(무관 기사 더미 방지).
       const answer = res.content;
       const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
-      let sources = parts.map((p) => p.source);
+      const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
+      const liveSrc = liveParts.map((p) => p.source);
+      const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
+      let sources: typeof liveSrc;
       if (notFound) {
-        // 못 찾음 → 공식 실시간·실거래 근거(url 없음)만 남기고 무관 기사 출처 제거
-        sources = parts.filter((p) => p.source.url === null).map((p) => p.source);
+        sources = liveSrc; // 못 찾음 → 공식 근거만(무관 기사 제거)
+      } else if (liveParts.length) {
+        // 주입한 공식 근거는 항상 표시(모델 인용 누락 대비) + 인용된 아카이브 기사만 추가
+        const citedArchive = parts.filter((p, i) => cited.has(i + 1) && p.source.url).map((p) => p.source);
+        sources = [...liveSrc, ...citedArchive];
       } else {
-        const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
-        if (cited.size) sources = parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source);
+        // 순수 아카이브 질문 — 인용분만, 없으면 전체
+        sources = cited.size ? parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source) : parts.map((p) => p.source);
       }
       return c.json({
         answer,
