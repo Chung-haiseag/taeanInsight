@@ -45,12 +45,13 @@ archiveRouter.get("/search", async (c) => {
       `WHERE ${where} ORDER BY a.published_at DESC LIMIT ? OFFSET ?`;
     return adb.prepare(sql).bind(q, ...binds, PAGE_SIZE, offset).all();
   }
+  // 짧은 질의(2글자) 폴백 — 본문 LIKE 풀스캔(~104k행, 2s+)을 피해 제목만 검색.
+  // 3글자↑ 본문 매칭은 FTS가 담당하므로 LIKE는 제목 한정으로 충분히 빠름.
   async function likeSearch() {
-    const where = ["(a.title LIKE ? OR a.body LIKE ?)", ...filters].join(" AND ");
-    const like = `%${q}%`;
+    const where = ["a.title LIKE ?", ...filters].join(" AND ");
     const sql =
       `SELECT ${cols} FROM archive_articles a WHERE ${where} ORDER BY published_at DESC LIMIT ? OFFSET ?`;
-    return adb.prepare(sql).bind(like, like, ...binds, PAGE_SIZE, offset).all();
+    return adb.prepare(sql).bind(`%${q}%`, ...binds, PAGE_SIZE, offset).all();
   }
   async function listOnly() {
     const where = filters.length ? "WHERE " + filters.join(" AND ") : "";
