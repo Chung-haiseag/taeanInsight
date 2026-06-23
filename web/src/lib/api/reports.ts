@@ -231,6 +231,21 @@ export async function fetchSeafog(): Promise<{ available: boolean; stills: Seafo
   }
 }
 
+// B2B 대시보드 시계열(지역 데이터 분석)
+export interface DashEnvPoint { date: string; pm10: number | null; pm25: number | null; o3: number | null; temp: number | null; humidity: number | null }
+export interface DashDemandPoint { date: string; idx: number | null; level: string | null }
+export async function fetchDashboardSeries(days = 30): Promise<{ days: number; environment: DashEnvPoint[]; demand: DashDemandPoint[] }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/dashboard/series?days=${days}`, { next: { revalidate: 300 } });
+    if (!res.ok) return { days, environment: [], demand: [] };
+    return (await res.json()) as { days: number; environment: DashEnvPoint[]; demand: DashDemandPoint[] };
+  } catch {
+    return { days, environment: [], demand: [] };
+  }
+}
+export const dashboardCsvUrl = (dataset: "environment" | "demand", days: number) =>
+  `${API_BASE}/api/dashboard/export?dataset=${dataset}&days=${days}`;
+
 // 발행분 목록(최신순).
 export async function listReports(): Promise<ReportListItem[]> {
   try {
