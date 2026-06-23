@@ -18,11 +18,22 @@ import { HybridLlmRouter } from "../llm/hybrid_router";
 import { WorkersAiLlmClient } from "../llm/workers_ai";
 import { fetchConditions } from "../env/sources";
 import { fetchRealEstateDeep } from "../env/realestate";
+import { fetchTour } from "../env/tour";
+import { forecastDemand } from "../tour/demand";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지/;
 // 부동산·실거래 질문이면 국토부 실거래가를 근거로 추가
 const REALESTATE_RE = /부동산|토지|시세|실거래|아파트|땅값|평당|매매|전세|임대|분양|집값/;
+// 관광 수요·축제·행사 질문이면 수요예측+축제를 근거로 추가
+const TOURISM_RE = /관광|수요|축제|행사|방문객|관광객|피서|성수기|혼잡|여행객|놀러|나들이|붐비/;
+// YYYYMMDD → 오늘 기준 D-day(KST)
+function ymd8Dday(s: string): number {
+  if (!/^\d{8}$/.test(s)) return 9999;
+  const target = Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8));
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  return Math.round((target - Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate())) / 86400000);
+}
 // 순수 날씨 질문 판별 — 날씨 용어·지명·시간어 외에 다른 내용 키워드가 없으면 true(기사 출처 생략)
 const PLACE_TIME = new Set(["태안", "태안군", "안면도", "안면", "오늘", "지금", "현재", "요즘", "내일", "오전", "오후", "이번", "어때", "어떄", "정도", "수준", "농도", "상태"]);
 function isPureWeather(query: string): boolean {
@@ -174,6 +185,32 @@ queryRouter.post("/", async (c) => {
       }
     }
 
+    // (a-3) 관광 수요·축제 질문이면 수요예측 + 축제 일정을 근거에 추가
+    if (TOURISM_RE.test(query)) {
+      const lines: string[] = [];
+      try {
+        const t = await fetchTour(c.env);
+        const fests = (t.festivals ?? [])
+          .map((f) => ({ ...f, dday: ymd8Dday(f.start) }))
+          .filter((f) => f.dday >= -3)
+          .sort((a, b) => a.dday - b.dday)
+          .slice(0, 8);
+        if (fests.length) {
+          lines.push("축제·행사: " + fests.map((f) => `${f.title}(${f.start}~${f.end}${f.dday >= 0 && f.dday <= 60 ? `, D-${f.dday}` : ""}${f.addr ? `, ${f.addr}` : ""})`).join("; "));
+        }
+      } catch { /* 무시 */ }
+      if (c.env.DATA_GO_KR_KEY) {
+        try {
+          const dem = await forecastDemand(c.env);
+          if (dem?.available) {
+            const fac = (dem.factors ?? []).map((f) => `${f.label} ${f.effect > 0 ? "+" : ""}${f.effect}(${f.detail})`).join(", ");
+            lines.push(`주말 관광 수요지수: ${dem.index}점 '${dem.level}' (${dem.weekend.sat}~${dem.weekend.sun}). ${dem.headline}. 기여 요인 — ${fac}`);
+          }
+        } catch { /* 무시 */ }
+      }
+      if (lines.length) parts.push({ text: `[태안 관광 수요·행사]\n${lines.join("\n")}`, source: { title: "관광 수요예측·축제(TourAPI·기상 기반)", url: null } });
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query)) {
       const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
@@ -192,7 +229,7 @@ queryRouter.post("/", async (c) => {
           {
             role: "system",
             content:
-              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·국토부 실거래·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n" +
+              "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·국토부 실거래·관광 수요·축제·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n" +
               "- 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 한 줄로 끝내지 마라.\n" +
               "- 부동산 질문이면 ㎡당 평균 단가·거래 건수·기간·월별 추이·태안군 전체 대비를 종합해 '시세 흐름'을 설명하라.\n" +
               "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
