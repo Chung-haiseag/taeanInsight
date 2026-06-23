@@ -35,9 +35,10 @@ export default function DashboardPage() {
           관광 수요·환경·부동산·검색 관심도 등 <strong className="text-brand">지역 시장 지표</strong>를 기간별로 보고 내려받습니다.
           관광협회·숙박체인·부동산·마케팅·연구 기관용. <span className="text-foreground-muted">(개인 가게 맞춤 제안은 ‘내 페이지’의 사장님 홈)</span>
         </p>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <AILabelBadge kind="ai_assisted" />
           <span className="text-xs text-foreground-muted">공공데이터 기반 · 매일 자동 집계</span>
+          <a href="/live" className="text-xs font-semibold text-accent hover:underline">· 실시간 현재값 → 지금 태안</a>
         </div>
       </header>
 
