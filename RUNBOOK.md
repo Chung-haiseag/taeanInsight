@@ -177,3 +177,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-24 · 업종 보드 3종 추가: 부동산 중개(실거래 시세·㎡단가·읍면)·골프장(라운딩 적합도·내장·매출)·양식수산(수온·적조 경보) — owner/brief, owner-home, onboarding
 
 - 2026-06-25 · 주간 개인화 푸시(금 09:00 KST): 구독자에게 본인 업종 보드/여행 플래너 요약 Web Push — owner/weekly_push, cron 0 0 * * 5
+
+- 2026-06-25 · AI 질의에 내 가게 연결: "우리 모텔 이번 주말 어때?" → shopProfile 보드 수치로 답변 — query/router buildShopEvidence(X-Taean-Uid)
