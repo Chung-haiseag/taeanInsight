@@ -35,6 +35,30 @@ const MARINE_RE = /일몰|일출|해넘이|해돋이|노을|물때|밀물|썰물
 const EVENT_RE = /행사|일정|이벤트|공지|군정|군청|새소식|소식|주간|개최|열리|열린/;
 // 추천·"오늘 뭐하지"류 → 오늘의 날씨·바다·행사·수요를 종합해 추천
 const RECOMMEND_RE = /뭐\s?하|뭘\s?하|무엇.*하면|할\s?만한|할\s?게|가\s?볼\s?만한|가볼만|추천|나들이|놀러|구경|데이트|코스|어디.*(갈|가면|놀|좋)|뭐\s?먹|볼거리|즐길/;
+// "우리 가게" 1인칭 사업 질문 → 사용자 shopProfile 보드 주입
+const MYSHOP_RE = /우리|저희|내\s?가게|장사|매출|예약|손님|가동률|영업|성수기|폐장|우리\s?(모텔|호텔|펜션|식당|카페|가게|골프장|여행사|배|농장)/;
+
+// owner-brief 보드 → AI 근거 텍스트(본인 가게 수치)
+function buildShopEvidence(b: import("../owner/brief").OwnerBrief): string | null {
+  const won = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n / 10000)}만원`);
+  const L: string[] = [];
+  const wk = b.lodging?.weekend ?? b.food?.weekend ?? b.leisure?.weekend ?? b.retail?.weekend ?? b.travel?.weekend ?? b.golf?.weekend;
+  if (wk) L.push(`이번 주말(${wk.sat}~${wk.sun})`);
+  if (b.lodging) L.push(`숙박: 예상 가동률 ${b.lodging.occRate}%, 권장 주말요금 ${won(b.lodging.recommendedPrice)}, 예상 1박 매출 ${won(b.lodging.estRevenue)} (수요 '${b.lodging.level}')`);
+  if (b.food) L.push(`${b.food.kind === "cafe" ? "카페" : "식당"}: 예상 혼잡 '${b.food.busyLabel}', 예상 손님 ${b.food.expectedCovers ?? "—"}명, 예상 매출 ${won(b.food.estRevenue)}`);
+  if (b.leisure) L.push(`레저: 야외활동 적합도 '${b.leisure.fitLabel}', 예상 참가 ${b.leisure.expectedGuests ?? "—"}명, 예상 매출 ${won(b.leisure.estRevenue)}`);
+  if (b.retail) L.push(`소매: 예상 혼잡 '${b.retail.busyLabel}', 예상 방문 ${b.retail.expectedVisitors ?? "—"}명, 예상 매출 ${won(b.retail.estRevenue)}`);
+  if (b.travel) L.push(`여행사: 투어 적합도 '${b.travel.fitLabel}', 예상 예약 ${b.travel.expectedBookings ?? "—"}명, 예상 매출 ${won(b.travel.estRevenue)}`);
+  if (b.golf) L.push(`골프장: 라운딩 적합도 '${b.golf.fitLabel}', 예상 내장 ${b.golf.expectedRounds ?? "—"}명, 예상 매출 ${won(b.golf.estRevenue)}`);
+  if (b.fishing) L.push(`낚시·수산: 오늘 출항 '${b.fishing.goLabel}'(파고 ${b.fishing.waveHeight?.toFixed(1) ?? "?"}m·풍속 ${b.fishing.windSpeed?.toFixed(0) ?? "?"}m/s), 수온 ${b.fishing.waterTemp ?? "?"}℃, 다음 ${b.fishing.nextTide ? `${b.fishing.nextTide.type} ${b.fishing.nextTide.time}` : "물때 정보 없음"}`);
+  if (b.salt) L.push(`염전: 오늘 채염 적합도 '${b.salt.harvestLabel}'(하늘 ${b.salt.sky ?? "?"})`);
+  if (b.farming) L.push(`농업: 영농 여건 '${b.farming.statusLabel}'${b.farming.alerts.length ? `, 경보: ${b.farming.alerts.map((a) => a.text).join("; ")}` : ""}`);
+  if (b.aqua) L.push(`양식·수산: 여건 '${b.aqua.statusLabel}', 수온 ${b.aqua.waterTemp ?? "?"}℃, 파고 ${b.aqua.waveHeight?.toFixed(1) ?? "?"}m${b.aqua.alerts.length ? `, 경보: ${b.aqua.alerts.map((a) => a.text).join("; ")}` : ""}`);
+  if (b.realtor) L.push(`부동산: 최근 아파트 거래 ${b.realtor.aptCount}건, 평균 ${b.realtor.aptAvgManwon ? `${(b.realtor.aptAvgManwon / 10000).toFixed(1)}억` : "—"}, ㎡당 ${b.realtor.aptPerM2Manwon ?? "—"}만원`);
+  // 실행 제안 상위 3
+  if (b.actions.length) L.push(`추천 조치: ${b.actions.slice(0, 3).map((a) => a.text).join(" / ")}`);
+  return L.length > 1 ? `[내 가게 맞춤 분석]\n${L.join("\n")}` : null;
+}
 // YYYYMMDD → 오늘 기준 D-day(KST)
 function ymd8Dday(s: string): number {
   if (!/^\d{8}$/.test(s)) return 9999;
@@ -126,6 +150,21 @@ queryRouter.post("/", async (c) => {
   try {
     const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string } }> = [];
     const recommend = RECOMMEND_RE.test(query); // 추천 질문 → 오늘 날씨·바다·행사·수요 종합
+
+    // (a-0) 내 가게 맞춤 — 로그인(익명 uid)에 가게 정보가 있고 사업/주말/추천 질문이면 본인 업종 보드 주입
+    let hasMyShop = false;
+    const uid = c.req.header("X-Taean-Uid");
+    if (uid && c.env.ARCHIVE_DB && (MYSHOP_RE.test(query) || recommend || /주말|예보|이번\s?주|다음\s?주/.test(query))) {
+      try {
+        const { D1PreferencesRepo } = await import("../preferences/repository_d1");
+        const prefs = await new D1PreferencesRepo(c.env.ARCHIVE_DB).get(uid);
+        if (prefs?.shopProfile) {
+          const { loadOwnerBrief } = await import("../owner/brief");
+          const text = buildShopEvidence(await loadOwnerBrief(c.env, prefs));
+          if (text) { parts.push({ text, source: { title: "내 가게 맞춤 분석(태안 수요·날씨 기반)", url: null } }); hasMyShop = true; }
+        }
+      } catch { /* 가게 분석 실패는 무시 */ }
+    }
 
     // (a) 날씨·대기질 질문이면 실시간 관측값을 근거에 추가
     if ((WEATHER_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY) {
@@ -295,7 +334,7 @@ queryRouter.post("/", async (c) => {
     }
 
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
-    if (c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend) {
+    if (c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend && !hasMyShop) {
       const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
       for (const r of rows) {
         parts.push({ text: `${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`, source: { title: r.title, url: `/news/${r.idxno}`, publishedAt: r.published_at } });
@@ -321,7 +360,8 @@ queryRouter.post("/", async (c) => {
               "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
               "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
               "- '이번 주/다음 주' 행사는 군청 주간행사계획·축제 일정을 우선 사용하고, 이미 끝난 과거 행사는 답에 넣지 마라.\n" +
-              "- '오늘 뭐하지/추천' 류 질문이면 오늘의 날씨·바다(물때·일출몰)·진행 중 축제·행사를 종합해 구체적인 활동을 추천하라(예: 맑고 낮 간조면 갯벌체험, 비 예보면 실내). 과거 기사로 답하지 마라.",
+              "- '오늘 뭐하지/추천' 류 질문이면 오늘의 날씨·바다(물때·일출몰)·진행 중 축제·행사를 종합해 구체적인 활동을 추천하라(예: 맑고 낮 간조면 갯벌체험, 비 예보면 실내). 과거 기사로 답하지 마라.\n" +
+              "- '[내 가게 맞춤 분석]' 근거가 있으면 그 사장님 본인 가게 데이터다. '우리 가게/모텔/식당' 질문엔 그 수치(가동률·예상 손님·권장가·매출·출항 가부 등)로 사장님에게 말하듯 구체적으로 답하고, 실행 조치도 1~2개 제안하라.",
           },
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
