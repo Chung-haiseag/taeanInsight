@@ -171,3 +171,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-24 · 사장님 업종 보드 5종: 숙박(가동률·권장가)·음식·카페(혼잡도·손님)·레저(적합도·참가자)·소매(방문·매출) — owner/brief, owner-home, onboarding
 
 - 2026-06-24 · 사장님 업종 보드 확장: 낚시·수산(출항 가부·물때·선상매출)·염전(채염 적기)·농업(영농 기상 경보) — owner/brief, owner-home, onboarding
+
+- 2026-06-24 · 개인 페르소나: 주말 태안 여행 플래너(날씨·일출몰·갯벌간조·혼잡·축제) — /me, owner-brief에 sun 추가

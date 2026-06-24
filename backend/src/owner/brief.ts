@@ -105,6 +105,7 @@ export interface OwnerBrief {
   demand: ReportMetrics["tourism"]["demand"];
   weather: ReportMetrics["environment"]["live"];
   tide: NonNullable<ReportMetrics["tourism"]["marine"]>["tide"] | null;
+  sun: NonNullable<ReportMetrics["tourism"]["marine"]>["sun"] | null;
   uv: ReportMetrics["uv"];
   actions: OwnerAction[];
   lodging: LodgingBoard | null; // 숙박 업종일 때만
@@ -500,6 +501,7 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     demand: metrics.tourism.demand,
     weather: metrics.environment.live,
     tide: metrics.tourism.marine?.tide ?? null,
+    sun: metrics.tourism.marine?.sun ?? null,
     uv: metrics.uv,
     actions: buildActions(industry, metrics),
     lodging: lodgingBoard(prefs, metrics),
