@@ -39,6 +39,8 @@ const STEP_LABEL: Record<StepKey, string> = {
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [shopRooms, setShopRooms] = useState("");
+  const [shopWkPrice, setShopWkPrice] = useState("");
   const [regions, setRegions] = useState<string[]>([]);
   const [categories, setCategories] = useState<InterestCategory[]>([]);
   const [segment, setSegment] = useState<UserSegment>("b2c_basic");
@@ -82,7 +84,12 @@ export default function OnboardingPage() {
         categories: trimmedCategories,
         notificationChannels: channels,
         shopProfile: isOwner && industry
-          ? { industry, eupMyeon: trimmedRegions[0], name: shopName || undefined }
+          ? {
+              industry, eupMyeon: trimmedRegions[0], name: shopName || undefined,
+              ...(industry === "lodging"
+                ? { capacity: shopRooms ? Number(shopRooms) : undefined, weekendPrice: shopWkPrice ? Number(shopWkPrice) : undefined }
+                : {}),
+            }
           : undefined,
       });
       router.push("/me");
@@ -246,6 +253,27 @@ export default function OnboardingPage() {
             aria-label="상호"
             className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
           />
+          {industry === "lodging" && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                value={shopRooms}
+                onChange={(e) => setShopRooms(e.target.value.replace(/[^0-9]/g, ""))}
+                inputMode="numeric"
+                placeholder="객실 수(예: 20)"
+                aria-label="객실 수"
+                className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={shopWkPrice}
+                onChange={(e) => setShopWkPrice(e.target.value.replace(/[^0-9]/g, ""))}
+                inputMode="numeric"
+                placeholder="주말 기본가(원, 예: 80000)"
+                aria-label="주말 기본가"
+                className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
+              />
+              <p className="sm:col-span-2 text-xs text-accent">→ 예상 가동률·권장가·1박 매출이 계산됩니다.</p>
+            </div>
+          )}
           <p className="text-xs text-foreground-muted">
             지역은 첫 번째 관심 읍·면({REGION_OPTIONS.find((r) => r.code === trimmedRegions[0])?.label ?? "미선택"})으로 설정됩니다. 건너뛰어도 됩니다.
           </p>
