@@ -13,7 +13,6 @@ import { MeOwnerBoard } from "@/components/me/owner-board";
 const FULL_WIDTH = new Set(["my_news", "personalized_report", "team_workspace", "b2g_department_space", "gov_notices"]);
 import { canToggleTone, preferredTone, REGION_OPTIONS, SEGMENT_LIMITS, type MeResponse } from "@/lib/types";
 import { getMe } from "@/lib/api/me";
-import { getMockMeResponse, isMockMode } from "@/lib/mock/me";
 
 export default function MePage() {
   const [data, setData] = useState<MeResponse | null>(null);
@@ -23,7 +22,9 @@ export default function MePage() {
   useEffect(() => {
     (async () => {
       try {
-        const resp = isMockMode() ? getMockMeResponse() : await getMe();
+        // /me는 항상 실제 저장 데이터(익명 uid)로 — 온보딩·가게설정이 즉시 반영되도록.
+        // (목 모드는 홈 데모 쇼케이스 전용; 개인화 화면엔 적용하지 않음)
+        const resp = await getMe();
         setData(resp);
       } catch (e) {
         setError(e instanceof Error ? e.message : "불러오기 실패");

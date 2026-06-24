@@ -29,9 +29,19 @@ export function MeOwnerBoard() {
     );
   }
 
+  if (open) {
+    return <ShopSetup onSaved={() => { setOpen(false); void load(); }} />;
+  }
+
   return (
     <div className="space-y-5">
       {brief.lodging && <LodgingBoardCard board={brief.lodging} nearby={brief.market.nearbyLodging} />}
+
+      <div className="text-right">
+        <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
+          ✏️ 가게 정보 수정(객실수·요금)
+        </button>
+      </div>
 
       {brief.actions.length > 0 && (
         <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
