@@ -7,6 +7,7 @@ import { renderWidgets } from "@/components/me/widget_registry";
 import { ToneToggleBar, useToneToggle } from "@/components/me/tone_toggle";
 import { PushOptInButton } from "@/components/me/push_opt_in";
 import { MeHeroStrip } from "@/components/me/hero-strip";
+import { MeOwnerBoard } from "@/components/me/owner-board";
 
 // 가로 전체로 둘 위젯(긴 목록·핵심) — 나머지는 2열 절반
 const FULL_WIDTH = new Set(["my_news", "personalized_report", "team_workspace", "b2g_department_space", "gov_notices"]);
@@ -89,6 +90,9 @@ function MeDashboard({ data }: { data: MeResponse }) {
 
       {/* 오늘 한눈에 — 히어로 요약 */}
       <MeHeroStrip preferences={preferences} />
+
+      {/* 사장님 보드 — 가게 정보가 있으면 모텔 운영 보드·실행 제안 */}
+      {preferences.shopProfile && <MeOwnerBoard />}
 
       {/* Push 옵트인 — 알림 채널에 webpush 있으면 노출 */}
       {preferences.notificationChannels.includes("webpush") && (

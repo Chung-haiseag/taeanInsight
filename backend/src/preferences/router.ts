@@ -38,6 +38,8 @@ const shopProfileSchema = z.object({
   eupMyeon: z.string().max(40).optional(),
   capacity: z.number().int().min(0).max(100000).optional(),
   name: z.string().max(60).optional(),
+  basePrice: z.number().int().min(0).max(100000000).optional(),
+  weekendPrice: z.number().int().min(0).max(100000000).optional(),
 });
 
 const onboardSchema = z.object({

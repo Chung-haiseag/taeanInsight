@@ -10,7 +10,7 @@ import { PushOptInButton } from "@/components/me/push_opt_in";
 import { DemandGauge } from "@/components/reports/report-charts";
 import { REGION_OPTIONS } from "@/lib/types";
 import {
-  fetchOwnerBrief, updateShopProfile, INDUSTRY_OPTIONS,
+  fetchOwnerBrief, updateShopProfile, INDUSTRY_OPTIONS, type LodgingBoard,
   type OwnerBrief, type ShopIndustry,
 } from "@/lib/api/owner";
 
@@ -53,6 +53,9 @@ function OwnerLive() {
       </section>
 
       {!brief.hasShop && <ShopSetup onSaved={load} />}
+
+      {/* 숙박 운영 보드 — 예상 가동률·권장가·매출 */}
+      {brief.lodging && <LodgingBoardCard board={brief.lodging} />}
 
       {/* 이번 주말 수요 — 실제 수요지수 */}
       {brief.demand?.available && (
@@ -139,11 +142,53 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
+// ── 숙박 운영 보드 ── (내 페이지에서도 재사용)
+export function LodgingBoardCard({ board }: { board: LodgingBoard }) {
+  const won = (n: number | null) => (n == null ? "—" : `${n.toLocaleString()}원`);
+  const occColor = board.occRate >= 75 ? "text-accent" : board.occRate >= 45 ? "text-brand" : "text-amber-600";
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">🛏 모텔 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">{board.weekend.sat.slice(5)}~{board.weekend.sun.slice(5)} 주말 · 수요 ‘{board.level}’</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">예상 가동률</p>
+          <p className={`mt-1 font-display text-3xl font-bold ${occColor}`}>{board.occRate}%</p>
+          {board.rooms != null && <p className="text-[11px] text-foreground-muted">객실 {board.rooms}실 기준</p>}
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">권장 주말 요금</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.recommendedPrice != null ? `${(board.recommendedPrice / 10000).toFixed(1)}만` : "—"}</p>
+          <p className="text-[11px] text-accent">{board.priceMultiplier !== 1 ? `기본가 ${board.priceMultiplier > 1 ? "+" : ""}${Math.round((board.priceMultiplier - 1) * 100)}%` : "기본가 유지"}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">예상 1박 매출</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "가동률×권장가" : "객실수·요금 입력 시"}</p>
+        </article>
+      </div>
+      {board.notes.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}
+        </ul>
+      )}
+      {board.recommendedPrice == null && (
+        <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">객실 수·주말 기본가</strong>를 입력하면 권장가·예상 매출이 계산됩니다.</p>
+      )}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 실제 예약은 채널·이벤트에 따라 달라집니다.</p>
+    </section>
+  );
+}
+
 // ── 가게 프로필 설정 ──
 function ShopSetup({ onSaved }: { onSaved: () => void }) {
   const [industry, setIndustry] = useState<ShopIndustry | null>(null);
   const [eupMyeon, setEupMyeon] = useState<string>("");
   const [name, setName] = useState("");
+  const [rooms, setRooms] = useState("");
+  const [wkPrice, setWkPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -151,7 +196,11 @@ function ShopSetup({ onSaved }: { onSaved: () => void }) {
     if (!industry) { setErr("업종을 선택하세요."); return; }
     setSaving(true); setErr(null);
     try {
-      const r = await updateShopProfile({ industry, eupMyeon: eupMyeon || undefined, name: name || undefined });
+      const r = await updateShopProfile({
+        industry, eupMyeon: eupMyeon || undefined, name: name || undefined,
+        capacity: rooms ? Number(rooms) : undefined,
+        weekendPrice: wkPrice ? Number(wkPrice) : undefined,
+      });
       if (r.ok) onSaved();
       else if (r.needOnboarding) setErr("먼저 관심사 설정(온보딩)을 완료해주세요.");
     } catch { setErr("저장 실패. 잠시 후 다시 시도하세요."); }
@@ -177,6 +226,15 @@ function ShopSetup({ onSaved }: { onSaved: () => void }) {
             {REGION_OPTIONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
           </select>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="상호(선택)" className="rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
+        </div>
+        {industry === "lodging" && (
+          <div className="flex flex-wrap gap-2">
+            <input value={rooms} onChange={(e) => setRooms(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="객실 수(예: 20)" className="w-32 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
+            <input value={wkPrice} onChange={(e) => setWkPrice(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="주말 기본가(원, 예: 80000)" className="w-44 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
+            <span className="self-center text-xs text-foreground-muted">→ 권장가·예상 매출 계산</span>
+          </div>
+        )}
+        <div className="flex">
           <button type="button" onClick={save} disabled={saving} className="btn-accent px-4 py-2 text-sm disabled:opacity-60">
             {saving ? "저장 중…" : "저장"}
           </button>

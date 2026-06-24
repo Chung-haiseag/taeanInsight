@@ -3,9 +3,22 @@ import { apiFetch, ApiError } from "./client";
 import type { DemandForecast, TideInfo } from "./reports";
 
 export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "other";
-export interface ShopProfile { industry: ShopIndustry; eupMyeon?: string; capacity?: number; name?: string }
+export interface ShopProfile { industry: ShopIndustry; eupMyeon?: string; capacity?: number; name?: string; basePrice?: number; weekendPrice?: number }
 export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
 export interface OwnerLive { pm10: number | null; pm25: number | null; grade: string | null; temp: number | null; humidity: number | null; sky: string | null; observedAt: string | null }
+export interface LodgingBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  occRate: number;
+  priceMultiplier: number;
+  basePrice: number | null;
+  recommendedPrice: number | null;
+  rooms: number | null;
+  estRevenue: number | null;
+  festivalSoon: { title: string; dday: number } | null;
+  weekendRain: boolean;
+  notes: string[];
+}
 
 export interface OwnerBrief {
   hasShop: boolean;
@@ -15,6 +28,7 @@ export interface OwnerBrief {
   tide: TideInfo | null;
   uv: { todayMax: number | null; level: string; peakHour: string | null } | null;
   actions: OwnerAction[];
+  lodging: LodgingBoard | null;
   market: { festivals: Array<{ title: string; dday: number }>; gasoline: number | null; aptAvgManwon: number | null };
 }
 

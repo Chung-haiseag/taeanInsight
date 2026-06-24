@@ -7,6 +7,20 @@ import { getFreshSnapshot } from "../reports/metrics_cache";
 import { loadReportMetrics, type ReportMetrics } from "../reports/metrics";
 
 export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
+// 숙박 전용 운영 보드 — 주말 수요로 예상 가동률·권장가·매출 추정
+export interface LodgingBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  occRate: number;            // 예상 가동률(%)
+  priceMultiplier: number;    // 기본가 대비 권장 배율
+  basePrice: number | null;   // 입력한 주말 기본가
+  recommendedPrice: number | null; // 권장가(원)
+  rooms: number | null;
+  estRevenue: number | null;  // 예상 1박 매출(원)
+  festivalSoon: { title: string; dday: number } | null;
+  weekendRain: boolean;
+  notes: string[];
+}
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -15,6 +29,7 @@ export interface OwnerBrief {
   tide: NonNullable<ReportMetrics["tourism"]["marine"]>["tide"] | null;
   uv: ReportMetrics["uv"];
   actions: OwnerAction[];
+  lodging: LodgingBoard | null; // 숙박 업종일 때만
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -106,6 +121,46 @@ function buildActions(industry: ShopIndustry | null, m: ReportMetrics): OwnerAct
   return out.sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9)).slice(0, 6);
 }
 
+// 숙박 운영 보드 — 주말 수요등급으로 예상 가동률·권장가·매출 추정(규칙기반·투명).
+function lodgingBoard(prefs: UserPreferences | null, m: ReportMetrics): LodgingBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "lodging") return null;
+  const demand = m.tourism.demand;
+  if (!demand?.available) return null;
+
+  const OCC: Record<string, number> = { 매우높음: 0.92, 높음: 0.78, 보통: 0.55, 낮음: 0.35, 매우낮음: 0.2 };
+  const MULT: Record<string, number> = { 매우높음: 1.2, 높음: 1.1, 보통: 1.0, 낮음: 0.9, 매우낮음: 0.85 };
+  let occ = OCC[demand.level] ?? 0.5;
+  let mult = MULT[demand.level] ?? 1.0;
+
+  // 인근 축제(주말 임박) → 가동률·요금 상향
+  const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
+    .filter((f) => f.dday >= 0 && f.dday <= 3).sort((a, b) => a.dday - b.dday)[0] ?? null;
+  if (fest) { occ += 0.1; mult += 0.05; }
+  // 주말 우천 → 가동률 하향
+  const weekendRain = [demand.weather?.sat, demand.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  if (weekendRain) occ -= 0.12;
+  occ = Math.max(0.1, Math.min(0.98, occ));
+
+  const rooms = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
+  const base = sp.weekendPrice ?? sp.basePrice ?? null;
+  const recommendedPrice = base ? Math.round((base * mult) / 1000) * 1000 : null;
+  const estRevenue = rooms && recommendedPrice ? Math.round(rooms * occ) * recommendedPrice : null;
+
+  const notes: string[] = [];
+  if (mult > 1) notes.push(`수요 '${demand.level}' → 주말 요금 ${Math.round((mult - 1) * 100)}% 상향 여력`);
+  else if (mult < 1) notes.push(`수요 '${demand.level}' → 막판 할인·연박 프로모션 권장`);
+  if (fest) notes.push(`인근 '${fest.title}' D-${fest.dday} — 조기 예약 마감 가능`);
+  if (weekendRain) notes.push("주말 강수 예보 — 환불·일정변경 문의 대비");
+
+  return {
+    weekend: demand.weekend, level: demand.level,
+    occRate: Math.round(occ * 100), priceMultiplier: Math.round(mult * 100) / 100,
+    basePrice: base, recommendedPrice, rooms, estRevenue,
+    festivalSoon: fest, weekendRain, notes,
+  };
+}
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
@@ -120,6 +175,7 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     tide: metrics.tourism.marine?.tide ?? null,
     uv: metrics.uv,
     actions: buildActions(industry, metrics),
+    lodging: lodgingBoard(prefs, metrics),
     market: {
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,

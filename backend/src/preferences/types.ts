@@ -15,6 +15,8 @@ export interface ShopProfile {
   eupMyeon?: string;                // 가게 읍·면 코드(없으면 regions[0] 사용)
   capacity?: number;               // 객실/좌석 수(선택)
   name?: string;                   // 상호(선택)
+  basePrice?: number;              // (숙박) 평일 기본 객실가(원)
+  weekendPrice?: number;           // (숙박) 주말 기본 객실가(원)
 }
 
 export interface UserPreferences {
