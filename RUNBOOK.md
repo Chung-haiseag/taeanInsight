@@ -175,3 +175,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-24 · 개인 페르소나: 주말 태안 여행 플래너(날씨·일출몰·갯벌간조·혼잡·축제) — /me, owner-brief에 sun 추가
 
 - 2026-06-24 · 업종 보드 3종 추가: 부동산 중개(실거래 시세·㎡단가·읍면)·골프장(라운딩 적합도·내장·매출)·양식수산(수온·적조 경보) — owner/brief, owner-home, onboarding
+
+- 2026-06-25 · 주간 개인화 푸시(금 09:00 KST): 구독자에게 본인 업종 보드/여행 플래너 요약 Web Push — owner/weekly_push, cron 0 0 * * 5

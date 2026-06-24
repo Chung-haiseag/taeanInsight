@@ -102,6 +102,18 @@ export default {
       return;
     }
 
+    // ── 주간 개인화 푸시 (금 09:00 KST) — 구독자에게 본인 업종 보드/여행 플래너 요약 ──
+    if (_event.cron === "0 0 * * 5") {
+      try {
+        const { sendWeeklyOwnerPush } = await import("./owner/weekly_push");
+        const r = await sendWeeklyOwnerPush(env);
+        console.log(`[cron] 주간 개인화 푸시: 사용자 ${r.users}·발송 ${r.sent}${r.skipped ? ` (${r.skipped})` : ""}`);
+      } catch (e) {
+        console.warn("[cron] 주간 개인화 푸시 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
     // ── 12시간마다 — 뉴스 수집 + 군청 목록 갱신(하루 2회) ──
     if (_event.cron === "0 */12 * * *") {
       try {
