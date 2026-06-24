@@ -11,6 +11,7 @@ export interface QuerySource {
   publisher?: string;
 }
 
+export interface QueryEvidence { n: number; source: string; text: string }
 export interface QueryResult {
   answer: string;
   intent: string;
@@ -19,6 +20,7 @@ export interface QueryResult {
   llmCalls: number;
   sources: QuerySource[];
   model: string;
+  evidence?: QueryEvidence[];
 }
 
 export async function askQuery(input: {
@@ -27,7 +29,8 @@ export async function askQuery(input: {
   location?: string;
   userTier?: "anon" | "b2c" | "b2b" | "b2g";
 }): Promise<QueryResult> {
-  return apiFetch<QueryResult>("/api/query", {
+  // evidence=1: AI가 받은 실시간 근거 원문을 함께 받아 "근거 보기"로 노출(RAG 투명성)
+  return apiFetch<QueryResult>("/api/query?evidence=1", {
     method: "POST",
     body: JSON.stringify(input),
   });
