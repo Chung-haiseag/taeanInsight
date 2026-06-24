@@ -2,7 +2,7 @@
 import { apiFetch, ApiError } from "./client";
 import type { DemandForecast, TideInfo } from "./reports";
 
-export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "other";
+export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "travel" | "other";
 export interface ShopProfile { industry: ShopIndustry; eupMyeon?: string; capacity?: number; name?: string; basePrice?: number; weekendPrice?: number }
 export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
 export interface OwnerLive { pm10: number | null; pm25: number | null; grade: string | null; temp: number | null; humidity: number | null; sky: string | null; observedAt: string | null }
@@ -96,6 +96,20 @@ export interface FarmingBoard {
   notes: string[];
 }
 
+export interface TravelBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  fitLabel: string;
+  capacity: number | null;
+  price: number | null;
+  expectedBookings: number | null;
+  estRevenue: number | null;
+  highWave: boolean;
+  rainSoon: boolean;
+  festivalSoon: { title: string; dday: number } | null;
+  notes: string[];
+}
+
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -112,6 +126,7 @@ export interface OwnerBrief {
   fishing: FishingBoard | null;
   salt: SaltBoard | null;
   farming: FarmingBoard | null;
+  travel: TravelBoard | null;
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -130,6 +145,7 @@ export const INDUSTRY_OPTIONS: { value: ShopIndustry; label: string; emoji: stri
   { value: "fishing", label: "낚시·수산", emoji: "🎣" },
   { value: "salt", label: "염전(천일염)", emoji: "🧂" },
   { value: "farming", label: "농업", emoji: "🌾" },
+  { value: "travel", label: "여행사", emoji: "🧭" },
   { value: "other", label: "기타", emoji: "🏢" },
 ];
 

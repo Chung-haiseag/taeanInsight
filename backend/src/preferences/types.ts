@@ -9,7 +9,7 @@ export type InterestCategory =
 export type NotificationChannel = "email" | "webpush" | "kakao";
 
 // 사장님 초개인화용 가게 프로필 — OwnerHome 실행 제안을 업종/지역 맞춤으로.
-export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "other";
+export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "travel" | "other";
 export interface ShopProfile {
   industry: ShopIndustry;
   eupMyeon?: string;                // 가게 읍·면 코드(없으면 regions[0] 사용)

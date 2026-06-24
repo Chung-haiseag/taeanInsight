@@ -99,6 +99,20 @@ export interface FarmingBoard {
   alerts: Array<{ icon: string; text: string }>;
   notes: string[];
 }
+// 여행사 운영 보드 — 투어 진행 적합도 + 예약·매출 + 축제 연계 상품
+export interface TravelBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  fitLabel: string;            // 투어 진행 적합도(좋음/보통/주의)
+  capacity: number | null;     // 일 투어 정원
+  price: number | null;        // 1인 상품가
+  expectedBookings: number | null;
+  estRevenue: number | null;
+  highWave: boolean;
+  rainSoon: boolean;
+  festivalSoon: { title: string; dday: number } | null;
+  notes: string[];
+}
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -115,6 +129,7 @@ export interface OwnerBrief {
   fishing: FishingBoard | null; // 낚시·수산 업종일 때만
   salt: SaltBoard | null;       // 염전 업종일 때만
   farming: FarmingBoard | null; // 농업 업종일 때만
+  travel: TravelBoard | null;   // 여행사 업종일 때만
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -125,7 +140,7 @@ export interface OwnerBrief {
 
 const INDUSTRY_LABEL: Record<ShopIndustry, string> = {
   lodging: "숙박", food: "음식", cafe: "카페", leisure: "레저·체험", retail: "소매",
-  fishing: "낚시·수산", salt: "염전", farming: "농업", other: "기타",
+  fishing: "낚시·수산", salt: "염전", farming: "농업", travel: "여행사", other: "기타",
 };
 
 function ymd8ToDday(s: string): number {
@@ -473,6 +488,41 @@ function farmingBoard(prefs: UserPreferences | null, m: ReportMetrics): FarmingB
   return { statusLabel, todayTemp, weekendMaxTemp: wkMax, weekendRain, alerts, notes };
 }
 
+// 여행사 보드 — 수요·날씨·파고로 투어 진행 적합도·예약·매출(축제 연계).
+function travelBoard(prefs: UserPreferences | null, m: ReportMetrics): TravelBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "travel") return null;
+  const demand = m.tourism.demand;
+  if (!demand?.available) return null;
+
+  const RATE: Record<string, number> = { 매우높음: 0.9, 높음: 0.72, 보통: 0.55, 낮음: 0.35, 매우낮음: 0.18 };
+  let rate = RATE[demand.level] ?? 0.55;
+  const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
+    .filter((f) => f.dday >= 0 && f.dday <= 7).sort((a, b) => a.dday - b.dday)[0] ?? null;
+  if (fest && fest.dday <= 3) rate += 0.1;
+  const rainSoon = [demand.weather?.sat, demand.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  if (rainSoon) rate -= 0.15;
+  rate = Math.max(0.05, Math.min(0.98, rate));
+
+  const wave = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.waveHeight ?? 0));
+  const highWave = wave >= 1.5;
+  const fitLabel = rainSoon ? "주의(우천)" : highWave ? "주의(해상)" : (demand.level === "높음" || demand.level === "매우높음") ? "좋음" : "보통";
+
+  const capacity = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
+  const price = sp.basePrice ?? null;
+  const expectedBookings = capacity ? Math.round(capacity * rate) : null;
+  const estRevenue = expectedBookings && price ? expectedBookings * price : null;
+
+  const notes: string[] = [];
+  if (fest) notes.push(`'${fest.title}' D-${fest.dday} — 축제 연계 패키지·셔틀 상품 기획`);
+  if (rainSoon) notes.push("주말 강수 — 실내·우천 대체 코스 준비, 환불 규정 안내");
+  if (highWave) notes.push(`파고 ${wave.toFixed(1)}m — 섬·유람선 등 해상 투어 일정 조정`);
+  if (demand.level === "낮음" || demand.level === "매우낮음") notes.push("비수기 — 단체·제휴 할인 프로모션 권장");
+  if (!notes.length) notes.push("투어 진행 양호 — 가이드·차량 배차 점검");
+
+  return { weekend: demand.weekend, level: demand.level, fitLabel, capacity, price, expectedBookings, estRevenue, highWave, rainSoon, festivalSoon: fest, notes };
+}
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
@@ -511,6 +561,7 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     fishing: fishingBoard(prefs, metrics),
     salt: saltBoard(prefs, metrics),
     farming: farmingBoard(prefs, metrics),
+    travel: travelBoard(prefs, metrics),
     market: {
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,

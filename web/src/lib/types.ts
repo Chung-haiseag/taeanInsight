@@ -11,7 +11,7 @@ export type NotificationChannel = "email" | "webpush" | "kakao";
 export type FavoriteKind = "place" | "event" | "report" | "article" | "dashboard_widget";
 
 export interface ShopProfile {
-  industry: "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "other";
+  industry: "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "travel" | "other";
   eupMyeon?: string;
   capacity?: number;
   name?: string;
