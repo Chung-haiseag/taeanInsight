@@ -34,7 +34,7 @@ const CATEGORY_VALUES = ["tourism", "environment", "realestate", "policy", "indu
 const CHANNEL_VALUES = ["email", "webpush", "kakao"] as const;
 
 const shopProfileSchema = z.object({
-  industry: z.enum(["lodging", "food", "cafe", "leisure", "retail", "fishing", "salt", "farming", "other"]),
+  industry: z.enum(["lodging", "food", "cafe", "leisure", "retail", "fishing", "salt", "farming", "travel", "other"]),
   eupMyeon: z.string().max(40).optional(),
   capacity: z.number().int().min(0).max(100000).optional(),
   name: z.string().max(60).optional(),
