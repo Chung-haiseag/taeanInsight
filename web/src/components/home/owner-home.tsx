@@ -11,6 +11,7 @@ import { DemandGauge } from "@/components/reports/report-charts";
 import { REGION_OPTIONS } from "@/lib/types";
 import {
   fetchOwnerBrief, updateShopProfile, INDUSTRY_OPTIONS, type LodgingBoard, type NearbyLodging, type FoodBoard, type LeisureBoard, type RetailBoard,
+  type FishingBoard, type SaltBoard, type FarmingBoard,
   type OwnerBrief, type ShopIndustry,
 } from "@/lib/api/owner";
 
@@ -65,6 +66,11 @@ function OwnerLive() {
 
       {/* 소매 운영 보드 — 혼잡도·방문·매출 */}
       {brief.retail && <RetailBoardCard board={brief.retail} />}
+
+      {/* 낚시·수산 / 염전 / 농업 보드 */}
+      {brief.fishing && <FishingBoardCard board={brief.fishing} />}
+      {brief.salt && <SaltBoardCard board={brief.salt} />}
+      {brief.farming && <FarmingBoardCard board={brief.farming} />}
 
       {/* 이번 주말 수요 — 실제 수요지수 */}
       {brief.demand?.available && (
@@ -324,6 +330,109 @@ export function RetailBoardCard({ board }: { board: RetailBoard }) {
   );
 }
 
+// ── 낚시·수산 운영 보드 ──
+export function FishingBoardCard({ board }: { board: FishingBoard }) {
+  const goColor = board.goLabel === "위험" ? "text-red-600" : board.goLabel === "주의" ? "text-amber-600" : "text-accent";
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">🎣 낚시·수산 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">오늘 출항 판단 · 수요 ‘{board.level}’</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">출항 가부</p>
+          <p className={`mt-1 font-display text-3xl font-bold ${goColor}`}>{board.goLabel}</p>
+          <p className="text-[11px] text-foreground-muted">파고 {board.waveHeight?.toFixed(1) ?? "—"}m · 풍속 {board.windSpeed?.toFixed(0) ?? "—"}m/s</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">다음 물때</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand">{board.nextTide ? `${board.nextTide.type} ${board.nextTide.time}` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">수온 {board.waterTemp != null ? `${board.waterTemp}℃` : "—"}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">선상낚시 예상(일)</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand">{board.expectedGuests != null ? `${board.expectedGuests}명` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? `매출 ${Math.round(board.estRevenue / 10000)}만` : "정원·요금 입력 시"}</p>
+        </article>
+      </div>
+      <p className="mt-2 text-[11px] text-foreground-muted">일출 {board.sunrise ?? "—"} · 일몰 {board.sunset ?? "—"}</p>
+      {board.notes.length > 0 && (
+        <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>
+      )}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 파고·풍속(국립해양조사원) 기반 안전 참고 — 최종 출항은 관할 해경·기상특보 확인.</p>
+    </section>
+  );
+}
+
+// ── 염전(천일염) 운영 보드 ──
+export function SaltBoardCard({ board }: { board: SaltBoard }) {
+  const c = board.harvestLabel === "최적" ? "text-accent" : board.harvestLabel === "불가" ? "text-red-600" : "text-brand";
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">🧂 염전 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">오늘 채염 판단</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">채염 적합도</p>
+          <p className={`mt-1 font-display text-3xl font-bold ${c}`}>{board.harvestLabel}</p>
+          <p className="text-[11px] text-foreground-muted">하늘 {board.sky ?? "—"}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">바람(증발)</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.windSpeed != null ? `${board.windSpeed.toFixed(0)}m/s` : "—"}</p>
+        </article>
+      </div>
+      {board.notes.length > 0 && (
+        <ul className="mt-3 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>
+      )}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 실시간 날씨·바람 기반 추정 — 결정지 상태는 현장 확인.</p>
+    </section>
+  );
+}
+
+// ── 농업 운영 보드 ──
+export function FarmingBoardCard({ board }: { board: FarmingBoard }) {
+  const c = board.statusLabel === "경보" ? "text-red-600" : board.statusLabel === "주의" ? "text-amber-600" : "text-accent";
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">🌾 농업 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">영농 기상 경보</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">영농 여건</p>
+          <p className={`mt-1 font-display text-3xl font-bold ${c}`}>{board.statusLabel}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">오늘 기온</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.todayTemp != null ? `${Math.round(board.todayTemp)}°` : "—"}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">주말 최고</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.weekendMaxTemp != null ? `${board.weekendMaxTemp}°` : "—"}</p>
+        </article>
+      </div>
+      {board.alerts.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {board.alerts.map((a, i) => (
+            <li key={i} className="flex gap-2 rounded-xl border border-accent/20 bg-background p-2.5">
+              <span aria-hidden>{a.icon}</span><span className="text-sm text-foreground">{a.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {board.notes.length > 0 && (
+        <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>
+      )}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 기상청 단기·주말 예보 기반 — 정밀 방제는 농업기술센터 안내 확인.</p>
+    </section>
+  );
+}
+
 // ── 가게 프로필 설정 ── (내 페이지에서도 재사용)
 export function ShopSetup({ onSaved }: { onSaved: () => void }) {
   const [industry, setIndustry] = useState<ShopIndustry | null>(null);
@@ -341,9 +450,9 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
       const r = await updateShopProfile({
         industry, eupMyeon: eupMyeon || undefined, name: name || undefined,
         capacity: rooms ? Number(rooms) : undefined,
-        // 숙박=주말 기본가(weekendPrice), 그 외(음식·카페·레저·소매)=객단가/체험료(basePrice)
+        // 숙박=주말 기본가(weekendPrice), 그 외(음식·카페·레저·소매·낚시)=객단가/체험료/요금(basePrice)
         weekendPrice: industry === "lodging" && wkPrice ? Number(wkPrice) : undefined,
-        basePrice: (industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail") && wkPrice ? Number(wkPrice) : undefined,
+        basePrice: (industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail" || industry === "fishing") && wkPrice ? Number(wkPrice) : undefined,
       });
       if (r.ok) onSaved();
       else if (r.needOnboarding) setErr("먼저 관심사 설정(온보딩)을 완료해주세요.");
@@ -371,16 +480,19 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
           </select>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="상호(선택)" className="rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
         </div>
-        {industry && industry !== "other" && (
+        {industry && ["lodging", "food", "cafe", "leisure", "retail", "fishing"].includes(industry) && (
           <div className="flex flex-wrap gap-2">
             <input value={rooms} onChange={(e) => setRooms(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
-              placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : "좌석 수(예: 40)"}
+              placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : industry === "fishing" ? "승선 정원(예: 12)" : "좌석 수(예: 40)"}
               className="w-40 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
             <input value={wkPrice} onChange={(e) => setWkPrice(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
-              placeholder={industry === "lodging" ? "주말 기본가(원, 예: 80000)" : industry === "leisure" ? "1인 체험료(원, 예: 30000)" : "객단가(원, 예: 15000)"}
+              placeholder={industry === "lodging" ? "주말 기본가(원, 예: 80000)" : industry === "leisure" ? "1인 체험료(원, 예: 30000)" : industry === "fishing" ? "1인 승선료(원, 예: 50000)" : "객단가(원, 예: 15000)"}
               className="w-44 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
-            <span className="self-center text-xs text-foreground-muted">→ {industry === "lodging" ? "권장가·예상 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : "예상 손님·매출"} 계산</span>
+            <span className="self-center text-xs text-foreground-muted">→ {industry === "lodging" ? "권장가·예상 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : industry === "fishing" ? "출항·예상 매출" : "예상 손님·매출"} 계산</span>
           </div>
+        )}
+        {industry && (industry === "salt" || industry === "farming") && (
+          <p className="text-xs text-foreground-muted">날씨·바람 기반 운영 보드가 표시됩니다(별도 입력 불필요).</p>
         )}
         <div className="flex">
           <button type="button" onClick={save} disabled={saving} className="btn-accent px-4 py-2 text-sm disabled:opacity-60">
