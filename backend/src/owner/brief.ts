@@ -63,6 +63,42 @@ export interface RetailBoard {
   rainSoon: boolean;
   notes: string[];
 }
+// 낚시·수산 운영 보드 — 파고·풍속 출항 가부 + 물때·수온 + 선상낚시 매출
+export interface FishingBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  goLabel: string;             // 출항 가부(양호/주의/위험)
+  waveHeight: number | null;
+  windSpeed: number | null;
+  waterTemp: number | null;
+  nextTide: { time: string; type: string } | null;
+  sunrise: string | null;
+  sunset: string | null;
+  seats: number | null;        // 승선 정원
+  price: number | null;        // 1인 요금
+  expectedGuests: number | null;
+  estRevenue: number | null;
+  festivalSoon: { title: string; dday: number } | null;
+  notes: string[];
+}
+// 염전(천일염) 운영 보드 — 채염 적기(맑음·무강수·바람)
+export interface SaltBoard {
+  harvestLabel: string;        // 채염 적합도(최적/가능/불가)
+  sky: string | null;
+  pty: string | null;
+  windSpeed: number | null;
+  weekendRain: boolean;
+  notes: string[];
+}
+// 농업 운영 보드 — 영농 기상 경보(강수·폭염·강풍 등)
+export interface FarmingBoard {
+  statusLabel: string;         // 영농 여건(양호/주의/경보)
+  todayTemp: number | null;
+  weekendMaxTemp: number | null;
+  weekendRain: boolean;
+  alerts: Array<{ icon: string; text: string }>;
+  notes: string[];
+}
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -75,6 +111,9 @@ export interface OwnerBrief {
   food: FoodBoard | null;       // 음식·카페 업종일 때만
   leisure: LeisureBoard | null; // 레저·체험 업종일 때만
   retail: RetailBoard | null;   // 소매·상점 업종일 때만
+  fishing: FishingBoard | null; // 낚시·수산 업종일 때만
+  salt: SaltBoard | null;       // 염전 업종일 때만
+  farming: FarmingBoard | null; // 농업 업종일 때만
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -84,7 +123,8 @@ export interface OwnerBrief {
 }
 
 const INDUSTRY_LABEL: Record<ShopIndustry, string> = {
-  lodging: "숙박", food: "음식", cafe: "카페", leisure: "레저·체험", retail: "소매", other: "기타",
+  lodging: "숙박", food: "음식", cafe: "카페", leisure: "레저·체험", retail: "소매",
+  fishing: "낚시·수산", salt: "염전", farming: "농업", other: "기타",
 };
 
 function ymd8ToDday(s: string): number {
@@ -331,6 +371,107 @@ function retailBoard(prefs: UserPreferences | null, m: ReportMetrics): RetailBoa
   };
 }
 
+// 낚시·수산 보드 — 파고·풍속으로 출항 가부, 물때·수온, 선상낚시 매출.
+function fishingBoard(prefs: UserPreferences | null, m: ReportMetrics): FishingBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "fishing") return null;
+  const demand = m.tourism.demand;
+  if (!demand?.available) return null;
+  const marine = m.tourism.marine;
+
+  const wave = Math.max(0, ...(marine?.beaches ?? []).map((b) => b.waveHeight ?? 0)) || (marine?.surf?.wave ?? null) || null;
+  const wind = Math.max(0, ...(marine?.beaches ?? []).map((b) => b.wind ?? 0)) || (marine?.surf?.wind ?? null) || null;
+  const waterTemp = (marine?.beaches ?? []).map((b) => b.waterTemp).find((t) => t != null) ?? marine?.surf?.waterTemp ?? null;
+
+  // 출항 가부 — 파고·풍속 기준(소형 선박 안전)
+  const danger = (wave != null && wave >= 2.0) || (wind != null && wind >= 14);
+  const caution = (wave != null && wave >= 1.5) || (wind != null && wind >= 10);
+  const goLabel = danger ? "위험" : caution ? "주의" : "양호";
+
+  // 다음 물때(만조/간조) — 현재 시각 이후 첫 이벤트
+  const nowHM = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(11, 16);
+  const ev = (marine?.tide?.events ?? []).find((e) => (e.time ?? "").slice(0, 5) >= nowHM) ?? (marine?.tide?.events ?? [])[0] ?? null;
+  const nextTide = ev ? { time: (ev.time ?? "").slice(0, 5), type: ev.type } : null;
+
+  // 선상낚시(차터) 매출 — 정원·요금 입력 시. 위험이면 운항 어려워 0 가정.
+  const RATE: Record<string, number> = { 매우높음: 0.95, 높음: 0.8, 보통: 0.6, 낮음: 0.4, 매우낮음: 0.2 };
+  let rate = RATE[demand.level] ?? 0.6;
+  if (danger) rate = 0; else if (caution) rate *= 0.7;
+  const seats = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
+  const price = sp.basePrice ?? null;
+  const expectedGuests = seats ? Math.round(seats * rate) : null;
+  const estRevenue = expectedGuests != null && price ? expectedGuests * price : null;
+
+  const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
+    .filter((f) => f.dday >= 0 && f.dday <= 3).sort((a, b) => a.dday - b.dday)[0] ?? null;
+
+  const notes: string[] = [];
+  if (danger) notes.push(`파고 ${wave?.toFixed(1) ?? "?"}m·풍속 ${wind?.toFixed(0) ?? "?"}m/s — 출항 자제·예약 연기 권장`);
+  else if (caution) notes.push("기상 주의 — 구명조끼·통신 점검, 무리한 원거리 자제");
+  else notes.push("출항 양호 — 안전장비 점검 후 운항");
+  if (nextTide) notes.push(`다음 ${nextTide.type} ${nextTide.time} — 조류 시간대 조과 유리`);
+  if (waterTemp != null) notes.push(`수온 ${waterTemp}℃`);
+  if (fest) notes.push(`인근 '${fest.title}' D-${fest.dday} — 예약 문의 증가 대비`);
+
+  return {
+    weekend: demand.weekend, level: demand.level, goLabel,
+    waveHeight: wave, windSpeed: wind, waterTemp,
+    nextTide, sunrise: marine?.sun?.sunrise ?? null, sunset: marine?.sun?.sunset ?? null,
+    seats, price, expectedGuests, estRevenue, festivalSoon: fest, notes,
+  };
+}
+
+// 염전(천일염) 보드 — 채염 적기(맑음·무강수·바람).
+function saltBoard(prefs: UserPreferences | null, m: ReportMetrics): SaltBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "salt") return null;
+  const w = m.environment.live;
+  const sky = w?.sky ?? null;
+  const wind = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.wind ?? 0)) || null;
+  const demand = m.tourism.demand;
+  const weekendRain = [demand?.weather?.sat, demand?.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+
+  const sunny = sky?.includes("맑") ?? false;
+  const cloudy = sky?.includes("흐") ?? false;
+  const harvestLabel = cloudy ? "불가" : sunny ? "최적" : "가능";
+
+  const notes: string[] = [];
+  if (harvestLabel === "최적") notes.push("맑고 건조 — 채염 적기, 결정지 관리·수확 집중");
+  else if (harvestLabel === "불가") notes.push("흐림 — 증발 더딤, 무리한 채염 자제");
+  else notes.push("부분 가능 — 일사·바람 보아 오후 채염 판단");
+  if (wind != null && wind >= 3) notes.push(`바람 ${wind.toFixed(0)}m/s — 증발 촉진(유리)`);
+  if (weekendRain) notes.push("주말 강수 예보 — 결정지 덮개·배수 준비");
+
+  return { harvestLabel, sky, pty: null, windSpeed: wind, weekendRain, notes };
+}
+
+// 농업 보드 — 영농 기상 경보(폭염·강수·강풍·저온).
+function farmingBoard(prefs: UserPreferences | null, m: ReportMetrics): FarmingBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "farming") return null;
+  const w = m.environment.live;
+  const demand = m.tourism.demand;
+  const todayTemp = w?.temp ?? null;
+  const weekendMaxTemp = Math.max(demand?.weather?.sat?.tmax ?? -99, demand?.weather?.sun?.tmax ?? -99);
+  const wkMax = weekendMaxTemp > -99 ? weekendMaxTemp : null;
+  const weekendRain = [demand?.weather?.sat, demand?.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  const wind = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.wind ?? 0)) || null;
+
+  const alerts: { icon: string; text: string }[] = [];
+  if ((todayTemp != null && todayTemp >= 33) || (wkMax != null && wkMax >= 33)) alerts.push({ icon: "🥵", text: "폭염 — 관수·차광, 오전·저녁 작업·일꾼 온열질환 주의" });
+  if (todayTemp != null && todayTemp <= 3) alerts.push({ icon: "❄️", text: "저온·서리 — 보온덮개·방상팬, 정식 시기 조정" });
+  if (weekendRain) alerts.push({ icon: "🌧", text: "주말 강수 — 배수로 점검·약제 살포 일정 조정·수확 앞당김" });
+  if (wind != null && wind >= 9) alerts.push({ icon: "💨", text: `강풍(${wind.toFixed(0)}m/s) — 지주·하우스 비닐 고정` });
+  if (w?.grade === "나쁨" || w?.grade === "매우나쁨") alerts.push({ icon: "😷", text: "대기질 나쁨 — 노지 장시간 작업 시 마스크" });
+
+  const statusLabel = alerts.some((a) => a.icon === "🥵" || a.icon === "❄️" || a.icon === "💨") ? "경보" : alerts.length ? "주의" : "양호";
+  const notes: string[] = [];
+  if (!alerts.length) notes.push("특이 기상 경보 없음 — 평상 영농 진행");
+  notes.push("태안 주요 작물: 6쪽마늘·생강·고구마 — 생육기 기상 점검");
+
+  return { statusLabel, todayTemp, weekendMaxTemp: wkMax, weekendRain, alerts, notes };
+}
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
@@ -365,6 +506,9 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     food: foodBoard(prefs, metrics),
     leisure: leisureBoard(prefs, metrics),
     retail: retailBoard(prefs, metrics),
+    fishing: fishingBoard(prefs, metrics),
+    salt: saltBoard(prefs, metrics),
+    farming: farmingBoard(prefs, metrics),
     market: {
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,

@@ -169,3 +169,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-24 · 시민기자 에디터 보완: 사진 캡션·촬영자 입력(alt 반영)·제출전 작성가이드 체크리스트(역피라미드·5W1H·균형, 비강제)·실시간점검 PII 실제문구 노출 · web/citizen/write, /api/copilot/check samples
 
 - 2026-06-24 · 사장님 업종 보드 5종: 숙박(가동률·권장가)·음식·카페(혼잡도·손님)·레저(적합도·참가자)·소매(방문·매출) — owner/brief, owner-home, onboarding
+
+- 2026-06-24 · 사장님 업종 보드 확장: 낚시·수산(출항 가부·물때·선상매출)·염전(채염 적기)·농업(영농 기상 경보) — owner/brief, owner-home, onboarding
