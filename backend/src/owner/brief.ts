@@ -49,6 +49,20 @@ export interface LeisureBoard {
   festivalSoon: { title: string; dday: number } | null;
   notes: string[];
 }
+// 소매·상점 운영 보드 — 평일 평균 방문객 × 주말 수요배율로 예상 방문·매출 추정
+export interface RetailBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  busyLabel: string;
+  baselineVisitors: number | null; // 평일 평균 일 방문객
+  avgTicket: number | null;        // 객단가(원)
+  multiplier: number;              // 평일 대비 주말 배율
+  expectedVisitors: number | null;
+  estRevenue: number | null;
+  festivalSoon: { title: string; dday: number } | null;
+  rainSoon: boolean;
+  notes: string[];
+}
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -60,6 +74,7 @@ export interface OwnerBrief {
   lodging: LodgingBoard | null; // 숙박 업종일 때만
   food: FoodBoard | null;       // 음식·카페 업종일 때만
   leisure: LeisureBoard | null; // 레저·체험 업종일 때만
+  retail: RetailBoard | null;   // 소매·상점 업종일 때만
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -279,6 +294,43 @@ function leisureBoard(prefs: UserPreferences | null, m: ReportMetrics): LeisureB
   };
 }
 
+// 소매·상점 운영 보드 — 평일 평균 방문객 × 주말 수요배율(규칙기반).
+function retailBoard(prefs: UserPreferences | null, m: ReportMetrics): RetailBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "retail") return null;
+  const demand = m.tourism.demand;
+  if (!demand?.available) return null;
+
+  const MULT: Record<string, number> = { 매우높음: 1.8, 높음: 1.4, 보통: 1.0, 낮음: 0.7, 매우낮음: 0.5 };
+  const BUSY: Record<string, string> = { 매우높음: "매우 붐빔", 높음: "붐빔", 보통: "보통", 낮음: "한산", 매우낮음: "매우 한산" };
+  let mult = MULT[demand.level] ?? 1.0;
+
+  const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
+    .filter((f) => f.dday >= 0 && f.dday <= 3).sort((a, b) => a.dday - b.dday)[0] ?? null;
+  if (fest) mult += 0.2;
+  const rainSoon = [demand.weather?.sat, demand.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  if (rainSoon) mult -= 0.15;
+  mult = Math.max(0.3, Math.round(mult * 100) / 100);
+
+  const baselineVisitors = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
+  const avgTicket = sp.basePrice ?? null;
+  const expectedVisitors = baselineVisitors ? Math.round(baselineVisitors * mult) : null;
+  const estRevenue = expectedVisitors && avgTicket ? expectedVisitors * avgTicket : null;
+
+  const notes: string[] = [];
+  const high = demand.level === "높음" || demand.level === "매우높음";
+  const low = demand.level === "낮음" || demand.level === "매우낮음";
+  if (high) notes.push("인기 품목 재고 보강·영업시간 연장 검토");
+  else if (low) notes.push("한산 — 묶음·기획전 프로모션 권장");
+  if (fest) notes.push(`인근 '${fest.title}' D-${fest.dday} — 방문객 유입 대비`);
+  if (rainSoon) notes.push("주말 강수 — 실내 동선·온라인 주문 안내");
+
+  return {
+    weekend: demand.weekend, level: demand.level, busyLabel: BUSY[demand.level] ?? "보통",
+    baselineVisitors, avgTicket, multiplier: mult, expectedVisitors, estRevenue, festivalSoon: fest, rainSoon, notes,
+  };
+}
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
@@ -312,6 +364,7 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     lodging: lodgingBoard(prefs, metrics),
     food: foodBoard(prefs, metrics),
     leisure: leisureBoard(prefs, metrics),
+    retail: retailBoard(prefs, metrics),
     market: {
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,

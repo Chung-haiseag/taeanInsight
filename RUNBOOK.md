@@ -159,3 +159,13 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-24 · 모텔(숙박) 특화: 사장님 홈 "모텔 운영 보드"(객실수·주말가 입력→예상 가동률·권장가·매출, 축제/우천 보정) · backend/owner/brief, web/owner-home
 
 - 2026-06-24 · 모텔 보드: 주변 숙박업소 수(TourAPI searchStay2)+실시간 요금 외부링크(야놀자·여기어때·네이버) · backend/env/tour, owner/brief
+
+- 2026-06-24 · 시민기자 에디터 "관련 과거 보도" 패널: 작성중 주제로 아카이브 FTS5·BM25 검색(무LLM) 5건 사이드 카드 · POST /api/copilot/related, web/citizen/write
+
+- 2026-06-24 · 시민기자 에디터 "데이터 넣기": 날씨·물때(안흥)·해돋이/해넘이를 출처표기 텍스트로 본문 삽입(공공데이터 재사용) · GET /api/copilot/context-data, web/citizen/write
+
+- 2026-06-24 · 시민기자 AI보조에 "사실 점검" 모드(본문서 수치·날짜·고유명사·인용 추출→체크리스트, 새 사실 창작 금지) · backend/copilot ASSIST_PROMPTS.factcheck
+
+- 2026-06-24 · 시민기자 에디터 보완: 사진 캡션·촬영자 입력(alt 반영)·제출전 작성가이드 체크리스트(역피라미드·5W1H·균형, 비강제)·실시간점검 PII 실제문구 노출 · web/citizen/write, /api/copilot/check samples
+
+- 2026-06-24 · 사장님 업종 보드 5종: 숙박(가동률·권장가)·음식·카페(혼잡도·손님)·레저(적합도·참가자)·소매(방문·매출) — owner/brief, owner-home, onboarding

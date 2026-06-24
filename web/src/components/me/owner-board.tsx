@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchOwnerBrief, type OwnerBrief } from "@/lib/api/owner";
-import { LodgingBoardCard, FoodBoardCard, LeisureBoardCard, ShopSetup } from "@/components/home/owner-home";
+import { LodgingBoardCard, FoodBoardCard, LeisureBoardCard, RetailBoardCard, ShopSetup } from "@/components/home/owner-home";
 
 export function MeOwnerBoard() {
   const [brief, setBrief] = useState<OwnerBrief | null>(null);
@@ -38,10 +38,11 @@ export function MeOwnerBoard() {
       {brief.lodging && <LodgingBoardCard board={brief.lodging} nearby={brief.market.nearbyLodging} />}
       {brief.food && <FoodBoardCard board={brief.food} />}
       {brief.leisure && <LeisureBoardCard board={brief.leisure} />}
+      {brief.retail && <RetailBoardCard board={brief.retail} />}
 
       <div className="text-right">
         <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
-          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : brief.industry === "leisure" ? "(정원·체험료)" : ""}
+          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : brief.industry === "leisure" ? "(정원·체험료)" : brief.industry === "retail" ? "(방문객·객단가)" : ""}
         </button>
       </div>
 

@@ -88,7 +88,7 @@ export default function OnboardingPage() {
               industry, eupMyeon: trimmedRegions[0], name: shopName || undefined,
               ...(industry === "lodging"
                 ? { capacity: shopRooms ? Number(shopRooms) : undefined, weekendPrice: shopWkPrice ? Number(shopWkPrice) : undefined }
-                : industry === "food" || industry === "cafe" || industry === "leisure"
+                : industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail"
                 ? { capacity: shopRooms ? Number(shopRooms) : undefined, basePrice: shopWkPrice ? Number(shopWkPrice) : undefined }
                 : {}),
             }
@@ -255,14 +255,14 @@ export default function OnboardingPage() {
             aria-label="상호"
             className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
           />
-          {(industry === "lodging" || industry === "food" || industry === "cafe" || industry === "leisure") && (
+          {industry && industry !== "other" && (
             <div className="grid gap-2 sm:grid-cols-2">
               <input
                 value={shopRooms}
                 onChange={(e) => setShopRooms(e.target.value.replace(/[^0-9]/g, ""))}
                 inputMode="numeric"
-                placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : "좌석 수(예: 40)"}
-                aria-label={industry === "lodging" ? "객실 수" : industry === "leisure" ? "일 정원" : "좌석 수"}
+                placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : "좌석 수(예: 40)"}
+                aria-label={industry === "lodging" ? "객실 수" : industry === "leisure" ? "일 정원" : industry === "retail" ? "평일 평균 방문객" : "좌석 수"}
                 className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
               />
               <input
@@ -273,7 +273,7 @@ export default function OnboardingPage() {
                 aria-label={industry === "lodging" ? "주말 기본가" : industry === "leisure" ? "1인 체험료" : "객단가"}
                 className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
               />
-              <p className="sm:col-span-2 text-xs text-accent">→ {industry === "lodging" ? "예상 가동률·권장가·1박 매출" : industry === "leisure" ? "예상 참가자·매출" : "예상 혼잡도·손님·매출"}이 계산됩니다.</p>
+              <p className="sm:col-span-2 text-xs text-accent">→ {industry === "lodging" ? "예상 가동률·권장가·1박 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : "예상 혼잡도·손님·매출"}이 계산됩니다.</p>
             </div>
           )}
           <p className="text-xs text-foreground-muted">
