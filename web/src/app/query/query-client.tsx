@@ -159,6 +159,24 @@ export function QueryClient() {
               </ul>
             </div>
           )}
+          {result.evidence && result.evidence.length > 0 && (
+            <details className="pt-2 border-t border-accent/20">
+              <summary className="cursor-pointer text-sm font-semibold text-brand">
+                🔍 AI가 참고한 실시간 근거 {result.evidence.length}건 (RAG)
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {result.evidence.map((e) => (
+                  <li key={e.n} className="rounded-lg border border-brand/10 bg-background p-3 text-xs">
+                    <p className="font-semibold text-brand">[{e.n}] {e.source}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-foreground-muted">{e.text}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-foreground-muted">
+                AI는 위 실시간 데이터를 근거로만 답합니다(없으면 “찾지 못함”). 사실은 공공데이터, 문장은 AI.
+              </p>
+            </details>
+          )}
           <p className="text-xs text-foreground-muted">
             ⚠️ AI 생성 답변입니다. 중요한 결정 전에는 출처와 원문을 확인하세요.
           </p>

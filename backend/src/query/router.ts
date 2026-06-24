@@ -351,6 +351,10 @@ queryRouter.post("/", async (c) => {
         llmCalls: 1,
         sources,
         model: client.model,
+        // RAG 투명성 — ?debug=1 또는 evidence=1이면 LLM에 넣은 근거 원문을 그대로 노출
+        ...(c.req.query("debug") === "1" || c.req.query("evidence") === "1"
+          ? { evidence: parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })) }
+          : {}),
       });
     }
   } catch { /* 실패 시 일반 경로로 폴백 */ }
