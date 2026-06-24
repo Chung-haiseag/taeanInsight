@@ -173,3 +173,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-24 · 사장님 업종 보드 확장: 낚시·수산(출항 가부·물때·선상매출)·염전(채염 적기)·농업(영농 기상 경보) — owner/brief, owner-home, onboarding
 
 - 2026-06-24 · 개인 페르소나: 주말 태안 여행 플래너(날씨·일출몰·갯벌간조·혼잡·축제) — /me, owner-brief에 sun 추가
+
+- 2026-06-24 · 업종 보드 3종 추가: 부동산 중개(실거래 시세·㎡단가·읍면)·골프장(라운딩 적합도·내장·매출)·양식수산(수온·적조 경보) — owner/brief, owner-home, onboarding

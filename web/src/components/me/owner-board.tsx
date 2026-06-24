@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { fetchOwnerBrief, type OwnerBrief } from "@/lib/api/owner";
-import { LodgingBoardCard, FoodBoardCard, LeisureBoardCard, RetailBoardCard, FishingBoardCard, SaltBoardCard, FarmingBoardCard, TravelBoardCard, ShopSetup } from "@/components/home/owner-home";
+import { LodgingBoardCard, FoodBoardCard, LeisureBoardCard, RetailBoardCard, FishingBoardCard, SaltBoardCard, FarmingBoardCard, TravelBoardCard, RealtorBoardCard, GolfBoardCard, AquaBoardCard, ShopSetup } from "@/components/home/owner-home";
 
 export function MeOwnerBoard() {
   const [brief, setBrief] = useState<OwnerBrief | null>(null);
@@ -42,10 +42,13 @@ export function MeOwnerBoard() {
       {brief.salt && <SaltBoardCard board={brief.salt} />}
       {brief.farming && <FarmingBoardCard board={brief.farming} />}
       {brief.travel && <TravelBoardCard board={brief.travel} />}
+      {brief.realtor && <RealtorBoardCard board={brief.realtor} />}
+      {brief.golf && <GolfBoardCard board={brief.golf} />}
+      {brief.aqua && <AquaBoardCard board={brief.aqua} />}
 
       <div className="text-right">
         <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
-          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : brief.industry === "leisure" ? "(정원·체험료)" : brief.industry === "retail" ? "(방문객·객단가)" : brief.industry === "fishing" ? "(정원·승선료)" : brief.industry === "travel" ? "(정원·상품가)" : ""}
+          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : brief.industry === "leisure" ? "(정원·체험료)" : brief.industry === "retail" ? "(방문객·객단가)" : brief.industry === "fishing" ? "(정원·승선료)" : brief.industry === "travel" ? "(정원·상품가)" : brief.industry === "golf" ? "(정원·그린피)" : ""}
         </button>
       </div>
 

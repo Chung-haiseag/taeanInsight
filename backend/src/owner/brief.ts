@@ -113,6 +113,41 @@ export interface TravelBoard {
   festivalSoon: { title: string; dday: number } | null;
   notes: string[];
 }
+// 부동산 중개 운영 보드 — 실거래 기반 시세·㎡단가·거래량·읍면
+export interface RealtorBoard {
+  aptCount: number;
+  aptAvgManwon: number;
+  aptPerM2Manwon: number | null;  // ㎡당 만원
+  aptPerPyeongManwon: number | null; // 평당 만원
+  landCount: number;
+  eupLabel: string | null;
+  eupAptCount: number | null;
+  recent: Array<{ dong: string; name: string; manwon: number; area: string }>;
+  notes: string[];
+}
+// 골프장 운영 보드 — 주말 라운딩 적합도 + 예약·매출
+export interface GolfBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  fitLabel: string;            // 라운딩 적합도(좋음/보통/주의)
+  weekendMaxTemp: number | null;
+  weekendRain: boolean;
+  windSpeed: number | null;
+  capacity: number | null;     // 일 내장객 정원
+  greenFee: number | null;     // 1인 그린피
+  expectedRounds: number | null;
+  estRevenue: number | null;
+  notes: string[];
+}
+// 양식·수산 운영 보드 — 수온·기상 작업 가부 + 적조·빈산소 주의
+export interface AquaBoard {
+  statusLabel: string;         // 양식 여건(양호/주의/경보)
+  waterTemp: number | null;
+  waveHeight: number | null;
+  weekendRain: boolean;
+  alerts: Array<{ icon: string; text: string }>;
+  notes: string[];
+}
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -130,6 +165,9 @@ export interface OwnerBrief {
   salt: SaltBoard | null;       // 염전 업종일 때만
   farming: FarmingBoard | null; // 농업 업종일 때만
   travel: TravelBoard | null;   // 여행사 업종일 때만
+  realtor: RealtorBoard | null; // 부동산 중개 업종일 때만
+  golf: GolfBoard | null;       // 골프장 업종일 때만
+  aqua: AquaBoard | null;       // 양식·수산 업종일 때만
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -140,7 +178,8 @@ export interface OwnerBrief {
 
 const INDUSTRY_LABEL: Record<ShopIndustry, string> = {
   lodging: "숙박", food: "음식", cafe: "카페", leisure: "레저·체험", retail: "소매",
-  fishing: "낚시·수산", salt: "염전", farming: "농업", travel: "여행사", other: "기타",
+  fishing: "낚시·수산", salt: "염전", farming: "농업", travel: "여행사",
+  realtor: "부동산 중개", golf: "골프장", aqua: "양식·수산", other: "기타",
 };
 
 function ymd8ToDday(s: string): number {
@@ -523,6 +562,99 @@ function travelBoard(prefs: UserPreferences | null, m: ReportMetrics): TravelBoa
   return { weekend: demand.weekend, level: demand.level, fitLabel, capacity, price, expectedBookings, estRevenue, highWave, rainSoon, festivalSoon: fest, notes };
 }
 
+// 부동산 중개 보드 — 국토부 실거래 기반 시세·㎡단가·거래량·읍면.
+const EUP_LABELS: Record<string, string> = {
+  taean: "태안읍", anmyeon: "안면읍", gonam: "고남면", geunheung: "근흥면",
+  nam: "남면", sowon: "소원면", wonbuk: "원북면", iwon: "이원면",
+};
+function realtorBoard(prefs: UserPreferences | null, m: ReportMetrics): RealtorBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "realtor") return null;
+  const re = m.realestate;
+  if (!re.apt && !re.land) return null;
+  const apt = re.apt;
+  const items = apt?.items ?? [];
+  // ㎡당 단가 — manwon / 전용면적(area)
+  const perM2s = items.map((it) => { const a = parseFloat(it.area); return a > 0 ? it.manwon / a : null; }).filter((x): x is number => x != null && isFinite(x));
+  const aptPerM2Manwon = perM2s.length ? Math.round(perM2s.reduce((s, n) => s + n, 0) / perM2s.length) : null;
+  const aptPerPyeongManwon = aptPerM2Manwon != null ? Math.round(aptPerM2Manwon * 3.305) : null;
+
+  const eupCode = sp.eupMyeon ?? prefs?.regions?.[0];
+  const eupLabel = eupCode ? EUP_LABELS[eupCode] ?? null : null;
+  const eupAptCount = eupLabel ? items.filter((it) => (it.dong ?? "").includes(eupLabel)).length : null;
+  const recent = items.slice(0, 3).map((it) => ({ dong: it.dong, name: it.name, manwon: it.manwon, area: it.area }));
+
+  const notes: string[] = [];
+  const cnt = apt?.count ?? 0;
+  if (cnt >= 8) notes.push("거래 활발 — 매물 확보·신규 문의 응대 강화");
+  else if (cnt <= 2) notes.push("거래 한산 — 급매·실수요 매물 위주 홍보");
+  if (eupLabel && eupAptCount != null) notes.push(`${eupLabel} 최근 아파트 거래 ${eupAptCount}건`);
+  notes.push("실거래 6개월 누적 — 상세 추이는 B2B 대시보드 참고");
+
+  return {
+    aptCount: cnt, aptAvgManwon: apt?.avgManwon ?? 0, aptPerM2Manwon, aptPerPyeongManwon,
+    landCount: re.land?.count ?? 0, eupLabel, eupAptCount, recent, notes,
+  };
+}
+
+// 골프장 보드 — 주말 라운딩 적합도(강수·강풍·폭염) + 예약·매출.
+function golfBoard(prefs: UserPreferences | null, m: ReportMetrics): GolfBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "golf") return null;
+  const demand = m.tourism.demand;
+  if (!demand?.available) return null;
+
+  const wkMaxRaw = Math.max(demand.weather?.sat?.tmax ?? -99, demand.weather?.sun?.tmax ?? -99);
+  const weekendMaxTemp = wkMaxRaw > -99 ? wkMaxRaw : null;
+  const weekendRain = [demand.weather?.sat, demand.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  const wind = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.wind ?? 0)) || null;
+  const hot = weekendMaxTemp != null && weekendMaxTemp >= 33;
+  const windy = wind != null && wind >= 9;
+  const fitLabel = weekendRain ? "주의(우천)" : windy ? "주의(강풍)" : hot ? "주의(폭염)" : "좋음";
+
+  const RATE: Record<string, number> = { 매우높음: 0.95, 높음: 0.85, 보통: 0.7, 낮음: 0.5, 매우낮음: 0.3 };
+  let rate = RATE[demand.level] ?? 0.7;
+  if (weekendRain) rate -= 0.3; else if (hot || windy) rate -= 0.1;
+  rate = Math.max(0.1, Math.min(0.99, rate));
+  const capacity = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
+  const greenFee = sp.basePrice ?? null;
+  const expectedRounds = capacity ? Math.round(capacity * rate) : null;
+  const estRevenue = expectedRounds && greenFee ? expectedRounds * greenFee : null;
+
+  const notes: string[] = [];
+  if (weekendRain) notes.push("주말 강수 — 예약 변동·우천 환불·카트 통제 대비");
+  if (hot) notes.push("폭염 — 새벽·薄暮 티타임 권장, 그늘집 수분 보강");
+  if (windy) notes.push(`강풍(${wind?.toFixed(0)}m/s) — 라운딩 난이도·안전 안내`);
+  if (!notes.length) notes.push("라운딩 양호 — 주말 부킹 마감·캐디 배치 점검");
+
+  return { weekend: demand.weekend, level: demand.level, fitLabel, weekendMaxTemp, weekendRain, windSpeed: wind, capacity, greenFee, expectedRounds, estRevenue, notes };
+}
+
+// 양식·수산 보드 — 수온·기상으로 작업 가부·적조/빈산소 주의.
+function aquaBoard(prefs: UserPreferences | null, m: ReportMetrics): AquaBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "aqua") return null;
+  const marine = m.tourism.marine;
+  const waterTemp = (marine?.beaches ?? []).map((b) => b.waterTemp).find((t) => t != null) ?? marine?.surf?.waterTemp ?? null;
+  const wave = Math.max(0, ...(marine?.beaches ?? []).map((b) => b.waveHeight ?? 0)) || null;
+  const demand = m.tourism.demand;
+  const weekendRain = [demand?.weather?.sat, demand?.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+
+  const alerts: { icon: string; text: string }[] = [];
+  if (waterTemp != null && waterTemp >= 28) alerts.push({ icon: "🌡", text: `고수온(${waterTemp}℃) — 빈산소·폐사 주의, 산소공급·먹이 조절` });
+  if (waterTemp != null && waterTemp >= 24) alerts.push({ icon: "🦠", text: "적조 발생 가능 수온대 — 예찰·차단막 점검" });
+  if (waterTemp != null && waterTemp <= 4) alerts.push({ icon: "❄️", text: `저수온(${waterTemp}℃) — 동해(凍害) 주의, 수하·이동 검토` });
+  if (wave != null && wave >= 1.5) alerts.push({ icon: "🌊", text: `파고 ${wave.toFixed(1)}m — 양식장 작업·채취 안전 점검` });
+  if (weekendRain) alerts.push({ icon: "🌧", text: "주말 강수 — 담수 유입·염도 변화 주의(굴·바지락)" });
+
+  const statusLabel = alerts.some((a) => a.icon === "🌡" || a.icon === "❄️" || a.icon === "🌊") ? "경보" : alerts.length ? "주의" : "양호";
+  const notes: string[] = [];
+  if (!alerts.length) notes.push("특이 경보 없음 — 평상 양식 관리");
+  notes.push("태안 주요 양식: 굴·바지락·김·우럭 — 수온·염도 점검");
+
+  return { statusLabel, waterTemp, waveHeight: wave, weekendRain, alerts, notes };
+}
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
@@ -562,6 +694,9 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     salt: saltBoard(prefs, metrics),
     farming: farmingBoard(prefs, metrics),
     travel: travelBoard(prefs, metrics),
+    realtor: realtorBoard(prefs, metrics),
+    golf: golfBoard(prefs, metrics),
+    aqua: aquaBoard(prefs, metrics),
     market: {
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,

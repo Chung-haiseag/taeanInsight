@@ -2,7 +2,7 @@
 import { apiFetch, ApiError } from "./client";
 import type { DemandForecast, TideInfo } from "./reports";
 
-export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "travel" | "other";
+export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "travel" | "realtor" | "golf" | "aqua" | "other";
 export interface ShopProfile { industry: ShopIndustry; eupMyeon?: string; capacity?: number; name?: string; basePrice?: number; weekendPrice?: number }
 export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
 export interface OwnerLive { pm10: number | null; pm25: number | null; grade: string | null; temp: number | null; humidity: number | null; sky: string | null; observedAt: string | null }
@@ -110,6 +110,39 @@ export interface TravelBoard {
   notes: string[];
 }
 
+export interface RealtorBoard {
+  aptCount: number;
+  aptAvgManwon: number;
+  aptPerM2Manwon: number | null;
+  aptPerPyeongManwon: number | null;
+  landCount: number;
+  eupLabel: string | null;
+  eupAptCount: number | null;
+  recent: Array<{ dong: string; name: string; manwon: number; area: string }>;
+  notes: string[];
+}
+export interface GolfBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  fitLabel: string;
+  weekendMaxTemp: number | null;
+  weekendRain: boolean;
+  windSpeed: number | null;
+  capacity: number | null;
+  greenFee: number | null;
+  expectedRounds: number | null;
+  estRevenue: number | null;
+  notes: string[];
+}
+export interface AquaBoard {
+  statusLabel: string;
+  waterTemp: number | null;
+  waveHeight: number | null;
+  weekendRain: boolean;
+  alerts: Array<{ icon: string; text: string }>;
+  notes: string[];
+}
+
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -127,6 +160,9 @@ export interface OwnerBrief {
   salt: SaltBoard | null;
   farming: FarmingBoard | null;
   travel: TravelBoard | null;
+  realtor: RealtorBoard | null;
+  golf: GolfBoard | null;
+  aqua: AquaBoard | null;
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -146,6 +182,9 @@ export const INDUSTRY_OPTIONS: { value: ShopIndustry; label: string; emoji: stri
   { value: "salt", label: "염전(천일염)", emoji: "🧂" },
   { value: "farming", label: "농업", emoji: "🌾" },
   { value: "travel", label: "여행사", emoji: "🧭" },
+  { value: "realtor", label: "부동산 중개", emoji: "🏘" },
+  { value: "golf", label: "골프장", emoji: "⛳" },
+  { value: "aqua", label: "양식·수산", emoji: "🦪" },
   { value: "other", label: "기타", emoji: "🏢" },
 ];
 
