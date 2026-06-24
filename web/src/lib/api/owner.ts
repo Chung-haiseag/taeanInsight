@@ -48,6 +48,20 @@ export interface LeisureBoard {
   notes: string[];
 }
 
+export interface RetailBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  busyLabel: string;
+  baselineVisitors: number | null;
+  avgTicket: number | null;
+  multiplier: number;
+  expectedVisitors: number | null;
+  estRevenue: number | null;
+  festivalSoon: { title: string; dday: number } | null;
+  rainSoon: boolean;
+  notes: string[];
+}
+
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -59,6 +73,7 @@ export interface OwnerBrief {
   lodging: LodgingBoard | null;
   food: FoodBoard | null;
   leisure: LeisureBoard | null;
+  retail: RetailBoard | null;
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
