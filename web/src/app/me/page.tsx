@@ -6,6 +6,10 @@ import Link from "next/link";
 import { renderWidgets } from "@/components/me/widget_registry";
 import { ToneToggleBar, useToneToggle } from "@/components/me/tone_toggle";
 import { PushOptInButton } from "@/components/me/push_opt_in";
+import { MeHeroStrip } from "@/components/me/hero-strip";
+
+// 가로 전체로 둘 위젯(긴 목록·핵심) — 나머지는 2열 절반
+const FULL_WIDTH = new Set(["my_news", "personalized_report", "team_workspace", "b2g_department_space", "gov_notices"]);
 import { canToggleTone, preferredTone, REGION_OPTIONS, SEGMENT_LIMITS, type MeResponse } from "@/lib/types";
 import { getMe } from "@/lib/api/me";
 import { getMockMeResponse, isMockMode } from "@/lib/mock/me";
@@ -83,18 +87,26 @@ function MeDashboard({ data }: { data: MeResponse }) {
         <p className="mt-3 text-sm text-foreground-muted">발행 콘텐츠는 모두 편집부 검토(HITL)를 거칩니다.</p>
       </header>
 
+      {/* 오늘 한눈에 — 히어로 요약 */}
+      <MeHeroStrip preferences={preferences} />
+
       {/* Push 옵트인 — 알림 채널에 webpush 있으면 노출 */}
       {preferences.notificationChannels.includes("webpush") && (
         <PushOptInButton vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
       )}
 
-      {/* 위젯 — 통일된 카드로 감싸 일관된 디자인 */}
-      <div className="grid gap-5">
-        {widgets.map(({ key, node }) => (
-          <section key={key} className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
-            {node}
-          </section>
-        ))}
+      {/* 위젯 — 매거진식 2열 그리드(핵심은 가로 전체) */}
+      <div className="grid gap-5 md:grid-cols-2">
+        {widgets
+          .filter(({ key }) => key !== "welcome_banner") // 인사는 히어로가 대체
+          .map(({ key, node }) => (
+            <section
+              key={key}
+              className={`rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6 ${FULL_WIDTH.has(key) ? "md:col-span-2" : ""}`}
+            >
+              {node}
+            </section>
+          ))}
       </div>
 
       <footer className="hairline pt-6 text-sm text-foreground-muted flex justify-between">
