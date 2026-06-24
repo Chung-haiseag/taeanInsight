@@ -71,3 +71,32 @@ async function fetchTourImpl(env: { DATA_GO_KR_KEY?: string }): Promise<TourInfo
 
 // 6시간 캐시 + dedup (축제는 자주 안 바뀜; 축제·수요지수 양쪽에서 호출)
 export const fetchTour = makeTtlCache(fetchTourImpl, 6 * 3600_000);
+
+// ── 태안 숙박업소(TourAPI searchStay2) — 주변 숙박 수·목록(요금은 없음) ──
+export interface StayInfo {
+  available: boolean;
+  total: number;                                  // 태안군 등록 숙박업소 수
+  items: Array<{ title: string; addr: string }>;  // 표본(최대 100)
+}
+function totalOf(j: unknown): number {
+  return Number((j as { response?: { body?: { totalCount?: number | string } } })?.response?.body?.totalCount ?? 0) || 0;
+}
+async function fetchStayImpl(env: { DATA_GO_KR_KEY?: string }): Promise<StayInfo> {
+  const key = env.DATA_GO_KR_KEY;
+  if (!key) return { available: false, total: 0, items: [] };
+  try {
+    const sigungu = await taeanSigungu(key);
+    const areaParams = { areaCode: AREA_CHUNGNAM, ...(sigungu ? { sigunguCode: sigungu } : {}) };
+    const j = await tourGet("searchStay2", key, { ...areaParams, arrange: "A", numOfRows: "100" });
+    const it = itemsOf(j);
+    return {
+      available: true,
+      total: totalOf(j) || it.length,
+      items: it.map((x) => ({ title: x.title, addr: x.addr1 || "" })),
+    };
+  } catch {
+    return { available: false, total: 0, items: [] };
+  }
+}
+// 24시간 캐시(숙박업소 목록은 거의 안 바뀜)
+export const fetchStay = makeTtlCache(fetchStayImpl, 24 * 3600_000);

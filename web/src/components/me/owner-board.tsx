@@ -15,7 +15,7 @@ export function MeOwnerBoard() {
 
   return (
     <div className="space-y-5">
-      {brief.lodging && <LodgingBoardCard board={brief.lodging} />}
+      {brief.lodging && <LodgingBoardCard board={brief.lodging} nearby={brief.market.nearbyLodging} />}
 
       {brief.actions.length > 0 && (
         <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">

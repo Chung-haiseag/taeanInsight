@@ -10,7 +10,7 @@ import { PushOptInButton } from "@/components/me/push_opt_in";
 import { DemandGauge } from "@/components/reports/report-charts";
 import { REGION_OPTIONS } from "@/lib/types";
 import {
-  fetchOwnerBrief, updateShopProfile, INDUSTRY_OPTIONS, type LodgingBoard,
+  fetchOwnerBrief, updateShopProfile, INDUSTRY_OPTIONS, type LodgingBoard, type NearbyLodging,
   type OwnerBrief, type ShopIndustry,
 } from "@/lib/api/owner";
 
@@ -55,7 +55,7 @@ function OwnerLive() {
       {!brief.hasShop && <ShopSetup onSaved={load} />}
 
       {/* 숙박 운영 보드 — 예상 가동률·권장가·매출 */}
-      {brief.lodging && <LodgingBoardCard board={brief.lodging} />}
+      {brief.lodging && <LodgingBoardCard board={brief.lodging} nearby={brief.market.nearbyLodging} />}
 
       {/* 이번 주말 수요 — 실제 수요지수 */}
       {brief.demand?.available && (
@@ -143,7 +143,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 // ── 숙박 운영 보드 ── (내 페이지에서도 재사용)
-export function LodgingBoardCard({ board }: { board: LodgingBoard }) {
+export function LodgingBoardCard({ board, nearby }: { board: LodgingBoard; nearby?: NearbyLodging | null }) {
   const won = (n: number | null) => (n == null ? "—" : `${n.toLocaleString()}원`);
   const occColor = board.occRate >= 75 ? "text-accent" : board.occRate >= 45 ? "text-brand" : "text-amber-600";
   return (
@@ -176,6 +176,24 @@ export function LodgingBoardCard({ board }: { board: LodgingBoard }) {
       )}
       {board.recommendedPrice == null && (
         <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">객실 수·주말 기본가</strong>를 입력하면 권장가·예상 매출이 계산됩니다.</p>
+      )}
+
+      {/* 주변 숙박 수 + 실시간 요금 확인(외부) */}
+      {nearby && (
+        <div className="mt-4 rounded-xl border border-brand/10 bg-background p-3">
+          <p className="text-sm">
+            <span className="font-semibold text-brand">🏨 주변 숙박업소</span>{" "}
+            태안 <strong className="text-brand">{nearby.total}곳</strong>
+            {nearby.eupLabel && nearby.nearbyEup != null && <> · {nearby.eupLabel} {nearby.nearbyEup}곳</>}
+            <span className="text-foreground-muted"> (한국관광공사 등록 기준)</span>
+          </p>
+          <p className="mt-1.5 text-xs text-foreground-muted">
+            실시간 경쟁 요금은 →{" "}
+            <a href="https://www.yanolja.com/search/태안" target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">야놀자</a>{" · "}
+            <a href="https://www.goodchoice.kr/product/search/태안" target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">여기어때</a>{" · "}
+            <a href="https://map.naver.com/p/search/태안%20모텔" target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">네이버지도</a>
+          </p>
+        </div>
       )}
       <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 실제 예약은 채널·이벤트에 따라 달라집니다.</p>
     </section>
