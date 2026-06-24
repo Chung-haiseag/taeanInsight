@@ -21,8 +21,9 @@ export interface LodgingBoard {
   weekendRain: boolean;
   notes: string[];
 }
-// 식당 전용 운영 보드 — 주말 수요로 예상 혼잡도·손님수·매출 추정
+// 식음(식당·카페) 운영 보드 — 주말 수요로 예상 혼잡도·손님수·매출 추정
 export interface FoodBoard {
+  kind: "food" | "cafe";
   weekend: { sat: string; sun: string };
   level: string;
   busyLabel: string;          // 혼잡도(매우 붐빔~매우 한산)
@@ -181,22 +182,26 @@ const EUP_LABEL: Record<string, string> = {
   nam: "남면", sowon: "소원면", wonbuk: "원북면", iwon: "이원면",
 };
 
-// 식당 운영 보드 — 주말 수요등급으로 예상 혼잡도·손님수·매출 추정(규칙기반).
+// 식음(식당·카페) 운영 보드 — 주말 수요등급으로 예상 혼잡도·손님수·매출 추정(규칙기반).
 function foodBoard(prefs: UserPreferences | null, m: ReportMetrics): FoodBoard | null {
   const sp = prefs?.shopProfile;
-  if (!sp || sp.industry !== "food") return null;
+  if (!sp || (sp.industry !== "food" && sp.industry !== "cafe")) return null;
   const demand = m.tourism.demand;
   if (!demand?.available) return null;
+  const isCafe = sp.industry === "cafe";
 
-  const TURN: Record<string, number> = { 매우높음: 3.5, 높음: 2.8, 보통: 2.0, 낮음: 1.3, 매우낮음: 0.9 };
+  // 카페는 회전율이 더 높음(체류 짧음·테이크아웃)
+  const TURN: Record<string, number> = isCafe
+    ? { 매우높음: 5.0, 높음: 4.0, 보통: 3.0, 낮음: 2.0, 매우낮음: 1.3 }
+    : { 매우높음: 3.5, 높음: 2.8, 보통: 2.0, 낮음: 1.3, 매우낮음: 0.9 };
   const BUSY: Record<string, string> = { 매우높음: "매우 붐빔", 높음: "붐빔", 보통: "보통", 낮음: "한산", 매우낮음: "매우 한산" };
-  let turn = TURN[demand.level] ?? 2.0;
+  let turn = TURN[demand.level] ?? (isCafe ? 3.0 : 2.0);
 
   const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
     .filter((f) => f.dday >= 0 && f.dday <= 3).sort((a, b) => a.dday - b.dday)[0] ?? null;
-  if (fest) turn += 0.4;
+  if (fest) turn += isCafe ? 0.6 : 0.4;
   const rainSoon = [demand.weather?.sat, demand.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
-  if (rainSoon) turn -= 0.3;
+  if (rainSoon) turn -= isCafe ? 0.4 : 0.3;
   turn = Math.max(0.5, turn);
 
   const seats = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
@@ -207,12 +212,15 @@ function foodBoard(prefs: UserPreferences | null, m: ReportMetrics): FoodBoard |
   const notes: string[] = [];
   const high = demand.level === "높음" || demand.level === "매우높음";
   const low = demand.level === "낮음" || demand.level === "매우낮음";
-  if (high) notes.push("식자재 추가 발주·인력 보강·웨이팅 동선 준비");
+  const hot = m.environment.live?.temp != null && m.environment.live.temp >= 28;
+  if (high) notes.push(isCafe ? "원두·디저트 재고 보강·테이크아웃 동선 준비" : "식자재 추가 발주·인력 보강·웨이팅 동선 준비");
   else if (low) notes.push("한산 시간대 세트·SNS 프로모션 권장");
+  if (isCafe && hot) notes.push("아이스 음료·빙수 재료 추가 준비(더위)");
   if (fest) notes.push(`인근 '${fest.title}' D-${fest.dday} — 손님 급증 대비`);
-  if (rainSoon) notes.push("주말 강수 — 배달·포장 비중 강화");
+  if (rainSoon) notes.push(isCafe ? "주말 강수 — 테이크아웃·배달 강화" : "주말 강수 — 배달·포장 비중 강화");
 
   return {
+    kind: isCafe ? "cafe" : "food",
     weekend: demand.weekend, level: demand.level, busyLabel: BUSY[demand.level] ?? "보통",
     seats, avgTicket, expectedCovers, estRevenue, festivalSoon: fest, rainSoon, notes,
   };
