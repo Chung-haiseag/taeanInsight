@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchOwnerBrief, type OwnerBrief } from "@/lib/api/owner";
-import { LodgingBoardCard, ShopSetup } from "@/components/home/owner-home";
+import { LodgingBoardCard, FoodBoardCard, ShopSetup } from "@/components/home/owner-home";
 
 export function MeOwnerBoard() {
   const [brief, setBrief] = useState<OwnerBrief | null>(null);
@@ -36,6 +36,7 @@ export function MeOwnerBoard() {
   return (
     <div className="space-y-5">
       {brief.lodging && <LodgingBoardCard board={brief.lodging} nearby={brief.market.nearbyLodging} />}
+      {brief.food && <FoodBoardCard board={brief.food} />}
 
       <div className="text-right">
         <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
