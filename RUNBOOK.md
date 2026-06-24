@@ -157,3 +157,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-23 · AI질의 행사: 군청 주간행사 PDF 첨부 일정 추출(pdftotext)·본문 적재 → 요일별 상세 일정 답변 · tools/gov/ingest-gov.mjs(extractPdfText), backend/query
 
 - 2026-06-24 · 모텔(숙박) 특화: 사장님 홈 "모텔 운영 보드"(객실수·주말가 입력→예상 가동률·권장가·매출, 축제/우천 보정) · backend/owner/brief, web/owner-home
+
+- 2026-06-24 · 모텔 보드: 주변 숙박업소 수(TourAPI searchStay2)+실시간 요금 외부링크(야놀자·여기어때·네이버) · backend/env/tour, owner/brief
