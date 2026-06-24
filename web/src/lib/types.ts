@@ -1,6 +1,8 @@
 // 프론트엔드 ↔ 백엔드 공유 타입 (backend/src/preferences/types.ts와 동기화)
 // PRD v1.8 §6 REQ-PRODUCT-005
 
+import { FRONT_REGION } from "./region";
+
 export type UserSegment = "b2c_basic" | "b2c_premium" | "b2b_basic" | "b2b_premium" | "b2g";
 
 export type InterestCategory =
@@ -81,17 +83,8 @@ export const CATEGORY_LABELS: Record<InterestCategory, string> = {
   culture: "문화",
 };
 
-// 태안 읍·면 (실제 행정구역으로 채워야 함, 일단 대표 8개)
-export const REGION_OPTIONS: Array<{ code: string; label: string }> = [
-  { code: "taean_eup", label: "태안읍" },
-  { code: "anmyeon", label: "안면읍" },
-  { code: "gonam", label: "고남면" },
-  { code: "geunheung", label: "근흥면" },
-  { code: "nam", label: "남면" },
-  { code: "sowon", label: "소원면" },
-  { code: "wonbuk", label: "원북면" },
-  { code: "iwon", label: "이원면" },
-];
+// 읍·면 — 지역설정(region.ts)에서 파생(코드는 backend region.ts와 일치)
+export const REGION_OPTIONS: Array<{ code: string; label: string }> = FRONT_REGION.eupMyeon;
 
 // 세그먼트별 한도 (백엔드 SEGMENT_LIMITS와 동기화)
 export const SEGMENT_LIMITS: Record<UserSegment, {

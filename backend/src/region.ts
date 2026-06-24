@@ -19,6 +19,10 @@ export interface RegionConfig {
   searchKeywords: string[];     // 네이버 데이터랩 검색어
   searchGroupName: string;
   tourAreaCode: string;         // TourAPI 지역코드(예: 34 충남)
+  eupMyeon: Array<{ code: string; label: string }>; // 읍·면 목록(온보딩·읍면 필터)
+  areaTerms: string[];          // 지역 지명(AI 질의 타지역 가드 — 이 지역 용어)
+  farmCrops: string;            // 농업 보드 주요 작물(예: 6쪽마늘·생강·고구마)
+  aquaSpecies: string;          // 양식 보드 주요 품종(예: 굴·바지락·김·우럭)
 }
 
 export const REGION: RegionConfig = {
@@ -41,4 +45,17 @@ export const REGION: RegionConfig = {
   searchKeywords: ["태안", "꽃지", "만리포", "안면도", "안면도여행"],
   searchGroupName: "태안관광",
   tourAreaCode: "34",
+  eupMyeon: [
+    { code: "taean", label: "태안읍" },
+    { code: "anmyeon", label: "안면읍" },
+    { code: "gonam", label: "고남면" },
+    { code: "geunheung", label: "근흥면" },
+    { code: "nam", label: "남면" },
+    { code: "sowon", label: "소원면" },
+    { code: "wonbuk", label: "원북면" },
+    { code: "iwon", label: "이원면" },
+  ],
+  areaTerms: ["태안", "안면", "안흥", "만리포", "꽃지", "신두리", "학암포", "남면", "소원", "원북", "이원", "근흥", "고남", "격렬비", "연포", "몽산포", "천리포", "기지포"],
+  farmCrops: "6쪽마늘·생강·고구마",
+  aquaSpecies: "굴·바지락·김·우럭",
 };

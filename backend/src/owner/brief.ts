@@ -5,6 +5,10 @@ import type { Env } from "../types";
 import type { ShopIndustry, UserPreferences } from "../preferences/types";
 import { getFreshSnapshot } from "../reports/metrics_cache";
 import { loadReportMetrics, type ReportMetrics } from "../reports/metrics";
+import { REGION } from "../region";
+
+// 읍·면 코드 → 라벨 (지역설정에서 파생)
+const EUP_LABEL: Record<string, string> = Object.fromEntries(REGION.eupMyeon.map((e) => [e.code, e.label]));
 
 export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
 // 숙박 전용 운영 보드 — 주말 수요로 예상 가동률·권장가·매출 추정
@@ -302,11 +306,6 @@ function lodgingBoard(prefs: UserPreferences | null, m: ReportMetrics): LodgingB
   };
 }
 
-const EUP_LABEL: Record<string, string> = {
-  taean: "태안읍", anmyeon: "안면읍", gonam: "고남면", geunheung: "근흥면",
-  nam: "남면", sowon: "소원면", wonbuk: "원북면", iwon: "이원면",
-};
-
 // 식음(식당·카페) 운영 보드 — 주말 수요등급으로 예상 혼잡도·손님수·매출 추정(규칙기반).
 function foodBoard(prefs: UserPreferences | null, m: ReportMetrics): FoodBoard | null {
   const sp = prefs?.shopProfile;
@@ -522,7 +521,7 @@ function farmingBoard(prefs: UserPreferences | null, m: ReportMetrics): FarmingB
   const statusLabel = alerts.some((a) => a.icon === "🥵" || a.icon === "❄️" || a.icon === "💨") ? "경보" : alerts.length ? "주의" : "양호";
   const notes: string[] = [];
   if (!alerts.length) notes.push("특이 기상 경보 없음 — 평상 영농 진행");
-  notes.push("태안 주요 작물: 6쪽마늘·생강·고구마 — 생육기 기상 점검");
+  notes.push(`${REGION.name} 주요 작물: ${REGION.farmCrops} — 생육기 기상 점검`);
 
   return { statusLabel, todayTemp, weekendMaxTemp: wkMax, weekendRain, alerts, notes };
 }
@@ -563,10 +562,6 @@ function travelBoard(prefs: UserPreferences | null, m: ReportMetrics): TravelBoa
 }
 
 // 부동산 중개 보드 — 국토부 실거래 기반 시세·㎡단가·거래량·읍면.
-const EUP_LABELS: Record<string, string> = {
-  taean: "태안읍", anmyeon: "안면읍", gonam: "고남면", geunheung: "근흥면",
-  nam: "남면", sowon: "소원면", wonbuk: "원북면", iwon: "이원면",
-};
 function realtorBoard(prefs: UserPreferences | null, m: ReportMetrics): RealtorBoard | null {
   const sp = prefs?.shopProfile;
   if (!sp || sp.industry !== "realtor") return null;
@@ -580,7 +575,7 @@ function realtorBoard(prefs: UserPreferences | null, m: ReportMetrics): RealtorB
   const aptPerPyeongManwon = aptPerM2Manwon != null ? Math.round(aptPerM2Manwon * 3.305) : null;
 
   const eupCode = sp.eupMyeon ?? prefs?.regions?.[0];
-  const eupLabel = eupCode ? EUP_LABELS[eupCode] ?? null : null;
+  const eupLabel = eupCode ? EUP_LABEL[eupCode] ?? null : null;
   const eupAptCount = eupLabel ? items.filter((it) => (it.dong ?? "").includes(eupLabel)).length : null;
   const recent = items.slice(0, 3).map((it) => ({ dong: it.dong, name: it.name, manwon: it.manwon, area: it.area }));
 
@@ -650,7 +645,7 @@ function aquaBoard(prefs: UserPreferences | null, m: ReportMetrics): AquaBoard |
   const statusLabel = alerts.some((a) => a.icon === "🌡" || a.icon === "❄️" || a.icon === "🌊") ? "경보" : alerts.length ? "주의" : "양호";
   const notes: string[] = [];
   if (!alerts.length) notes.push("특이 경보 없음 — 평상 양식 관리");
-  notes.push("태안 주요 양식: 굴·바지락·김·우럭 — 수온·염도 점검");
+  notes.push(`${REGION.name} 주요 양식: ${REGION.aquaSpecies} — 수온·염도 점검`);
 
   return { statusLabel, waterTemp, waveHeight: wave, weekendRain, alerts, notes };
 }
