@@ -11,17 +11,22 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { createArticle, getMyArticle, submitArticle, updateArticle } from "@/lib/api/citizen-articles";
+import { getArchiveArticle, type ArchiveArticle } from "@/lib/api/archive";
 
 import {
   copilotAssist,
   copilotCheck,
+  copilotContextData,
   copilotDraft,
+  copilotRelated,
   copilotUploadImage,
   PII_LABELS,
   SENSITIVE_LABELS,
   type AiLabel,
   type AssistMode,
   type CheckResult,
+  type ContextBlock,
+  type RelatedArticle,
   type SubmitResult,
 } from "@/lib/api/copilot";
 
@@ -127,7 +132,10 @@ function CopilotEditorPage() {
     setUploading(true); setUploadErr(null);
     try {
       const { url } = await copilotUploadImage(file);
-      setBody((b) => `${b}${b && !b.endsWith("\n") ? "\n\n" : ""}![사진 설명을 적어주세요](${url})\n\n`);
+      // 캡션을 바로 받아 alt에 넣음(취재 맥락·저작권 표기). 비우면 안내 자리표시.
+      const caption = (window.prompt("사진 설명(캡션)을 적어주세요. 예: 만리포 해수욕장 개장식 (사진=홍길동)") ?? "").trim();
+      const alt = caption || "사진 설명을 적어주세요";
+      setBody((b) => `${b}${b && !b.endsWith("\n") ? "\n\n" : ""}![${alt}](${url})\n\n`);
     } catch (err) {
       setUploadErr(err instanceof Error ? err.message : "업로드 실패");
     } finally {
@@ -291,6 +299,7 @@ function CopilotEditorPage() {
                   className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5 disabled:opacity-50">
                   {uploading ? "업로드 중…" : "🖼 사진 추가"}
                 </button>
+                <DataInsertButton onInsert={(text) => setBody((b) => `${b}${b && !b.endsWith("\n") ? "\n\n" : ""}${text}\n\n`)} />
                 {uploadErr && <span className="text-[11px] text-red-600">{uploadErr}</span>}
               </div>
               <p className="text-[11px] text-foreground-muted">
@@ -340,6 +349,8 @@ function CopilotEditorPage() {
             )}
           </div>
 
+          <PreSubmitChecklist />
+
           <div className="sticky bottom-2 z-10 -mx-1 rounded-xl bg-background/90 px-1 py-2 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
             <button type="button" onClick={submit} disabled={!canSubmit} className="btn-accent w-full disabled:opacity-50 lg:w-auto">
               {submitting ? "제출 중…" : "편집부에 제출 (HITL 검수)"}
@@ -353,6 +364,7 @@ function CopilotEditorPage() {
         {/* 코파일럿 사이드 */}
         <aside className="space-y-4">
           <GovernancePanel check={check} />
+          <RelatedPanel title={title} body={body} />
           <AssistPanel body={body} onApply={(t) => setBody(t)} />
         </aside>
       </div>
@@ -397,6 +409,16 @@ function GovernancePanel({ check }: { check: CheckResult | null }) {
             <div className="rounded border border-amber-200 bg-amber-50 p-2.5 text-xs">
               <p className="font-semibold text-amber-800">개인정보 {check.pii.count}건</p>
               <p className="text-amber-700">{check.pii.kinds.map((k) => PII_LABELS[k] ?? k).join(", ")} · 발행 시 자동 마스킹</p>
+              {check.pii.samples && check.pii.samples.length > 0 && (
+                <ul className="mt-1.5 space-y-1">
+                  {check.pii.samples.map((s, i) => (
+                    <li key={`${s.matched}-${i}`} className="flex items-center gap-1.5">
+                      <span className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-[11px] text-amber-900">{s.matched}</span>
+                      <span className="text-amber-700">{PII_LABELS[s.kind] ?? s.kind}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
           {check.sensitive.topics.map((t) => (
@@ -445,6 +467,7 @@ function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) 
     ["polish", "✍️ 다듬기"],
     ["summarize", "📝 요약"],
     ["title", "💡 제목 추천"],
+    ["factcheck", "🔍 사실 점검"],
   ];
 
   return (
@@ -478,8 +501,193 @@ function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) 
           )}
         </div>
       )}
-      <p className="text-[11px] text-foreground-muted">Workers AI (Llama 3.1) · 무료 할당 내 종량 0 · 관련 과거기사·팩트체크는 아카이브 백필 후</p>
+      <p className="text-[11px] text-foreground-muted">Workers AI (Llama 3.3) · 무료 할당 내 종량 0 · 사실 점검은 본문에서 확인 대상만 추출(새 사실 창작 안 함)</p>
     </section>
+  );
+}
+
+// 제출 전 작성 가이드 — 신참 시민기자용 자가점검(비강제). 교육(LMS) 전 인라인 가이드 역할.
+const CHECKLIST_ITEMS = [
+  "핵심(누가·언제·어디서·무엇을·왜·어떻게)을 리드 1~2문단에 먼저 담았다",
+  "가장 중요한 사실부터 → 덜 중요한 순으로 배치했다(역피라미드)",
+  "수치·날짜·이름·기관명을 취재로 확인했다(추측·전언 금지)",
+  "한쪽 주장만 싣지 않고 관련자 입장·반론을 균형 있게 담았다",
+  "개인정보(이름·연락처·주소)는 보도 필요 최소한으로, 사생활은 가렸다",
+  "사진에 캡션과 촬영자(저작권)를 표기했다",
+  "AI를 썼다면 라벨과 출처를 정확히 표시했다",
+];
+function PreSubmitChecklist() {
+  const [done, setDone] = useState<boolean[]>(() => CHECKLIST_ITEMS.map(() => false));
+  const count = done.filter(Boolean).length;
+  return (
+    <details className="rounded-lg border border-brand/15 bg-brand/[0.02] px-4 py-2 text-sm">
+      <summary className="cursor-pointer font-semibold text-brand">
+        ✅ 제출 전 작성 가이드 <span className="text-xs font-normal text-foreground-muted">({count}/{CHECKLIST_ITEMS.length})</span>
+      </summary>
+      <ul className="mt-2 space-y-1.5">
+        {CHECKLIST_ITEMS.map((item, i) => (
+          <li key={i}>
+            <label className="flex items-start gap-2 text-xs text-foreground">
+              <input
+                type="checkbox"
+                checked={done[i]}
+                onChange={() => setDone((d) => d.map((v, j) => (j === i ? !v : v)))}
+                className="mt-0.5 accent-accent"
+              />
+              <span className={done[i] ? "text-foreground-muted line-through" : ""}>{item}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] text-foreground-muted">자가점검용 안내입니다 · 체크하지 않아도 제출할 수 있어요(편집부가 최종 검토).</p>
+    </details>
+  );
+}
+
+// 관련 과거기사 — 제목·본문 주제로 태안신문 아카이브를 디바운스 검색(무LLM FTS5).
+function RelatedPanel({ title, body }: { title: string; body: string }) {
+  const [items, setItems] = useState<RelatedArticle[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [reading, setReading] = useState<ArchiveArticle | null>(null);
+  const [readId, setReadId] = useState<number | null>(null);
+  const [readLoading, setReadLoading] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const seed = `${title} ${body}`.trim();
+    if (seed.replace(/\s/g, "").length < 6) { setItems([]); return; }
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const r = await copilotRelated(title, body.slice(0, 1200));
+        setItems(r.items ?? []);
+      } catch { /* 검색 실패는 조용히 무시 */ }
+      finally { setLoading(false); }
+    }, 900);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [title, body]);
+
+  // 같은 창에서 보기 — 기사 본문을 인라인 리더(드로어)로 로드
+  async function openReader(idxno: number) {
+    setReadId(idxno); setReadLoading(true); setReading(null);
+    try { setReading(await getArchiveArticle(idxno)); }
+    catch { setReading(null); }
+    finally { setReadLoading(false); }
+  }
+
+  return (
+    <section className="rounded-2xl border border-brand/15 bg-background p-4 space-y-3">
+      <h2 className="text-sm font-bold text-brand">📚 관련 과거 보도</h2>
+      {!items.length && (
+        <p className="text-xs text-foreground-muted">
+          {loading ? "태안신문 아카이브 검색 중…" : "주제를 입력하면 태안신문이 다룬 과거 기사를 찾아드립니다. 맥락·중복·후속취재 확인용."}
+        </p>
+      )}
+      {items.length > 0 && (
+        <ul className="space-y-2">
+          {items.map((a) => (
+            <li key={a.idxno}>
+              <button type="button" onClick={() => openReader(a.idxno)}
+                aria-pressed={readId === a.idxno}
+                className={`block w-full text-left rounded-lg border p-2.5 transition-colors ${readId === a.idxno ? "border-accent bg-accent-subtle/20" : "border-brand/10 hover:border-accent/40 hover:bg-accent-subtle/10"}`}>
+                <p className="text-sm font-semibold text-brand leading-snug">{a.title}</p>
+                <p className="mt-0.5 text-[11px] text-foreground-muted">
+                  {a.publishedAt ? a.publishedAt.slice(0, 10) : ""}{a.category ? ` · ${a.category}` : ""}
+                </p>
+                {a.excerpt && <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">{a.excerpt}</p>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length > 0 && <p className="text-[11px] text-foreground-muted">클릭하면 같은 창에서 본문을 봅니다 · 규칙 기반 검색(무LLM)</p>}
+
+      {(reading || readLoading) && (
+        <ArchiveReader article={reading} loading={readLoading} onClose={() => { setReading(null); setReadId(null); }} />
+      )}
+    </section>
+  );
+}
+
+// 같은 창 인라인 리더 — 화면 오른쪽 드로어로 과거 기사 본문을 띄움(작성 중단 없이).
+function ArchiveReader({ article, loading, onClose }: { article: ArchiveArticle | null; loading: boolean; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="관련 과거 기사">
+      <button type="button" aria-label="닫기" onClick={onClose} className="flex-1 bg-black/30" />
+      <div className="h-full w-full max-w-xl overflow-y-auto bg-background p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <p className="eyebrow">📚 태안신문 아카이브</p>
+          <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-sm font-semibold text-foreground-muted hover:bg-brand/5">✕ 닫기</button>
+        </div>
+        {loading && <p className="mt-6 text-sm text-foreground-muted">본문 불러오는 중…</p>}
+        {article && (
+          <article className="mt-3">
+            <h3 className="font-display text-2xl font-bold text-brand leading-tight">{article.title}</h3>
+            <p className="mt-1 text-xs text-foreground-muted">
+              {article.published_at?.slice(0, 10)}{article.category ? ` · ${article.category}` : ""}{article.author ? ` · ${article.author}` : ""}
+            </p>
+            {article.faithfulness != null && article.faithfulness < 0.7 && (
+              <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-700">※ 옛 신문 OCR 본문이라 오탈자가 있을 수 있습니다.</p>
+            )}
+            <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {article.body || article.excerpt || "(본문 없음)"}
+            </div>
+            <div className="mt-5 hairline pt-3">
+              <Link href={`/news/${article.idxno}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-accent hover:underline">원문 페이지 새 탭으로 →</Link>
+            </div>
+          </article>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 실시간 데이터 넣기 — 날씨·물때·해넘이를 출처와 함께 본문에 끼워넣는다(공공데이터).
+function DataInsertButton({ onInsert }: { onInsert: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [blocks, setBlocks] = useState<ContextBlock[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function toggle() {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (blocks) return;
+    setLoading(true); setErr(null);
+    try {
+      const r = await copilotContextData();
+      setBlocks(r.blocks ?? []);
+      if (!r.available) setErr("지금은 가져올 실시간 데이터가 없습니다.");
+    } catch {
+      setErr("데이터를 불러오지 못했습니다.");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div className="relative">
+      <button type="button" onClick={toggle}
+        className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5">
+        📊 데이터 넣기
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-lg border border-brand/15 bg-background p-2 shadow-lg">
+          {loading && <p className="px-2 py-1 text-xs text-foreground-muted">불러오는 중…</p>}
+          {err && <p className="px-2 py-1 text-xs text-amber-600">{err}</p>}
+          {blocks?.map((b) => (
+            <button key={b.id} type="button"
+              onClick={() => { onInsert(b.markdown); setOpen(false); }}
+              className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-brand/5">
+              <span className="text-xs font-semibold text-brand">{b.label}</span>
+              <span className="mt-0.5 block text-[11px] text-foreground-muted line-clamp-2">{b.markdown}</span>
+            </button>
+          ))}
+          {blocks && blocks.length === 0 && !err && (
+            <p className="px-2 py-1 text-xs text-foreground-muted">표시할 데이터가 없습니다.</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
