@@ -37,6 +37,9 @@ const EVENT_RE = /행사|일정|이벤트|공지|군정|군청|새소식|소식|
 const RECOMMEND_RE = /뭐\s?하|뭘\s?하|무엇.*하면|할\s?만한|할\s?게|가\s?볼\s?만한|가볼만|추천|나들이|놀러|구경|데이트|코스|어디.*(갈|가면|놀|좋)|뭐\s?먹|볼거리|즐길/;
 // "우리 가게" 1인칭 사업 질문 → 사용자 shopProfile 보드 주입
 const MYSHOP_RE = /우리|저희|내\s?가게|장사|매출|예약|손님|가동률|영업|성수기|폐장|우리\s?(모텔|호텔|펜션|식당|카페|가게|골프장|여행사|배|농장)/;
+// 태안 지역 용어 / 타지역 용어 — 타지역만 언급되면 실시간(태안) 데이터 주입을 막아 오표기 방지
+const TAEAN_AREA_RE = /태안|안면|안흥|만리포|꽃지|신두리|학암포|남면|소원|원북|이원|근흥|고남|격렬비|연포|몽산포|천리포|기지포/;
+const OTHER_REGION_RE = /서울|부산|대구|인천|광주|대전|울산|세종|경기|수원|성남|용인|강원|춘천|강릉|속초|청주|충북|천안|아산|당진|서산|보령|예산|홍성|청양|전주|전북|전남|여수|순천|목포|경북|포항|경주|안동|경남|창원|진주|통영|거제|제주|서귀포|강남|강북|홍대|명동|이태원|잠실|분당|일산/;
 
 // owner-brief 보드 → AI 근거 텍스트(본인 가게 수치)
 function buildShopEvidence(b: import("../owner/brief").OwnerBrief): string | null {
@@ -150,6 +153,11 @@ queryRouter.post("/", async (c) => {
   try {
     const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string } }> = [];
     const recommend = RECOMMEND_RE.test(query); // 추천 질문 → 오늘 날씨·바다·행사·수요 종합
+    // 타지역만 언급(태안 용어 없음) → 태안 실시간 데이터 주입 차단(강남 날씨에 태안값 오표기 방지)
+    const offRegion = OTHER_REGION_RE.test(query) && !TAEAN_AREA_RE.test(query);
+    if (offRegion) {
+      parts.push({ text: "이 서비스는 충청남도 태안군 지역 정보만 제공합니다. 태안 외 지역의 날씨·시세·관광 데이터는 보유하지 않습니다.", source: { title: "안내 · 태안 전용 서비스", url: null } });
+    }
 
     // (a-0) 내 가게 맞춤 — 로그인(익명 uid)에 가게 정보가 있고 사업/주말/추천 질문이면 본인 업종 보드 주입
     let hasMyShop = false;
@@ -167,7 +175,7 @@ queryRouter.post("/", async (c) => {
     }
 
     // (a) 날씨·대기질 질문이면 실시간 관측값을 근거에 추가
-    if ((WEATHER_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY) {
+    if ((WEATHER_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY && !offRegion) {
       const cond = await fetchConditions(c.env);
       if (cond.available && (cond.weather.temp != null || cond.air.pm10 != null || cond.air.grade)) {
         const w = cond.weather, a = cond.air;
@@ -218,7 +226,7 @@ queryRouter.post("/", async (c) => {
     }
 
     // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터 + ㎡당 단가·월별 추이·전체 대비)
-    if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY) {
+    if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY && !offRegion) {
       const re = await fetchRealEstateDeep(c.env);
       if (re.available && (re.apartments.length || re.lands.length)) {
         const EUPMYEON = ["태안읍", "안면읍", "고남면", "근흥면", "남면", "소원면", "원북면", "이원면"];
@@ -271,7 +279,7 @@ queryRouter.post("/", async (c) => {
     }
 
     // (a-3) 관광 수요·축제 질문이면 수요예측 + 축제 일정을 근거에 추가
-    if (TOURISM_RE.test(query) || recommend) {
+    if ((TOURISM_RE.test(query) || recommend) && !offRegion) {
       const lines: string[] = [];
       try {
         const t = await fetchTour(c.env);
@@ -297,7 +305,7 @@ queryRouter.post("/", async (c) => {
     }
 
     // (a-4) 바다·해변 질문이면 일출몰·물때·수온·파고·서핑을 근거에 추가(실시간/천문계산)
-    if ((MARINE_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY) {
+    if ((MARINE_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY && !offRegion) {
       try {
         const m = await loadMarine(c.env);
         if (m.available) {
@@ -313,7 +321,7 @@ queryRouter.post("/", async (c) => {
     }
 
     // (a-5) 행사·일정·군정 질문이면 태안군청 군정소식·주간행사계획 주입(이번 주 행사의 정본)
-    if ((EVENT_RE.test(query) || recommend) && c.env.ARCHIVE_DB) {
+    if ((EVENT_RE.test(query) || recommend) && c.env.ARCHIVE_DB && !offRegion) {
       try {
         const r = await c.env.ARCHIVE_DB
           .prepare(

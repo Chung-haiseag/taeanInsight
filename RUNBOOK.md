@@ -179,3 +179,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-25 · 주간 개인화 푸시(금 09:00 KST): 구독자에게 본인 업종 보드/여행 플래너 요약 Web Push — owner/weekly_push, cron 0 0 * * 5
 
 - 2026-06-25 · AI 질의에 내 가게 연결: "우리 모텔 이번 주말 어때?" → shopProfile 보드 수치로 답변 — query/router buildShopEvidence(X-Taean-Uid)
+
+- 2026-06-25 · 품질: AI 질의 타지역 가드(서울·강남 등 태안 외 → 태안 데이터 오표기 차단·전용 안내), mock 점검(/me만 데이터버그였고 수정됨; 홈·뉴스는 데모 게이트로 데이터는 실제) — query/router
