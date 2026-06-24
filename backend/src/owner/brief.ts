@@ -35,6 +35,20 @@ export interface FoodBoard {
   rainSoon: boolean;
   notes: string[];
 }
+// 레저·체험 운영 보드 — 날씨·파고·수요로 예상 참가율·참가자·매출 추정(야외 민감)
+export interface LeisureBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  fitLabel: string;            // 야외 활동 적합도(좋음/보통/주의)
+  capacity: number | null;     // 일 정원
+  price: number | null;        // 1인 체험료
+  expectedGuests: number | null;
+  estRevenue: number | null;
+  highWave: boolean;
+  rainSoon: boolean;
+  festivalSoon: { title: string; dday: number } | null;
+  notes: string[];
+}
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -44,7 +58,8 @@ export interface OwnerBrief {
   uv: ReportMetrics["uv"];
   actions: OwnerAction[];
   lodging: LodgingBoard | null; // 숙박 업종일 때만
-  food: FoodBoard | null;       // 음식 업종일 때만
+  food: FoodBoard | null;       // 음식·카페 업종일 때만
+  leisure: LeisureBoard | null; // 레저·체험 업종일 때만
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
@@ -226,6 +241,44 @@ function foodBoard(prefs: UserPreferences | null, m: ReportMetrics): FoodBoard |
   };
 }
 
+// 레저·체험 운영 보드 — 수요·날씨·파고로 예상 참가율·참가자·매출(야외 민감).
+function leisureBoard(prefs: UserPreferences | null, m: ReportMetrics): LeisureBoard | null {
+  const sp = prefs?.shopProfile;
+  if (!sp || sp.industry !== "leisure") return null;
+  const demand = m.tourism.demand;
+  if (!demand?.available) return null;
+
+  const RATE: Record<string, number> = { 매우높음: 0.9, 높음: 0.7, 보통: 0.5, 낮음: 0.3, 매우낮음: 0.15 };
+  let rate = RATE[demand.level] ?? 0.5;
+
+  const fest = (m.tourism.festivals ?? []).map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
+    .filter((f) => f.dday >= 0 && f.dday <= 3).sort((a, b) => a.dday - b.dday)[0] ?? null;
+  if (fest) rate += 0.1;
+  const rainSoon = [demand.weather?.sat, demand.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);
+  if (rainSoon) rate -= 0.2;
+  rate = Math.max(0.05, Math.min(0.98, rate));
+
+  const wave = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.waveHeight ?? 0));
+  const highWave = wave >= 1.5;
+
+  const capacity = sp.capacity && sp.capacity > 0 ? sp.capacity : null;
+  const price = sp.basePrice ?? null;
+  const expectedGuests = capacity ? Math.round(capacity * rate) : null;
+  const estRevenue = expectedGuests && price ? expectedGuests * price : null;
+
+  const fitLabel = rainSoon ? "주의(우천)" : highWave ? "주의(파고)" : (demand.level === "높음" || demand.level === "매우높음") ? "좋음" : "보통";
+  const notes: string[] = [];
+  if (rainSoon) notes.push("주말 강수 — 실내 대체 프로그램·환불 규정 안내");
+  if (highWave) notes.push(`파고 ${wave.toFixed(1)}m — 수상 활동 안전 점검·일정 조정`);
+  if (fest) notes.push(`인근 '${fest.title}' D-${fest.dday} — 예약 슬롯 확대`);
+  if (demand.level === "낮음" || demand.level === "매우낮음") notes.push("한산 — 단체·패키지 프로모션 권장");
+
+  return {
+    weekend: demand.weekend, level: demand.level, fitLabel,
+    capacity, price, expectedGuests, estRevenue, highWave, rainSoon, festivalSoon: fest, notes,
+  };
+}
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
@@ -258,6 +311,7 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
     actions: buildActions(industry, metrics),
     lodging: lodgingBoard(prefs, metrics),
     food: foodBoard(prefs, metrics),
+    leisure: leisureBoard(prefs, metrics),
     market: {
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,
