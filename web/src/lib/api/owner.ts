@@ -20,6 +20,19 @@ export interface LodgingBoard {
   notes: string[];
 }
 
+export interface FoodBoard {
+  weekend: { sat: string; sun: string };
+  level: string;
+  busyLabel: string;
+  seats: number | null;
+  avgTicket: number | null;
+  expectedCovers: number | null;
+  estRevenue: number | null;
+  festivalSoon: { title: string; dday: number } | null;
+  rainSoon: boolean;
+  notes: string[];
+}
+
 export interface OwnerBrief {
   hasShop: boolean;
   industry: ShopIndustry | null;
@@ -29,6 +42,7 @@ export interface OwnerBrief {
   uv: { todayMax: number | null; level: string; peakHour: string | null } | null;
   actions: OwnerAction[];
   lodging: LodgingBoard | null;
+  food: FoodBoard | null;
   market: {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
