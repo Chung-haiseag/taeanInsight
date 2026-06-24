@@ -91,8 +91,8 @@ function MeDashboard({ data }: { data: MeResponse }) {
       {/* 오늘 한눈에 — 히어로 요약 */}
       <MeHeroStrip preferences={preferences} />
 
-      {/* 사장님 보드 — 가게 정보가 있으면 모텔 운영 보드·실행 제안 */}
-      {preferences.shopProfile && <MeOwnerBoard />}
+      {/* 사장님 보드 — 가게 정보가 있으면 운영 보드, 없으면 입력 안내 */}
+      <MeOwnerBoard />
 
       {/* Push 옵트인 — 알림 채널에 webpush 있으면 노출 */}
       {preferences.notificationChannels.includes("webpush") && (

@@ -200,8 +200,8 @@ export function LodgingBoardCard({ board, nearby }: { board: LodgingBoard; nearb
   );
 }
 
-// ── 가게 프로필 설정 ──
-function ShopSetup({ onSaved }: { onSaved: () => void }) {
+// ── 가게 프로필 설정 ── (내 페이지에서도 재사용)
+export function ShopSetup({ onSaved }: { onSaved: () => void }) {
   const [industry, setIndustry] = useState<ShopIndustry | null>(null);
   const [eupMyeon, setEupMyeon] = useState<string>("");
   const [name, setName] = useState("");
