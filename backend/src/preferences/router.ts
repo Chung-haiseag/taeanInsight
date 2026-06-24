@@ -96,6 +96,14 @@ meRouter.get("/owner-brief", async (c) => {
   return c.json(await loadOwnerBrief(c.env, prefs));
 });
 
+// GET /api/me/weekly-preview — 이번 주 푸시 문구 미리보기(현재 사용자)
+meRouter.get("/weekly-preview", async (c) => {
+  const auth = c.get("auth");
+  const prefs = await serviceFor(c).get(auth.sub);
+  const { previewWeeklyPush } = await import("../owner/weekly_push");
+  return c.json({ body: await previewWeeklyPush(c.env, prefs) });
+});
+
 // POST /api/me/onboarding
 meRouter.post("/onboarding", async (c) => {
   const auth = c.get("auth");
