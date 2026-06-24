@@ -10,11 +10,22 @@ export interface SeasonalFood {
 
 export interface FrontRegionConfig {
   name: string;                 // 지역명(표시용)
+  eupMyeon: Array<{ code: string; label: string }>; // 읍·면(온보딩 — 코드는 backend region.ts와 일치)
   seasonalFoods: SeasonalFood[]; // 이달의 제철 먹거리
 }
 
 export const FRONT_REGION: FrontRegionConfig = {
   name: "태안",
+  eupMyeon: [
+    { code: "taean", label: "태안읍" },
+    { code: "anmyeon", label: "안면읍" },
+    { code: "gonam", label: "고남면" },
+    { code: "geunheung", label: "근흥면" },
+    { code: "nam", label: "남면" },
+    { code: "sowon", label: "소원면" },
+    { code: "wonbuk", label: "원북면" },
+    { code: "iwon", label: "이원면" },
+  ],
   seasonalFoods: [
     { name: "꽃게", emoji: "🦀", months: [4, 5, 6, 9, 10, 11] },
     { name: "바지락", emoji: "🐚", months: [3, 4, 5, 6] },

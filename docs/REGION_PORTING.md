@@ -43,33 +43,21 @@
 
 ---
 
-## 3. 권장 개선 (재적용을 "1파일 편집"으로)
+## 3. 중앙화 — 적용 완료 (2026-06-25)
 
-현재 지역상수가 6개 파일에 흩어져 있음. **`backend/src/region.ts` 한 파일로 중앙화**하면 새 지역 적용이 그 파일 편집 + 키 발급으로 끝남:
+**A형(포크형) 포팅** 기준, 지역 고유값은 이제 **단 2파일**에 모여 있다(과거 "6개 파일 흩어짐" 해소):
 
-```ts
-// backend/src/region.ts (제안)
-export const REGION = {
-  name: "태안", grid: { nx: "51", ny: "109" },
-  airSido: "충남", airStation: "태안읍", lawdCd: "44825",
-  center: { lat: 36.745, lon: 126.298 },
-  box: { latMin: 36.55, latMax: 37.1, lonMin: 126.05, lonMax: 126.5 },
-  beaches: [{ num: "70", name: "만리포" }, { num: "44", name: "꽃지" }],
-  tideObs: "DT_0067", surfSpot: "만리포", uvAreaNo: "4482500000",
-  opinetSido: "05", searchKeywords: ["태안","꽃지","만리포","안면도"],
-  tourAreaCode: "34",
-};
-```
-→ marine.ts·oil.ts·living.ts·search_trend.ts·demand.ts·sources.ts가 이 상수를 import.
-프론트 `TAEAN_SEAFOOD`도 region별 분리.
+- **`backend/src/region.ts`** (`REGION`) — 격자·시도·측정소·법정동코드·좌표·박스·해변·조석지점·서핑·자외선·오피넷·검색어·TourAPI 코드 + **읍·면 목록(eupMyeon)·지역지명(areaTerms)·작물(farmCrops)·양식품종(aquaSpecies)**.
+  - import 사용처: `env/sources·oil·tour·search_trend·living·realestate`, `tour/marine·demand`, `owner/brief`(읍면·작물·품종), `query/router`(타지역 가드 areaTerms).
+- **`web/src/lib/region.ts`** (`FRONT_REGION`) — 지역명·**읍·면 목록**·제철 먹거리. `lib/types.ts REGION_OPTIONS`가 이걸로 파생.
 
-> 이 중앙화 리팩터는 미적용 상태. 다른 신문사 1곳이라도 확정되면 진행 권장.
+> ⚠️ **읍·면 코드는 backend·frontend가 반드시 동일**해야 한다(부동산·주변숙박 읍면 필터가 코드로 매칭). 과거 `taean_eup`↔`taean` 불일치 버그는 수정됨.
 
 ---
 
 ## 4. 새 지역 적용 체크리스트
 
-1. `region.ts`(또는 §1 표의 각 파일) 지역값 교체
+1. **`backend/src/region.ts` + `web/src/lib/region.ts`** 두 파일의 지역값 교체
 2. data.go.kr 6개 데이터셋 활용신청 + `DATA_GO_KR_KEY` 등록
 3. `OPINET_KEY`, `NAVER_*`, `VAPID_*`, 신문 로그인 시크릿 등록
 4. 조석 obsCode·해수욕장 코드·areaNo는 API 스캔으로 실측 확정(메모의 방법)
