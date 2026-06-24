@@ -568,8 +568,9 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [title, body]);
 
-  // 같은 창에서 보기 — 기사 본문을 인라인 리더(드로어)로 로드
-  async function openReader(idxno: number) {
+  // 같은 창에서 보기 — 클릭한 기사 아래로 본문을 펼침(아코디언). 다시 누르면 접힘.
+  async function toggleReader(idxno: number) {
+    if (readId === idxno) { setReadId(null); setReading(null); return; }
     setReadId(idxno); setReadLoading(true); setReading(null);
     try { setReading(await getArchiveArticle(idxno)); }
     catch { setReading(null); }
@@ -586,60 +587,45 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
       )}
       {items.length > 0 && (
         <ul className="space-y-2">
-          {items.map((a) => (
-            <li key={a.idxno}>
-              <button type="button" onClick={() => openReader(a.idxno)}
-                aria-pressed={readId === a.idxno}
-                className={`block w-full text-left rounded-lg border p-2.5 transition-colors ${readId === a.idxno ? "border-accent bg-accent-subtle/20" : "border-brand/10 hover:border-accent/40 hover:bg-accent-subtle/10"}`}>
-                <p className="text-sm font-semibold text-brand leading-snug">{a.title}</p>
-                <p className="mt-0.5 text-[11px] text-foreground-muted">
-                  {a.publishedAt ? a.publishedAt.slice(0, 10) : ""}{a.category ? ` · ${a.category}` : ""}
-                </p>
-                {a.excerpt && <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">{a.excerpt}</p>}
-              </button>
-            </li>
-          ))}
+          {items.map((a) => {
+            const open = readId === a.idxno;
+            return (
+              <li key={a.idxno}>
+                <button type="button" onClick={() => toggleReader(a.idxno)}
+                  aria-expanded={open}
+                  className={`block w-full text-left rounded-lg border p-2.5 transition-colors ${open ? "border-accent bg-accent-subtle/20" : "border-brand/10 hover:border-accent/40 hover:bg-accent-subtle/10"}`}>
+                  <p className="text-sm font-semibold text-brand leading-snug">{a.title}</p>
+                  <p className="mt-0.5 text-[11px] text-foreground-muted">
+                    {a.publishedAt ? a.publishedAt.slice(0, 10) : ""}{a.category ? ` · ${a.category}` : ""}
+                    <span className="ml-1 text-accent">{open ? "▲ 접기" : "▼ 본문 보기"}</span>
+                  </p>
+                  {!open && a.excerpt && <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">{a.excerpt}</p>}
+                </button>
+
+                {open && (
+                  <div className="mt-1 rounded-lg border border-accent/20 bg-accent-subtle/5 p-3">
+                    {readLoading && <p className="text-xs text-foreground-muted">본문 불러오는 중…</p>}
+                    {reading && (
+                      <>
+                        {reading.faithfulness != null && reading.faithfulness < 0.7 && (
+                          <p className="mb-2 rounded bg-amber-50 p-1.5 text-[11px] text-amber-700">※ 옛 신문 OCR 본문이라 오탈자가 있을 수 있습니다.</p>
+                        )}
+                        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+                          {reading.body || reading.excerpt || "(본문 없음)"}
+                        </div>
+                        <Link href={`/news/${reading.idxno}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[11px] font-semibold text-accent hover:underline">원문 페이지 새 탭으로 →</Link>
+                      </>
+                    )}
+                    {!readLoading && !reading && <p className="text-xs text-foreground-muted">본문을 불러오지 못했습니다.</p>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
-      {items.length > 0 && <p className="text-[11px] text-foreground-muted">클릭하면 같은 창에서 본문을 봅니다 · 규칙 기반 검색(무LLM)</p>}
-
-      {(reading || readLoading) && (
-        <ArchiveReader article={reading} loading={readLoading} onClose={() => { setReading(null); setReadId(null); }} />
-      )}
+      {items.length > 0 && <p className="text-[11px] text-foreground-muted">제목을 누르면 본문이 아래로 펼쳐집니다 · 규칙 기반 검색(무LLM)</p>}
     </section>
-  );
-}
-
-// 같은 창 인라인 리더 — 화면 오른쪽 드로어로 과거 기사 본문을 띄움(작성 중단 없이).
-function ArchiveReader({ article, loading, onClose }: { article: ArchiveArticle | null; loading: boolean; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="관련 과거 기사">
-      <button type="button" aria-label="닫기" onClick={onClose} className="flex-1 bg-black/30" />
-      <div className="h-full w-full max-w-xl overflow-y-auto bg-background p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <p className="eyebrow">📚 태안신문 아카이브</p>
-          <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-sm font-semibold text-foreground-muted hover:bg-brand/5">✕ 닫기</button>
-        </div>
-        {loading && <p className="mt-6 text-sm text-foreground-muted">본문 불러오는 중…</p>}
-        {article && (
-          <article className="mt-3">
-            <h3 className="font-display text-2xl font-bold text-brand leading-tight">{article.title}</h3>
-            <p className="mt-1 text-xs text-foreground-muted">
-              {article.published_at?.slice(0, 10)}{article.category ? ` · ${article.category}` : ""}{article.author ? ` · ${article.author}` : ""}
-            </p>
-            {article.faithfulness != null && article.faithfulness < 0.7 && (
-              <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-700">※ 옛 신문 OCR 본문이라 오탈자가 있을 수 있습니다.</p>
-            )}
-            <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-              {article.body || article.excerpt || "(본문 없음)"}
-            </div>
-            <div className="mt-5 hairline pt-3">
-              <Link href={`/news/${article.idxno}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-accent hover:underline">원문 페이지 새 탭으로 →</Link>
-            </div>
-          </article>
-        )}
-      </div>
-    </div>
   );
 }
 
