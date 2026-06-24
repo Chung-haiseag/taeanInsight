@@ -545,6 +545,21 @@ function PreSubmitChecklist() {
 }
 
 // 관련 과거기사 — 제목·본문 주제로 태안신문 아카이브를 디바운스 검색(무LLM FTS5).
+// 본문을 읽기 좋은 단락으로 — 줄바꿈 기준 분리, 한 덩어리면 문장 3개씩 묶어 단락화.
+function paragraphize(text: string): string[] {
+  const clean = text.replace(/\r/g, "").trim();
+  if (!clean) return [];
+  let paras = clean.split(/\n{2,}/).map((p) => p.replace(/\n+/g, " ").trim()).filter(Boolean);
+  if (paras.length <= 1) paras = clean.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  // 여전히 한 덩어리로 길면 문장 단위로 잘라 3문장씩 묶음
+  if (paras.length <= 1 && clean.length > 240) {
+    const sentences = clean.split(/(?<=[.!?。…])\s+/).map((s) => s.trim()).filter(Boolean);
+    paras = [];
+    for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join(" "));
+  }
+  return paras.length ? paras : [clean];
+}
+
 function RelatedPanel({ title, body }: { title: string; body: string }) {
   const [items, setItems] = useState<RelatedArticle[]>([]);
   const [loading, setLoading] = useState(false);
@@ -610,8 +625,10 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
                         {reading.faithfulness != null && reading.faithfulness < 0.7 && (
                           <p className="mb-2 rounded bg-amber-50 p-1.5 text-[11px] text-amber-700">※ 옛 신문 OCR 본문이라 오탈자가 있을 수 있습니다.</p>
                         )}
-                        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground">
-                          {reading.body || reading.excerpt || "(본문 없음)"}
+                        <div className="max-h-80 space-y-2.5 overflow-y-auto text-xs leading-relaxed text-foreground">
+                          {paragraphize(reading.body || reading.excerpt || "(본문 없음)").map((p, i) => (
+                            <p key={i}>{p}</p>
+                          ))}
                         </div>
                         <Link href={`/news/${reading.idxno}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[11px] font-semibold text-accent hover:underline">원문 페이지 새 탭으로 →</Link>
                       </>
