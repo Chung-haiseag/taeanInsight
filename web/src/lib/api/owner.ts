@@ -29,8 +29,14 @@ export interface OwnerBrief {
   uv: { todayMax: number | null; level: string; peakHour: string | null } | null;
   actions: OwnerAction[];
   lodging: LodgingBoard | null;
-  market: { festivals: Array<{ title: string; dday: number }>; gasoline: number | null; aptAvgManwon: number | null };
+  market: {
+    festivals: Array<{ title: string; dday: number }>;
+    gasoline: number | null;
+    aptAvgManwon: number | null;
+    nearbyLodging?: { total: number; nearbyEup: number | null; eupLabel: string | null } | null;
+  };
 }
+export interface NearbyLodging { total: number; nearbyEup: number | null; eupLabel: string | null }
 
 export const INDUSTRY_OPTIONS: { value: ShopIndustry; label: string; emoji: string }[] = [
   { value: "lodging", label: "숙박(펜션·호텔)", emoji: "🛏" },

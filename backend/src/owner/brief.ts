@@ -34,6 +34,7 @@ export interface OwnerBrief {
     festivals: Array<{ title: string; dday: number }>;
     gasoline: number | null;
     aptAvgManwon: number | null;
+    nearbyLodging?: { total: number; nearbyEup: number | null; eupLabel: string | null } | null;
   };
 }
 
@@ -161,12 +162,33 @@ function lodgingBoard(prefs: UserPreferences | null, m: ReportMetrics): LodgingB
   };
 }
 
+const EUP_LABEL: Record<string, string> = {
+  taean: "태안읍", anmyeon: "안면읍", gonam: "고남면", geunheung: "근흥면",
+  nam: "남면", sowon: "소원면", wonbuk: "원북면", iwon: "이원면",
+};
+
 export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): Promise<OwnerBrief> {
   const metrics = (await getFreshSnapshot(env)) ?? (await loadReportMetrics(env));
   const industry = prefs?.shopProfile?.industry ?? null;
   const festivals = (metrics.tourism.festivals ?? [])
     .map((f) => ({ title: f.title, dday: ymd8ToDday(f.start) }))
     .filter((f) => f.dday >= 0).sort((a, b) => a.dday - b.dday).slice(0, 3);
+
+  // 숙박 업종이면 주변 숙박업소 수(TourAPI searchStay) — 읍·면 분포까지
+  let nearbyLodging: { total: number; nearbyEup: number | null; eupLabel: string | null } | null = null;
+  if (industry === "lodging") {
+    try {
+      const { fetchStay } = await import("../env/tour");
+      const stay = await fetchStay(env);
+      if (stay.available) {
+        const eupCode = prefs?.shopProfile?.eupMyeon ?? prefs?.regions?.[0];
+        const eupLabel = eupCode ? EUP_LABEL[eupCode] ?? null : null;
+        const nearbyEup = eupLabel ? stay.items.filter((x) => x.addr.includes(eupLabel)).length : null;
+        nearbyLodging = { total: stay.total, nearbyEup, eupLabel };
+      }
+    } catch { /* 무시 */ }
+  }
+
   return {
     hasShop: !!prefs?.shopProfile,
     industry,
@@ -180,6 +202,7 @@ export async function loadOwnerBrief(env: Env, prefs: UserPreferences | null): P
       festivals,
       gasoline: metrics.oil?.gasoline?.chungnam ?? null,
       aptAvgManwon: metrics.realestate.apt?.avgManwon ?? null,
+      nearbyLodging,
     },
   };
 }

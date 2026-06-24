@@ -6,16 +6,42 @@
 import { useEffect, useState } from "react";
 
 import { fetchOwnerBrief, type OwnerBrief } from "@/lib/api/owner";
-import { LodgingBoardCard } from "@/components/home/owner-home";
+import { LodgingBoardCard, ShopSetup } from "@/components/home/owner-home";
 
 export function MeOwnerBoard() {
   const [brief, setBrief] = useState<OwnerBrief | null>(null);
-  useEffect(() => { fetchOwnerBrief().then(setBrief).catch(() => {}); }, []);
-  if (!brief?.hasShop) return null;
+  const [open, setOpen] = useState(false);
+  const load = () => fetchOwnerBrief().then(setBrief).catch(() => {});
+  useEffect(() => { void load(); }, []);
+
+  if (!brief) return null; // 로딩 중
+
+  // 가게 정보가 없으면 — 사장님이면 바로 입력할 수 있게 안내(접이식)
+  if (!brief.hasShop) {
+    return open ? (
+      <ShopSetup onSaved={() => { setOpen(false); void load(); }} />
+    ) : (
+      <button type="button" onClick={() => setOpen(true)}
+        className="w-full rounded-2xl border border-dashed border-accent/40 bg-accent-subtle/15 p-4 text-left hover:bg-accent-subtle/25">
+        <p className="font-semibold text-brand">🏪 사장님이세요? 가게 정보를 입력하세요</p>
+        <p className="mt-0.5 text-sm text-foreground-muted">업종(숙박·음식·카페 등)·객실수·요금을 넣으면 <strong className="text-brand">맞춤 운영 보드</strong>(가동률·권장가·실행제안)를 드려요. →</p>
+      </button>
+    );
+  }
+
+  if (open) {
+    return <ShopSetup onSaved={() => { setOpen(false); void load(); }} />;
+  }
 
   return (
     <div className="space-y-5">
-      {brief.lodging && <LodgingBoardCard board={brief.lodging} />}
+      {brief.lodging && <LodgingBoardCard board={brief.lodging} nearby={brief.market.nearbyLodging} />}
+
+      <div className="text-right">
+        <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
+          ✏️ 가게 정보 수정(객실수·요금)
+        </button>
+      </div>
 
       {brief.actions.length > 0 && (
         <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
