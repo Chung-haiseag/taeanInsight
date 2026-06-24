@@ -142,8 +142,8 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-// ── 숙박 운영 보드 ──
-function LodgingBoardCard({ board }: { board: LodgingBoard }) {
+// ── 숙박 운영 보드 ── (내 페이지에서도 재사용)
+export function LodgingBoardCard({ board }: { board: LodgingBoard }) {
   const won = (n: number | null) => (n == null ? "—" : `${n.toLocaleString()}원`);
   const occColor = board.occRate >= 75 ? "text-accent" : board.occRate >= 45 ? "text-brand" : "text-amber-600";
   return (

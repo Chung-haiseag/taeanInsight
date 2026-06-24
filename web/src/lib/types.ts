@@ -10,12 +10,21 @@ export type NotificationChannel = "email" | "webpush" | "kakao";
 
 export type FavoriteKind = "place" | "event" | "report" | "article" | "dashboard_widget";
 
+export interface ShopProfile {
+  industry: "lodging" | "food" | "cafe" | "leisure" | "retail" | "other";
+  eupMyeon?: string;
+  capacity?: number;
+  name?: string;
+  basePrice?: number;
+  weekendPrice?: number;
+}
 export interface UserPreferences {
   userId: string;
   segment: UserSegment;
   regions: string[];
   categories: InterestCategory[];
   notificationChannels: NotificationChannel[];
+  shopProfile?: ShopProfile;
   onboardedAt?: string;
   updatedAt: string;
 }
