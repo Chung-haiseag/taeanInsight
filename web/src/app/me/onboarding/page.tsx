@@ -88,7 +88,7 @@ export default function OnboardingPage() {
               industry, eupMyeon: trimmedRegions[0], name: shopName || undefined,
               ...(industry === "lodging"
                 ? { capacity: shopRooms ? Number(shopRooms) : undefined, weekendPrice: shopWkPrice ? Number(shopWkPrice) : undefined }
-                : industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail" || industry === "fishing" || industry === "travel"
+                : industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail" || industry === "fishing" || industry === "travel" || industry === "golf"
                 ? { capacity: shopRooms ? Number(shopRooms) : undefined, basePrice: shopWkPrice ? Number(shopWkPrice) : undefined }
                 : {}),
             }
@@ -255,13 +255,13 @@ export default function OnboardingPage() {
             aria-label="상호"
             className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
           />
-          {industry && ["lodging", "food", "cafe", "leisure", "retail", "fishing", "travel"].includes(industry) && (
+          {industry && ["lodging", "food", "cafe", "leisure", "retail", "fishing", "travel", "golf"].includes(industry) && (
             <div className="grid gap-2 sm:grid-cols-2">
               <input
                 value={shopRooms}
                 onChange={(e) => setShopRooms(e.target.value.replace(/[^0-9]/g, ""))}
                 inputMode="numeric"
-                placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : industry === "fishing" ? "승선 정원(예: 12)" : industry === "travel" ? "일 투어 정원(예: 40)" : "좌석 수(예: 40)"}
+                placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : industry === "fishing" ? "승선 정원(예: 12)" : industry === "travel" ? "일 투어 정원(예: 40)" : industry === "golf" ? "일 내장 정원(예: 200)" : "좌석 수(예: 40)"}
                 aria-label="규모"
                 className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
               />
@@ -269,15 +269,15 @@ export default function OnboardingPage() {
                 value={shopWkPrice}
                 onChange={(e) => setShopWkPrice(e.target.value.replace(/[^0-9]/g, ""))}
                 inputMode="numeric"
-                placeholder={industry === "lodging" ? "주말 기본가(원, 예: 80000)" : industry === "leisure" ? "1인 체험료(원, 예: 30000)" : industry === "fishing" ? "1인 승선료(원, 예: 50000)" : industry === "travel" ? "1인 상품가(원, 예: 45000)" : "객단가(원, 예: 15000)"}
+                placeholder={industry === "lodging" ? "주말 기본가(원, 예: 80000)" : industry === "leisure" ? "1인 체험료(원, 예: 30000)" : industry === "fishing" ? "1인 승선료(원, 예: 50000)" : industry === "travel" ? "1인 상품가(원, 예: 45000)" : industry === "golf" ? "1인 그린피(원, 예: 120000)" : "객단가(원, 예: 15000)"}
                 aria-label="요금"
                 className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
               />
-              <p className="sm:col-span-2 text-xs text-accent">→ {industry === "lodging" ? "예상 가동률·권장가·1박 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : industry === "fishing" ? "출항 가부·예상 매출" : industry === "travel" ? "예상 예약·매출" : "예상 혼잡도·손님·매출"}이 계산됩니다.</p>
+              <p className="sm:col-span-2 text-xs text-accent">→ {industry === "lodging" ? "예상 가동률·권장가·1박 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : industry === "fishing" ? "출항 가부·예상 매출" : industry === "travel" ? "예상 예약·매출" : industry === "golf" ? "예상 내장·매출" : "예상 혼잡도·손님·매출"}이 계산됩니다.</p>
             </div>
           )}
-          {industry && (industry === "salt" || industry === "farming") && (
-            <p className="text-xs text-foreground-muted">날씨·바람 기반 운영 보드가 자동 표시됩니다(별도 입력 불필요).</p>
+          {industry && (industry === "salt" || industry === "farming" || industry === "realtor" || industry === "aqua") && (
+            <p className="text-xs text-foreground-muted">{industry === "realtor" ? "실거래 기반 시세 보드가 자동 표시됩니다(별도 입력 불필요)." : "날씨·수온 기반 운영 보드가 자동 표시됩니다(별도 입력 불필요)."}</p>
           )}
           <p className="text-xs text-foreground-muted">
             지역은 첫 번째 관심 읍·면({REGION_OPTIONS.find((r) => r.code === trimmedRegions[0])?.label ?? "미선택"})으로 설정됩니다. 건너뛰어도 됩니다.

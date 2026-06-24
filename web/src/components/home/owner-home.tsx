@@ -12,6 +12,7 @@ import { REGION_OPTIONS } from "@/lib/types";
 import {
   fetchOwnerBrief, updateShopProfile, INDUSTRY_OPTIONS, type LodgingBoard, type NearbyLodging, type FoodBoard, type LeisureBoard, type RetailBoard,
   type FishingBoard, type SaltBoard, type FarmingBoard, type TravelBoard,
+  type RealtorBoard, type GolfBoard, type AquaBoard,
   type OwnerBrief, type ShopIndustry,
 } from "@/lib/api/owner";
 
@@ -72,6 +73,9 @@ function OwnerLive() {
       {brief.salt && <SaltBoardCard board={brief.salt} />}
       {brief.farming && <FarmingBoardCard board={brief.farming} />}
       {brief.travel && <TravelBoardCard board={brief.travel} />}
+      {brief.realtor && <RealtorBoardCard board={brief.realtor} />}
+      {brief.golf && <GolfBoardCard board={brief.golf} />}
+      {brief.aqua && <AquaBoardCard board={brief.aqua} />}
 
       {/* 이번 주말 수요 — 실제 수요지수 */}
       {brief.demand?.available && (
@@ -470,6 +474,115 @@ export function TravelBoardCard({ board }: { board: TravelBoard }) {
   );
 }
 
+// ── 부동산 중개 운영 보드 ──
+export function RealtorBoardCard({ board }: { board: RealtorBoard }) {
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">🏘 부동산 중개 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">국토부 실거래 6개월</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">아파트 평균가</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand">{board.aptAvgManwon ? `${(board.aptAvgManwon / 10000).toFixed(2)}억` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">거래 {board.aptCount}건</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">평당가(전용)</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand">{board.aptPerPyeongManwon != null ? `${board.aptPerPyeongManwon}만` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">㎡당 {board.aptPerM2Manwon ?? "—"}만</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">{board.eupLabel ?? "내 읍·면"} 거래</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand">{board.eupAptCount != null ? `${board.eupAptCount}건` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">토지 {board.landCount}건</p>
+        </article>
+      </div>
+      {board.recent.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-brand">최근 거래</p>
+          <ul className="mt-1 space-y-1">
+            {board.recent.map((r, i) => (
+              <li key={i} className="text-sm text-foreground">· {r.dong} {r.name} {Math.round(r.manwon / 10000 * 100) / 100}억 ({r.area}㎡)</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {board.notes.length > 0 && <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 국토부 실거래가 — 상세 추이·CSV는 <Link href="/dashboard" className="text-accent hover:underline">B2B 대시보드</Link>.</p>
+    </section>
+  );
+}
+
+// ── 골프장 운영 보드 ──
+export function GolfBoardCard({ board }: { board: GolfBoard }) {
+  const fitColor = board.fitLabel.startsWith("주의") ? "text-red-600" : board.fitLabel === "좋음" ? "text-accent" : "text-brand";
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">⛳ 골프장 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">{board.weekend.sat.slice(5)}~{board.weekend.sun.slice(5)} 주말 · 수요 ‘{board.level}’</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">라운딩 적합도</p>
+          <p className={`mt-1 font-display text-2xl font-bold ${fitColor}`}>{board.fitLabel}</p>
+          <p className="text-[11px] text-foreground-muted">{board.weekendMaxTemp != null ? `주말 최고 ${board.weekendMaxTemp}°` : ""}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">예상 내장(일)</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.expectedRounds != null ? `${board.expectedRounds}명` : "—"}</p>
+          {board.capacity != null && <p className="text-[11px] text-foreground-muted">정원 {board.capacity}명</p>}
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">예상 매출(일)</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
+          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "내장×그린피" : "정원·그린피 입력 시"}</p>
+        </article>
+      </div>
+      {board.notes.length > 0 && <ul className="mt-3 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 주말 예보·풍속 기반 추정 — 코스 상태는 현장 확인.</p>
+    </section>
+  );
+}
+
+// ── 양식·수산 운영 보드 ──
+export function AquaBoardCard({ board }: { board: AquaBoard }) {
+  const c = board.statusLabel === "경보" ? "text-red-600" : board.statusLabel === "주의" ? "text-amber-600" : "text-accent";
+  return (
+    <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-brand">🦪 양식·수산 운영 보드</h2>
+        <span className="text-xs text-foreground-muted">수온·기상 경보</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">양식 여건</p>
+          <p className={`mt-1 font-display text-3xl font-bold ${c}`}>{board.statusLabel}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">수온</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.waterTemp != null ? `${board.waterTemp}℃` : "—"}</p>
+        </article>
+        <article className="rounded-xl bg-background p-4 text-center shadow-card">
+          <p className="text-xs text-foreground-muted">파고</p>
+          <p className="mt-1 font-display text-3xl font-bold text-brand">{board.waveHeight != null ? `${board.waveHeight.toFixed(1)}m` : "—"}</p>
+        </article>
+      </div>
+      {board.alerts.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {board.alerts.map((a, i) => (
+            <li key={i} className="flex gap-2 rounded-xl border border-accent/20 bg-background p-2.5"><span aria-hidden>{a.icon}</span><span className="text-sm text-foreground">{a.text}</span></li>
+          ))}
+        </ul>
+      )}
+      {board.notes.length > 0 && <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 국립해양조사원 수온·파고 기반 — 적조 속보는 국립수산과학원 확인.</p>
+    </section>
+  );
+}
+
 // ── 가게 프로필 설정 ── (내 페이지에서도 재사용)
 export function ShopSetup({ onSaved }: { onSaved: () => void }) {
   const [industry, setIndustry] = useState<ShopIndustry | null>(null);
@@ -489,7 +602,7 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
         capacity: rooms ? Number(rooms) : undefined,
         // 숙박=주말 기본가(weekendPrice), 그 외(음식·카페·레저·소매·낚시)=객단가/체험료/요금(basePrice)
         weekendPrice: industry === "lodging" && wkPrice ? Number(wkPrice) : undefined,
-        basePrice: (industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail" || industry === "fishing" || industry === "travel") && wkPrice ? Number(wkPrice) : undefined,
+        basePrice: (industry === "food" || industry === "cafe" || industry === "leisure" || industry === "retail" || industry === "fishing" || industry === "travel" || industry === "golf") && wkPrice ? Number(wkPrice) : undefined,
       });
       if (r.ok) onSaved();
       else if (r.needOnboarding) setErr("먼저 관심사 설정(온보딩)을 완료해주세요.");
@@ -517,19 +630,19 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
           </select>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="상호(선택)" className="rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
         </div>
-        {industry && ["lodging", "food", "cafe", "leisure", "retail", "fishing", "travel"].includes(industry) && (
+        {industry && ["lodging", "food", "cafe", "leisure", "retail", "fishing", "travel", "golf"].includes(industry) && (
           <div className="flex flex-wrap gap-2">
             <input value={rooms} onChange={(e) => setRooms(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
-              placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : industry === "fishing" ? "승선 정원(예: 12)" : industry === "travel" ? "일 투어 정원(예: 40)" : "좌석 수(예: 40)"}
+              placeholder={industry === "lodging" ? "객실 수(예: 20)" : industry === "leisure" ? "일 정원(예: 50)" : industry === "retail" ? "평일 평균 방문객(예: 100)" : industry === "fishing" ? "승선 정원(예: 12)" : industry === "travel" ? "일 투어 정원(예: 40)" : industry === "golf" ? "일 내장 정원(예: 200)" : "좌석 수(예: 40)"}
               className="w-40 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
             <input value={wkPrice} onChange={(e) => setWkPrice(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
-              placeholder={industry === "lodging" ? "주말 기본가(원, 예: 80000)" : industry === "leisure" ? "1인 체험료(원, 예: 30000)" : industry === "fishing" ? "1인 승선료(원, 예: 50000)" : industry === "travel" ? "1인 상품가(원, 예: 45000)" : "객단가(원, 예: 15000)"}
+              placeholder={industry === "lodging" ? "주말 기본가(원, 예: 80000)" : industry === "leisure" ? "1인 체험료(원, 예: 30000)" : industry === "fishing" ? "1인 승선료(원, 예: 50000)" : industry === "travel" ? "1인 상품가(원, 예: 45000)" : industry === "golf" ? "1인 그린피(원, 예: 120000)" : "객단가(원, 예: 15000)"}
               className="w-44 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
-            <span className="self-center text-xs text-foreground-muted">→ {industry === "lodging" ? "권장가·예상 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : industry === "fishing" ? "출항·예상 매출" : industry === "travel" ? "예상 예약·매출" : "예상 손님·매출"} 계산</span>
+            <span className="self-center text-xs text-foreground-muted">→ {industry === "lodging" ? "권장가·예상 매출" : industry === "leisure" ? "예상 참가자·매출" : industry === "retail" ? "예상 방문·매출" : industry === "fishing" ? "출항·예상 매출" : industry === "travel" ? "예상 예약·매출" : industry === "golf" ? "예상 내장·매출" : "예상 손님·매출"} 계산</span>
           </div>
         )}
-        {industry && (industry === "salt" || industry === "farming") && (
-          <p className="text-xs text-foreground-muted">날씨·바람 기반 운영 보드가 표시됩니다(별도 입력 불필요).</p>
+        {industry && (industry === "salt" || industry === "farming" || industry === "realtor" || industry === "aqua") && (
+          <p className="text-xs text-foreground-muted">{industry === "realtor" ? "실거래 기반 시세 보드가 표시됩니다(별도 입력 불필요)." : "날씨·수온 기반 운영 보드가 표시됩니다(별도 입력 불필요)."}</p>
         )}
         <div className="flex">
           <button type="button" onClick={save} disabled={saving} className="btn-accent px-4 py-2 text-sm disabled:opacity-60">
