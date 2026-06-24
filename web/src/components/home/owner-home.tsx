@@ -209,7 +209,7 @@ export function FoodBoardCard({ board }: { board: FoodBoard }) {
   return (
     <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-brand">🍽 식당 운영 보드</h2>
+        <h2 className="text-xl font-bold text-brand">{board.kind === "cafe" ? "🍰 카페 운영 보드" : "🍽 식당 운영 보드"}</h2>
         <span className="text-xs text-foreground-muted">{board.weekend.sat.slice(5)}~{board.weekend.sun.slice(5)} 주말 · 수요 ‘{board.level}’</span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -258,9 +258,9 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
       const r = await updateShopProfile({
         industry, eupMyeon: eupMyeon || undefined, name: name || undefined,
         capacity: rooms ? Number(rooms) : undefined,
-        // 숙박=주말 기본가(weekendPrice), 음식=객단가(basePrice)
+        // 숙박=주말 기본가(weekendPrice), 음식·카페=객단가(basePrice)
         weekendPrice: industry === "lodging" && wkPrice ? Number(wkPrice) : undefined,
-        basePrice: industry === "food" && wkPrice ? Number(wkPrice) : undefined,
+        basePrice: (industry === "food" || industry === "cafe") && wkPrice ? Number(wkPrice) : undefined,
       });
       if (r.ok) onSaved();
       else if (r.needOnboarding) setErr("먼저 관심사 설정(온보딩)을 완료해주세요.");
@@ -288,7 +288,7 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
           </select>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="상호(선택)" className="rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
         </div>
-        {(industry === "lodging" || industry === "food") && (
+        {(industry === "lodging" || industry === "food" || industry === "cafe") && (
           <div className="flex flex-wrap gap-2">
             <input value={rooms} onChange={(e) => setRooms(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric"
               placeholder={industry === "lodging" ? "객실 수(예: 20)" : "좌석 수(예: 40)"}

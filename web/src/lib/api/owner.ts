@@ -21,6 +21,7 @@ export interface LodgingBoard {
 }
 
 export interface FoodBoard {
+  kind: "food" | "cafe";
   weekend: { sat: string; sun: string };
   level: string;
   busyLabel: string;

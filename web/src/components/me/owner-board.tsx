@@ -40,7 +40,7 @@ export function MeOwnerBoard() {
 
       <div className="text-right">
         <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
-          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" ? "(좌석수·객단가)" : ""}
+          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : ""}
         </button>
       </div>
 

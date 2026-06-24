@@ -88,7 +88,7 @@ export default function OnboardingPage() {
               industry, eupMyeon: trimmedRegions[0], name: shopName || undefined,
               ...(industry === "lodging"
                 ? { capacity: shopRooms ? Number(shopRooms) : undefined, weekendPrice: shopWkPrice ? Number(shopWkPrice) : undefined }
-                : industry === "food"
+                : industry === "food" || industry === "cafe"
                 ? { capacity: shopRooms ? Number(shopRooms) : undefined, basePrice: shopWkPrice ? Number(shopWkPrice) : undefined }
                 : {}),
             }
@@ -255,7 +255,7 @@ export default function OnboardingPage() {
             aria-label="상호"
             className="w-full border border-brand/20 rounded px-3 py-2 text-sm"
           />
-          {(industry === "lodging" || industry === "food") && (
+          {(industry === "lodging" || industry === "food" || industry === "cafe") && (
             <div className="grid gap-2 sm:grid-cols-2">
               <input
                 value={shopRooms}
