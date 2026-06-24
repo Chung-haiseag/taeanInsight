@@ -102,6 +102,7 @@ export interface OwnerBrief {
   demand: DemandForecast | null;
   weather: OwnerLive | null;
   tide: TideInfo | null;
+  sun: { sunrise: string; sunset: string } | null;
   uv: { todayMax: number | null; level: string; peakHour: string | null } | null;
   actions: OwnerAction[];
   lodging: LodgingBoard | null;
