@@ -96,6 +96,36 @@ meRouter.get("/owner-brief", async (c) => {
   return c.json(await loadOwnerBrief(c.env, prefs));
 });
 
+// POST /api/me/weekly-send-now — 주간 푸시 즉시 발송(관리자 토큰). 실발송 테스트·수동 운영용.
+meRouter.post("/weekly-send-now", async (c) => {
+  const token = c.req.header("X-Admin-Token");
+  const expected = (c.env as Env & { GOV_IMPORT_TOKEN?: string }).GOV_IMPORT_TOKEN;
+  if (!expected || token !== expected) return c.json({ error: "unauthorized" }, 401);
+  const { sendWeeklyOwnerPush } = await import("../owner/weekly_push");
+  return c.json(await sendWeeklyOwnerPush(c.env));
+});
+
+// POST /api/me/push-test — 본인 구독에 테스트 알림 발송(인증 불필요한 관리자 권한 없이, 자기 자신에게만)
+meRouter.post("/push-test", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const auth = c.get("auth");
+  const { vapidFromEnv, WebCryptoWebPushDispatcher } = await import("../notifications/dispatcher");
+  const vapid = vapidFromEnv(c.env);
+  if (!vapid) return c.json({ error: "no_vapid" }, 503);
+  const repo = new D1WebPushSubscriptionRepo(c.env.ARCHIVE_DB);
+  const subs = await repo.listEnabledForUser(auth.sub);
+  if (!subs.length) return c.json({ error: "no_subscription", hint: "브라우저에서 알림을 먼저 허용하세요" }, 404);
+  const dispatcher = new WebCryptoWebPushDispatcher(vapid);
+  const payload = { title: "태안 인사이트 · 알림 테스트", body: "푸시 알림이 정상 작동합니다 ✅ 매주 금요일 맞춤 브리핑을 보내드려요.", url: "/me", tag: "push-test" };
+  let sent = 0;
+  for (const sub of subs) {
+    const res = await dispatcher.send(sub, payload);
+    if (res.ok) sent += 1;
+    else if (res.status === 410 || res.status === 404) await repo.disable(sub.userId, sub.endpoint);
+  }
+  return c.json({ subscriptions: subs.length, sent });
+});
+
 // GET /api/me/weekly-preview — 이번 주 푸시 문구 미리보기(현재 사용자)
 meRouter.get("/weekly-preview", async (c) => {
   const auth = c.get("auth");
