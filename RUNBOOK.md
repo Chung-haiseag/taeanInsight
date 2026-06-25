@@ -191,3 +191,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-25 · 독자 초개인화 Phase 2: Cloudflare Vectorize(taean-articles, bge-m3 1024d) 기사 임베딩 맥락 추천. 읽은 기사 벡터 평균→최근접 기사(/me 실시간 픽 "맥락 기반"). 12h cron 임베딩 적재 + 관리자 백필(/embed-recent). backend/reading, wrangler vectorize 바인딩
 
 - 2026-06-25 · 독자 초개인화 Phase 3: AI 3줄 요약(스캐너·온디맨드·D1캐시 /api/reading/summary)+시간대 컨텍스트(출근 브리핑/낮/저녁 깊이읽기/심야). reading/router, me/reader-picks
+
+- 2026-06-25 · 기자 취재 알림(Coverage Alert): 군청 새 공지·기상특보·데이터 급변·키워드 감지→기자 Web Push. /reporter(등록·키워드·인박스), 30분 cron, 멱등(ref_key)·최근3일 필터. backend/reporter, mig 023

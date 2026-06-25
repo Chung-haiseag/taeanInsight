@@ -20,6 +20,7 @@ import { ebookReviewRouter } from "./archive/ebook_review";
 import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
 import { readingRouter } from "./reading/router";
+import { reporterRouter } from "./reporter/router";
 import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
 import { pushRouter } from "./notifications/router";
@@ -66,6 +67,7 @@ app.route("/api/dashboard", dashboardRouter);
 app.route("/api/copilot", copilotRouter);
 app.route("/api/query", queryRouter);
 app.route("/api/reading", readingRouter);
+app.route("/api/reporter", reporterRouter);
 app.route("/api/conditions", envRouter);
 app.route("/api/reports", reportsRouter);
 app.route("/api/admin/reports", adminReportsRouter);
@@ -165,6 +167,14 @@ export default {
         console.log("[cron] 해무 캐시 워밍");
       } catch (e) {
         console.warn("[cron] 해무 캐시 워밍 실패:", e instanceof Error ? e.message : e);
+      }
+      // 기자 취재 알림 — 트리거 점검(멱등, 신규분만 발송)
+      try {
+        const { runReporterAlerts } = await import("./reporter/alerts");
+        const ra = await runReporterAlerts(env);
+        if (ra.fresh) console.log(`[cron] 취재 알림: 신규 ${ra.fresh}·발송 ${ra.sent}`);
+      } catch (e) {
+        console.warn("[cron] 취재 알림 실패:", e instanceof Error ? e.message : e);
       }
       return;
     }
