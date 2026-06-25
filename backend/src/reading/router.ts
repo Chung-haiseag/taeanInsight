@@ -142,6 +142,39 @@ readingRouter.get("/feed", async (c) => {
   }
 });
 
+// GET /api/reading/summary?idxno= — 기사 AI 3줄 요약(스캐너용). D1 캐시(영구) + Workers AI.
+readingRouter.get("/summary", async (c) => {
+  const idxno = Number(c.req.query("idxno"));
+  if (!idxno || !c.env.ARCHIVE_DB || !c.env.AI) return c.json({ summary: null });
+  const { readCache, writeCache } = await import("../lib/api_cache");
+  const key = `summary3:${idxno}`;
+  const cached = await readCache<{ summary: string }>(c.env.ARCHIVE_DB, key);
+  if (cached?.value?.summary) return c.json({ summary: cached.value.summary, cached: true });
+
+  const row = await c.env.ARCHIVE_DB
+    .prepare("SELECT title, substr(COALESCE(body, excerpt, ''),1,2000) AS body FROM archive_articles WHERE idxno=?")
+    .bind(idxno)
+    .first<{ title: string; body: string }>();
+  if (!row || !row.body) return c.json({ summary: null });
+
+  try {
+    const { WorkersAiLlmClient } = await import("../llm/workers_ai");
+    const client = new WorkersAiLlmClient({ ai: c.env.AI });
+    const res = await client.complete({
+      channel: "realtime", maxTokens: 220, temperature: 0.2,
+      messages: [
+        { role: "system", content: "다음 한국어 기사를 핵심만 3줄로 요약하라. 각 줄은 '- '로 시작하는 한 문장. 새로운 사실을 지어내지 말고 본문 내용만. 군더더기 없이." },
+        { role: "user", content: `[제목] ${row.title}\n[본문] ${row.body}` },
+      ],
+    });
+    const summary = (res.content ?? "").trim();
+    if (summary) await writeCache(c.env.ARCHIVE_DB, key, { summary });
+    return c.json({ summary });
+  } catch {
+    return c.json({ summary: null });
+  }
+});
+
 // POST /api/reading/embed-recent — 최근 기사 임베딩 백필(관리자 토큰)
 readingRouter.post("/embed-recent", async (c) => {
   const token = c.req.header("X-Admin-Token");
