@@ -34,6 +34,13 @@
   "ai": {
     "binding": "AI"
   },
+  // Vectorize — 기사 임베딩(bge-m3, 1024차원) 맥락 추천(독자 초개인화 Phase 2)
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "taean-articles"
+    }
+  ],
   // 향후: KV(캐시·세션), Queues(배치), Vectorize(RAG),
   //       Secrets: ANTHROPIC_API_KEY, TOGETHER_API_KEY, SLACK_WEBHOOK_URL
   "triggers": {

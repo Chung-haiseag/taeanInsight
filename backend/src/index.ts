@@ -130,6 +130,12 @@ export default {
         if (n) console.log(`[cron12h] 군청 목록: ${n}건`);
       } catch (e) { console.warn("[cron12h] 군청 목록 실패:", e instanceof Error ? e.message : e); }
       // 카드뉴스 이미지는 군청이 Worker(데이터센터) IP의 상세페이지를 차단 → 로컬 크롤러(launchd)가 담당.
+      // 독자 맥락 추천(Phase 2): 최근 기사 임베딩을 Vectorize에 적재(신규 반영, 멱등 upsert).
+      try {
+        const { embedRecentArticles } = await import("./reading/router");
+        const e = await embedRecentArticles(env, 80, 30);
+        if (e.embedded) console.log(`[cron12h] 기사 임베딩: ${e.embedded}건`);
+      } catch (e) { console.warn("[cron12h] 임베딩 실패:", e instanceof Error ? e.message : e); }
       return;
     }
 

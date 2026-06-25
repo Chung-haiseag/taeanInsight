@@ -6,11 +6,13 @@ import { getUid } from "../uid";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
+export interface ReadingRec { idxno: number; title: string; category: string; publishedAt: string; excerpt: string }
 export interface ReadingFeed {
   hasData: boolean;
   readerType: "heavy" | "scanner" | "balanced";
   topCategories: string[];
   recentIdxnos: number[];
+  recommended?: ReadingRec[];
 }
 
 // 읽기 종료 시 1회 전송(페이지 떠나도 keepalive로 전달)
