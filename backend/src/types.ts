@@ -31,6 +31,7 @@ export interface Env {
   ARCHIVE_DB?: D1Database;        // 기사 텍스트·검색
   ARCHIVE_PHOTOS?: R2Bucket;      // 사진 파일
   AI?: Ai;                        // Workers AI (저가 오픈모델)
+  VECTORIZE?: VectorizeIndex;     // 기사 임베딩 인덱스(독자 맥락 추천)
 
   // 향후 추가
   // CACHE: KVNamespace;

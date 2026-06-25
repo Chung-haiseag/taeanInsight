@@ -16,22 +16,35 @@ const READER_LABEL: Record<ReadingFeed["readerType"], { tag: string; hint: strin
   balanced: { tag: "균형형", hint: "관심 분야 최신 소식을 모았어요" },
 };
 
+interface Pick { id: string; title: string; category: string; publishedAt: string; excerpt: string }
+
 export function ReaderPicks() {
   const [feed, setFeed] = useState<ReadingFeed | null>(null);
-  const [items, setItems] = useState<NewsItem[]>([]);
+  const [items, setItems] = useState<Pick[]>([]);
+  const [vector, setVector] = useState(false);
 
   useEffect(() => {
     getReadingFeed()
       .then(async (f) => {
         setFeed(f);
         if (!f.hasData) return;
+        // Phase 2: 임베딩 맥락 추천이 있으면 우선(태그 달라도 맥락 유사)
+        if (f.recommended && f.recommended.length) {
+          setVector(true);
+          setItems(f.recommended.slice(0, f.readerType === "scanner" ? 4 : 3).map((r) => ({
+            id: String(r.idxno), title: r.title, category: r.category, publishedAt: r.publishedAt, excerpt: r.excerpt,
+          })));
+          return;
+        }
+        // 폴백: 관심 카테고리 룰(Phase 1)
         const news = await getNews(undefined, 40).catch(() => null);
         if (!news) return;
         const cats = new Set(f.topCategories);
         const read = new Set(f.recentIdxnos.map(String));
-        const picks = news.items
-          .filter((i) => cats.has(i.category) && !read.has(i.id))
-          .slice(0, f.readerType === "scanner" ? 4 : 3);
+        const picks: Pick[] = news.items
+          .filter((i: NewsItem) => cats.has(i.category) && !read.has(i.id))
+          .slice(0, f.readerType === "scanner" ? 4 : 3)
+          .map((i: NewsItem) => ({ id: i.id, title: i.title, category: i.category, publishedAt: i.publishedAt, excerpt: i.excerpt }));
         setItems(picks);
       })
       .catch(() => {});
@@ -64,7 +77,7 @@ export function ReaderPicks() {
           </li>
         ))}
       </ul>
-      <p className="mt-1 text-[11px] text-foreground-muted">읽을수록 정확해집니다 · 행동 기반(룰)</p>
+      <p className="mt-1 text-[11px] text-foreground-muted">읽을수록 정확해집니다 · {vector ? "맥락 기반(AI 임베딩)" : "행동 기반(관심 분야)"}</p>
     </section>
   );
 }

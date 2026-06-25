@@ -7,6 +7,68 @@ import type { Env } from "../types";
 
 export const readingRouter = new Hono<{ Bindings: Env }>();
 
+// ── Phase 2: 기사 임베딩(bge-m3 1024d) + Vectorize 맥락 추천 ──
+interface RecItem { idxno: number; title: string; category: string; publishedAt: string; excerpt: string }
+
+async function embedText(env: Env, text: string): Promise<number[] | null> {
+  if (!env.AI) return null;
+  try {
+    const r = (await env.AI.run("@cf/baai/bge-m3", { text: [text.slice(0, 1500)] })) as { data?: number[][] };
+    return r.data?.[0] ?? null;
+  } catch { return null; }
+}
+
+// 최근 기사 N건 임베딩 → Vectorize 적재(id=idxno, 메타데이터에 표시정보). 재실행 안전(upsert).
+export async function embedRecentArticles(env: Env, limit = 400, sinceDays = 120): Promise<{ embedded: number }> {
+  if (!env.ARCHIVE_DB || !env.VECTORIZE || !env.AI) return { embedded: 0 };
+  const since = new Date(Date.now() - sinceDays * 86400_000).toISOString().slice(0, 10);
+  const r = await env.ARCHIVE_DB
+    .prepare("SELECT idxno, title, category, published_at, substr(COALESCE(body, excerpt, ''),1,1200) AS snippet FROM archive_articles WHERE published_at >= ? AND (category IS NOT NULL) ORDER BY published_at DESC LIMIT ?")
+    .bind(since, limit)
+    .all<{ idxno: number; title: string; category: string; published_at: string; snippet: string }>();
+  const rows = r.results ?? [];
+  let embedded = 0;
+  for (const a of rows) {
+    const vec = await embedText(env, `${a.title}\n${a.snippet}`);
+    if (!vec) continue;
+    try {
+      await env.VECTORIZE.upsert([{
+        id: String(a.idxno),
+        values: vec,
+        metadata: { idxno: a.idxno, category: a.category ?? "", title: a.title.slice(0, 180), publishedAt: a.published_at ?? "", excerpt: (a.snippet ?? "").slice(0, 200) },
+      }]);
+      embedded += 1;
+    } catch { /* 개별 실패 무시 */ }
+  }
+  return { embedded };
+}
+
+// 독자가 읽은 기사 벡터 평균 → 최근접 추천(읽은 것 제외)
+async function vectorRecommend(env: Env, readIdxnos: number[]): Promise<RecItem[]> {
+  if (!env.VECTORIZE || !readIdxnos.length) return [];
+  try {
+    const ids = readIdxnos.slice(0, 20).map(String);
+    const got = await env.VECTORIZE.getByIds(ids);
+    const vecs = (got ?? []).map((v) => v.values as number[]).filter((v) => Array.isArray(v) && v.length);
+    if (!vecs.length) return [];
+    const dim = vecs[0].length;
+    const avg = new Array(dim).fill(0);
+    for (const v of vecs) for (let i = 0; i < dim; i++) avg[i] += v[i];
+    for (let i = 0; i < dim; i++) avg[i] /= vecs.length;
+    const q = await env.VECTORIZE.query(avg, { topK: 12, returnMetadata: true });
+    const read = new Set(readIdxnos);
+    const out: RecItem[] = [];
+    for (const m of q.matches ?? []) {
+      const md = (m.metadata ?? {}) as Record<string, unknown>;
+      const idxno = Number(md.idxno ?? m.id);
+      if (!idxno || read.has(idxno)) continue;
+      out.push({ idxno, title: String(md.title ?? ""), category: String(md.category ?? ""), publishedAt: String(md.publishedAt ?? ""), excerpt: String(md.excerpt ?? "") });
+      if (out.length >= 5) break;
+    }
+    return out;
+  } catch { return []; }
+}
+
 function uidOf(c: { req: { header: (k: string) => string | undefined } }): string | null {
   const u = c.req.header("X-Taean-Uid");
   return u && /^[A-Za-z0-9_-]{8,64}$/.test(u) ? u : null;
@@ -47,7 +109,7 @@ readingRouter.post("/event", async (c) => {
 
 // GET /api/reading/feed — 독자 행동 요약: 관심 카테고리 순위 + 독자 유형 + 최근 읽은 idxno
 readingRouter.get("/feed", async (c) => {
-  const empty = { hasData: false, readerType: "balanced" as const, topCategories: [] as string[], recentIdxnos: [] as number[] };
+  const empty = { hasData: false, readerType: "balanced" as const, topCategories: [] as string[], recentIdxnos: [] as number[], recommended: [] as RecItem[] };
   if (!c.env.ARCHIVE_DB) return c.json(empty);
   const uid = uidOf(c);
   if (!uid) return c.json(empty);
@@ -71,8 +133,20 @@ readingRouter.get("/feed", async (c) => {
     const avgScroll = scrollN ? scrollSum / scrollN : 0;
     const readerType = avgScroll >= 70 ? "heavy" : avgScroll < 40 ? "scanner" : "balanced";
 
-    return c.json({ hasData: topCategories.length > 0, readerType, topCategories, recentIdxnos });
+    // Phase 2: 임베딩 맥락 추천(가능할 때). 실패/미적재면 빈 배열 → 프론트가 카테고리 룰로 폴백.
+    const recommended = await vectorRecommend(c.env, recentIdxnos);
+
+    return c.json({ hasData: topCategories.length > 0 || recommended.length > 0, readerType, topCategories, recentIdxnos, recommended });
   } catch {
     return c.json(empty);
   }
+});
+
+// POST /api/reading/embed-recent — 최근 기사 임베딩 백필(관리자 토큰)
+readingRouter.post("/embed-recent", async (c) => {
+  const token = c.req.header("X-Admin-Token");
+  const expected = (c.env as Env & { GOV_IMPORT_TOKEN?: string }).GOV_IMPORT_TOKEN;
+  if (!expected || token !== expected) return c.json({ error: "unauthorized" }, 401);
+  const limit = Math.min(800, Number(c.req.query("limit")) || 400);
+  return c.json(await embedRecentArticles(c.env, limit));
 });
