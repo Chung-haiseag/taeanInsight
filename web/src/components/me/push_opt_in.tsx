@@ -17,6 +17,7 @@ interface Props {
 export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
   const [status, setStatus] = useState<Status>("unknown");
   const [error, setError] = useState<string | null>(null);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -93,8 +94,21 @@ export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
 
   if (status === "subscribed") {
     return (
-      <div className="border border-accent/40 rounded p-3 bg-accent-subtle/40 text-sm text-brand">
-        ✅ 적조·기상 특보 알림이 활성화되었습니다.
+      <div className="border border-accent/40 rounded p-3 bg-accent-subtle/40 text-sm text-brand flex items-center justify-between gap-3">
+        <span>✅ 알림이 활성화되었습니다. 매주 금요일 맞춤 브리핑·특보를 보내드려요.</span>
+        <button
+          type="button"
+          onClick={async () => {
+            setTestMsg("보내는 중…");
+            try {
+              const r = await apiFetch<{ sent: number }>("/api/me/push-test", { method: "POST" });
+              setTestMsg(r.sent ? "전송됨 — 알림을 확인하세요" : "전송 대상 없음");
+            } catch { setTestMsg("전송 실패"); }
+          }}
+          className="shrink-0 rounded border border-accent/40 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent-subtle/60"
+        >
+          {testMsg ?? "테스트 알림"}
+        </button>
       </div>
     );
   }

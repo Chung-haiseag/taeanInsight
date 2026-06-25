@@ -183,3 +183,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-25 · 품질: AI 질의 타지역 가드(서울·강남 등 태안 외 → 태안 데이터 오표기 차단·전용 안내), mock 점검(/me만 데이터버그였고 수정됨; 홈·뉴스는 데모 게이트로 데이터는 실제) — query/router
 
 - 2026-06-25 · A형 포팅 중앙화 완성: 읍·면 목록·지역지명·작물·양식품종을 region.ts(backend)·region.ts(web)로 통합. 읍면 코드 backend/frontend 일치(taean_eup→taean 버그 수정). docs/REGION_PORTING 갱신
+
+- 2026-06-25 · VAPID 푸시 실발송 검증 완료(sent:1, FCM 수신). 본인 테스트 발송 엔드포인트(/api/me/push-test)+UI "테스트 알림" 버튼, 관리자 즉시발송(/weekly-send-now) — preferences/router, push_opt_in
