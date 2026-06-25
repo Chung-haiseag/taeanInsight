@@ -18,11 +18,13 @@ import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addon
 import { decodeEntities } from "@/lib/html";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
+import { ReadingTracker } from "@/components/reading-tracker";
 
 interface Reader {
   title: string;
   publishedAt: string;
   author?: string;
+  category?: string;
   categoryLabel: string;
   excerpt: string;
   body?: string; // 전문 (D1)
@@ -78,6 +80,7 @@ export default function NewsReaderPage() {
           title: decodeEntities(a.title),
           publishedAt: a.published_at,
           author: a.author,
+          category: a.category,
           categoryLabel: ARCHIVE_CATEGORY_LABELS[a.category] ?? a.category,
           excerpt: decodeEntities(a.excerpt ?? ""),
           body: decodeEntities(a.body),
@@ -96,6 +99,7 @@ export default function NewsReaderPage() {
             title: decodeEntities(n.title),
             publishedAt: n.publishedAt,
             author: n.author,
+            category: n.category,
             categoryLabel: n.categoryLabel,
             excerpt: decodeEntities(n.excerpt),
             images: [],
@@ -125,6 +129,8 @@ export default function NewsReaderPage() {
 
   return (
     <article className="mx-auto max-w-7xl space-y-6">
+      {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
+      <ReadingTracker idxno={Number(params.id)} category={article.category} />
       <div className="flex gap-4 text-sm text-foreground-muted">
         <Link href="/news" className="hover:text-brand">← 태안뉴스</Link>
         <Link href="/archive" className="hover:text-brand">아카이브 검색</Link>
