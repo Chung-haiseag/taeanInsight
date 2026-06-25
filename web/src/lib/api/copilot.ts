@@ -6,7 +6,12 @@ export type AiLabel = "human" | "ai_assisted" | "ai_generated";
 
 export interface CheckResult {
   chars: number;
-  pii: { count: number; kinds: string[]; maskedPreview: string | null };
+  pii: {
+    count: number;
+    kinds: string[];
+    maskedPreview: string | null;
+    samples?: { kind: string; matched: string }[];
+  };
   sensitive: {
     topics: { topic: string; matched: string[] }[];
     requiresHitl: boolean;
@@ -30,10 +35,32 @@ export async function copilotCheck(title: string, text: string): Promise<CheckRe
   return apiFetch("/api/copilot/check", { method: "POST", body: JSON.stringify({ title, text }) });
 }
 
-export type AssistMode = "polish" | "summarize" | "title";
+export type AssistMode = "polish" | "summarize" | "title" | "factcheck";
 
 export async function copilotAssist(mode: AssistMode, text: string): Promise<{ result: string; model: string }> {
   return apiFetch("/api/copilot/assist", { method: "POST", body: JSON.stringify({ mode, text }) });
+}
+
+// 관련 과거기사 — 작성 중 주제로 태안신문 아카이브 검색(무LLM FTS5). 맥락·중복·후속취재용.
+export interface RelatedArticle {
+  idxno: number;
+  title: string;
+  publishedAt: string;
+  excerpt: string;
+  category: string;
+}
+export async function copilotRelated(title: string, text: string): Promise<{ items: RelatedArticle[] }> {
+  return apiFetch("/api/copilot/related", { method: "POST", body: JSON.stringify({ title, text }) });
+}
+
+// 실시간 데이터 블록(날씨·물때·해넘이) — 본문에 끼워넣을 출처 표기 텍스트.
+export interface ContextBlock {
+  id: string;
+  label: string;
+  markdown: string;
+}
+export async function copilotContextData(): Promise<{ available: boolean; blocks: ContextBlock[] }> {
+  return apiFetch("/api/copilot/context-data");
 }
 
 // 키워드 → 기사 초안(시민기자가 수정). 사실은 [확인 필요] 자리표시로 비워둠.

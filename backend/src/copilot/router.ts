@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Env } from "../types";
+import { fetchConditions } from "../env/sources";
 import { detectPii } from "../governance/pii";
 import { classifySensitiveTopics } from "../governance/sensitive_topics";
 import { applyGovernance } from "../governance/middleware";
@@ -31,6 +32,8 @@ copilotRouter.post("/check", async (c) => {
       count: pii.findings.length,
       kinds: [...new Set(pii.findings.map((f) => f.kind))],
       maskedPreview: pii.findings.length ? pii.masked.slice(0, 240) : null,
+      // 감지된 실제 문구(중복 제거, 종류별) — 본문에서 찾아 수정하도록 안내. 본문은 이미 작성자 소유.
+      samples: [...new Map(pii.findings.map((f) => [f.matched, { kind: f.kind, matched: f.matched }])).values()].slice(0, 12),
     },
     sensitive: {
       topics: sensitive.topics.map((t) => ({ topic: t.topic, matched: t.matchedKeywords })),
@@ -53,6 +56,11 @@ const ASSIST_PROMPTS: Record<string, string> = {
   polish: "다음 한국어 기사 문장을 사실은 바꾸지 말고 자연스럽고 명확하게 다듬어줘. 결과만 출력해.",
   summarize: "다음 한국어 기사를 핵심 3줄로 요약해줘. 불릿으로.",
   title: "다음 한국어 기사에 어울리는 신문 제목 3개를 제안해줘. 각 줄에 하나씩.",
+  // 사실 점검 보조 — 본문에서 검증 대상만 뽑아 체크리스트로. 새 사실 창작 금지(HITL·정확성 원칙).
+  factcheck:
+    "다음 한국어 기사 초안에서 발행 전 사실 확인이 필요한 항목(수치·통계·날짜·시각·고유명사·기관명·직책·인용)을 뽑아라. " +
+    "본문에 실제로 있는 것만 추출하고 새로운 사실을 지어내지 마라. " +
+    "각 항목을 '- [ ] 항목 — 확인처(예: 태안군 보도자료/담당부서/현장)' 형식의 체크리스트로만 출력해. 항목이 없으면 '확인할 항목 없음'이라고만 답해.",
 };
 
 copilotRouter.post("/assist", async (c) => {
@@ -112,6 +120,107 @@ copilotRouter.post("/draft", async (c) => {
   } catch (e) {
     return c.json({ error: "draft_failed", detail: e instanceof Error ? e.message : String(e) }, 500);
   }
+});
+
+// ── 관련 과거기사 (아카이브 RAG) — 작성 중 주제로 태안신문 과거 보도 검색 ──
+// 무LLM(FTS5 트라이그램·BM25). 시민기자가 맥락·중복·후속취재 포인트를 잡도록 돕는다.
+// 제목 가중(2회) + 본문 앞부분에서 3글자↑ 키워드 추출 → MATCH OR.
+const RELATED_STOP = new Set([
+  "태안", "태안군", "안면도", "기자", "오늘", "지금", "이번", "관련", "그리고", "위해", "통해",
+  "있다", "했다", "한다", "한다고", "밝혔다", "대한", "대해", "위한", "에서", "으로",
+]);
+copilotRouter.post("/related", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ items: [] });
+  const body = await c.req.json().catch(() => ({}));
+  const title = typeof body?.title === "string" ? body.title : "";
+  const text = typeof body?.text === "string" ? body.text : "";
+
+  const src = `${title} ${title} ${text.slice(0, 600)}`; // 제목 2회 가중
+  const tokens = [
+    ...new Set(
+      src.replace(/[^가-힣0-9a-zA-Z]/g, " ").split(/\s+/).filter((t) => t.length >= 3 && !RELATED_STOP.has(t)),
+    ),
+  ].slice(0, 8);
+  if (!tokens.length) return c.json({ items: [] });
+
+  const match = tokens.map((t) => `"${t.replace(/"/g, "")}"`).join(" OR ");
+  try {
+    const r = await db
+      .prepare(
+        `SELECT a.idxno, a.title, a.published_at, a.excerpt, a.category FROM archive_fts f ` +
+          `JOIN archive_articles a ON a.idxno=f.rowid WHERE archive_fts MATCH ? ORDER BY bm25(archive_fts) LIMIT 5`,
+      )
+      .bind(match)
+      .all<{ idxno: number; title: string; published_at: string; excerpt: string | null; category: string | null }>();
+    const items = (r.results ?? []).map((it) => ({
+      idxno: it.idxno,
+      title: it.title,
+      publishedAt: it.published_at,
+      excerpt: it.excerpt ?? "",
+      category: it.category ?? "",
+    }));
+    return c.json({ items });
+  } catch (e) {
+    return c.json({ items: [], error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// ── 실시간 데이터 블록 (날씨·물때·해넘이) — 본문에 끼워넣을 출처 표기 텍스트 ──
+// 태안 지역기사(개장·축제·갯벌·바다)에 필요한 사실을 공공데이터로 채운다. 미리보기 호환 위해 표 대신 한 줄 텍스트.
+copilotRouter.get("/context-data", async (c) => {
+  const [cond, marine] = await Promise.all([
+    fetchConditions(c.env).catch(() => null),
+    import("../tour/marine").then((m) => m.loadMarine(c.env)).catch(() => null),
+  ]);
+
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  const md = `${k.getUTCMonth() + 1}/${k.getUTCDate()}`;
+  const hhmm = (iso: string | null) => (iso && iso.length >= 16 ? iso.slice(11, 16) : "");
+  const blocks: { id: string; label: string; markdown: string }[] = [];
+
+  if (cond?.available) {
+    const w = cond.weather, air = cond.air;
+    const parts: string[] = [];
+    if (w.temp != null) parts.push(`기온 ${w.temp}℃`);
+    if (w.sky) parts.push(w.sky);
+    if (w.pty && w.pty !== "없음") parts.push(w.pty);
+    if (w.humidity != null) parts.push(`습도 ${w.humidity}%`);
+    if (air.pm10 != null) parts.push(`미세먼지${air.grade ? ` ${air.grade}` : ""}(PM10 ${air.pm10}㎍/㎥)`);
+    if (parts.length) {
+      const at = hhmm(cond.observedAt);
+      blocks.push({
+        id: "weather",
+        label: "날씨·대기질",
+        markdown: `[태안 날씨 · ${md}${at ? ` ${at}` : ""} 기준] ${parts.join(", ")}. (출처: 기상청·에어코리아)`,
+      });
+    }
+  }
+
+  if (marine?.tide?.events?.length) {
+    const hi = marine.tide.events.filter((e) => e.type === "고조").map((e) => `${e.time}${e.level != null ? `(${e.level}cm)` : ""}`);
+    const lo = marine.tide.events.filter((e) => e.type === "저조").map((e) => `${e.time}${e.level != null ? `(${e.level}cm)` : ""}`);
+    const seg: string[] = [];
+    if (hi.length) seg.push(`만조 ${hi.join("·")}`);
+    if (lo.length) seg.push(`간조 ${lo.join("·")}`);
+    if (seg.length) {
+      blocks.push({
+        id: "tide",
+        label: "물때(밀물·썰물)",
+        markdown: `[물때 · ${marine.tide.station} ${md}] ${seg.join(", ")}. (출처: 국립해양조사원)`,
+      });
+    }
+  }
+
+  if (marine?.sun?.sunrise && marine.sun.sunset) {
+    blocks.push({
+      id: "sun",
+      label: "해돋이·해넘이",
+      markdown: `[해돋이·해넘이 · ${md}] 일출 ${marine.sun.sunrise}, 일몰 ${marine.sun.sunset}. (출처: 천문계산)`,
+    });
+  }
+
+  return c.json({ available: blocks.length > 0, blocks });
 });
 
 // ── 이미지 업로드 → R2 (시민기자 기사 사진). 서빙은 /api/archive/photo/<key> ──
