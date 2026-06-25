@@ -32,3 +32,8 @@ export function sendReadingEvent(input: { idxno: number; category?: string; dwel
 export function getReadingFeed(): Promise<ReadingFeed> {
   return apiFetch<ReadingFeed>("/api/reading/feed");
 }
+
+// 기사 AI 3줄 요약(스캐너용·온디맨드, 서버 캐시)
+export function getArticleSummary(idxno: number): Promise<{ summary: string | null }> {
+  return apiFetch<{ summary: string | null }>(`/api/reading/summary?idxno=${idxno}`);
+}

@@ -189,3 +189,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-25 · 독자 초개인화 Phase 1(추가형): 기사 체류·스크롤 로그(reading_events)+행동 기반 "실시간 픽"(/me)+독자유형(정독/스캐너). backend/reading, reading-tracker, me/reader-picks. mig 022
 
 - 2026-06-25 · 독자 초개인화 Phase 2: Cloudflare Vectorize(taean-articles, bge-m3 1024d) 기사 임베딩 맥락 추천. 읽은 기사 벡터 평균→최근접 기사(/me 실시간 픽 "맥락 기반"). 12h cron 임베딩 적재 + 관리자 백필(/embed-recent). backend/reading, wrangler vectorize 바인딩
+
+- 2026-06-25 · 독자 초개인화 Phase 3: AI 3줄 요약(스캐너·온디맨드·D1캐시 /api/reading/summary)+시간대 컨텍스트(출근 브리핑/낮/저녁 깊이읽기/심야). reading/router, me/reader-picks
