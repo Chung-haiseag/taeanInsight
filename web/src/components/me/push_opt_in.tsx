@@ -26,6 +26,24 @@ export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
       return;
     }
     setStatus(Notification.permission as Status);
+    // 이미 허용·구독돼 있으면 본인 uid로 재등록(과거 anon 저장분 자가 치유) + 구독 상태 복원
+    if (Notification.permission === "granted") {
+      (async () => {
+        try {
+          const reg = await navigator.serviceWorker.register("/sw.js");
+          await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) {
+            const json = sub.toJSON();
+            await apiFetch("/api/push/subscribe", {
+              method: "POST",
+              body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+            }).catch(() => {});
+            setStatus("subscribed");
+          }
+        } catch { /* 무시 */ }
+      })();
+    }
   }, []);
 
   async function subscribe() {

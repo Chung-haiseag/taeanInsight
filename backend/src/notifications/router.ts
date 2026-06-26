@@ -13,6 +13,13 @@ import { broadcast } from "./web_push";
 
 export const pushRouter = new Hono<{ Bindings: Env }>();
 
+// 익명 디바이스 uid(X-Taean-Uid)로 구독을 식별 — 개인화 푸시(주간 브리핑·취재 알림·테스트)가
+// 본인 구독을 찾을 수 있게. 없으면 "anon" 폴백.
+function subUid(c: { req: { header: (k: string) => string | undefined } }): string {
+  const u = c.req.header("X-Taean-Uid");
+  return u && /^[A-Za-z0-9_-]{8,64}$/.test(u) ? u : "anon";
+}
+
 // 클라이언트가 구독에 필요한 공개 정보(VAPID 공개키) 제공
 pushRouter.get("/key", (c) => {
   return c.json({ vapidPublicKey: c.env.VAPID_PUBLIC_KEY ?? null, enabled: !!vapidFromEnv(c.env) });
@@ -29,7 +36,7 @@ pushRouter.post("/subscribe", async (c) => {
   if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
   const repo = new D1WebPushSubscriptionRepo(c.env.ARCHIVE_DB);
   await repo.add({
-    userId: "anon",
+    userId: subUid(c),
     endpoint: parsed.data.endpoint,
     p256dhKey: parsed.data.keys.p256dh,
     authKey: parsed.data.keys.auth,
@@ -56,6 +63,6 @@ pushRouter.post("/unsubscribe", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { endpoint?: string };
   if (!body.endpoint) return c.json({ error: "invalid_input" }, 400);
   const repo = new D1WebPushSubscriptionRepo(c.env.ARCHIVE_DB);
-  await repo.disable("anon", body.endpoint);
+  await repo.disable(subUid(c), body.endpoint);
   return c.json({ ok: true });
 });
