@@ -116,7 +116,14 @@ meRouter.post("/push-test", async (c) => {
   const subs = await repo.listEnabledForUser(auth.sub);
   if (!subs.length) return c.json({ error: "no_subscription", hint: "브라우저에서 알림을 먼저 허용하세요" }, 404);
   const dispatcher = new WebCryptoWebPushDispatcher(vapid);
-  const payload = { title: "태안 인사이트 · 알림 테스트", body: "푸시 알림이 정상 작동합니다 ✅ 매주 금요일 맞춤 브리핑을 보내드려요.", url: "/me", tag: "push-test" };
+  // 본문은 실제 개인화 브리핑(가게 보드/여행 플래너)으로 — '내용 있는 알림' 데모
+  const prefs = await serviceFor(c).get(auth.sub);
+  const { previewWeeklyPush } = await import("../owner/weekly_push");
+  const brief = await previewWeeklyPush(c.env, prefs).catch(() => null);
+  const body = brief
+    ? `${brief}\n— 매주 금요일 이런 맞춤 브리핑을 보내드려요.`
+    : "관심사·가게 정보를 설정하면 맞춤 브리핑이 여기에 표시됩니다. 매주 금요일 발송돼요.";
+  const payload = { title: "태안 인사이트 · 미리보는 브리핑", body, url: "/me", tag: "push-test" };
   let sent = 0;
   for (const sub of subs) {
     const res = await dispatcher.send(sub, payload);
