@@ -193,3 +193,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-25 · 독자 초개인화 Phase 3: AI 3줄 요약(스캐너·온디맨드·D1캐시 /api/reading/summary)+시간대 컨텍스트(출근 브리핑/낮/저녁 깊이읽기/심야). reading/router, me/reader-picks
 
 - 2026-06-25 · 기자 취재 알림(Coverage Alert): 군청 새 공지·기상특보·데이터 급변·키워드 감지→기자 Web Push. /reporter(등록·키워드·인박스), 30분 cron, 멱등(ref_key)·최근3일 필터. backend/reporter, mig 023
+
+- 2026-06-26 · PWA 설치형 전환: manifest.webmanifest + 아이콘(192/512/apple180/badge, Node zlib 생성) + layout 메타. iOS "홈 화면에 추가"→Web Push 활성화. web/scripts/gen-icons.mjs
