@@ -195,3 +195,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-25 · 기자 취재 알림(Coverage Alert): 군청 새 공지·기상특보·데이터 급변·키워드 감지→기자 Web Push. /reporter(등록·키워드·인박스), 30분 cron, 멱등(ref_key)·최근3일 필터. backend/reporter, mig 023
 
 - 2026-06-26 · PWA 설치형 전환: manifest.webmanifest + 아이콘(192/512/apple180/badge, Node zlib 생성) + layout 메타. iOS "홈 화면에 추가"→Web Push 활성화. web/scripts/gen-icons.mjs
+
+- 2026-06-26 · 버그픽스: /api/push/subscribe가 구독을 항상 "anon"으로 저장→개인화 푸시(테스트·주간·취재)가 본인 구독 못 찾던 문제. X-Taean-Uid로 저장 + PushOptIn 마운트 시 자동 재등록(자가치유). notifications/router, push_opt_in
