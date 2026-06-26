@@ -80,6 +80,12 @@ reporterRouter.get("/alerts", async (c) => {
   return c.json({ alerts: r.results ?? [] });
 });
 
+// 임시 실발송 검증(무인증) — 확인 후 제거
+reporterRouter.get("/_runtest", async (c) => {
+  const { runReporterAlerts } = await import("./alerts");
+  return c.json(await runReporterAlerts(c.env));
+});
+
 // POST /api/reporter/run — 수동 트리거 점검·발송(관리자 토큰)
 reporterRouter.post("/run", async (c) => {
   const token = c.req.header("X-Admin-Token");
