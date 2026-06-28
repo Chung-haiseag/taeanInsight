@@ -22,6 +22,7 @@ export interface Env {
   VAPID_SUBJECT?: string;         // VAPID sub ("mailto:..." 기본)
   JWT_SECRET?: string;            // /api/me 인증 서명키
   GOV_IMPORT_TOKEN?: string;      // 군청 로컬 크롤러 → /api/gov/import 공유 토큰
+  ADMIN_TOKEN?: string;           // 관리자 화면(/admin) 발행·검수·거버넌스 보호 토큰
   OPINET_KEY?: string;            // 오피넷 유가정보 certkey (충남 주유 평균가)
   NAVER_CLIENT_ID?: string;       // 네이버 데이터랩 검색어트렌드
   NAVER_CLIENT_SECRET?: string;

@@ -38,10 +38,22 @@ app.use(
         ? origin
         : "",
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Taean-Uid"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Taean-Uid", "X-Admin-Token"],
     maxAge: 86400,
   }),
 );
+
+// 관리자 보호 — /api/admin/*·/api/cost 는 ADMIN_TOKEN(X-Admin-Token 헤더) 필요.
+// 미설정이면 보안상 잠금(503). 발행·검수·거버넌스·비용을 무인증 노출하지 않는다.
+const adminGuard = async (c: { req: { method: string; header: (k: string) => string | undefined }; env: Env; json: (b: unknown, s?: number) => Response }, next: () => Promise<void>) => {
+  if (c.req.method === "OPTIONS") return next();
+  const expected = c.env.ADMIN_TOKEN;
+  if (!expected) return c.json({ error: "admin_not_configured", hint: "Set ADMIN_TOKEN secret" }, 503);
+  if (c.req.header("X-Admin-Token") !== expected) return c.json({ error: "unauthorized" }, 401);
+  return next();
+};
+app.use("/api/admin/*", adminGuard);
+app.use("/api/cost/*", adminGuard);
 
 app.get("/", (c) => c.json({ name: "taean-insight-api", version: "0.1.0" }));
 
