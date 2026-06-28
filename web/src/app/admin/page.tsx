@@ -112,10 +112,7 @@ export default function AdminPage() {
     })();
   }, []);
 
-  if (authed === null) return <p className="p-6 text-sm text-foreground-muted">확인 중…</p>;
-  if (!authed) return <AdminLogin onOk={() => setAuthed(true)} />;
-
-  // 상단 헤더 메뉴(해시 앵커) 클릭 ↔ 탭 동기화
+  // 상단 헤더 메뉴(해시 앵커) 클릭 ↔ 탭 동기화 — Hook은 조건부 return 이전에 모두 호출
   useEffect(() => {
     const fromHash = () => {
       const h = window.location.hash.replace("#", "").replace("-heading", "");
@@ -130,6 +127,9 @@ export default function AdminPage() {
     setTab(k);
     if (typeof window !== "undefined") window.history.replaceState(null, "", `#${k}-heading`);
   };
+
+  if (authed === null) return <p className="p-6 text-sm text-foreground-muted">확인 중…</p>;
+  if (!authed) return <AdminLogin onOk={() => setAuthed(true)} />;
 
   return (
     <div className="space-y-6">
