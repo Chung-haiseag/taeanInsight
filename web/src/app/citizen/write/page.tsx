@@ -62,11 +62,29 @@ function CopilotEditorPage() {
   const fileInput = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loaded = useRef(false);
-  const editId = useSearchParams().get("id");
+  const sp = useSearchParams();
+  const editId = sp.get("id");
+  const fromAlert = sp.get("from") === "alert";
 
-  // 로드: ?id=면 서버 기사 불러오기(수정), 아니면 localStorage 임시저장 복구
+  // 로드: 취재알림 핸드오프(AI 초안) > ?id= 서버 기사 > localStorage 임시저장
   useEffect(() => {
     (async () => {
+      // 취재 알림 → AI 기사 초안 핸드오프(sessionStorage)
+      if (fromAlert) {
+        try {
+          const raw = sessionStorage.getItem("reporter-article-draft");
+          if (raw) {
+            const d = JSON.parse(raw) as { title?: string; body?: string; sources?: { title: string }[] };
+            setTitle(d.title ?? ""); setBody(d.body ?? "");
+            setAiLabel("ai_assisted");
+            setSource(d.sources?.[0]?.title ?? "");
+            sessionStorage.removeItem("reporter-article-draft");
+            setRestored(true);
+          }
+        } catch { /* 무시 */ }
+        loaded.current = true;
+        return;
+      }
       if (editId) {
         try {
           const a = await getMyArticle(editId);

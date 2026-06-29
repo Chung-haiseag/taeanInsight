@@ -14,3 +14,7 @@ export const addReporterKeyword = (keyword: string) =>
 export const deleteReporterKeyword = (id: number) =>
   apiFetch<{ ok: boolean }>(`/api/reporter/keywords/${id}`, { method: "DELETE" });
 export const getReporterAlerts = () => apiFetch<{ alerts: ReporterAlert[] }>("/api/reporter/alerts");
+
+export interface ArticleDraft { title: string; body: string; sources: { title: string; url: string }[] }
+export const draftFromAlert = (a: { title?: string; body?: string; kind?: string }) =>
+  apiFetch<ArticleDraft>("/api/reporter/draft", { method: "POST", body: JSON.stringify(a) });

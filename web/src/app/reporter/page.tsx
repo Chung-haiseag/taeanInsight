@@ -3,20 +3,35 @@
 // 기자 취재 알림 — 등록·키워드 감시·알림 인박스. Web Push로 취재거리 즉시 수신.
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   getReporterMe, registerReporter, unregisterReporter,
-  addReporterKeyword, deleteReporterKeyword, getReporterAlerts,
+  addReporterKeyword, deleteReporterKeyword, getReporterAlerts, draftFromAlert,
   type ReporterKeyword, type ReporterAlert,
 } from "@/lib/api/reporter";
 import { PushOptInButton } from "@/components/me/push_opt_in";
 
 export default function ReporterPage() {
+  const router = useRouter();
   const [registered, setRegistered] = useState<boolean | null>(null);
   const [keywords, setKeywords] = useState<ReporterKeyword[]>([]);
   const [alerts, setAlerts] = useState<ReporterAlert[]>([]);
   const [kw, setKw] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState<number | null>(null);
+
+  // 취재 알림 → AI 기사 초안 → 에디터로 핸드오프(sessionStorage)
+  async function makeDraft(a: ReporterAlert, idx: number) {
+    setDrafting(idx);
+    try {
+      const d = await draftFromAlert({ title: a.title, body: a.body, kind: a.kind });
+      sessionStorage.setItem("reporter-article-draft", JSON.stringify({ title: d.title, body: d.body, sources: d.sources }));
+      router.push("/citizen/write?from=alert");
+    } catch {
+      alert("초안 생성에 실패했습니다. 잠시 후 다시 시도하세요.");
+    } finally { setDrafting(null); }
+  }
 
   async function refresh() {
     const me = await getReporterMe().catch(() => null);
@@ -100,6 +115,10 @@ export default function ReporterPage() {
                   <p className="mt-0.5 font-semibold text-brand group-hover:underline">{a.title}</p>
                   {a.body && <p className="mt-0.5 text-sm text-foreground-muted">{a.body}</p>}
                 </a>
+                <button type="button" onClick={() => makeDraft(a, i)} disabled={drafting === i}
+                  className="mt-1 text-xs font-semibold text-accent hover:underline disabled:opacity-60">
+                  {drafting === i ? "초안 생성 중…" : "📝 이 건으로 기사 초안"}
+                </button>
               </li>
             ))}
           </ul>
