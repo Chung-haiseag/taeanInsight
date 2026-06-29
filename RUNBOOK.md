@@ -207,3 +207,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-29 · 주간리포트 자동발행(B안): 금 cron 초안생성 후 거버넌스 통과 시 자동 발행(막히면 초안 유지). /admin 토글+수동 점검, on/off는 D1(api_cache). reports/scheduled autoPublishIfClean
 
 - 2026-06-29 · 취재 알림 → AI 기사 초안 연결: /reporter 알림 "📝 기사 초안" → POST /api/reporter/draft(알림내용+관련 과거기사 RAG→Workers AI 보도 초안, [확인 필요] 마커)→ /citizen/write 핸드오프(sessionStorage). reporter/router, reporter·citizen 페이지
+
+- 2026-06-29 · 오디오 뉴스 MVP: 기사 제목+발췌→Workers AI MeloTTS(한국어, WAV)→R2 캐시(audio/news/<idxno>.wav)→스트리밍. 기사 상세 "🔊 기사 듣기". backend/audio, news-audio
