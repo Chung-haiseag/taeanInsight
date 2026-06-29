@@ -12,7 +12,6 @@ const NAV_ITEMS = [
   { href: "/archive", label: "아카이브" },
   { href: "/reports", label: "주간 리포트" },
   { href: "/query", label: "AI 질의" },
-  { href: "/dashboard", label: "B2B 대시보드" },
   { href: "/citizen", label: "시민기자" },
   { href: "/me", label: "내 페이지" },
 ];

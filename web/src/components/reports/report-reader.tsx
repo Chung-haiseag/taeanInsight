@@ -12,6 +12,7 @@ import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGau
 import { ReportTTS } from "@/components/reports/report-tts";
 import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
+import { RegionDataPanel } from "@/components/reports/region-data-panel";
 import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -305,6 +306,16 @@ export function ReportReader({
           </Link>
         </section>
       )}
+
+      {/* 데이터 부록 — 기관·업체용 지역 시계열·CSV(구 B2B 대시보드 흡수) */}
+      <details id="data" className="mt-16 break-inside-avoid rounded-2xl border-t-2 border-brand/15 pt-8 no-print">
+        <summary className="cursor-pointer list-none">
+          <span className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> 데이터 부록</span>
+          <h2 className="mt-3 text-display-sm font-bold text-brand">📊 지역 데이터 (추세·다운로드) <span className="align-middle text-sm font-normal text-accent">펼치기 ▾</span></h2>
+          <p className="mt-1 text-sm text-foreground-muted">관광 수요·환경·부동산·유가의 기간별 추세와 CSV. 관광협회·숙박체인·부동산·연구 기관용.</p>
+        </summary>
+        <div className="mt-6"><RegionDataPanel /></div>
+      </details>
 
       <EmailSignup />
 

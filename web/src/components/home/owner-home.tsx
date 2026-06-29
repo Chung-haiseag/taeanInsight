@@ -510,7 +510,7 @@ export function RealtorBoardCard({ board }: { board: RealtorBoard }) {
         </div>
       )}
       {board.notes.length > 0 && <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 국토부 실거래가 — 상세 추이·CSV는 <Link href="/dashboard" className="text-accent hover:underline">B2B 대시보드</Link>.</p>
+      <p className="mt-2 text-[11px] text-foreground-muted">※ 국토부 실거래가 — 상세 추이·CSV는 <Link href="/reports#data" className="text-accent hover:underline">주간 리포트 · 데이터 부록</Link>.</p>
     </section>
   );
 }

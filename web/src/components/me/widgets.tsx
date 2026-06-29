@@ -265,7 +265,7 @@ export function KpiCards({
           </article>
         ))}
       </div>
-      <Link href="/dashboard" className="mt-3 inline-block text-xs font-semibold text-accent hover:underline">
+      <Link href="/reports#data" className="mt-3 inline-block text-xs font-semibold text-accent hover:underline">
         지역 데이터 분석(추세·CSV) →
       </Link>
     </section>
