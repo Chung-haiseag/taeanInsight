@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/reports", label: "주간 리포트" },
   { href: "/query", label: "AI 질의" },
   { href: "/citizen", label: "시민기자" },
+  { href: "/reporter", label: "취재 알림" },
   { href: "/me", label: "내 페이지" },
 ];
 
