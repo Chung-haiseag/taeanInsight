@@ -66,8 +66,8 @@ export function GenericHome() {
           />
           <ProductCard
             index="03"
-            href="/dashboard"
-            title="B2B 기본 대시보드"
+            href="/reports#data"
+            title="지역 데이터 (추세·다운로드)"
             description="주 1회 업데이트되는 관광·상권·환경 지표 (B2B 전용)"
             label="ai_assisted"
           />

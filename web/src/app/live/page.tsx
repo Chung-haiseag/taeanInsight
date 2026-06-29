@@ -57,7 +57,7 @@ export default async function LivePage() {
           <section className="mt-6">
             <SummaryInfographic metrics={metrics} />
             <p className="mt-3 text-right text-sm">
-              <Link href="/dashboard" className="font-semibold text-accent hover:underline">기간별 추세·CSV 다운로드 → 지역 데이터 분석</Link>
+              <Link href="/reports#data" className="font-semibold text-accent hover:underline">기간별 추세·CSV 다운로드 → 주간 리포트 · 데이터 부록</Link>
             </p>
           </section>
 
