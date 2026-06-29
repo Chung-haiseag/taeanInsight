@@ -1,0 +1,11 @@
+[Unit]
+Description=Taean 도로 CCTV 갱신 (한국 IP·ITS 9443 → Worker /api/conditions/cctv/ingest)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean-crawler.env
+WorkingDirectory=/opt/taean-crawler
+ExecStart=/usr/bin/node /opt/taean-crawler/refresh-cctv.mjs
+Nice=10

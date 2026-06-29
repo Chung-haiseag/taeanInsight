@@ -1,0 +1,12 @@
+[Unit]
+Description=Taean 군청 수집 (한국 IP 크롤러 → Worker /api/gov/import)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean-crawler.env
+WorkingDirectory=/opt/taean-crawler
+ExecStart=/usr/bin/node /opt/taean-crawler/ingest-gov.mjs
+# 본문 PDF(주간행사) 추출에 pdftotext(poppler-utils) 필요
+Nice=10
