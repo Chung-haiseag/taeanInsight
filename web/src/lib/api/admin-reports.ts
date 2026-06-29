@@ -39,3 +39,13 @@ export async function publishReport(weekId: string, reviewerId: string): Promise
 export function unpublishReport(weekId: string): Promise<{ ok: boolean; reverted: boolean }> {
   return apiFetch(`/api/admin/reports/${encodeURIComponent(weekId)}/unpublish`, { method: "POST", body: JSON.stringify({}) });
 }
+
+export function getAutoPublish(): Promise<{ enabled: boolean }> {
+  return apiFetch("/api/admin/reports/autopublish");
+}
+export function setAutoPublish(enabled: boolean): Promise<{ enabled: boolean }> {
+  return apiFetch("/api/admin/reports/autopublish", { method: "POST", body: JSON.stringify({ enabled }) });
+}
+export function runAutoPublish(): Promise<{ weekId: string; published: boolean; reasons?: string[]; skipped?: string }> {
+  return apiFetch("/api/admin/reports/autopublish/run", { method: "POST", body: JSON.stringify({}) });
+}

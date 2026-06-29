@@ -108,12 +108,16 @@ export default {
       }
       try {
         if (env.AI && env.ARCHIVE_DB) {
-          const { buildWeeklyDraft } = await import("./reports/scheduled");
+          const { buildWeeklyDraft, autoPublishIfClean } = await import("./reports/scheduled");
           const r = await buildWeeklyDraft(env);
           console.log(`[cron] 주간 리포트 초안 생성: ${r.weekId} (${r.sections}개 섹션)`);
+          // B안 — 거버넌스 통과 시 자동 발행(off면 초안 유지, 막히면 사람 검토)
+          const ap = await autoPublishIfClean(env, r.weekId);
+          if (ap.published) console.log(`[cron] 주간 리포트 자동발행: ${ap.weekId}`);
+          else console.log(`[cron] 자동발행 보류: ${ap.skipped ?? (ap.reasons ? `거버넌스(${ap.reasons.join(",")})` : "?")}`);
         }
       } catch (e) {
-        console.warn("[cron] 주간 리포트 초안 실패:", e instanceof Error ? e.message : e);
+        console.warn("[cron] 주간 리포트 초안/발행 실패:", e instanceof Error ? e.message : e);
       }
       return;
     }

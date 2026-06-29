@@ -203,3 +203,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-28 · 관리자 인증: /api/admin/*·/api/cost를 ADMIN_TOKEN(X-Admin-Token)으로 보호(미설정 시 503 잠금). /admin 비밀번호 게이트(sessionStorage)+로그아웃. index.ts adminGuard
 
 - 2026-06-29 · IA 단순화: B2B 대시보드를 주간 리포트 "데이터 부록"으로 흡수(RegionDataPanel), 메뉴 제거, /dashboard→/reports#data 리다이렉트, 관련 링크 재지정
+
+- 2026-06-29 · 주간리포트 자동발행(B안): 금 cron 초안생성 후 거버넌스 통과 시 자동 발행(막히면 초안 유지). /admin 토글+수동 점검, on/off는 D1(api_cache). reports/scheduled autoPublishIfClean
