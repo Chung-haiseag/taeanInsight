@@ -285,6 +285,22 @@ adminReportsRouter.post("/generate", async (c) => {
 
 const publishSchema = z.object({ reviewerId: z.string().min(1).max(80) });
 
+// 자동발행 설정 조회/변경 + 수동 자동발행 트리거
+adminReportsRouter.get("/autopublish", async (c) => {
+  const { getAutoPublish } = await import("./scheduled");
+  return c.json({ enabled: await getAutoPublish(c.env) });
+});
+adminReportsRouter.post("/autopublish", async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { enabled?: boolean };
+  const { setAutoPublish, getAutoPublish } = await import("./scheduled");
+  if (typeof body.enabled === "boolean") await setAutoPublish(c.env, body.enabled);
+  return c.json({ enabled: await getAutoPublish(c.env) });
+});
+adminReportsRouter.post("/autopublish/run", async (c) => {
+  const { autoPublishIfClean } = await import("./scheduled");
+  return c.json(await autoPublishIfClean(c.env));
+});
+
 adminReportsRouter.post("/:weekId/publish", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   const parsed = publishSchema.safeParse(await c.req.json().catch(() => ({})));

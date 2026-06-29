@@ -40,6 +40,9 @@ import {
   generateDraft,
   publishReport,
   unpublishReport,
+  getAutoPublish,
+  setAutoPublish,
+  runAutoPublish,
   type AdminReport,
 } from "@/lib/api/admin-reports";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
@@ -250,6 +253,7 @@ function ReportPublishSection() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [autoPub, setAutoPub] = useState<boolean | null>(null);
 
   async function load() {
     setLoading(true);
@@ -257,6 +261,7 @@ function ReportPublishSection() {
       const r = await getCurrentReport();
       setReport(r.report);
       setGov(r.governance);
+      getAutoPublish().then((a) => setAutoPub(a.enabled)).catch(() => {});
     } catch (e) {
       setMsg({ kind: "err", text: e instanceof Error ? e.message : "불러오기 실패" });
     } finally {
@@ -264,6 +269,23 @@ function ReportPublishSection() {
     }
   }
   useEffect(() => { void load(); }, []);
+
+  async function onToggleAuto() {
+    const next = !autoPub;
+    setAutoPub(next);
+    try { await setAutoPublish(next); } catch { setAutoPub(!next); }
+  }
+  async function onRunAuto() {
+    setBusy("auto"); setMsg(null);
+    try {
+      const r = await runAutoPublish();
+      setMsg(r.published
+        ? { kind: "ok", text: `${r.weekId} 자동발행 완료 — 구독자 알림 발송됨.` }
+        : { kind: "err", text: `자동발행 보류: ${r.skipped ?? (r.reasons ? `거버넌스(${r.reasons.join(", ")})` : "?")}` });
+      await load();
+    } catch (e) { setMsg({ kind: "err", text: e instanceof Error ? e.message : "실행 실패" }); }
+    finally { setBusy(null); }
+  }
 
   async function onGenerate() {
     setBusy("gen"); setMsg(null);
@@ -297,6 +319,18 @@ function ReportPublishSection() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 id="report-heading" className="text-xl font-bold text-brand">📅 주간 리포트 검수·발행</h2>
         <span className="text-xs text-foreground-muted">초안 금 16:00 자동 생성 · 발행 목표 금 17:00</span>
+      </div>
+
+      {/* 자동발행(B안) — 거버넌스 통과 시 금요일 자동 발행 */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/30 bg-accent-subtle/15 p-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!autoPub} onChange={onToggleAuto} disabled={autoPub === null} className="h-4 w-4 accent-[var(--color-accent,#c9a227)]" />
+          <span className="font-semibold text-brand">자동발행</span>
+          <span className="text-foreground-muted">— 금요일 초안 생성 후 <strong>거버넌스 통과 시 자동 발행</strong>(막히면 초안 유지·검토 대기)</span>
+        </label>
+        <button type="button" onClick={onRunAuto} disabled={busy === "auto"} className="rounded border border-brand/20 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">
+          {busy === "auto" ? "실행 중…" : "지금 자동발행 점검"}
+        </button>
       </div>
 
       {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
