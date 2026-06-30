@@ -65,6 +65,11 @@ export function ReportTTS({ text, label = "음성으로 듣기" }: { text: strin
     cancelledRef.current = false;
     window.speechSynthesis.cancel(); // 큐 초기화
     const voice = pickKoVoice();
+    // 한국어 음성이 없으면 영어 음성으로 한국어를 읽어 발음이 깨짐 → 차단 + 안내
+    if (!voice) {
+      alert("이 기기/브라우저에 한국어 음성이 없어 음성 읽기를 지원하지 않습니다.\n(크롬 사용 또는 OS에 한국어 음성 추가 시 가능)");
+      return;
+    }
     const parts = chunk(text);
     setSpeaking(true);
     parts.forEach((part, i) => {

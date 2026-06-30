@@ -209,3 +209,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-29 · 취재 알림 → AI 기사 초안 연결: /reporter 알림 "📝 기사 초안" → POST /api/reporter/draft(알림내용+관련 과거기사 RAG→Workers AI 보도 초안, [확인 필요] 마커)→ /citizen/write 핸드오프(sessionStorage). reporter/router, reporter·citizen 페이지
 
 - 2026-06-29 · 오디오 뉴스 MVP: 기사 제목+발췌→Workers AI MeloTTS(한국어, WAV)→R2 캐시(audio/news/<idxno>.wav)→스트리밍. 기사 상세 "🔊 기사 듣기". backend/audio, news-audio
+
+- 2026-06-30 · 오디오 뉴스: MeloTTS(한국어 품질 불가, STT 역검수로 확인) 제거→브라우저 Web Speech(ReportTTS) 사용. 기기에 한국어 음성 없으면 영어 폴백 차단+안내. 신뢰성 위해선 클라우드 TTS(Google/Naver) 필요(키)
