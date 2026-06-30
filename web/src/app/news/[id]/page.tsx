@@ -19,7 +19,7 @@ import { decodeEntities } from "@/lib/html";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
-import { NewsAudio } from "@/components/news-audio";
+import { ReportTTS } from "@/components/reports/report-tts";
 
 interface Reader {
   title: string;
@@ -146,7 +146,9 @@ export default function NewsReaderPage() {
           {article.author && <span className="text-foreground-muted">· {article.author}</span>}
         </div>
         <h1 className="text-display-sm font-bold text-brand">{article.title}</h1>
-        <div className="no-print pt-1"><NewsAudio idxno={Number(params.id)} /></div>
+        <div className="no-print pt-1">
+          <ReportTTS text={`${article.title}. ${article.body || article.excerpt || ""}`} label="🔊 기사 듣기" />
+        </div>
       </header>
 
       {member && article.hasFullText ? (
