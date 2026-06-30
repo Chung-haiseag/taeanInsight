@@ -69,3 +69,6 @@ tools/gov/*.log
 
 tools/cctv/.its_key
 tools/cctv/*.log
+
+tools/podcast/.gemini_key
+tools/podcast/podcast.log

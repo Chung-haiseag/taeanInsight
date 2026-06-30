@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.taean.podcast</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Applications/taean/tools/podcast/run-podcast.sh</string>
+  </array>
+  <!-- 매주 금요일 18:00 KST (리포트 자동발행 16:00 이후) -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>5</integer>
+    <key>Hour</key><integer>18</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Applications/taean/tools/podcast/podcast.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Applications/taean/tools/podcast/podcast.log</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
