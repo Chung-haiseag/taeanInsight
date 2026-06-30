@@ -37,6 +37,37 @@ async function googleTts(env: Env, text: string): Promise<Uint8Array | null> {
   }
 }
 
+// GET /api/audio/briefing — 오늘의 주요 뉴스를 한 편의 음성 브리핑으로(날짜별 R2 캐시)
+audioRouter.get("/briefing", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  const date = `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}-${String(k.getUTCDate()).padStart(2, "0")}`;
+  const cacheKey = `audio/briefing/${date}.mp3`;
+
+  const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
+  if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=21600" } });
+
+  if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY) return c.json({ error: "tts_unconfigured" }, 503);
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+
+  // 최근 3일 주요 기사 5건(본문 충분·광고 제외)
+  const since = `${new Date(Date.now() + 9 * 3600_000 - 14 * 86400_000).toISOString().slice(0, 10)}`;
+  const r = await c.env.ARCHIVE_DB
+    .prepare("SELECT title, substr(COALESCE(excerpt, body, ''),1,140) AS brief FROM archive_articles WHERE published_at >= ? AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC LIMIT 5")
+    .bind(since).all<{ title: string; brief: string }>();
+  const items = r.results ?? [];
+  if (!items.length) return c.json({ error: "no_news" }, 404);
+
+  const ord = ["첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"];
+  const lines = items.map((it, i) => `${ord[i] ?? `${i + 1}번째`} 소식. ${it.title}. ${(it.brief ?? "").replace(/\s+/g, " ").trim()}`);
+  const script = `태안 인사이트 오늘의 뉴스 브리핑입니다. 오늘의 주요 소식 ${items.length}건을 전해드립니다.\n${lines.join("\n")}\n이상 태안 인사이트 브리핑이었습니다. 자세한 내용은 태안뉴스에서 확인하세요.`;
+
+  const bytes = await googleTts(c.env, script);
+  if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
+  await c.env.ARCHIVE_PHOTOS.put(cacheKey, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
+  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=21600" } });
+});
+
 audioRouter.get("/news/:idxno", async (c) => {
   const idxno = Number(c.req.param("idxno"));
   if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
