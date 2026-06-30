@@ -71,7 +71,7 @@ async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
     .prepare("SELECT week_id, summary, substr(sections,1,4000) AS sections FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1")
     .first<{ week_id: string; summary: string; sections: string }>();
   if (!rep) return c.json({ error: "no_report" }, 404);
-  const cacheKey = `audio/podcast/${rep.week_id}.mp3`;
+  const cacheKey = `audio/podcast/${rep.week_id}-v2.mp3`;
 
   if (!force) {
     const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
@@ -91,12 +91,13 @@ async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
       messages: [
         { role: "system", content:
           "너는 따뜻한 지역 라디오 팟캐스트 작가다. 아래 '이번 주 태안 소식'을 두 진행자의 진짜 대화처럼 각색하라.\n" +
-          "진행자 A=수아: 밝고 호기심 많은 메인 진행자. 질문을 던지고 청취자 입장에서 반응한다(\"오, 그래요?\", \"그게 왜 중요한가요?\").\n" +
-          "진행자 B=준호: 차분하고 사려 깊은 해설자. 배경과 의미를 쉽게 풀어준다.\n" +
+          "진행자 A: 밝고 호기심 많은 메인 진행자. 질문을 던지고 청취자 입장에서 반응한다(\"오, 그래요?\", \"그게 왜 중요한가요?\").\n" +
+          "진행자 B: 차분하고 사려 깊은 해설자. 배경과 의미를 쉽게 풀어준다.\n" +
           "작성 규칙:\n" +
           "- 진짜 대화처럼: 짧게 주고받고, 가끔 맞장구(\"맞아요\", \"그렇죠\")와 자연스러운 연결어를 써라. 한 줄은 1~2문장으로 짧게.\n" +
           "- 딱딱한 보도체 금지. 친구에게 설명하듯 쉬운 구어체 존댓말.\n" +
-          "- 오프닝: 수아가 팟캐스트·이번 주 주제를 가볍게 소개. 클로징: 두 사람이 짧게 마무리 인사.\n" +
+          "- 진행자 이름·호칭·자기소개를 절대 쓰지 마라(서로를 이름으로 부르지 않는다).\n" +
+          "- 오프닝: 이름 소개 없이 바로 이번 주 주제를 가볍게 안내. 클로징: 짧게 마무리 인사.\n" +
           "- 소식에 없는 사실을 지어내지 마라. 핵심 1~3가지를 깊이 있게 다뤄라.\n" +
           "- 형식: 각 줄을 정확히 'A: ...' 또는 'B: ...' 로만 출력. 18~24줄." },
         { role: "user", content: src },

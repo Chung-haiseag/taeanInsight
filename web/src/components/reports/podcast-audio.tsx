@@ -31,7 +31,7 @@ export function PodcastAudio() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-brand">🎙 이번 주 AI 팟캐스트</h2>
-          <p className="mt-0.5 text-xs text-foreground-muted">진행자 수아·준호가 이번 주 태안 소식을 대담으로 · AI 생성(Google TTS)</p>
+          <p className="mt-0.5 text-xs text-foreground-muted">진행자 두 명이 이번 주 태안 소식을 대담으로 · AI 생성(Google TTS)</p>
         </div>
         <button type="button" onClick={play} disabled={state === "loading"}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-60">
