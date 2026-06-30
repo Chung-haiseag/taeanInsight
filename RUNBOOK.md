@@ -221,3 +221,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-30 · 팟캐스트 품질 개선: Chirp3-HD 음성(기계음↓)+줄 사이 무음 450ms(끊김·쉼↓)+대담 프롬프트 개선(맞장구·질문). 오디오 응답 cache-control private(엣지 stale 차단). backend/audio
 
 - 2026-06-30 · 팟캐스트 Gemini 멀티스피커(NotebookLM급) 옵션: GEMINI_API_KEY 있으면 gemini-2.5-flash-preview-tts 멀티스피커(2인 한 번에·WAV), 없으면 Chirp3-HD 폴백. PCM→WAV 래핑. backend/audio
+
+- 2026-07-01 · 팟캐스트 Gemini: Worker에서 Gemini API 지역차단("User location not supported", 텍스트·TTS 모두) 확인 → Worker는 Chirp3-HD 유지, 로컬(한국IP)이 audio/podcast/<주차>-gem.wav 올리면 우선 서빙하도록 변경. backend/audio
