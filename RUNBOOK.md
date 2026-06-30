@@ -217,3 +217,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-30 · 출근길 오디오 브리핑: 최근 주요 뉴스 5건을 한 편 음성으로(Google TTS)·날짜별 R2 캐시. /me에 시간대별 라벨(출근길/오늘/저녁) 플레이어. backend/audio/briefing, briefing-audio
 
 - 2026-06-30 · 주간 AI 팟캐스트(B안): 주간 리포트→Workers AI 2인 대담 대본→Google TTS 2-보이스(수아 여/준호 남) 합성·이어붙임→주차별 R2 캐시. /reports 플레이어. backend/audio/podcast, podcast-audio
+
+- 2026-06-30 · 팟캐스트 품질 개선: Chirp3-HD 음성(기계음↓)+줄 사이 무음 450ms(끊김·쉼↓)+대담 프롬프트 개선(맞장구·질문). 오디오 응답 cache-control private(엣지 stale 차단). backend/audio
