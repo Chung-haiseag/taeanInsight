@@ -215,3 +215,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-30 · 오디오 뉴스: Google Cloud TTS(ko-KR Neural2)로 전환. 서버 mp3→R2 캐시(audio/news/N.mp3), 기사 "🔊 기사 듣기"(NewsAudio). GOOGLE_TTS_KEY 시크릿 필요(미설정 시 503·안내). backend/audio
 
 - 2026-06-30 · 출근길 오디오 브리핑: 최근 주요 뉴스 5건을 한 편 음성으로(Google TTS)·날짜별 R2 캐시. /me에 시간대별 라벨(출근길/오늘/저녁) 플레이어. backend/audio/briefing, briefing-audio
+
+- 2026-06-30 · 주간 AI 팟캐스트(B안): 주간 리포트→Workers AI 2인 대담 대본→Google TTS 2-보이스(수아 여/준호 남) 합성·이어붙임→주차별 R2 캐시. /reports 플레이어. backend/audio/podcast, podcast-audio

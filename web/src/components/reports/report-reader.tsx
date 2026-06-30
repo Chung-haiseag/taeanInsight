@@ -13,6 +13,7 @@ import { ReportTTS } from "@/components/reports/report-tts";
 import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
 import { RegionDataPanel } from "@/components/reports/region-data-panel";
+import { PodcastAudio } from "@/components/reports/podcast-audio";
 import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -137,6 +138,8 @@ export function ReportReader({
         <ReportPushButton />
         <ReportTTS text={briefing} label="리포트 듣기" />
       </div>
+
+      <div className="mt-6"><PodcastAudio /></div>
 
       {report.personalized && report.interests?.length ? (
         <div className="no-print mt-6 flex items-center gap-2 rounded-xl bg-accent-subtle/30 px-4 py-2.5 text-sm">
