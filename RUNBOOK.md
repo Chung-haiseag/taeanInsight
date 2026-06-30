@@ -213,3 +213,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-30 · 오디오 뉴스: MeloTTS(한국어 품질 불가, STT 역검수로 확인) 제거→브라우저 Web Speech(ReportTTS) 사용. 기기에 한국어 음성 없으면 영어 폴백 차단+안내. 신뢰성 위해선 클라우드 TTS(Google/Naver) 필요(키)
 
 - 2026-06-30 · 오디오 뉴스: Google Cloud TTS(ko-KR Neural2)로 전환. 서버 mp3→R2 캐시(audio/news/N.mp3), 기사 "🔊 기사 듣기"(NewsAudio). GOOGLE_TTS_KEY 시크릿 필요(미설정 시 503·안내). backend/audio
+
+- 2026-06-30 · 출근길 오디오 브리핑: 최근 주요 뉴스 5건을 한 편 음성으로(Google TTS)·날짜별 R2 캐시. /me에 시간대별 라벨(출근길/오늘/저녁) 플레이어. backend/audio/briefing, briefing-audio

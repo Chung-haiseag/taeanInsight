@@ -9,6 +9,7 @@ import { PushOptInButton } from "@/components/me/push_opt_in";
 import { MeHeroStrip } from "@/components/me/hero-strip";
 import { MeOwnerBoard } from "@/components/me/owner-board";
 import { ReaderPicks } from "@/components/me/reader-picks";
+import { BriefingAudio } from "@/components/briefing-audio";
 
 // 가로 전체로 둘 위젯(긴 목록·핵심) — 나머지는 2열 절반
 const FULL_WIDTH = new Set(["my_news", "personalized_report", "team_workspace", "b2g_department_space", "gov_notices"]);
@@ -92,6 +93,9 @@ function MeDashboard({ data }: { data: MeResponse }) {
 
       {/* 오늘 한눈에 — 히어로 요약 */}
       <MeHeroStrip preferences={preferences} />
+
+      {/* 출근길 오디오 브리핑 */}
+      <BriefingAudio />
 
       {/* 독자 행동 기반 실시간 픽(데이터 있을 때만 표시) */}
       <ReaderPicks />
