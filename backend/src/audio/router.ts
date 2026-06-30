@@ -3,6 +3,7 @@
 //  필요 시크릿: GOOGLE_TTS_KEY (Cloud Text-to-Speech API 키). 미설정이면 503.
 
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
@@ -37,9 +38,33 @@ async function googleTts(env: Env, text: string, voice = "ko-KR-Neural2-A"): Pro
   }
 }
 
+// 짧은 무음 mp3(줄 사이 자연스러운 쉼 + 바이트 이음새를 무음에 숨김). Neural2 SSML break.
+async function ttsSilence(env: Env, ms = 500): Promise<Uint8Array | null> {
+  const apiKey = (env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(`${TTS_URL}?key=${apiKey}`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        input: { ssml: `<speak><break time="${ms}ms"/></speak>` },
+        voice: { languageCode: "ko-KR", name: "ko-KR-Neural2-A" },
+        audioConfig: { audioEncoding: "MP3" },
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { audioContent?: string };
+    if (!j.audioContent) return null;
+    const bin = atob(j.audioContent);
+    const b = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+    return b;
+  } catch { return null; }
+}
+
 // GET /api/audio/podcast — 주간 리포트로 2인 대담 AI 팟캐스트(주차별 R2 캐시)
 //  진행자 수아(여, Neural2-A) · 해설자 준호(남, Neural2-C). 대본은 Workers AI, 음성은 줄마다 번갈아 합성→이어붙임.
-audioRouter.get("/podcast", async (c) => {
+async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
   if (!c.env.ARCHIVE_PHOTOS || !c.env.ARCHIVE_DB) return c.json({ error: "bad_request" }, 400);
   // 최신 발행 리포트
   const rep = await c.env.ARCHIVE_DB
@@ -48,41 +73,50 @@ audioRouter.get("/podcast", async (c) => {
   if (!rep) return c.json({ error: "no_report" }, 404);
   const cacheKey = `audio/podcast/${rep.week_id}.mp3`;
 
-  const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
-  if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=86400" } });
+  if (!force) {
+    const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
+    if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
+  }
 
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY || !c.env.AI) return c.json({ error: "unconfigured" }, 503);
 
-  // 1) 대본 생성(2인 대화체)
+  // 1) 대본 생성(2인 대화체) — 자연스러운 라디오 대담
   let dialogue: { sp: "A" | "B"; text: string }[] = [];
   try {
     const { WorkersAiLlmClient } = await import("../llm/workers_ai");
     const client = new WorkersAiLlmClient({ ai: c.env.AI });
     const src = `${rep.summary}\n\n${(rep.sections ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 2500)}`;
     const res = await client.complete({
-      channel: "realtime", maxTokens: 900, temperature: 0.5,
+      channel: "realtime", maxTokens: 1100, temperature: 0.75,
       messages: [
         { role: "system", content:
-          "너는 지역신문 팟캐스트 작가다. 아래 '이번 주 태안 소식'을 두 진행자의 자연스러운 대담으로 각색하라.\n" +
-          "- 진행자 A=수아(밝게 진행·질문), B=준호(차분히 해설). 구어체·존댓말.\n" +
-          "- 형식: 각 줄을 'A: ...' 또는 'B: ...' 로만. 16~20줄. 인사로 시작, 마무리 인사로 끝.\n" +
-          "- 소식에 없는 사실을 지어내지 말고, 핵심을 쉽게 풀어 대화하라. 수치·인용은 자연스럽게." },
+          "너는 따뜻한 지역 라디오 팟캐스트 작가다. 아래 '이번 주 태안 소식'을 두 진행자의 진짜 대화처럼 각색하라.\n" +
+          "진행자 A=수아: 밝고 호기심 많은 메인 진행자. 질문을 던지고 청취자 입장에서 반응한다(\"오, 그래요?\", \"그게 왜 중요한가요?\").\n" +
+          "진행자 B=준호: 차분하고 사려 깊은 해설자. 배경과 의미를 쉽게 풀어준다.\n" +
+          "작성 규칙:\n" +
+          "- 진짜 대화처럼: 짧게 주고받고, 가끔 맞장구(\"맞아요\", \"그렇죠\")와 자연스러운 연결어를 써라. 한 줄은 1~2문장으로 짧게.\n" +
+          "- 딱딱한 보도체 금지. 친구에게 설명하듯 쉬운 구어체 존댓말.\n" +
+          "- 오프닝: 수아가 팟캐스트·이번 주 주제를 가볍게 소개. 클로징: 두 사람이 짧게 마무리 인사.\n" +
+          "- 소식에 없는 사실을 지어내지 마라. 핵심 1~3가지를 깊이 있게 다뤄라.\n" +
+          "- 형식: 각 줄을 정확히 'A: ...' 또는 'B: ...' 로만 출력. 18~24줄." },
         { role: "user", content: src },
       ],
     });
     dialogue = (res.content ?? "").split("\n").map((l) => l.trim()).map((l) => {
       const m = l.match(/^([AB])\s*[:：]\s*(.+)$/);
-      return m ? { sp: m[1] as "A" | "B", text: m[2].trim() } : null;
-    }).filter((x): x is { sp: "A" | "B"; text: string } => !!x && x.text.length > 1).slice(0, 22);
+      return m ? { sp: m[1] as "A" | "B", text: m[2].trim().replace(/^["']|["']$/g, "") } : null;
+    }).filter((x): x is { sp: "A" | "B"; text: string } => !!x && x.text.length > 1).slice(0, 26);
   } catch { /* 무시 */ }
   if (dialogue.length < 4) return c.json({ error: "script_failed" }, 502);
 
-  // 2) 줄마다 음성 합성(A=여/B=남) → 바이트 이어붙임
-  const VOICE = { A: "ko-KR-Neural2-A", B: "ko-KR-Neural2-C" } as const;
+  // 2) 줄마다 음성 합성(Chirp3-HD, A=여/B=남) + 줄 사이 무음 → 이어붙임
+  const VOICE = { A: "ko-KR-Chirp3-HD-Aoede", B: "ko-KR-Chirp3-HD-Charon" } as const;
+  const gap = await ttsSilence(c.env, 450);
   const chunks: Uint8Array[] = [];
-  for (const line of dialogue) {
-    const b = await googleTts(c.env, line.text, VOICE[line.sp]);
+  for (let i = 0; i < dialogue.length; i++) {
+    const b = await googleTts(c.env, dialogue[i].text, VOICE[dialogue[i].sp]);
     if (b) chunks.push(b);
+    if (gap && i < dialogue.length - 1) chunks.push(gap); // 마지막 줄 뒤엔 무음 생략
   }
   if (!chunks.length) return c.json({ error: "tts_failed" }, 502);
   const total = chunks.reduce((s, b) => s + b.length, 0);
@@ -91,8 +125,9 @@ audioRouter.get("/podcast", async (c) => {
   for (const b of chunks) { merged.set(b, off); off += b.length; }
 
   await c.env.ARCHIVE_PHOTOS.put(cacheKey, merged, { httpMetadata: { contentType: "audio/mpeg" } });
-  return new Response(merged, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=86400" } });
-});
+  return new Response(merged, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
+}
+audioRouter.get("/podcast", (c) => genPodcast(c));
 
 // GET /api/audio/briefing — 오늘의 주요 뉴스를 한 편의 음성 브리핑으로(날짜별 R2 캐시)
 audioRouter.get("/briefing", async (c) => {
@@ -102,7 +137,7 @@ audioRouter.get("/briefing", async (c) => {
   const cacheKey = `audio/briefing/${date}.mp3`;
 
   const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
-  if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=21600" } });
+  if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
 
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY) return c.json({ error: "tts_unconfigured" }, 503);
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
@@ -122,7 +157,7 @@ audioRouter.get("/briefing", async (c) => {
   const bytes = await googleTts(c.env, script);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(cacheKey, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
-  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=21600" } });
+  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
 });
 
 audioRouter.get("/news/:idxno", async (c) => {
@@ -133,7 +168,7 @@ audioRouter.get("/news/:idxno", async (c) => {
   // 1) R2 캐시 우선
   const cached = await c.env.ARCHIVE_PHOTOS.get(key);
   if (cached) {
-    return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=604800" } });
+    return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
   }
 
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY) {
@@ -152,5 +187,5 @@ audioRouter.get("/news/:idxno", async (c) => {
   const bytes = await googleTts(c.env, script);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(key, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
-  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=604800" } });
+  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
 });

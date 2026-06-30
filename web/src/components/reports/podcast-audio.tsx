@@ -35,7 +35,7 @@ export function PodcastAudio() {
         </div>
         <button type="button" onClick={play} disabled={state === "loading"}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-60">
-          {state === "loading" ? "대담 준비 중…(최초 ~15초)" : state === "ready" ? "▶ 다시 듣기" : "▶ 듣기"}
+          {state === "loading" ? "대담 준비 중…(최초 ~20초)" : state === "ready" ? "▶ 다시 듣기" : "▶ 듣기"}
         </button>
       </div>
       <audio ref={ref} controls className={state === "ready" ? "mt-3 w-full" : "hidden"} preload="none" />
