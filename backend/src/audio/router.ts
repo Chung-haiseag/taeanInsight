@@ -62,6 +62,53 @@ async function ttsSilence(env: Env, ms = 500): Promise<Uint8Array | null> {
   } catch { return null; }
 }
 
+// 원시 PCM(L16) → WAV 컨테이너(브라우저 재생용)
+function pcmToWav(pcm: Uint8Array, sampleRate = 24000): Uint8Array {
+  const numCh = 1, bps = 16, dataSize = pcm.length;
+  const buf = new Uint8Array(44 + dataSize);
+  const dv = new DataView(buf.buffer);
+  const ws = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, "RIFF"); dv.setUint32(4, 36 + dataSize, true); ws(8, "WAVE");
+  ws(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, numCh, true);
+  dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate * numCh * bps / 8, true);
+  dv.setUint16(32, numCh * bps / 8, true); dv.setUint16(34, bps, true);
+  ws(36, "data"); dv.setUint32(40, dataSize, true); buf.set(pcm, 44);
+  return buf;
+}
+
+// Gemini 멀티스피커 TTS(NotebookLM급) — 대본→2인 자연 대담 음성(WAV). 키 없으면 null.
+async function geminiPodcastTts(env: Env, dialogue: { sp: "A" | "B"; text: string }[]): Promise<Uint8Array | null> {
+  const key = (env as Env & { GEMINI_API_KEY?: string }).GEMINI_API_KEY;
+  if (!key) return null;
+  const transcript = dialogue.map((d) => `${d.sp === "A" ? "Speaker1" : "Speaker2"}: ${d.text}`).join("\n");
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${key}`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `다음 두 진행자의 라디오 대담을 자연스럽고 생동감 있게 읽어줘:\n\n${transcript}` }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: [
+            { speaker: "Speaker1", voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } },
+            { speaker: "Speaker2", voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } },
+          ] } },
+        },
+      }),
+      signal: AbortSignal.timeout(90000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] };
+    const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+    const b64 = part?.inlineData?.data;
+    if (!b64) return null;
+    const bin = atob(b64);
+    const pcm = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) pcm[i] = bin.charCodeAt(i);
+    const rate = Number(part?.inlineData?.mimeType?.match(/rate=(\d+)/)?.[1] ?? 24000);
+    return pcmToWav(pcm, rate);
+  } catch { return null; }
+}
+
 // GET /api/audio/podcast — 주간 리포트로 2인 대담 AI 팟캐스트(주차별 R2 캐시)
 //  진행자 수아(여, Neural2-A) · 해설자 준호(남, Neural2-C). 대본은 Workers AI, 음성은 줄마다 번갈아 합성→이어붙임.
 async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
@@ -71,11 +118,14 @@ async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
     .prepare("SELECT week_id, summary, substr(sections,1,4000) AS sections FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1")
     .first<{ week_id: string; summary: string; sections: string }>();
   if (!rep) return c.json({ error: "no_report" }, 404);
-  const cacheKey = `audio/podcast/${rep.week_id}-v2.mp3`;
+  // 엔진: GEMINI_API_KEY 있으면 멀티스피커(WAV), 없으면 Chirp3-HD(MP3)
+  const useGemini = !!(c.env as Env & { GEMINI_API_KEY?: string }).GEMINI_API_KEY;
+  const cacheKey = useGemini ? `audio/podcast/${rep.week_id}-gem.wav` : `audio/podcast/${rep.week_id}-v2.mp3`;
+  const ctype = useGemini ? "audio/wav" : "audio/mpeg";
 
   if (!force) {
     const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
-    if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
+    if (cached) return new Response(cached.body, { headers: { "content-type": ctype, "cache-control": "private, max-age=86400" } });
   }
 
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY || !c.env.AI) return c.json({ error: "unconfigured" }, 503);
@@ -110,23 +160,33 @@ async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
   } catch { /* 무시 */ }
   if (dialogue.length < 4) return c.json({ error: "script_failed" }, 502);
 
-  // 2) 줄마다 음성 합성(Chirp3-HD, A=여/B=남) + 줄 사이 무음 → 이어붙임
-  const VOICE = { A: "ko-KR-Chirp3-HD-Aoede", B: "ko-KR-Chirp3-HD-Charon" } as const;
-  const gap = await ttsSilence(c.env, 450);
-  const chunks: Uint8Array[] = [];
-  for (let i = 0; i < dialogue.length; i++) {
-    const b = await googleTts(c.env, dialogue[i].text, VOICE[dialogue[i].sp]);
-    if (b) chunks.push(b);
-    if (gap && i < dialogue.length - 1) chunks.push(gap); // 마지막 줄 뒤엔 무음 생략
+  // 2) 음성 합성 — Gemini 멀티스피커(한 번에) 우선, 실패/무키 시 Chirp3-HD(이어붙임)
+  let merged: Uint8Array | null = null;
+  if (useGemini) merged = await geminiPodcastTts(c.env, dialogue);
+  if (!merged) {
+    const VOICE = { A: "ko-KR-Chirp3-HD-Aoede", B: "ko-KR-Chirp3-HD-Charon" } as const;
+    const gap = await ttsSilence(c.env, 450);
+    const chunks: Uint8Array[] = [];
+    for (let i = 0; i < dialogue.length; i++) {
+      const b = await googleTts(c.env, dialogue[i].text, VOICE[dialogue[i].sp]);
+      if (b) chunks.push(b);
+      if (gap && i < dialogue.length - 1) chunks.push(gap);
+    }
+    if (chunks.length) {
+      const total = chunks.reduce((s, b) => s + b.length, 0);
+      merged = new Uint8Array(total);
+      let off = 0;
+      for (const b of chunks) { merged.set(b, off); off += b.length; }
+    }
   }
-  if (!chunks.length) return c.json({ error: "tts_failed" }, 502);
-  const total = chunks.reduce((s, b) => s + b.length, 0);
-  const merged = new Uint8Array(total);
-  let off = 0;
-  for (const b of chunks) { merged.set(b, off); off += b.length; }
+  if (!merged || merged.length < 200) return c.json({ error: "tts_failed" }, 502);
 
-  await c.env.ARCHIVE_PHOTOS.put(cacheKey, merged, { httpMetadata: { contentType: "audio/mpeg" } });
-  return new Response(merged, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
+  // Gemini 실패로 MP3 폴백이면 키/타입 보정
+  const isWav = merged.length > 4 && merged[0] === 0x52 && merged[1] === 0x49; // "RI"
+  const outKey = isWav ? `audio/podcast/${rep.week_id}-gem.wav` : `audio/podcast/${rep.week_id}-v2.mp3`;
+  const outType = isWav ? "audio/wav" : "audio/mpeg";
+  await c.env.ARCHIVE_PHOTOS.put(outKey, merged, { httpMetadata: { contentType: outType } });
+  return new Response(merged, { headers: { "content-type": outType, "cache-control": "private, max-age=86400" } });
 }
 audioRouter.get("/podcast", (c) => genPodcast(c));
 
