@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccessibility } from "./accessibility-provider";
 import { AdminHeader } from "./admin-header";
+import { AccountNav } from "./account-nav";
 
 const NAV_ITEMS = [
   { href: "/live", label: "지금 태안" },
@@ -87,8 +88,9 @@ export function SiteHeader() {
           })}
         </nav>
 
-        {/* 데스크톱 접근성 */}
+        {/* 데스크톱 접근성 + 계정 */}
         <A11y className="hidden md:flex" />
+        <AccountNav />
 
         {/* 모바일 햄버거 */}
         <button

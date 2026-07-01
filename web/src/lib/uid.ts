@@ -17,3 +17,11 @@ export function getUid(): string {
     return "";
   }
 }
+
+// 로그인 시 계정의 정규 uid로 교체(기기 간 개인화 동기화). 로그아웃 시 새 익명 uid 발급.
+export function setUid(uid: string): void {
+  try { if (uid && /^[A-Za-z0-9_-]{8,64}$/.test(uid)) localStorage.setItem(KEY, uid); } catch { /* 무시 */ }
+}
+export function resetUid(): void {
+  try { localStorage.removeItem(KEY); getUid(); } catch { /* 무시 */ }
+}
