@@ -18,7 +18,7 @@ export function NewsAudio({ idxno }: { idxno: number }) {
     setState("loading");
     // 503(키 미설정) 등은 사전 확인 — audio 엘리먼트 에러 메시지가 모호하므로
     try {
-      const head = await fetch(`${API_BASE}/api/audio/news/${idxno}`, { method: "GET" });
+      const head = await fetch(`${API_BASE}/api/audio/news/${idxno}`, { method: "GET", cache: "reload" });
       if (head.status === 503) { setState("unconfigured"); return; }
       if (!head.ok) { setState("error"); return; }
       const blob = await head.blob();
