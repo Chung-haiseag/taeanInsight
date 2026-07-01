@@ -9,7 +9,6 @@ import Link from "next/link";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGauge, MarineCard, SummaryInfographic, SeasonalFoodCard, OilCard } from "@/components/reports/report-charts";
-import { ReportTTS } from "@/components/reports/report-tts";
 import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
 import { RegionDataPanel } from "@/components/reports/region-data-panel";
@@ -119,12 +118,6 @@ export function ReportReader({
     );
   }
 
-  // 음성 브리핑 텍스트 — 잠금 안 된 섹션(요약·미리보기) 본문을 제목과 함께 이어붙임
-  const briefing = [
-    `${formatWeek(report.weekId)} 태안 인사이트 리포트입니다.`,
-    ...report.sections.filter((s) => !s.locked && s.content.trim()).map((s) => `${s.title}. ${s.content}`),
-  ].join("\n");
-
   return (
     <div className="mx-auto max-w-3xl">
       <Masthead
@@ -136,7 +129,6 @@ export function ReportReader({
 
       <div className="no-print mt-4 flex flex-wrap justify-end gap-1">
         <ReportPushButton />
-        <ReportTTS text={briefing} label="리포트 듣기" />
       </div>
 
       <div className="mt-6"><PodcastAudio /></div>
