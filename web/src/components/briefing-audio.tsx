@@ -4,6 +4,7 @@
 // 시간대에 따라 라벨만 바뀜(출근길/오늘/저녁). 데이터 없으면 숨김.
 
 import { useEffect, useRef, useState } from "react";
+import { trackEvent } from "@/lib/api/reading";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
@@ -32,6 +33,7 @@ export function BriefingAudio() {
       if (!res.ok) { setState("error"); return; }
       el.src = URL.createObjectURL(await res.blob());
       await el.play();
+      trackEvent("audio_play", "briefing");
       setState("ready");
     } catch { setState("error"); }
   }
