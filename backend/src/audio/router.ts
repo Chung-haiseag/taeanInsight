@@ -209,6 +209,24 @@ audioRouter.get("/briefing", async (c) => {
   return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
 });
 
+// GET /api/audio/status — 오디오 자동생성 현황(로컬 잡이 기록한 status.json + 이번주 팟캐스트 존재)
+audioRouter.get("/status", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "no_r2" }, 503);
+  let status: Record<string, unknown> = {};
+  try {
+    const s = await c.env.ARCHIVE_PHOTOS.get("audio/status.json");
+    if (s) status = await s.json();
+  } catch { /* 없음 */ }
+  // 이번(최신 발행) 주차 팟캐스트가 Gemini(-gem.wav)로 존재하는지
+  let podcastLive = false, week = "";
+  if (c.env.ARCHIVE_DB) {
+    const rep = await c.env.ARCHIVE_DB.prepare("SELECT week_id FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1").first<{ week_id: string }>();
+    week = rep?.week_id ?? "";
+    if (week) podcastLive = !!(await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${week}-gem.wav`));
+  }
+  return c.json({ ...status, podcastLive, week, checkedAt: new Date().toISOString() });
+});
+
 audioRouter.get("/news/:idxno", async (c) => {
   const idxno = Number(c.req.param("idxno"));
   if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
