@@ -143,6 +143,14 @@ async function main() {
     console.log(`▸ R2 업로드 → ${key}`);
     wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]);
     console.log("✅ 완료 — /reports 팟캐스트가 NotebookLM급으로 교체됩니다.");
+    // 현황 기록(Worker /api/audio/status)
+    try {
+      let cur = {};
+      try { cur = JSON.parse(wrangler(["r2", "object", "get", `${BUCKET}/audio/status.json`, "--remote", "--pipe"], { stdio: ["ignore", "pipe", "ignore"] })); } catch { /* 최초 */ }
+      const stmp = join(tmpdir(), "audio-status.json");
+      writeFileSync(stmp, JSON.stringify({ ...cur, podcast: { week: rep.week_id, ok: true, at: new Date().toISOString() } }));
+      try { wrangler(["r2", "object", "put", `${BUCKET}/audio/status.json`, "--file", stmp, "--content-type", "application/json", "--remote"]); } finally { rmSync(stmp, { force: true }); }
+    } catch { /* 무시 */ }
   } finally { rmSync(tmp, { force: true }); }
 }
 

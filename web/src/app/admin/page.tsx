@@ -148,6 +148,8 @@ export default function AdminPage() {
         </div>
       </header>
 
+      <AudioAutomationStatus />
+
       {/* 탭바 — 메뉴별 전환 (헤더 메뉴와 동기화) */}
       <div className="flex flex-wrap gap-1.5 border-b border-brand/15 pb-2">
         {ADMIN_TABS.map((t) => (
@@ -171,6 +173,35 @@ export default function AdminPage() {
       <div className={tab === "governance" ? "" : "hidden"}><GovernanceSection /></div>
       <div className={tab === "ebook" ? "" : "hidden"}><EbookReviewSection /></div>
     </div>
+  );
+}
+
+// ── 오디오 자동생성 현황 ─────────────────────────────
+function AudioAutomationStatus() {
+  const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
+  const [s, setS] = useState<{ podcastLive?: boolean; week?: string; podcast?: { at?: string }; news?: { generated?: number; skipped?: number; failed?: number; target?: number; at?: string } } | null>(null);
+  useEffect(() => { fetch(`${API}/api/audio/status`).then((r) => r.json()).then(setS).catch(() => {}); }, [API]);
+  if (!s) return null;
+  const ago = (iso?: string) => { if (!iso) return "-"; const h = Math.round((Date.now() - Date.parse(iso)) / 3600000); return h < 1 ? "방금" : h < 24 ? `${h}시간 전` : `${Math.round(h / 24)}일 전`; };
+  const n = s.news;
+  return (
+    <section className="rounded-xl border border-brand/15 bg-background p-4 text-sm shadow-card">
+      <h2 className="mb-2 font-bold text-brand">🎙 오디오 자동 생성 현황</h2>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="rounded-lg bg-foreground-muted/5 p-3">
+          <div className="font-semibold">주간 팟캐스트 <span className="text-xs text-foreground-muted">({s.week})</span></div>
+          <div className={s.podcastLive ? "text-green-700" : "text-amber-700"}>
+            {s.podcastLive ? "✅ Gemini 라이브" : "⚠ 미생성(Chirp3-HD 폴백)"} · {ago(s.podcast?.at)}
+          </div>
+        </div>
+        <div className="rounded-lg bg-foreground-muted/5 p-3">
+          <div className="font-semibold">기사 낭독(매일)</div>
+          <div className="text-foreground-muted">
+            {n ? `생성 ${n.generated ?? 0} · 스킵 ${n.skipped ?? 0} · 실패 ${n.failed ?? 0} / 대상 ${n.target ?? 0} · ${ago(n.at)}` : "아직 실행 기록 없음"}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -35,6 +35,16 @@ function wrangler(args, opts = {}) {
 }
 function d1(sql) { return JSON.parse(wrangler(["d1", "execute", "taean-archive", "--remote", "--json", "--command", sql]))[0]?.results ?? []; }
 
+// 생성 현황을 R2 audio/status.json 에 병합 기록(Worker /api/audio/status 가 노출)
+function writeStatus(patch) {
+  let cur = {};
+  try { cur = JSON.parse(wrangler(["r2", "object", "get", `${BUCKET}/audio/status.json`, "--remote", "--pipe"], { stdio: ["ignore", "pipe", "ignore"] })); } catch { /* 최초 */ }
+  const tmp = join(tmpdir(), "audio-status.json");
+  writeFileSync(tmp, JSON.stringify({ ...cur, ...patch }));
+  try { wrangler(["r2", "object", "put", `${BUCKET}/audio/status.json`, "--file", tmp, "--content-type", "application/json", "--remote"]); }
+  catch { /* 무시 */ } finally { rmSync(tmp, { force: true }); }
+}
+
 function r2Has(key) {
   try { wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "ignore", "ignore"] }); return true; }
   catch { return false; }
@@ -118,5 +128,6 @@ async function main() {
     await sleep(1500); // rate 여유
   }
   console.log(`완료 — 생성 ${done} · 스킵(이미있음) ${skip} · 실패건너뜀 ${fail} · 키사용 ${used.join("/")}`);
+  writeStatus({ news: { generated: done, skipped: skip, failed: fail, target: rows.length, at: new Date().toISOString() } });
 }
 main().catch((e) => { console.error("실패:", e.message); process.exit(1); });

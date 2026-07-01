@@ -237,3 +237,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 태안뉴스 최신순 고정: 관심사 개인화 재정렬 제거(관심분야를 앞으로 끌던 것)→발행일 내림차순만. 관심사는 강조용으로만 전달. news/router
 
 - 2026-07-01 · 태안뉴스 회차 누락 보강: 라이브 수집이 6/19 등 일부 회차 누락 → 완전한 D1 아카이브(최근 35일) 병합·중복제거. 기본 상한 60건(최신 3회차), D1 바인드 100 한도 보호(500 수정). news/router
+
+- 2026-07-01 · 오디오 자동화 완성: setup-launchd.sh(팟캐스트 금18시+기사낭독 매일7시 원클릭 설치), 생성기가 audio/status.json 기록, GET /api/audio/status(현황), /admin 오디오 자동생성 현황 카드
