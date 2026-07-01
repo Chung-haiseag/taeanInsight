@@ -46,31 +46,43 @@ function normalize(t) {
     .replace(/㎡/g, "제곱미터").replace(/㎞/g, "킬로미터").replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").trim();
 }
 
-// 키 로테이션 Gemini TTS(단일 화자). 429/소진 시 다음 키. 전부 소진이면 null.
+const exhausted = new Set(); // 429/한도 도달 키
+const keyAvail = (i) => !exhausted.has(i) && used[i] < PER_KEY;
+const allExhausted = () => KEYS.every((_, i) => !keyAvail(i));
+
+async function ttsOnce(key, text) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${key}`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: `${normalize(text)}` }] }],
+      systemInstruction: { parts: [{ text: "너는 뉴스 낭독 성우다. 위 기사 본문을 차분하고 또렷하게 소리내어 읽는다. 텍스트를 생성하지 말고 음성만 출력한다." }] },
+      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } },
+    }),
+  });
+  return res;
+}
+
+// 키 로테이션 단일화자 TTS. 반환: {audio} | {skip} (이 기사만 실패) | {exhausted} (전 키 소진)
 async function geminiTts(text) {
-  for (let tries = 0; tries < KEYS.length; tries++) {
-    if (used[ki] >= PER_KEY) { ki = (ki + 1) % KEYS.length; continue; }
-    const key = KEYS[ki];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // 사용 가능한 키 선택
+    let hop = 0;
+    while (hop < KEYS.length && !keyAvail(ki)) { ki = (ki + 1) % KEYS.length; hop++; }
+    if (!keyAvail(ki)) return { exhausted: true };
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${key}`, {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `다음 뉴스 기사를 아나운서처럼 차분하고 또렷하게 읽어줘:\n\n${normalize(text)}` }] }],
-          generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } },
-        }),
-      });
-      if (res.status === 429) { used[ki] = PER_KEY; ki = (ki + 1) % KEYS.length; continue; } // 한도 → 다음 키
-      if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 160)}`);
+      const res = await ttsOnce(KEYS[ki], text);
+      if (res.status === 429) { exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; } // 한도 → 다음 키
+      if (!res.ok) { console.warn(`  키#${ki + 1} ${res.status} 재시도`); await sleep(1200); continue; } // 일시 오류 → 재시도
       const j = await res.json();
       const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-      if (!part) throw new Error("오디오 없음");
+      if (!part) { console.warn(`  키#${ki + 1} 오디오 없음 재시도`); await sleep(1200); continue; }
       used[ki]++;
       const pcm = Buffer.from(part.inlineData.data, "base64");
       const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType || "")?.[1] ?? 24000);
-      return pcmToWav(pcm, rate);
-    } catch (e) { console.warn(`  키#${ki + 1} 오류: ${e.message}`); ki = (ki + 1) % KEYS.length; }
+      return { audio: pcmToWav(pcm, rate) };
+    } catch (e) { console.warn(`  키#${ki + 1} 오류: ${e.message} 재시도`); await sleep(1200); }
   }
-  return null; // 전 키 소진
+  return { skip: true }; // 3회 실패 → 이 기사만 스킵(키는 유지)
 }
 
 function pcmToWav(pcm, rate) {
@@ -84,26 +96,27 @@ function pcmToWav(pcm, rate) {
 
 async function main() {
   console.log(`▸ 무료 키 ${KEYS.length}개 · 키당 상한 ${PER_KEY} · 최대 ${MAX}건`);
-  // 최근 14일 주요 기사(본문 충분·광고 제외) 최신순
+  // 최신 주요 기사(본문 충분·광고 제외) 최신순 — 최신 MAX개
   const rows = d1(`SELECT idxno, title, substr(COALESCE(body, excerpt, ''),1,1500) AS body FROM archive_articles
-    WHERE published_at >= date('now','-14 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
+    WHERE published_at >= date('now','-60 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
     ORDER BY published_at DESC LIMIT ${MAX}`);
   console.log(`  대상 ${rows.length}건`);
-  let done = 0, skip = 0;
+  let done = 0, skip = 0, fail = 0;
   for (const a of rows) {
     const key = `audio/news/${a.idxno}-gem.wav`;
     if (!FORCE && r2Has(key)) { skip++; continue; }
     const script = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
-    const wav = await geminiTts(script);
-    if (!wav) { console.log(`  ⚠ 무료 한도 소진 — 나머지는 Chirp3-HD 폴백. (생성 ${done}, 스킵 ${skip})`); break; }
+    const r = await geminiTts(script);
+    if (r.exhausted) { console.log(`  ⚠ 무료 한도 소진 — 나머지는 Chirp3-HD 폴백. (생성 ${done})`); break; }
+    if (r.skip) { fail++; console.log(`  ⤼ ${a.idxno} 건너뜀(TTS 반복 오류) — Chirp3-HD 폴백`); continue; }
     const tmp = join(tmpdir(), `news-${a.idxno}.wav`);
-    writeFileSync(tmp, wav);
+    writeFileSync(tmp, r.audio);
     try { wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]); }
     finally { rmSync(tmp, { force: true }); }
     done++;
-    console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(wav.length / 1024).toFixed(0)}KB)`);
+    console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(r.audio.length / 1024).toFixed(0)}KB)`);
     await sleep(1500); // rate 여유
   }
-  console.log(`완료 — 생성 ${done} · 스킵(이미있음) ${skip} · 키사용 ${used.join("/")}`);
+  console.log(`완료 — 생성 ${done} · 스킵(이미있음) ${skip} · 실패건너뜀 ${fail} · 키사용 ${used.join("/")}`);
 }
 main().catch((e) => { console.error("실패:", e.message); process.exit(1); });
