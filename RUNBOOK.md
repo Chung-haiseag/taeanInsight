@@ -225,3 +225,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 팟캐스트 Gemini: Worker에서 Gemini API 지역차단("User location not supported", 텍스트·TTS 모두) 확인 → Worker는 Chirp3-HD 유지, 로컬(한국IP)이 audio/podcast/<주차>-gem.wav 올리면 우선 서빙하도록 변경. backend/audio
 
 - 2026-07-01 · 주간 팟캐스트 로컬 생성기(tools/podcast): 맥(한국IP)에서 Gemini 멀티스피커(NotebookLM급) 생성→R2 audio/podcast/<주차>-gem.wav 업로드, Worker 우선 서빙. launchd 금 18:00 KST. 키=env GEMINI_API_KEY
+
+- 2026-07-01 · 기사 듣기·브리핑 음성 Neural2→Chirp3-HD 업그레이드(자연스러움↑). Chirp3-HD 긴문장 거부 대응: 문장 청크 병렬 합성·이어붙임(synthLong). 첫생성 31s→7s. 캐시키 -hd. backend/audio

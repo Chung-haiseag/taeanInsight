@@ -8,11 +8,11 @@ import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
-const KEY = (idxno: number) => `audio/news/${idxno}.mp3`;
+const KEY = (idxno: number) => `audio/news/${idxno}-hd.mp3`; // -hd: Chirp3-HD 음성(구 Neural2 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
 // 텍스트 → mp3 바이트(Google TTS Neural2). 실패 시 null.
-async function googleTts(env: Env, text: string, voice = "ko-KR-Neural2-A"): Promise<Uint8Array | null> {
+async function googleTts(env: Env, text: string, voice = "ko-KR-Chirp3-HD-Aoede"): Promise<Uint8Array | null> {
   const apiKey = (env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY;
   if (!apiKey) return null;
   try {
@@ -60,6 +60,37 @@ async function ttsSilence(env: Env, ms = 500): Promise<Uint8Array | null> {
     for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
     return b;
   } catch { return null; }
+}
+
+// 문장 단위 청크 — Chirp3-HD는 긴 문장을 거부하므로 짧게 나눔(긴 문장은 강제 분할)
+function chunkText(text: string, max = 170): string[] {
+  const sents = text.replace(/\s+/g, " ").trim().split(/(?<=[.!?。…])\s+/);
+  const pieces: string[] = [];
+  for (const s of sents) {
+    if (s.length <= 240) { pieces.push(s); continue; }
+    for (let i = 0; i < s.length; i += 200) pieces.push(s.slice(i, i + 200)); // 마침표 없는 초장문 강제 분할
+  }
+  const out: string[] = [];
+  let buf = "";
+  for (const p of pieces) {
+    if ((buf + " " + p).length > max && buf) { out.push(buf); buf = p; }
+    else buf = buf ? `${buf} ${p}` : p;
+  }
+  if (buf) out.push(buf);
+  return out.filter(Boolean);
+}
+
+// 긴 텍스트 → Chirp3-HD로 문장 청크 합성 후 이어붙임(단일 화자 자연 낭독)
+async function synthLong(env: Env, text: string, voice = "ko-KR-Chirp3-HD-Aoede"): Promise<Uint8Array | null> {
+  const parts = chunkText(text);
+  const results = await Promise.all(parts.map((p) => googleTts(env, p, voice))); // 병렬 합성(순서 유지)
+  const chunks = results.filter((b): b is Uint8Array => !!b);
+  if (!chunks.length) return null;
+  const total = chunks.reduce((s, b) => s + b.length, 0);
+  const merged = new Uint8Array(total);
+  let off = 0;
+  for (const b of chunks) { merged.set(b, off); off += b.length; }
+  return merged;
 }
 
 // GET /api/audio/podcast — 주간 리포트로 2인 대담 AI 팟캐스트(주차별 R2 캐시)
@@ -158,7 +189,7 @@ audioRouter.get("/briefing", async (c) => {
   const lines = items.map((it, i) => `${ord[i] ?? `${i + 1}번째`} 소식. ${it.title}. ${(it.brief ?? "").replace(/\s+/g, " ").trim()}`);
   const script = `태안 인사이트 오늘의 뉴스 브리핑입니다. 오늘의 주요 소식 ${items.length}건을 전해드립니다.\n${lines.join("\n")}\n이상 태안 인사이트 브리핑이었습니다. 자세한 내용은 태안뉴스에서 확인하세요.`;
 
-  const bytes = await googleTts(c.env, script);
+  const bytes = await synthLong(c.env, script);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(cacheKey, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
   return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
@@ -187,8 +218,8 @@ audioRouter.get("/news/:idxno", async (c) => {
   if (!row) return c.json({ error: "not_found" }, 404);
   const script = `${row.title}.\n${(row.snippet ?? "").replace(/\s+/g, " ").trim()}`;
 
-  // 3) 생성 → R2 저장
-  const bytes = await googleTts(c.env, script);
+  // 3) 생성(Chirp3-HD 문장 청크) → R2 저장
+  const bytes = await synthLong(c.env, script);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(key, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
   return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
