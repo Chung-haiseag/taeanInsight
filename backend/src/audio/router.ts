@@ -214,7 +214,11 @@ audioRouter.get("/news/:idxno", async (c) => {
   if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
   const key = KEY(idxno);
 
-  // 1) R2 캐시 우선
+  // 0) 로컬 잡이 올린 Gemini 낭독(자연 음성) 우선 — 있으면 그걸
+  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem.wav`);
+  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=604800" } });
+
+  // 1) Chirp3-HD R2 캐시
   const cached = await c.env.ARCHIVE_PHOTOS.get(key);
   if (cached) {
     return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });

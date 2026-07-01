@@ -72,3 +72,6 @@ tools/cctv/*.log
 
 tools/podcast/.gemini_key
 tools/podcast/podcast.log
+
+tools/news-audio/.gemini_keys
+tools/news-audio/news-audio.log
