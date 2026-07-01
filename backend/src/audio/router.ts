@@ -8,7 +8,7 @@ import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
-const KEY = (idxno: number) => `audio/news/${idxno}-hd2.mp3`; // -hd2: Chirp3-HD + TTS 정규화(구 캐시 무효화)
+const KEY = (idxno: number) => `audio/news/${idxno}-hd3.mp3`; // -hd2: Chirp3-HD + TTS 정규화(구 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
 // TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로(가운뎃점·물결표 범위·괄호·단위)
