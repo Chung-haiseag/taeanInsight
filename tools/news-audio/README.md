@@ -21,11 +21,11 @@ KEYS
 chmod 600 tools/news-audio/.gemini_keys
 
 # 수동 실행(검증)
-sh tools/news-audio/run-news-audio.sh --max=24
+sh tools/news-audio/run-news-audio.sh --max=30
 ```
 
 ## 옵션
-- `--max=N` : 최대 N건(기본 24)
+- `--max=N` : 최대 N건(기본 30)
 - `--force` : 이미 있는 것도 재생성
 - `PER_KEY=15` : 키당 하루 안전 상한(기본 15, 유료 전환 방지)
 

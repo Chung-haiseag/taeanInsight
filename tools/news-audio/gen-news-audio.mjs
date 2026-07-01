@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
-const MAX = Number((process.argv.find((a) => a.startsWith("--max=")) || "--max=24").split("=")[1]);
+const MAX = Number((process.argv.find((a) => a.startsWith("--max=")) || "--max=30").split("=")[1]);
 const FORCE = process.argv.includes("--force");
 const PER_KEY = Number(process.env.PER_KEY || "15"); // 키당 하루 안전 상한
 
