@@ -245,3 +245,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 이벤트 추적 확장: usage_events 테이블(024) + POST /api/reading/track. 오디오 재생(기사·브리핑·팟캐스트)·AI질의 기록. 분석 대시보드에 오디오재생·AI질의 KPI + 인기질의·오디오분포
 
 - 2026-07-01 · 계정·로그인(Cloudflare 네이티브): users/sessions(025), Web Crypto PBKDF2, D1 세션토큰. 익명 uid를 계정에 귀속→로그인 시 정규 uid 반환으로 기기간 개인화 동기화. /login, 헤더 계정표시, auth/router
+
+- 2026-07-01 · 내 관심사 팟캐스트(/me): 관심 카테고리 최신 뉴스→Workers AI 2인 대담→Chirp3-HD 2보이스, uid·날짜별 캐시. GET /api/audio/me-podcast. (Gemini는 Worker 지역차단이라 per-user는 Chirp3-HD)
