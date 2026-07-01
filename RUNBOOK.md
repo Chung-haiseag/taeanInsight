@@ -231,3 +231,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · TTS 음성 정규화: 가운뎃점(·)→쉼표, 숫자범위(18~45)→"에서", 괄호→휴지, 단위(㎡㎞) 한글화. googleTts 진입점 적용(기사·브리핑·팟캐스트 폴백). 캐시키 -hd2. backend/audio
 
 - 2026-07-01 · 기사 낭독 Gemini(무료) 옵션: tools/news-audio 로컬 생성기(무료 키 victory·holyroad 로테이션, 키당 15건→하루 ~30건 무료)→R2 audio/news/<idxno>-gem.wav, Worker 우선 서빙(없으면 Chirp3-HD). launchd 07:00. 유료 위험 0(초과분 Chirp3-HD 폴백)
+
+- 2026-07-01 · 태안뉴스 최신만: /api/news 최근 60일 필터(최소 20건 보장), 그 이전은 /archive. 8개월 69건→최근 34건. news/router
