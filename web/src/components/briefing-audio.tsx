@@ -27,7 +27,7 @@ export function BriefingAudio() {
     if (state === "ready") { void el.play(); return; }
     setState("loading");
     try {
-      const res = await fetch(`${API_BASE}/api/audio/briefing`, { cache: "reload" });
+      const res = await fetch(`${API_BASE}/api/audio/briefing?v=hd2`, { cache: "reload" });
       if (res.status === 503 || res.status === 404) { setState("unavailable"); return; }
       if (!res.ok) { setState("error"); return; }
       el.src = URL.createObjectURL(await res.blob());
