@@ -3,6 +3,7 @@
 // 주간 AI 팟캐스트 — 진행자 2인(수아·준호) 대담. 주간 리포트로 생성(Google TTS 2-보이스), 주차별 캐시.
 
 import { useRef, useState } from "react";
+import { trackEvent } from "@/lib/api/reading";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
@@ -20,6 +21,7 @@ export function PodcastAudio() {
       if (!res.ok) { setState("error"); return; }
       el.src = URL.createObjectURL(await res.blob());
       await el.play();
+      trackEvent("audio_play", "podcast");
       setState("ready");
     } catch { setState("error"); }
   }

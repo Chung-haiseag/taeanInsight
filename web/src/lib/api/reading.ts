@@ -29,6 +29,20 @@ export function sendReadingEvent(input: { idxno: number; category?: string; dwel
   } catch { /* 무시 */ }
 }
 
+// 범용 사용 이벤트(오디오 재생·AI 질의 등) — 익명 uid 집계, 실패 무시
+export function trackEvent(type: string, ref?: string): void {
+  try {
+    const uid = getUid();
+    if (!uid) return;
+    void fetch(`${API_BASE}/api/reading/track`, {
+      method: "POST",
+      keepalive: true,
+      headers: { "content-type": "application/json", "X-Taean-Uid": uid },
+      body: JSON.stringify({ type, ref }),
+    }).catch(() => {});
+  } catch { /* 무시 */ }
+}
+
 export function getReadingFeed(): Promise<ReadingFeed> {
   return apiFetch<ReadingFeed>("/api/reading/feed");
 }

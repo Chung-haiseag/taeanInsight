@@ -89,6 +89,23 @@ const eventSchema = z.object({
   scrollPct: z.number().int().min(0).max(100),
 });
 
+// POST /api/reading/track — 범용 사용 이벤트(오디오 재생·AI 질의 등)
+const trackSchema = z.object({ type: z.string().max(24), ref: z.string().max(200).optional() });
+readingRouter.post("/track", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ ok: false });
+  const uid = uidOf(c);
+  if (!uid) return c.json({ ok: false });
+  const parsed = trackSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ ok: false });
+  try {
+    await c.env.ARCHIVE_DB
+      .prepare("INSERT INTO usage_events (uid, type, ref, created_at) VALUES (?,?,?,?)")
+      .bind(uid, parsed.data.type, parsed.data.ref ?? null, new Date().toISOString())
+      .run();
+  } catch { /* 단일 실패 무시 */ }
+  return c.json({ ok: true });
+});
+
 // POST /api/reading/event — 기사 1건 읽기 종료 시 비콘
 readingRouter.post("/event", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ ok: false });

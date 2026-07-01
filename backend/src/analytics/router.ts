@@ -40,8 +40,25 @@ analyticsRouter.get("/", async (c) => {
   const segments = await many<{ segment: string; n: number }>(
     "SELECT COALESCE(segment,'미지정') segment, COUNT(*) n FROM user_preferences GROUP BY segment ORDER BY n DESC",
   );
+  // 사용 이벤트(오디오 재생·AI 질의 등)
+  const usageByType = await many<{ type: string; n: number }>(
+    "SELECT type, COUNT(*) n FROM usage_events GROUP BY type ORDER BY n DESC",
+  ).catch(() => []);
+  const audioByRef = await many<{ ref: string; n: number }>(
+    "SELECT COALESCE(ref,'기타') ref, COUNT(*) n FROM usage_events WHERE type='audio_play' GROUP BY ref ORDER BY n DESC LIMIT 8",
+  ).catch(() => []);
+  const topQueries = await many<{ ref: string; n: number }>(
+    "SELECT ref, COUNT(*) n FROM usage_events WHERE type='ai_query' AND ref IS NOT NULL GROUP BY ref ORDER BY n DESC LIMIT 10",
+  ).catch(() => []);
 
   return c.json({
+    usage: {
+      byType: usageByType,
+      audioPlays: usageByType.find((x) => x.type === "audio_play")?.n ?? 0,
+      aiQueries: usageByType.find((x) => x.type === "ai_query")?.n ?? 0,
+      audioByRef,
+      topQueries,
+    },
     reads: {
       total: reads.total ?? 0,
       readers: reads.readers ?? 0,

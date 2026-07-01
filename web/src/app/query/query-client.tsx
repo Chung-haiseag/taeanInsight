@@ -8,6 +8,7 @@ import { useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { ApiError } from "@/lib/api/client";
 import { askQuery, type QueryResult } from "@/lib/api/query";
+import { trackEvent } from "@/lib/api/reading";
 
 const SUGGESTED_QUESTIONS = [
   "다음 주말 안면도 기상 예보 알려줘",
@@ -37,6 +38,7 @@ export function QueryClient() {
     setError(null);
     setResult(null);
     try {
+      trackEvent("ai_query", text.slice(0, 120));
       const res = await askQuery({ query: text });
       setResult(res);
     } catch (e) {

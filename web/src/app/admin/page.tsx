@@ -230,7 +230,34 @@ function AnalyticsSection() {
         <Kpi label="평균 스크롤" val={`${d.reads.avgScrollPct}%`} />
         <Kpi label="온보딩 사용자" val={d.audience.onboarded} />
         <Kpi label="푸시 구독" val={d.audience.pushSubs} />
+        <Kpi label="오디오 재생" val={d.usage?.audioPlays ?? 0} />
+        <Kpi label="AI 질의" val={d.usage?.aiQueries ?? 0} />
       </div>
+
+      {d.usage && (d.usage.topQueries.length > 0 || d.usage.audioByRef.length > 0) && (
+        <div className="grid gap-5 md:grid-cols-2">
+          {d.usage.topQueries.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-brand">인기 AI 질의</h3>
+              <ul className="space-y-1 text-sm">
+                {d.usage.topQueries.map((q, i) => (
+                  <li key={i} className="flex justify-between gap-2 border-b border-brand/5 py-1"><span className="truncate">{q.ref}</span><span className="shrink-0 text-foreground-muted">{q.n}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {d.usage.audioByRef.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-brand">오디오 재생 분포</h3>
+              <ul className="space-y-1 text-sm">
+                {d.usage.audioByRef.map((a, i) => (
+                  <li key={i} className="flex justify-between gap-2 border-b border-brand/5 py-1"><span className="truncate">{a.ref}</span><span className="shrink-0 text-foreground-muted">{a.n}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <h3 className="mb-2 text-sm font-bold text-brand">일별 조회 (최근 14일)</h3>

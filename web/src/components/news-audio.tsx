@@ -4,6 +4,7 @@
 // 모든 기기에서 동일한 한국어 음질(브라우저 음성 의존 X).
 
 import { useRef, useState } from "react";
+import { trackEvent } from "@/lib/api/reading";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
@@ -24,6 +25,7 @@ export function NewsAudio({ idxno }: { idxno: number }) {
       const blob = await head.blob();
       el.src = URL.createObjectURL(blob);
       await el.play();
+      trackEvent("audio_play", `news:${idxno}`);
       setState("ready");
     } catch {
       setState("error");

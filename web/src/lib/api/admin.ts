@@ -26,6 +26,11 @@ export interface AnalyticsData {
   daily: { day: string; reads: number }[];
   audience: { onboarded: number; pushSubs: number };
   segments: { segment: string; n: number }[];
+  usage?: {
+    audioPlays: number; aiQueries: number;
+    audioByRef: { ref: string; n: number }[];
+    topQueries: { ref: string; n: number }[];
+  };
   generatedAt: string;
 }
 export async function getAnalytics(): Promise<AnalyticsData> {
