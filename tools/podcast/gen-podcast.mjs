@@ -24,13 +24,24 @@ function wrangler(args, opts = {}) {
   return execFileSync("npx", ["wrangler", ...args], { encoding: "utf8", maxBuffer: 64 << 20, ...opts });
 }
 
+function d1(sql) {
+  const out = wrangler(["d1", "execute", "taean-archive", "--remote", "--json", "--command", sql]);
+  return JSON.parse(out)[0]?.results ?? [];
+}
+
 // 1) 최신 발행 리포트(D1)
 function latestReport() {
-  const out = wrangler(["d1", "execute", "taean-archive", "--remote", "--json", "--command",
-    "SELECT week_id, summary, sections FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1;"]);
-  const rows = JSON.parse(out)[0]?.results ?? [];
+  const rows = d1("SELECT week_id, summary, sections FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1;");
   if (!rows.length) throw new Error("발행된 리포트 없음");
   return rows[0];
+}
+
+// 군정 소식·카드뉴스·행사일정(최근) + 한 주간 주요 뉴스 — /reports 화면과 동일 소스
+function recentGov(n = 8) {
+  return d1(`SELECT title, dept FROM gov_notices ORDER BY published_at DESC LIMIT ${n};`);
+}
+function weeklyNews(n = 8) {
+  return d1(`SELECT title FROM archive_articles WHERE length(COALESCE(body,''))>300 ORDER BY published_at DESC LIMIT ${n};`);
 }
 
 async function gemini(model, body, attempt = 0) {
@@ -49,22 +60,23 @@ async function gemini(model, body, attempt = 0) {
 // 2) 2인 대담 대본 (이름·자기소개 없음 — Worker 프롬프트와 동일 취지)
 async function makeDialogue(src) {
   const sys =
-    "너는 따뜻한 지역 라디오 팟캐스트 작가다. 아래 '이번 주 태안 소식'을 두 진행자의 진짜 대화처럼 각색하라.\n" +
+    "너는 따뜻한 지역 라디오 팟캐스트 작가다. 아래 '이번 주 태안 소식(주간 리포트 전체)'을 두 진행자의 진짜 대화처럼 각색하라.\n" +
     "진행자 A: 밝고 호기심 많은 메인 진행자(질문·반응). 진행자 B: 차분한 해설자(배경·의미).\n" +
     "- 진짜 대화처럼 짧게 주고받고 맞장구(\"맞아요\",\"그렇죠\")·연결어 사용. 한 줄 1~2문장.\n" +
     "- 딱딱한 보도체 금지, 쉬운 구어체 존댓말. 진행자 이름·호칭·자기소개 절대 금지.\n" +
-    "- 오프닝은 이름 없이 바로 주제 안내, 클로징은 짧은 마무리 인사.\n" +
-    "- 소식에 없는 사실 창작 금지. 핵심 1~3가지를 깊이 있게.\n" +
-    "- 각 줄을 정확히 'A: ...' 또는 'B: ...' 로만. 18~24줄.";
+    "- 오프닝은 이름 없이 바로 오늘 다룰 내용 소개, 클로징은 짧은 마무리 인사.\n" +
+    "- 소식에 없는 사실 창작 금지.\n" +
+    "- ★중요: 리포트의 '모든 섹션'을 빠짐없이 순서대로 다뤄라(요약/관광·기상, 부동산·지역경제, 다음주 이벤트, 환경 모니터링, 군정 소식·카드뉴스·행사일정, 한 주간 주요 뉴스). 섹션마다 최소 2~3번 주고받으며 자연스럽게 화제를 전환(\"다음은 ~ 소식인데요\").\n" +
+    "- 각 줄을 정확히 'A: ...' 또는 'B: ...' 로만. 28~40줄(전 섹션을 다 담되 각 주제는 간결히).";
   const j = await gemini(TEXT_MODEL, {
     systemInstruction: { parts: [{ text: sys }] },
     contents: [{ parts: [{ text: src }] }],
-    generationConfig: { temperature: 0.8, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { temperature: 0.8, maxOutputTokens: 2800, thinkingConfig: { thinkingBudget: 0 } },
   });
   const text = j.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
   const lines = text.split("\n").map((l) => l.trim())
     .map((l) => { const m = l.match(/^([AB])\s*[:：]\s*(.+)$/); return m ? { sp: m[1], text: m[2].trim().replace(/^["']|["']$/g, "") } : null; })
-    .filter((x) => x && x.text.length > 1).slice(0, 28);
+    .filter((x) => x && x.text.length > 1).slice(0, 44);
   if (lines.length < 4) throw new Error("대본 생성 실패");
   return lines;
 }
@@ -109,7 +121,13 @@ async function main() {
   }
 
   const sections = JSON.parse(rep.sections || "[]");
-  const src = `${rep.summary}\n\n${sections.map((s) => `${s.title || s.key}: ${s.content || ""}`).join("\n").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 3000)}`;
+  const gov = recentGov();
+  const news = weeklyNews();
+  const secText = sections.map((s) => `[${s.title || s.key}]\n${s.content || ""}`).join("\n\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").slice(0, 6000);
+  const govText = gov.length ? `\n\n[군정 소식·카드뉴스·행사일정]\n${gov.map((g) => `- ${g.title}${g.dept ? ` (${g.dept})` : ""}`).join("\n")}` : "";
+  const newsText = news.length ? `\n\n[한 주간 주요 뉴스]\n${news.map((n) => `- ${n.title}`).join("\n")}` : "";
+  const src = `${rep.summary}\n\n${secText}${govText}${newsText}`;
+  console.log(`  소스: 섹션 ${sections.length} · 군정 ${gov.length} · 뉴스 ${news.length}`);
 
   console.log("▸ 대본 생성(Gemini)…");
   const dialogue = await makeDialogue(src);
