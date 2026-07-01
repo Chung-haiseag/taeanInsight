@@ -10,9 +10,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-
 
 function ctxLabel(): { emoji: string; label: string } {
   const h = (new Date().getUTCHours() + 9) % 24;
-  if (h >= 5 && h < 10) return { emoji: "☕", label: "출근길 오디오 브리핑" };
-  if (h >= 18 || h < 5) return { emoji: "🌙", label: "저녁 오디오 브리핑" };
-  return { emoji: "🎧", label: "오늘의 오디오 브리핑" };
+  if (h >= 5 && h < 10) return { emoji: "☕", label: "출근길 뉴스 팟캐스트" };
+  if (h >= 18 || h < 5) return { emoji: "🌙", label: "저녁 뉴스 팟캐스트" };
+  return { emoji: "🎧", label: "오늘의 뉴스 팟캐스트" };
 }
 
 export function BriefingAudio() {
@@ -28,7 +28,7 @@ export function BriefingAudio() {
     if (state === "ready") { void el.play(); return; }
     setState("loading");
     try {
-      const res = await fetch(`${API_BASE}/api/audio/briefing?v=hd3`, { cache: "reload" });
+      const res = await fetch(`${API_BASE}/api/audio/briefing?v=pod`, { cache: "reload" });
       if (res.status === 503 || res.status === 404) { setState("unavailable"); return; }
       if (!res.ok) { setState("error"); return; }
       el.src = URL.createObjectURL(await res.blob());
@@ -45,11 +45,11 @@ export function BriefingAudio() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-brand">{ctx.emoji} {ctx.label}</h2>
-          <p className="mt-0.5 text-xs text-foreground-muted">오늘의 주요 소식을 한 번에 들어보세요 · AI 음성(Google TTS)</p>
+          <p className="mt-0.5 text-xs text-foreground-muted">오늘의 주요 소식을 두 진행자가 대담으로 · AI 생성</p>
         </div>
         <button type="button" onClick={play} disabled={state === "loading"}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-60">
-          {state === "loading" ? "준비 중…" : state === "ready" ? "▶ 다시 듣기" : "▶ 듣기"}
+          {state === "loading" ? "대담 준비 중…(최초 ~20초)" : state === "ready" ? "▶ 다시 듣기" : "▶ 듣기"}
         </button>
       </div>
       <audio ref={ref} controls className={state === "ready" ? "mt-3 w-full" : "hidden"} preload="none" />
