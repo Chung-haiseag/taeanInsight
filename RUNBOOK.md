@@ -233,3 +233,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 기사 낭독 Gemini(무료) 옵션: tools/news-audio 로컬 생성기(무료 키 victory·holyroad 로테이션, 키당 15건→하루 ~30건 무료)→R2 audio/news/<idxno>-gem.wav, Worker 우선 서빙(없으면 Chirp3-HD). launchd 07:00. 유료 위험 0(초과분 Chirp3-HD 폴백)
 
 - 2026-07-01 · 태안뉴스 최신만: /api/news 최근 60일 필터(최소 20건 보장), 그 이전은 /archive. 8개월 69건→최근 34건. news/router
+
+- 2026-07-01 · 태안뉴스 최신순 고정: 관심사 개인화 재정렬 제거(관심분야를 앞으로 끌던 것)→발행일 내림차순만. 관심사는 강조용으로만 전달. news/router

@@ -74,15 +74,9 @@ newsRouter.get("/", async (c) => {
     filtered = items.filter((it) => it.category === category);
   }
 
-  // 관심사 개인화 — 카테고리 미선택(기본 뷰)일 때 관심 분야 기사를 앞으로(최신순 유지)
-  let personalized = false;
-  if (interests) {
-    const set = new Set(interests);
-    const primary = filtered.filter((it) => set.has(it.category));
-    const secondary = filtered.filter((it) => !set.has(it.category));
-    filtered = [...primary, ...secondary];
-    personalized = true;
-  }
+  // 목록은 항상 최신순(발행일 내림차순) — 관심사는 강조 표시용으로만 전달(재정렬 안 함)
+  const personalized = false;
+  filtered = filtered.slice().sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : a.publishedAt > b.publishedAt ? -1 : 0));
 
   if (limit > 0) filtered = filtered.slice(0, limit);
 
