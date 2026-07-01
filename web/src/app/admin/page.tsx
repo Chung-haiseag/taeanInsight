@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
-import { getCostSummary, type MonthlyCostReport } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, type MonthlyCostReport, type AnalyticsData } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -89,8 +89,9 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
   );
 }
 
-type AdminTab = "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
+type AdminTab = "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
+  { key: "analytics", label: "📊 분석" },
   { key: "cost", label: "💰 비용" },
   { key: "report", label: "📅 주간 리포트" },
   { key: "review", label: "🛡 AI 검수" },
@@ -166,6 +167,7 @@ export default function AdminPage() {
         ))}
       </div>
 
+      <div className={tab === "analytics" ? "" : "hidden"}><AnalyticsSection /></div>
       <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
       <div className={tab === "report" ? "" : "hidden"}><ReportPublishSection /></div>
       <div className={tab === "review" ? "" : "hidden"}><ReviewQueueSection /></div>
@@ -201,6 +203,81 @@ function AudioAutomationStatus() {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+// ── 0. 운영·분석 (실수집 데이터) ─────────────────────────────
+function AnalyticsSection() {
+  const [d, setD] = useState<AnalyticsData | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { getAnalytics().then(setD).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패")); }, []);
+  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  const maxDaily = Math.max(1, ...d.daily.map((x) => x.reads));
+  const Kpi = ({ label, val }: { label: string; val: string | number }) => (
+    <div className="rounded-lg border border-brand/10 bg-background p-3 text-center shadow-card">
+      <div className="text-2xl font-bold text-brand">{val}</div>
+      <div className="text-xs text-foreground-muted">{label}</div>
+    </div>
+  );
+  return (
+    <section className="space-y-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Kpi label="총 조회" val={d.reads.total} />
+        <Kpi label="순 독자" val={d.reads.readers} />
+        <Kpi label="평균 체류" val={`${d.reads.avgDwellSec}초`} />
+        <Kpi label="평균 스크롤" val={`${d.reads.avgScrollPct}%`} />
+        <Kpi label="온보딩 사용자" val={d.audience.onboarded} />
+        <Kpi label="푸시 구독" val={d.audience.pushSubs} />
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-brand">일별 조회 (최근 14일)</h3>
+        <div className="flex items-end gap-1 h-24 rounded-lg border border-brand/10 p-2">
+          {d.daily.length === 0 ? <span className="text-xs text-foreground-muted m-auto">데이터 없음</span> :
+            d.daily.map((x) => (
+              <div key={x.day} className="flex-1 flex flex-col items-center justify-end" title={`${x.day}: ${x.reads}`}>
+                <div className="w-full rounded-t bg-accent" style={{ height: `${(x.reads / maxDaily) * 100}%` }} />
+                <span className="mt-1 text-[9px] text-foreground-muted">{x.day.slice(5)}</span>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        <div>
+          <h3 className="mb-2 text-sm font-bold text-brand">인기 기사 Top 10</h3>
+          <ol className="space-y-1 text-sm">
+            {d.topArticles.map((a, i) => (
+              <li key={a.idxno} className="flex justify-between gap-2 border-b border-brand/5 py-1">
+                <span className="truncate"><span className="text-foreground-muted mr-1">{i + 1}.</span>{a.title}</span>
+                <span className="shrink-0 text-foreground-muted">{a.reads}회 · {a.avgDwellSec}초</span>
+              </li>
+            ))}
+            {d.topArticles.length === 0 && <li className="text-xs text-foreground-muted">데이터 없음</li>}
+          </ol>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-brand">카테고리별 조회</h3>
+            <ul className="space-y-1 text-sm">
+              {d.byCategory.map((x) => (
+                <li key={x.category} className="flex justify-between border-b border-brand/5 py-1"><span>{x.category}</span><span className="text-foreground-muted">{x.reads}</span></li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-brand">독자 세그먼트</h3>
+            <ul className="space-y-1 text-sm">
+              {d.segments.map((x) => (
+                <li key={x.segment} className="flex justify-between border-b border-brand/5 py-1"><span>{x.segment}</span><span className="text-foreground-muted">{x.n}명</span></li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-foreground-muted">기준 {new Date(d.generatedAt).toLocaleString("ko-KR")} · 실수집 행동 데이터</p>
     </section>
   );
 }

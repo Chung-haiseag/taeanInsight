@@ -17,3 +17,17 @@ export interface MonthlyCostReport {
 export async function getCostSummary(): Promise<MonthlyCostReport> {
   return apiFetch<MonthlyCostReport>("/api/cost/summary");
 }
+
+// 운영·분석 대시보드 (backend/src/analytics/router.ts)
+export interface AnalyticsData {
+  reads: { total: number; readers: number; avgDwellSec: number; avgScrollPct: number };
+  topArticles: { idxno: number; title: string; reads: number; avgDwellSec: number }[];
+  byCategory: { category: string; reads: number }[];
+  daily: { day: string; reads: number }[];
+  audience: { onboarded: number; pushSubs: number };
+  segments: { segment: string; n: number }[];
+  generatedAt: string;
+}
+export async function getAnalytics(): Promise<AnalyticsData> {
+  return apiFetch<AnalyticsData>("/api/admin/analytics");
+}

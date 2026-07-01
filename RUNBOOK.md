@@ -239,3 +239,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 태안뉴스 회차 누락 보강: 라이브 수집이 6/19 등 일부 회차 누락 → 완전한 D1 아카이브(최근 35일) 병합·중복제거. 기본 상한 60건(최신 3회차), D1 바인드 100 한도 보호(500 수정). news/router
 
 - 2026-07-01 · 오디오 자동화 완성: setup-launchd.sh(팟캐스트 금18시+기사낭독 매일7시 원클릭 설치), 생성기가 audio/status.json 기록, GET /api/audio/status(현황), /admin 오디오 자동생성 현황 카드
+
+- 2026-07-01 · 운영·분석 대시보드: /api/admin/analytics(reading_events 조회·체류·스크롤, 인기기사 Top10, 카테고리, 일별추이, 온보딩·푸시 규모, 세그먼트). /admin "📊 분석" 탭. analytics/router
