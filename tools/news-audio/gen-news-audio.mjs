@@ -51,11 +51,11 @@ const keyAvail = (i) => !exhausted.has(i) && used[i] < PER_KEY;
 const allExhausted = () => KEYS.every((_, i) => !keyAvail(i));
 
 async function ttsOnce(key, text) {
+  // TTS 프리뷰 모델은 systemInstruction 미지원(500). 인라인 스타일 지시만 사용.
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${key}`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `${normalize(text)}` }] }],
-      systemInstruction: { parts: [{ text: "너는 뉴스 낭독 성우다. 위 기사 본문을 차분하고 또렷하게 소리내어 읽는다. 텍스트를 생성하지 말고 음성만 출력한다." }] },
+      contents: [{ parts: [{ text: `다음 뉴스 기사를 아나운서처럼 차분하고 또렷하게 읽어줘:\n\n${normalize(text)}` }] }],
       generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } },
     }),
   });
@@ -71,7 +71,7 @@ async function geminiTts(text) {
     if (!keyAvail(ki)) return { exhausted: true };
     try {
       const res = await ttsOnce(KEYS[ki], text);
-      if (res.status === 429) { exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; } // 한도 → 다음 키
+      if (res.status === 429) { console.warn(`  키#${ki + 1} 429 일일한도 도달`); exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; } // 한도 → 다음 키
       if (!res.ok) { console.warn(`  키#${ki + 1} ${res.status} 재시도`); await sleep(1200); continue; } // 일시 오류 → 재시도
       const j = await res.json();
       const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
