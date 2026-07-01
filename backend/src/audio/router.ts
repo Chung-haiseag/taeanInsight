@@ -8,10 +8,24 @@ import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
-const KEY = (idxno: number) => `audio/news/${idxno}-hd.mp3`; // -hd: Chirp3-HD 음성(구 Neural2 캐시 무효화)
+const KEY = (idxno: number) => `audio/news/${idxno}-hd2.mp3`; // -hd2: Chirp3-HD + TTS 정규화(구 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
-// 텍스트 → mp3 바이트(Google TTS Neural2). 실패 시 null.
+// TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로(가운뎃점·물결표 범위·괄호·단위)
+function normalizeForTts(t: string): string {
+  return t
+    .replace(/(\d)\s*[~∼〜･·]\s*(\d)/g, "$1에서 $2")   // 숫자 범위(18~45, 18·45) → 에서
+    .replace(/[·・‧∙•ㆍ]/g, ", ")                        // 가운뎃점 나열 → 쉼표 휴지
+    .replace(/[~∼〜]/g, " ")                              // 남은 물결표 제거
+    .replace(/[（(]/g, ", ").replace(/[）)]/g, ", ")      // 괄호 → 쉼표 휴지
+    .replace(/(\d)\s*%/g, "$1 퍼센트")
+    .replace(/㎡/g, "제곱미터").replace(/㎞/g, "킬로미터").replace(/㎏/g, "킬로그램")
+    .replace(/\s*[·]\s*/g, ", ")
+    .replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1")
+    .trim();
+}
+
+// 텍스트 → mp3 바이트(Google TTS Chirp3-HD). 실패 시 null.
 async function googleTts(env: Env, text: string, voice = "ko-KR-Chirp3-HD-Aoede"): Promise<Uint8Array | null> {
   const apiKey = (env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY;
   if (!apiKey) return null;
@@ -20,7 +34,7 @@ async function googleTts(env: Env, text: string, voice = "ko-KR-Chirp3-HD-Aoede"
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        input: { text: text.slice(0, 4800) },          // Google 한도 5000자
+        input: { text: normalizeForTts(text).slice(0, 4800) },          // Google 한도 5000자
         voice: { languageCode: "ko-KR", name: voice },
         audioConfig: { audioEncoding: "MP3", speakingRate: 1.0 },
       }),
