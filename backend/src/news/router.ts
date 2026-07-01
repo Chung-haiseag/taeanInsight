@@ -7,11 +7,14 @@ import type { Env } from "../types";
 import {
   NEWS_CATEGORY_LABELS,
   categoryCounts,
+  classifyNews,
   getNews,
   getNewsFast,
   writeNewsCache,
   type NewsCategory,
 } from "./ingest";
+
+const ARTICLE_BASE = "https://www.taeannews.co.kr/news/articleView.html?idxno=";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
 
 // uid(헤더 X-Taean-Uid 또는 ?uid=)로 저장된 관심 분야 로드
@@ -60,7 +63,30 @@ newsRouter.get("/", async (c) => {
     return c.json({ error: "rss_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
   }
 
-  // 최신 뉴스만 노출 — 최근 60일(단, 너무 적으면 최신 20건 보장). 그 이전은 /archive.
+  // 라이브 수집이 일부 회차를 누락(예: 6/19)하므로 완전한 D1 아카이브에서 최근 기사 병합
+  if (c.env.ARCHIVE_DB) {
+    try {
+      const cutoffDt = new Date(Date.now() - 35 * 86_400_000).toISOString().slice(0, 10);
+      const rs = await c.env.ARCHIVE_DB
+        .prepare("SELECT idxno, title, published_at, category, excerpt, author FROM archive_articles WHERE published_at >= ? AND title NOT LIKE '%광고%' ORDER BY published_at DESC LIMIT 400")
+        .bind(cutoffDt)
+        .all<{ idxno: number; title: string; published_at: string; category: string | null; excerpt: string | null; author: string | null }>();
+      const have = new Set(items.map((i) => String(i.id)));
+      for (const r of rs.results ?? []) {
+        const id = String(r.idxno);
+        if (have.has(id)) continue;
+        have.add(id);
+        items.push({
+          id, title: r.title, url: `${ARTICLE_BASE}${id}`,
+          excerpt: r.excerpt ?? "", author: r.author ?? "",
+          publishedAt: (r.published_at || "").replace("T", " ").slice(0, 19),
+          category: (r.category as NewsCategory) || classifyNews(r.title),
+        });
+      }
+    } catch { /* 아카이브 병합 실패는 무시(라이브 목록 유지) */ }
+  }
+
+  // 최신 뉴스만 노출 — 최근 30일(단, 너무 적으면 최신 20건 보장). 그 이전은 /archive.
   const RECENT_DAYS = 30, MIN_ITEMS = 20;
   const cutoff = new Date(Date.now() - RECENT_DAYS * 86_400_000).toISOString().slice(0, 10);
   const recent = items.filter((it) => (it.publishedAt || "").slice(0, 10) >= cutoff);
@@ -78,11 +104,12 @@ newsRouter.get("/", async (c) => {
   const personalized = false;
   filtered = filtered.slice().sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : a.publishedAt > b.publishedAt ? -1 : 0));
 
-  if (limit > 0) filtered = filtered.slice(0, limit);
+  // 기본 상한 60건(최신순) — 화면 정돈 + D1 바인드 파라미터 한도(100) 보호. 그 이전은 /archive.
+  filtered = filtered.slice(0, limit > 0 ? limit : 60);
 
-  // 대표사진: 아카이브(D1)에 백필/수집된 lead_image를 배치 조인해 부착
+  // 대표사진: 아카이브(D1)에 백필/수집된 lead_image를 배치 조인해 부착(≤100 바인드)
   if (c.env.ARCHIVE_DB && filtered.length) {
-    const ids = filtered.map((it) => Number(it.id)).filter((n) => Number.isFinite(n) && n > 0);
+    const ids = filtered.map((it) => Number(it.id)).filter((n) => Number.isFinite(n) && n > 0).slice(0, 100);
     if (ids.length) {
       const rs = await c.env.ARCHIVE_DB
         .prepare(`SELECT idxno, lead_image, excerpt FROM archive_articles WHERE idxno IN (${ids.map(() => "?").join(",")})`)
