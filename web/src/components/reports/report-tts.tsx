@@ -5,9 +5,21 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// TTS용 정규화 — 기호를 자연스러운 낭독으로(백엔드 normalizeForTts와 동일 취지)
+function normalizeForTts(t: string): string {
+  return t
+    .replace(/(\d)\s*[~∼〜]\s*(\d)/g, "$1에서 $2")
+    .replace(/[·・‧∙•ㆍ]/g, ", ")
+    .replace(/[~∼〜]/g, " ")
+    .replace(/[（(]/g, ", ").replace(/[）)]/g, ", ")
+    .replace(/(\d)\s*%/g, "$1 퍼센트")
+    .replace(/㎡/g, "제곱미터").replace(/㎞/g, "킬로미터").replace(/㎏/g, "킬로그램")
+    .replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1").trim();
+}
+
 // 텍스트를 ~180자 이하 청크로 분할(문장 경계 우선)
 function chunk(text: string): string[] {
-  const sentences = text.replace(/\s+/g, " ").trim().split(/(?<=[.!?。…\n])\s+/);
+  const sentences = normalizeForTts(text).replace(/\s+/g, " ").trim().split(/(?<=[.!?。…\n])\s+/);
   const out: string[] = [];
   let buf = "";
   for (const s of sentences) {
