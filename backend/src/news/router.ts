@@ -61,7 +61,7 @@ newsRouter.get("/", async (c) => {
   }
 
   // 최신 뉴스만 노출 — 최근 60일(단, 너무 적으면 최신 20건 보장). 그 이전은 /archive.
-  const RECENT_DAYS = 60, MIN_ITEMS = 20;
+  const RECENT_DAYS = 30, MIN_ITEMS = 20;
   const cutoff = new Date(Date.now() - RECENT_DAYS * 86_400_000).toISOString().slice(0, 10);
   const recent = items.filter((it) => (it.publishedAt || "").slice(0, 10) >= cutoff);
   items = recent.length >= MIN_ITEMS ? recent : items.slice(0, MIN_ITEMS);
