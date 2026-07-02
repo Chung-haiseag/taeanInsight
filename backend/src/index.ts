@@ -23,6 +23,7 @@ import { readingRouter } from "./reading/router";
 import { reporterRouter } from "./reporter/router";
 import { audioRouter } from "./audio/router";
 import { analyticsRouter } from "./analytics/router";
+import { clipsRouter, fetchAndStoreClips } from "./clips/router";
 import { authRouter } from "./auth/router";
 import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
@@ -85,6 +86,7 @@ app.route("/api/reading", readingRouter);
 app.route("/api/reporter", reporterRouter);
 app.route("/api/audio", audioRouter);
 app.route("/api/admin/analytics", analyticsRouter);
+app.route("/api/clips", clipsRouter);
 app.route("/api/auth", authRouter);
 app.route("/api/conditions", envRouter);
 app.route("/api/reports", reportsRouter);
@@ -160,6 +162,10 @@ export default {
         const e = await embedRecentArticles(env, 80, 30);
         if (e.embedded) console.log(`[cron12h] 기사 임베딩: ${e.embedded}건`);
       } catch (e) { console.warn("[cron12h] 임베딩 실패:", e instanceof Error ? e.message : e); }
+      try {
+        const c = await fetchAndStoreClips(env);
+        if (c.inserted) console.log(`[cron12h] 언론 클리핑: 신규 ${c.inserted}/${c.fetched}`);
+      } catch (e) { console.warn("[cron12h] 클리핑 실패:", e instanceof Error ? e.message : e); }
       return;
     }
 
