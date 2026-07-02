@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
-  getReporterMe, registerReporter, unregisterReporter,
+  getReporterMe, registerReporter, unregisterReporter, getNewsClips,
   addReporterKeyword, deleteReporterKeyword, getReporterAlerts, draftFromAlert,
   type ReporterKeyword, type ReporterAlert,
 } from "@/lib/api/reporter";
@@ -124,6 +124,34 @@ export default function ReporterPage() {
           </ul>
         )}
       </section>
+
+      <NewsClips />
     </div>
+  );
+}
+
+function NewsClips() {
+  const [clips, setClips] = useState<import("@/lib/api/reporter").NewsClip[] | null>(null);
+  useEffect(() => { getNewsClips().then((r) => setClips(r.clips)).catch(() => setClips([])); }, []);
+  if (!clips || clips.length === 0) return null;
+  return (
+    <section className="mt-8">
+      <h2 className="text-lg font-bold text-brand">📰 언론 클리핑 <span className="text-xs font-normal text-foreground-muted">— 태안 관련 외부 매체 보도</span></h2>
+      <ul className="mt-3 divide-y divide-brand/10">
+        {clips.map((c, i) => (
+          <li key={i} className="py-2.5">
+            <a href={c.url} target="_blank" rel="noopener noreferrer" className="group block">
+              <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
+                <span className="rounded-full bg-brand/10 px-1.5 py-0.5 font-semibold">{c.source}</span>
+                <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-accent">{c.keyword}</span>
+                <span>{(c.pub_date ?? "").slice(0, 10)}</span>
+              </div>
+              <p className="mt-0.5 font-semibold text-brand group-hover:underline">{c.title}</p>
+              {c.description && <p className="mt-0.5 text-sm text-foreground-muted line-clamp-2">{c.description}</p>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -257,3 +257,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-02 · 동적 OG 이미지: /api/og(next/og ImageResponse, 제목 그린 브랜드 카드, 한국어 Do Hyeon TTF 런타임로드·모듈캐시). 대표사진 없는 기사·리포트 og:image로 사용. (OpenNext: runtime=edge 금지, woff 비호환→ttf)
 
 - 2026-07-02 · 카카오 로그인(OAuth): users provider/provider_id(026), /api/auth/kakao/start·callback(code→토큰→프로필→계정 생성/로그인→세션), 익명 uid 귀속. /login "카카오로 시작". KAKAO_REST_KEY 시크릿 필요
+
+- 2026-07-02 · 언론 클리핑 자동화: news_clips(027)+네이버 뉴스검색(태안군·안면도 등, 자사 제외), 12h cron 수집, GET /api/clips, /reporter "언론 클리핑" 피드. ⚠️네이버 앱에 검색 API 추가 필요(현재 데이터랩만→401)

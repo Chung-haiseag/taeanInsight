@@ -18,3 +18,6 @@ export const getReporterAlerts = () => apiFetch<{ alerts: ReporterAlert[] }>("/a
 export interface ArticleDraft { title: string; body: string; sources: { title: string; url: string }[] }
 export const draftFromAlert = (a: { title?: string; body?: string; kind?: string }) =>
   apiFetch<ArticleDraft>("/api/reporter/draft", { method: "POST", body: JSON.stringify(a) });
+
+export interface NewsClip { title: string; url: string; source: string; description: string; keyword: string; pub_date: string }
+export const getNewsClips = () => apiFetch<{ clips: NewsClip[] }>("/api/clips");
