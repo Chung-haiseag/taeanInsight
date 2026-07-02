@@ -253,3 +253,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 오디오 재생 실패 수정: 큰 파일(팟캐스트 9MB·Gemini 기사 5MB) blob 다운로드 중 사용자 제스처 만료→자동재생 차단. 직접 스트리밍(el.src+즉시 play)으로 전환(팟캐스트·기사·브리핑)
 
 - 2026-07-02 · 공유·SEO: 기사별 OG 메타(카카오톡 카드 — 제목·발췌·대표사진), /api/news/:id 아카이브 보강(excerpt·leadImage), 기본 og.png(1200x630), sitemap.xml·robots.txt, 루트 og:image. 기사 페이지 서버/클라 분리(generateMetadata)
+
+- 2026-07-02 · 동적 OG 이미지: /api/og(next/og ImageResponse, 제목 그린 브랜드 카드, 한국어 Do Hyeon TTF 런타임로드·모듈캐시). 대표사진 없는 기사·리포트 og:image로 사용. (OpenNext: runtime=edge 금지, woff 비호환→ttf)
