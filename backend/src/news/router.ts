@@ -146,11 +146,22 @@ newsRouter.get("/:id", async (c) => {
     return c.json({ error: "rss_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
   }
   const item = items.find((it) => it.id === c.req.param("id"));
-  if (!item) return c.json({ error: "not_found" }, 404);
+  // 목록에 없어도 아카이브(D1)에 있으면 그걸로 — 발췌·대표사진 보강(공유 카드용)
+  let excerpt = item?.excerpt ?? "", leadImage: string | null = null, title = item?.title ?? "";
+  if (c.env.ARCHIVE_DB) {
+    const idxno = Number(c.req.param("id"));
+    if (Number.isFinite(idxno)) {
+      const a = await c.env.ARCHIVE_DB
+        .prepare("SELECT title, lead_image, substr(COALESCE(excerpt, body, ''),1,160) AS ex FROM archive_articles WHERE idxno=?")
+        .bind(idxno).first<{ title: string; lead_image: string | null; ex: string | null }>();
+      if (a) { title = title || a.title; excerpt = excerpt || (a.ex ?? ""); leadImage = a.lead_image; }
+    }
+  }
+  if (!item && !title) return c.json({ error: "not_found" }, 404);
   return c.json({
-    ...item,
-    categoryLabel: NEWS_CATEGORY_LABELS[item.category],
-    // 본문 출처 표시: 현재는 발췌(RSS). 백필 전문 연동 시 fullText:true 로 전환
+    ...(item ?? { id: c.req.param("id"), category: "society" as const }),
+    title, excerpt, leadImage,
+    categoryLabel: item ? NEWS_CATEGORY_LABELS[item.category] : "지역사회",
     bodySource: "rss_excerpt",
   });
 });
