@@ -104,6 +104,6 @@ clipsRouter.get("/", async (c) => {
 
 clipsRouter.post("/run", async (c) => {
   const token = c.req.header("Authorization")?.replace("Bearer ", "");
-  if (c.env.GOV_IMPORT_TOKEN && token !== c.env.GOV_IMPORT_TOKEN) return c.json({ error: "unauthorized" }, 401);
+  if (!c.env.GOV_IMPORT_TOKEN || token !== c.env.GOV_IMPORT_TOKEN) return c.json({ error: "unauthorized" }, 401);
   return c.json(await fetchAndStoreClips(c.env));
 });

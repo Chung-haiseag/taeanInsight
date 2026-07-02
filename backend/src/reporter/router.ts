@@ -81,11 +81,6 @@ reporterRouter.get("/alerts", async (c) => {
 });
 
 // 임시 실발송 검증(무인증) — 확인 후 제거
-reporterRouter.get("/_runtest", async (c) => {
-  const { runReporterAlerts } = await import("./alerts");
-  return c.json(await runReporterAlerts(c.env));
-});
-
 // POST /api/reporter/draft — 취재 알림 내용 → AI 기사 초안(관련 과거기사 RAG 포함)
 const draftSchema = z.object({ title: z.string().max(200).optional(), body: z.string().max(2000).optional(), kind: z.string().max(20).optional() });
 const DRAFT_STOP = new Set(["태안군", "태안", "안내", "공지", "새소식", "카드뉴스", "주간행사계획", "취재", "알림", "관련", "그리고", "위해", "통해"]);

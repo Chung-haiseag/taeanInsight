@@ -265,3 +265,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-02 · VPS 공존 배포 패키지(tools/vps): 기존 카페24/리눅스 VPS에 taean- 네임스페이스 systemd 4개(군청6h·CCTV30m·팟캐스트금18시·기사낭독매일7시). 통합 taean.env, install.sh(node·poppler·wrangler), Cloudflare API 토큰으로 헤드리스 D1/R2. data.go.kr·네이버는 Worker 유지
 
 - 2026-07-02 · 계정 완성: /account 설정(이름변경·비번변경·탈퇴), POST /api/auth/{profile,change-password,delete}(세션 토큰 검증, 소셜은 비번 제외, 비번변경 시 타 세션 무효화). 헤더 이름→/account
+
+- 2026-07-02 · 보안 리뷰 수정: 카카오 OAuth 리다이렉트 호스트 화이트리스트(오픈리다이렉트=계정탈취 방지), /clips/run fail-closed, 잔존 디버그 라우트 제거(reporter/_runtest·env/_debug_tour·_debug_realestate)
