@@ -251,3 +251,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-01 · 오디오 브리핑을 2인 대담 팟캐스트로 전환(synthNewsPodcast 공용화). 별도 "내 관심사 팟캐스트"(me-podcast) 삭제. /me 브리핑=출근길/저녁 뉴스 팟캐스트
 
 - 2026-07-01 · 오디오 재생 실패 수정: 큰 파일(팟캐스트 9MB·Gemini 기사 5MB) blob 다운로드 중 사용자 제스처 만료→자동재생 차단. 직접 스트리밍(el.src+즉시 play)으로 전환(팟캐스트·기사·브리핑)
+
+- 2026-07-02 · 공유·SEO: 기사별 OG 메타(카카오톡 카드 — 제목·발췌·대표사진), /api/news/:id 아카이브 보강(excerpt·leadImage), 기본 og.png(1200x630), sitemap.xml·robots.txt, 루트 og:image. 기사 페이지 서버/클라 분리(generateMetadata)
