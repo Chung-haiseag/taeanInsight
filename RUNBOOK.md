@@ -263,3 +263,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-02 · 일간 클리핑 다이제스트: 매일 07시 KST(0 22 * * *) 지난 24h 태안 외부보도를 기자에게 Web Push 1건 묶음("📰 태안 언론보도 N건"+상위4). clips/sendClippingDigest
 
 - 2026-07-02 · VPS 공존 배포 패키지(tools/vps): 기존 카페24/리눅스 VPS에 taean- 네임스페이스 systemd 4개(군청6h·CCTV30m·팟캐스트금18시·기사낭독매일7시). 통합 taean.env, install.sh(node·poppler·wrangler), Cloudflare API 토큰으로 헤드리스 D1/R2. data.go.kr·네이버는 Worker 유지
+
+- 2026-07-02 · 계정 완성: /account 설정(이름변경·비번변경·탈퇴), POST /api/auth/{profile,change-password,delete}(세션 토큰 검증, 소셜은 비번 제외, 비번변경 시 타 세션 무효화). 헤더 이름→/account

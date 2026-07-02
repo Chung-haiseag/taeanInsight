@@ -106,6 +106,62 @@ authRouter.get("/me", async (c) => {
   return c.json({ user: { email: row.email, uid: row.uid, displayName: row.display_name } });
 });
 
+// 세션 토큰 → 사용자 조회(계정 관리 공용)
+async function userFromToken(db: D1Database, token: string | null) {
+  if (!token) return null;
+  return db.prepare(
+    "SELECT u.id, u.email, u.uid, u.display_name, u.pw_hash, u.pw_salt, u.provider FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at > ?")
+    .bind(token, new Date().toISOString())
+    .first<{ id: number; email: string; uid: string; display_name: string | null; pw_hash: string; pw_salt: string; provider: string }>();
+}
+
+// POST /api/auth/profile — 표시 이름 변경
+authRouter.post("/profile", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const user = await userFromToken(db, bearer(c));
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+  const body = await c.req.json().catch(() => ({})) as { displayName?: string };
+  const name = (body.displayName ?? "").trim().slice(0, 40);
+  await db.prepare("UPDATE users SET display_name=? WHERE id=?").bind(name || null, user.id).run();
+  return c.json({ ok: true, displayName: name || null });
+});
+
+// POST /api/auth/change-password — 현재 비번 확인 후 변경(이메일 계정만)
+authRouter.post("/change-password", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const user = await userFromToken(db, bearer(c));
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+  if (user.provider !== "email" || !user.pw_hash) return c.json({ error: "social_account", hint: "소셜 로그인 계정은 비밀번호가 없습니다" }, 400);
+  const body = await c.req.json().catch(() => ({})) as { currentPassword?: string; newPassword?: string };
+  if (!body.currentPassword || !body.newPassword || body.newPassword.length < 8) return c.json({ error: "invalid_input" }, 400);
+  const cur = await hashPw(body.currentPassword, user.pw_salt);
+  if (!safeEq(cur, user.pw_hash)) return c.json({ error: "invalid_credentials" }, 401);
+  const salt = randHex(16);
+  const hash = await hashPw(body.newPassword, salt);
+  await db.prepare("UPDATE users SET pw_hash=?, pw_salt=? WHERE id=?").bind(hash, salt, user.id).run();
+  // 다른 세션 무효화(현재 토큰 제외)
+  await db.prepare("DELETE FROM sessions WHERE user_id=? AND token<>?").bind(user.id, bearer(c)).run();
+  return c.json({ ok: true });
+});
+
+// POST /api/auth/delete — 계정 삭제(이메일 계정은 비번 확인)
+authRouter.post("/delete", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const user = await userFromToken(db, bearer(c));
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+  if (user.provider === "email" && user.pw_hash) {
+    const body = await c.req.json().catch(() => ({})) as { password?: string };
+    const h = await hashPw(body.password ?? "", user.pw_salt);
+    if (!safeEq(h, user.pw_hash)) return c.json({ error: "invalid_credentials" }, 401);
+  }
+  await db.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id).run();
+  await db.prepare("DELETE FROM users WHERE id=?").bind(user.id).run();
+  return c.json({ ok: true });
+});
+
 // ── 카카오 로그인(OAuth) ────────────────────────────────
 const KAKAO_CB = "https://taean-insight-api.chs9182.workers.dev/api/auth/kakao/callback";
 
