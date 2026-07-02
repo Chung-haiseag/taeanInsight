@@ -106,6 +106,68 @@ authRouter.get("/me", async (c) => {
   return c.json({ user: { email: row.email, uid: row.uid, displayName: row.display_name } });
 });
 
+// ── 카카오 로그인(OAuth) ────────────────────────────────
+const KAKAO_CB = "https://taean-insight-api.chs9182.workers.dev/api/auth/kakao/callback";
+
+// GET /api/auth/kakao/start?redirect=<프론트 콜백>&uid=<익명uid> — 카카오 인증으로 리다이렉트
+authRouter.get("/kakao/start", async (c) => {
+  const key = (c.env as Env & { KAKAO_REST_KEY?: string }).KAKAO_REST_KEY;
+  if (!key) return c.json({ error: "kakao_not_configured", hint: "KAKAO_REST_KEY 시크릿 설정" }, 503);
+  const redirect = c.req.query("redirect") || "https://insight.taeannews.co.kr/login";
+  const uid = c.req.query("uid") || "";
+  const state = btoa(JSON.stringify({ redirect, uid })).replace(/=+$/, "");
+  const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${key}&redirect_uri=${encodeURIComponent(KAKAO_CB)}&state=${encodeURIComponent(state)}&scope=profile_nickname,account_email`;
+  return c.redirect(url, 302);
+});
+
+// GET /api/auth/kakao/callback?code=&state= — 토큰교환→프로필→계정 생성/로그인→프론트로 토큰 전달
+authRouter.get("/kakao/callback", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  const key = (c.env as Env & { KAKAO_REST_KEY?: string }).KAKAO_REST_KEY;
+  if (!db || !key) return c.text("unconfigured", 503);
+  const code = c.req.query("code");
+  let redirect = "https://insight.taeannews.co.kr/login", uid = "";
+  try { const s = JSON.parse(atob(c.req.query("state") || "")); redirect = s.redirect || redirect; uid = s.uid || ""; } catch { /* */ }
+  if (!code) return c.redirect(`${redirect}?error=kakao_denied`, 302);
+
+  try {
+    // 1) code → access token
+    const tokRes = await fetch("https://kauth.kakao.com/oauth/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "authorization_code", client_id: key, redirect_uri: KAKAO_CB, code }),
+    });
+    const tok = await tokRes.json() as { access_token?: string };
+    if (!tok.access_token) return c.redirect(`${redirect}?error=kakao_token`, 302);
+
+    // 2) 프로필
+    const meRes = await fetch("https://kapi.kakao.com/v2/user/me", { headers: { Authorization: `Bearer ${tok.access_token}` } });
+    const me = await meRes.json() as { id?: number; kakao_account?: { email?: string; profile?: { nickname?: string } } };
+    if (!me.id) return c.redirect(`${redirect}?error=kakao_profile`, 302);
+    const kakaoId = String(me.id);
+    const email = me.kakao_account?.email?.toLowerCase() || `kakao_${kakaoId}@kakao.local`;
+    const nick = me.kakao_account?.profile?.nickname || "카카오 사용자";
+
+    // 3) 계정 조회(provider_id) / 생성
+    let user = await db.prepare("SELECT id, uid FROM users WHERE provider='kakao' AND provider_id=?").bind(kakaoId).first<{ id: number; uid: string }>();
+    if (!user) {
+      const existingUid = /^[A-Za-z0-9_-]{8,64}$/.test(uid) ? uid : `u_${randHex(11)}`;
+      const now = new Date().toISOString();
+      const res = await db.prepare(
+        "INSERT INTO users (email, pw_hash, pw_salt, uid, display_name, provider, provider_id, created_at, last_login_at) VALUES (?,?,?,?,?,?,?,?,?)")
+        .bind(email, "", "", existingUid, nick, "kakao", kakaoId, now, now).run();
+      user = { id: Number(res.meta.last_row_id), uid: existingUid };
+    } else {
+      await db.prepare("UPDATE users SET last_login_at=? WHERE id=?").bind(new Date().toISOString(), user.id).run();
+    }
+    const token = await createSession(db, user.id);
+    // 4) 프론트로 토큰 전달(쿼리) — 프론트가 저장 후 정리
+    return c.redirect(`${redirect}?kakao_token=${token}&uid=${user.uid}`, 302);
+  } catch {
+    return c.redirect(`${redirect}?error=kakao_failed`, 302);
+  }
+});
+
 // POST /api/auth/logout
 authRouter.post("/logout", async (c) => {
   const db = c.env.ARCHIVE_DB;
