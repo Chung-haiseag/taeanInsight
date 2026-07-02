@@ -1,5 +1,10 @@
 // 공통 타입 정의
 
+// Cloudflare Rate Limiting 바인딩(설치 타입에 없을 수 있어 명시)
+export interface RateLimit {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   // 환경변수
   MONTHLY_COST_LIMIT_KRW: string;       // "300000"
@@ -36,6 +41,8 @@ export interface Env {
   ARCHIVE_PHOTOS?: R2Bucket;      // 사진 파일
   AI?: Ai;                        // Workers AI (저가 오픈모델)
   VECTORIZE?: VectorizeIndex;     // 기사 임베딩 인덱스(독자 맥락 추천)
+  LOGIN_RL?: RateLimit;           // 로그인 무차별 대입 방어
+  AUDIO_RL?: RateLimit;           // 오디오 온디맨드 생성 남용 방어
 
   // 향후 추가
   // CACHE: KVNamespace;

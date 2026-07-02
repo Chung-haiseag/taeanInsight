@@ -267,3 +267,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-02 · 계정 완성: /account 설정(이름변경·비번변경·탈퇴), POST /api/auth/{profile,change-password,delete}(세션 토큰 검증, 소셜은 비번 제외, 비번변경 시 타 세션 무효화). 헤더 이름→/account
 
 - 2026-07-02 · 보안 리뷰 수정: 카카오 OAuth 리다이렉트 호스트 화이트리스트(오픈리다이렉트=계정탈취 방지), /clips/run fail-closed, 잔존 디버그 라우트 제거(reporter/_runtest·env/_debug_tour·_debug_realestate)
+
+- 2026-07-03 · 레이트리밋(Cloudflare 네이티브 ratelimits 바인딩): LOGIN_RL 8/60s(로그인·가입 무차별대입), AUDIO_RL 30/60s(오디오 온디맨드 생성 남용). CF-Connecting-IP 키. 429 반환
