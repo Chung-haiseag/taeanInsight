@@ -73,6 +73,26 @@ export function consumeKakaoCallback(): boolean {
   } catch { return false; }
 }
 
+async function authPost(path: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
+  const token = getAuthToken();
+  if (!token) return { ok: false, error: "unauthorized" };
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, error: res.ok ? undefined : String(data.error ?? "실패") };
+}
+
+export const updateProfile = (displayName: string) => authPost("/api/auth/profile", { displayName });
+export const changePassword = (currentPassword: string, newPassword: string) => authPost("/api/auth/change-password", { currentPassword, newPassword });
+export async function deleteAccount(password?: string): Promise<{ ok: boolean; error?: string }> {
+  const r = await authPost("/api/auth/delete", { password });
+  if (r.ok) { setAuthToken(null); resetUid(); }
+  return r;
+}
+
 export async function logout(): Promise<void> {
   const token = getAuthToken();
   try { if (token) await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }); } catch { /* 무시 */ }
