@@ -1,0 +1,10 @@
+[Unit]
+Description=Taean 도로 CCTV 갱신 (한국 IP·ITS 9443)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean.env
+WorkingDirectory=__REPO__
+ExecStart=/usr/bin/node tools/cctv/refresh-cctv.mjs
+Nice=10

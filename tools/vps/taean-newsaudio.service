@@ -1,0 +1,11 @@
+[Unit]
+Description=Taean 주요 기사 낭독 생성 (Gemini, 한국 IP)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean.env
+WorkingDirectory=__REPO__
+ExecStart=/usr/bin/node tools/news-audio/gen-news-audio.mjs
+Nice=10
+TimeoutStartSec=900

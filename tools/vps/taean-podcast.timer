@@ -1,0 +1,7 @@
+[Unit]
+Description=태안 팟캐스트 매주 금 18:00 (KST)
+[Timer]
+OnCalendar=Fri 18:00
+Persistent=true
+[Install]
+WantedBy=timers.target

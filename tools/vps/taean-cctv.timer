@@ -1,0 +1,8 @@
+[Unit]
+Description=태안 CCTV 30분마다
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+Persistent=true
+[Install]
+WantedBy=timers.target
