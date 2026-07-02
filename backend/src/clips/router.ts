@@ -51,7 +51,6 @@ export async function fetchAndStoreClips(env: Env): Promise<{ fetched: number; i
   return { fetched, inserted };
 }
 
-clipsRouter.get("/_test", async (c) => { return c.json(await fetchAndStoreClips(c.env)); }); // 임시
 
 clipsRouter.get("/", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ clips: [] });
