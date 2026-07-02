@@ -52,6 +52,46 @@ export async function fetchAndStoreClips(env: Env): Promise<{ fetched: number; i
 }
 
 
+// 일간 클리핑 다이제스트 — 지난 24h 외부 보도를 기자에게 한 묶음 푸시(아침 cron)
+export async function sendClippingDigest(env: Env): Promise<{ clips: number; sent: number; skipped?: string }> {
+  if (!env.ARCHIVE_DB) return { clips: 0, sent: 0, skipped: "no_db" };
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const r = await env.ARCHIVE_DB
+    .prepare("SELECT title, source FROM news_clips WHERE created_at >= ? ORDER BY pub_date DESC LIMIT 30")
+    .bind(since).all<{ title: string; source: string }>();
+  const clips = r.results ?? [];
+  if (!clips.length) return { clips: 0, sent: 0, skipped: "no_clips" };
+
+  const { vapidFromEnv, WebCryptoWebPushDispatcher } = await import("../notifications/dispatcher");
+  const vapid = vapidFromEnv(env);
+  if (!vapid) return { clips: clips.length, sent: 0, skipped: "no_vapid" };
+  const { D1WebPushSubscriptionRepo } = await import("../notifications/repo_d1");
+  const repo = new D1WebPushSubscriptionRepo(env.ARCHIVE_DB);
+  const dispatcher = new WebCryptoWebPushDispatcher(vapid);
+
+  const reporters = await env.ARCHIVE_DB.prepare("SELECT uid FROM reporters").all<{ uid: string }>();
+  const uids = (reporters.results ?? []).map((x) => x.uid);
+  if (!uids.length) return { clips: clips.length, sent: 0, skipped: "no_reporters" };
+
+  const heads = clips.slice(0, 4).map((c) => `· ${c.title} (${c.source})`).join("\n");
+  const kstDate = new Date(Date.now() + 9 * 3600_000).toISOString().slice(5, 10).replace("-", "/");
+  const payload = {
+    title: `📰 태안 언론보도 ${clips.length}건 (${kstDate})`,
+    body: `${heads}${clips.length > 4 ? `\n외 ${clips.length - 4}건` : ""}`,
+    url: "/reporter",
+    tag: `clip-digest-${kstDate}`,
+  };
+  let sent = 0;
+  for (const uid of uids) {
+    for (const sub of await repo.listEnabledForUser(uid)) {
+      const res = await dispatcher.send(sub, payload);
+      if (res.ok) sent += 1;
+      else if (res.status === 410 || res.status === 404) await repo.disable(sub.userId, sub.endpoint);
+    }
+  }
+  return { clips: clips.length, sent };
+}
+
 clipsRouter.get("/", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ clips: [] });
   const days = Math.min(30, Number(c.req.query("days") ?? "7"));

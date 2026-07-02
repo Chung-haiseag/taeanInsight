@@ -259,3 +259,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-02 · 카카오 로그인(OAuth): users provider/provider_id(026), /api/auth/kakao/start·callback(code→토큰→프로필→계정 생성/로그인→세션), 익명 uid 귀속. /login "카카오로 시작". KAKAO_REST_KEY 시크릿 필요
 
 - 2026-07-02 · 언론 클리핑 자동화: news_clips(027)+네이버 뉴스검색(태안군·안면도 등, 자사 제외), 12h cron 수집, GET /api/clips, /reporter "언론 클리핑" 피드. ⚠️네이버 앱에 검색 API 추가 필요(현재 데이터랩만→401)
+
+- 2026-07-02 · 일간 클리핑 다이제스트: 매일 07시 KST(0 22 * * *) 지난 24h 태안 외부보도를 기자에게 Web Push 1건 묶음("📰 태안 언론보도 N건"+상위4). clips/sendClippingDigest
