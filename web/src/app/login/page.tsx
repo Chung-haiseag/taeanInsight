@@ -11,6 +11,9 @@ const ERR: Record<string, string> = {
   invalid_input: "이메일과 8자 이상 비밀번호를 입력하세요.",
 };
 
+// 카카오 로그인 — 도메인·KAKAO_REST_KEY 설정 완료 후 true로 켜기(백엔드·콜백은 이미 완비)
+const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -44,15 +47,19 @@ export default function LoginPage() {
         로그인하면 관심사·읽은 기사·알림이 <strong>모든 기기에서 동기화</strong>됩니다.
       </p>
 
-      <button type="button" onClick={startKakaoLogin}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 py-2.5 text-sm font-bold text-[#191919] hover:brightness-95">
-        <span aria-hidden>💬</span> 카카오로 시작하기
-      </button>
-      <div className="my-4 flex items-center gap-3 text-xs text-foreground-muted">
-        <span className="h-px flex-1 bg-brand/10" /> 또는 이메일 <span className="h-px flex-1 bg-brand/10" />
-      </div>
+      {KAKAO_ENABLED && (
+        <>
+          <button type="button" onClick={startKakaoLogin}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 py-2.5 text-sm font-bold text-[#191919] hover:brightness-95">
+            <span aria-hidden>💬</span> 카카오로 시작하기
+          </button>
+          <div className="my-4 flex items-center gap-3 text-xs text-foreground-muted">
+            <span className="h-px flex-1 bg-brand/10" /> 또는 이메일 <span className="h-px flex-1 bg-brand/10" />
+          </div>
+        </>
+      )}
 
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} className={`space-y-3 ${KAKAO_ENABLED ? "" : "mt-6"}`}>
         {mode === "signup" && (
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름(선택)" maxLength={40}
             className="w-full rounded-lg border border-brand/20 px-3 py-2.5 text-sm" />
