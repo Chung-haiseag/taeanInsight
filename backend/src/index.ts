@@ -216,6 +216,14 @@ export default {
       } catch (e) {
         console.warn("[cron] 환경·안전 알림 실패:", e instanceof Error ? e.message : e);
       }
+      // 일간 언론 클리핑 다이제스트(기자에게 어제의 태안 외부보도 1건 묶음)
+      try {
+        const { sendClippingDigest } = await import("./clips/router");
+        const d = await sendClippingDigest(env);
+        console.log(`[cron] 클리핑 다이제스트: ${d.clips}건, 발송 ${d.sent}${d.skipped ? ` (${d.skipped})` : ""}`);
+      } catch (e) {
+        console.warn("[cron] 클리핑 다이제스트 실패:", e instanceof Error ? e.message : e);
+      }
       return;
     }
 
