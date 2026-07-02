@@ -18,6 +18,9 @@ function bearer(c: { req: { header: (k: string) => string | undefined } }): stri
   const h = c.req.header("Authorization");
   return h?.startsWith("Bearer ") ? h.slice(7) : null;
 }
+function clientIp(c: { req: { header: (k: string) => string | undefined } }): string {
+  return c.req.header("CF-Connecting-IP") || c.req.header("X-Forwarded-For") || "unknown";
+}
 function toHex(buf: ArrayBuffer): string {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -57,6 +60,8 @@ const credSchema = z.object({
 authRouter.post("/signup", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
+  const rl = (c.env as Env & { LOGIN_RL?: import("../types").RateLimit }).LOGIN_RL;
+  if (rl && !(await rl.limit({ key: `signup:${clientIp(c)}` })).success) return c.json({ error: "rate_limited", hint: "잠시 후 다시 시도하세요" }, 429);
   const parsed = credSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json({ error: "invalid_input", hint: "이메일/8자 이상 비밀번호" }, 400);
   const email = parsed.data.email.toLowerCase().trim();
@@ -79,6 +84,8 @@ authRouter.post("/signup", async (c) => {
 authRouter.post("/login", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
+  const rl = (c.env as Env & { LOGIN_RL?: import("../types").RateLimit }).LOGIN_RL;
+  if (rl && !(await rl.limit({ key: `login:${clientIp(c)}` })).success) return c.json({ error: "rate_limited", hint: "잠시 후 다시 시도하세요" }, 429);
   const parsed = credSchema.pick({ email: true, password: true }).safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
   const email = parsed.data.email.toLowerCase().trim();

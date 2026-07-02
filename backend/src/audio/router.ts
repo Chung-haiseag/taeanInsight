@@ -11,6 +11,15 @@ export const audioRouter = new Hono<{ Bindings: Env }>();
 const KEY = (idxno: number) => `audio/news/${idxno}-hd3.mp3`; // -hd2: Chirp3-HD + TTS 정규화(구 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
+// 온디맨드 오디오 생성(유료 호출) 레이트리밋 — 캐시 미스 시에만 호출
+function clientIp(c: { req: { header: (k: string) => string | undefined } }): string {
+  return c.req.header("CF-Connecting-IP") || c.req.header("X-Forwarded-For") || "unknown";
+}
+async function overAudioLimit(c: { env: Env; req: { header: (k: string) => string | undefined } }): Promise<boolean> {
+  const rl = (c.env as Env & { AUDIO_RL?: import("../types").RateLimit }).AUDIO_RL;
+  return rl ? !(await rl.limit({ key: `audio:${clientIp(c)}` })).success : false;
+}
+
 // TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로(가운뎃점·물결표 범위·괄호·단위)
 function normalizeForTts(t: string): string {
   return t
@@ -166,6 +175,7 @@ async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
     if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
   }
 
+  if (await overAudioLimit(c)) return c.json({ error: "rate_limited" }, 429);
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY || !c.env.AI) return c.json({ error: "unconfigured" }, 503);
 
   // 1) 대본 생성(2인 대화체) — 자연스러운 라디오 대담
@@ -229,6 +239,7 @@ audioRouter.get("/briefing", async (c) => {
   const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
   if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
 
+  if (await overAudioLimit(c)) return c.json({ error: "rate_limited" }, 429);
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY || !c.env.AI) return c.json({ error: "unconfigured" }, 503);
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
 
@@ -280,6 +291,7 @@ audioRouter.get("/news/:idxno", async (c) => {
     return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
   }
 
+  if (await overAudioLimit(c)) return c.json({ error: "rate_limited" }, 429);
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY) {
     return c.json({ error: "tts_unconfigured", hint: "GOOGLE_TTS_KEY 미설정" }, 503);
   }
