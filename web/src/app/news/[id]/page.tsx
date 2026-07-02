@@ -16,16 +16,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const a = await res.json();
     const title: string = a.title || "태안뉴스";
     const desc = stripHtml(a.excerpt || a.body || "태안의 소식을 AI 인사이트와 함께.").slice(0, 120);
-    const img: string | undefined = a.leadImage || a.lead_image || undefined;
+    // 대표사진 있으면 그걸, 없으면 제목이 그려진 동적 OG 카드
+    const lead: string | undefined = a.leadImage || a.lead_image || undefined;
+    const tag = a.categoryLabel || "태안신문 · AI";
+    const img = lead || `/api/og?title=${encodeURIComponent(title)}&tag=${encodeURIComponent(tag)}`;
     return {
       title,
       description: desc,
       openGraph: {
         title, description: desc, type: "article", locale: "ko_KR", siteName: "태안 AI 인텔리전스",
         url: `/news/${id}`,
-        images: img ? [{ url: img }] : [{ url: "/og.png", width: 1200, height: 630 }],
+        images: [{ url: img, width: 1200, height: 630 }],
       },
-      twitter: { card: img ? "summary_large_image" : "summary", title, description: desc, images: img ? [img] : ["/og.png"] },
+      twitter: { card: "summary_large_image", title, description: desc, images: [img] },
       alternates: { canonical: `/news/${id}` },
     };
   } catch {

@@ -12,11 +12,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const description =
     report?.summary?.replace(/\s+/g, " ").trim().slice(0, 140) ||
     "매주 발행되는 태안 관광·환경·부동산 예측 리포트";
+  const img = `/api/og?title=${encodeURIComponent(title)}&tag=${encodeURIComponent("주간 인사이트 리포트")}`;
   return {
     title,
     description,
-    openGraph: { title, description, type: "article", locale: "ko_KR", siteName: "태안 AI 인텔리전스" },
-    twitter: { card: "summary", title, description },
+    openGraph: { title, description, type: "article", locale: "ko_KR", siteName: "태안 AI 인텔리전스", images: [{ url: img, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [img] },
   };
 }
 
