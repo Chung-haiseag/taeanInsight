@@ -1,0 +1,11 @@
+[Unit]
+Description=Taean 주간 팟캐스트 생성 (Gemini, 한국 IP)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean.env
+WorkingDirectory=__REPO__
+ExecStart=/usr/bin/node tools/podcast/gen-podcast.mjs --force
+Nice=10
+TimeoutStartSec=600
