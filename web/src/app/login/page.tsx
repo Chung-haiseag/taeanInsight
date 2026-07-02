@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { login, signup } from "@/lib/api/auth";
+import { login, signup, startKakaoLogin, consumeKakaoCallback } from "@/lib/api/auth";
 
 const ERR: Record<string, string> = {
   email_taken: "이미 가입된 이메일입니다.",
@@ -19,6 +19,13 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // 카카오 콜백 처리 — kakao_token 있으면 로그인 완료 → /me
+  useEffect(() => {
+    if (consumeKakaoCallback()) { router.push("/me"); return; }
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("error")?.startsWith("kakao")) setErr("카카오 로그인에 실패했습니다. 다시 시도해 주세요.");
+  }, [router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +44,15 @@ export default function LoginPage() {
         로그인하면 관심사·읽은 기사·알림이 <strong>모든 기기에서 동기화</strong>됩니다.
       </p>
 
-      <form onSubmit={submit} className="mt-6 space-y-3">
+      <button type="button" onClick={startKakaoLogin}
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 py-2.5 text-sm font-bold text-[#191919] hover:brightness-95">
+        <span aria-hidden>💬</span> 카카오로 시작하기
+      </button>
+      <div className="my-4 flex items-center gap-3 text-xs text-foreground-muted">
+        <span className="h-px flex-1 bg-brand/10" /> 또는 이메일 <span className="h-px flex-1 bg-brand/10" />
+      </div>
+
+      <form onSubmit={submit} className="space-y-3">
         {mode === "signup" && (
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름(선택)" maxLength={40}
             className="w-full rounded-lg border border-brand/20 px-3 py-2.5 text-sm" />
