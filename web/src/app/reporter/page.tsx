@@ -27,7 +27,7 @@ export default function ReporterPage() {
     try {
       const d = await draftFromAlert({ title: a.title, body: a.body, kind: a.kind });
       sessionStorage.setItem("reporter-article-draft", JSON.stringify({ title: d.title, body: d.body, sources: d.sources }));
-      router.push("/citizen/write?from=alert");
+      router.push("/reporter/write");
     } catch {
       alert("초안 생성에 실패했습니다. 잠시 후 다시 시도하세요.");
     } finally { setDrafting(null); }
