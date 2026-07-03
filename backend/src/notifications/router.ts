@@ -48,6 +48,9 @@ pushRouter.post("/subscribe", async (c) => {
 
 // 발송 검증용 — 현재 전 구독자에게 테스트 푸시(옵트인 후 도달 확인)
 pushRouter.post("/test", async (c) => {
+  // 전체 구독자 브로드캐스트 — 관리자 토큰 필수(무인증 스팸 방지)
+  const expected = (c.env as { ADMIN_TOKEN?: string }).ADMIN_TOKEN;
+  if (!expected || c.req.header("X-Admin-Token") !== expected) return c.json({ error: "unauthorized" }, 401);
   const vapid = vapidFromEnv(c.env);
   if (!vapid || !c.env.ARCHIVE_DB) return c.json({ error: "push_unconfigured" }, 503);
   const repo = new D1WebPushSubscriptionRepo(c.env.ARCHIVE_DB);
