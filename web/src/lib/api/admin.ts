@@ -49,3 +49,12 @@ export interface RoiData {
 export async function getRoi(): Promise<RoiData> {
   return apiFetch<RoiData>("/api/admin/analytics/roi");
 }
+
+// 자동작업 현황 — backend /api/admin/analytics/jobs
+export interface JobStatus {
+  key: string; name: string; source: string; schedule: string;
+  lastRun: string | null; result: string; status: "ok" | "warn" | "idle";
+}
+export async function getJobs(): Promise<{ jobs: JobStatus[]; generatedAt: string }> {
+  return apiFetch<{ jobs: JobStatus[]; generatedAt: string }>("/api/admin/analytics/jobs");
+}
