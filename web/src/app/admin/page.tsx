@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
-import { getCostSummary, getAnalytics, getRoi, type MonthlyCostReport, type AnalyticsData, type RoiData } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, getJobs, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -89,8 +89,9 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
   );
 }
 
-type AdminTab = "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
+type AdminTab = "jobs" | "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
+  { key: "jobs", label: "⚙️ 자동화" },
   { key: "roi", label: "💎 성과" },
   { key: "analytics", label: "📊 분석" },
   { key: "cost", label: "💰 비용" },
@@ -150,8 +151,6 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <AudioAutomationStatus />
-
       {/* 탭바 — 메뉴별 전환 (헤더 메뉴와 동기화) */}
       <div className="flex flex-wrap gap-1.5 border-b border-brand/15 pb-2">
         {ADMIN_TABS.map((t) => (
@@ -168,6 +167,7 @@ export default function AdminPage() {
         ))}
       </div>
 
+      <div className={tab === "jobs" ? "" : "hidden"}><JobsSection /></div>
       <div className={tab === "roi" ? "" : "hidden"}><RoiSection /></div>
       <div className={tab === "analytics" ? "" : "hidden"}><AnalyticsSection /></div>
       <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
@@ -180,31 +180,58 @@ export default function AdminPage() {
   );
 }
 
-// ── 오디오 자동생성 현황 ─────────────────────────────
-function AudioAutomationStatus() {
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
-  const [s, setS] = useState<{ podcastLive?: boolean; week?: string; podcast?: { at?: string }; news?: { generated?: number; skipped?: number; failed?: number; target?: number; at?: string } } | null>(null);
-  useEffect(() => { fetch(`${API}/api/audio/status`).then((r) => r.json()).then(setS).catch(() => {}); }, [API]);
-  if (!s) return null;
-  const ago = (iso?: string) => { if (!iso) return "-"; const h = Math.round((Date.now() - Date.parse(iso)) / 3600000); return h < 1 ? "방금" : h < 24 ? `${h}시간 전` : `${Math.round(h / 24)}일 전`; };
-  const n = s.news;
+// ── 자동작업 현황 — 수집·생성 파이프라인 전체(신선도 감지) ─────────
+const JOB_ICON: Record<string, string> = { ok: "✅", warn: "⚠️", idle: "⏸" };
+function ago(iso: string | null): string {
+  if (!iso) return "기록 없음";
+  const t = Date.parse(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z");
+  if (!Number.isFinite(t)) return iso;
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 60) return `${m}분 전`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}시간 전`;
+  return `${Math.round(h / 24)}일 전`;
+}
+function JobsSection() {
+  const [d, setD] = useState<{ jobs: JobStatus[]; generatedAt: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => getJobs().then(setD).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
+  useEffect(() => { void load(); }, []);
+  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  const warns = d.jobs.filter((j) => j.status === "warn").length;
   return (
-    <section className="rounded-xl border border-brand/15 bg-background p-4 text-sm shadow-card">
-      <h2 className="mb-2 font-bold text-brand">🎙 오디오 자동 생성 현황</h2>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="rounded-lg bg-foreground-muted/5 p-3">
-          <div className="font-semibold">주간 팟캐스트 <span className="text-xs text-foreground-muted">({s.week})</span></div>
-          <div className={s.podcastLive ? "text-green-700" : "text-amber-700"}>
-            {s.podcastLive ? "✅ Gemini 라이브" : "⚠ 미생성(Chirp3-HD 폴백)"} · {ago(s.podcast?.at)}
-          </div>
-        </div>
-        <div className="rounded-lg bg-foreground-muted/5 p-3">
-          <div className="font-semibold">기사 낭독(매일)</div>
-          <div className="text-foreground-muted">
-            {n ? `생성 ${n.generated ?? 0} · 스킵 ${n.skipped ?? 0} · 실패 ${n.failed ?? 0} / 대상 ${n.target ?? 0} · ${ago(n.at)}` : "아직 실행 기록 없음"}
-          </div>
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl font-bold text-brand">⚙️ 자동작업 현황</h2>
+        <div className="flex items-center gap-3 text-xs text-foreground-muted">
+          {warns > 0 ? <span className="font-semibold text-amber-700">⚠️ 지연 {warns}건</span> : <span className="text-green-700">✅ 전체 정상</span>}
+          <button type="button" onClick={load} className="rounded border border-brand/20 px-2.5 py-1 font-semibold text-brand hover:bg-brand/5">새로고침</button>
         </div>
       </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
+            <th className="py-2 pr-2">상태</th><th className="py-2 pr-3">작업</th><th className="py-2 pr-3">소스·실행 위치</th><th className="py-2 pr-3">주기</th><th className="py-2 pr-3">최근 데이터</th><th className="py-2">최근 결과</th>
+          </tr></thead>
+          <tbody>
+            {d.jobs.map((j) => (
+              <tr key={j.key} className={`border-b border-brand/5 ${j.status === "warn" ? "bg-amber-50/60" : ""}`}>
+                <td className="py-2 pr-2">{JOB_ICON[j.status]}</td>
+                <td className="py-2 pr-3 font-medium text-brand">{j.name}</td>
+                <td className="py-2 pr-3 text-xs text-foreground-muted">{j.source}</td>
+                <td className="py-2 pr-3 text-xs">{j.schedule}</td>
+                <td className="py-2 pr-3 text-xs" title={j.lastRun ?? ""}>{ago(j.lastRun)}</td>
+                <td className="py-2 text-xs">{j.result}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-foreground-muted">
+        기준 {new Date(d.generatedAt).toLocaleString("ko-KR")} · "최근 데이터"는 실제 적재된 데이터의 시각 기준
+        (신규가 없으면 오래돼 보일 수 있음 — ⚠️는 주기×2 초과 시 표시) · VPS 작업은 카페24 서버에서 실행
+      </p>
     </section>
   );
 }

@@ -271,3 +271,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-03 · 레이트리밋(Cloudflare 네이티브 ratelimits 바인딩): LOGIN_RL 8/60s(로그인·가입 무차별대입), AUDIO_RL 30/60s(오디오 온디맨드 생성 남용). CF-Connecting-IP 키. 429 반환
 
 - 2026-07-03 · 수익화 기반: /membership(3플랜 패키징+사전신청 leads, 028) + /admin "💎 성과" 탭(자동화 환산가치·아카이브 자산·독자기반·수요검증 — /api/admin/analytics/roi, 산정식 병기). 네비 멤버십 추가
+
+- 2026-07-03 · 자동작업 현황(/admin ⚙️ 자동화): 10개 파이프라인(뉴스·군청·CCTV·클리핑·공공데이터·환경일일·리포트발행·팟캐스트·기사낭독·취재알림) 최근실행·결과·신선도(주기×2 초과 ⚠️). GET /api/admin/analytics/jobs. 구 오디오 카드 대체
