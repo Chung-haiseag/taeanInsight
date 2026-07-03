@@ -14,6 +14,7 @@ import {
   type ArchiveStats,
 } from "@/lib/api/archive";
 import { decodeEntities } from "@/lib/html";
+import { PageHeader } from "@/components/page-header";
 
 const CATEGORIES = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
 // 1990년(창간·세로쓰기, Gemini 멀티모달 디지털화) ~ 올해.
@@ -58,20 +59,19 @@ export default function ArchivePage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="eyebrow">
-          <span className="inline-block w-6 h-px bg-accent" aria-hidden="true" />
-          Archive Search
-        </p>
-        <h1 className="mt-4 text-display-sm font-bold text-brand">태안신문 아카이브</h1>
-        <p className="mt-2 text-foreground-muted">1990년 창간호부터 최신까지 한 번에 검색하세요.</p>
+      <div>
+        <PageHeader
+          eyebrow="Archive Search"
+          title="태안신문 아카이브"
+          description="1990년 창간호부터 최신까지 한 번에 검색하세요."
+        />
         {stats && stats.total > 0 && (
-          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand/[0.03] px-4 py-1.5 text-sm">
+          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand/[0.03] px-4 py-1.5 text-sm">
             <span className="font-semibold text-brand">총 {stats.total.toLocaleString()}건</span>
             <span className="text-foreground-muted">· {stats.minYear}~{stats.maxYear}년 디지털 아카이브</span>
           </p>
         )}
-      </header>
+      </div>
 
       {/* 검색 폼 */}
       <form onSubmit={run} className="space-y-3 rounded-2xl border border-brand/15 bg-background p-5 shadow-card">

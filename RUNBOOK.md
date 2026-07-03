@@ -277,3 +277,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-03 · 회원 구분 체계: users.role(user/reporter/admin)+plan(free/reader/business/org)(029). /admin 👥회원 탭(역할·플랜 부여), /api/admin/users. 취재알림 메뉴·페이지 기자 전용(비기자 안내), /api/reporter/draft 등록기자만(403), 리포트 게이팅에 계정 plan 연동(planTier). /api/auth/me role·plan 반환
 
 - 2026-07-03 · 기자 전용 초안 에디터(/reporter/write): 취재알림→AI초안 핸드오프 목적지를 시민기자 에디터에서 분리. 다듬기·제목제안·사실점검(copilot 재사용)+복사·다운로드(제출·검수 흐름 없음, 신문사 편집시스템으로 가져가는 용도). 기자 전용 게이트·자동 임시저장
+
+- 2026-07-03 · 공용 PageHeader 컴포넌트: 9개 페이지(뉴스·아카이브·지금태안·내페이지·취재알림·기자에디터·멤버십·시민기자 에디터·내기사) 헤더를 한 규격으로 통일(간격·타이포·강조선 편차 제거, eyebrow/제목/설명/actions/center 지원)

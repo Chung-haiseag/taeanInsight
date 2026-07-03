@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { copilotAssist, type AssistMode } from "@/lib/api/copilot";
+import { PageHeader } from "@/components/page-header";
 
 const DRAFT_KEY = "reporter-write-draft";
 
@@ -97,11 +98,11 @@ export default function ReporterWritePage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <header className="pt-2">
-        <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> 기자 전용</p>
-        <h1 className="mt-3 font-display text-display-sm text-brand">기사 초안 에디터</h1>
-        <p className="mt-1 text-sm text-foreground-muted">AI 초안을 다듬은 뒤 <strong className="text-brand">복사·다운로드</strong>해 신문사 편집시스템에서 마무리하세요. (자동 임시저장)</p>
-      </header>
+      <PageHeader
+        eyebrow="기자 전용"
+        title="기사 초안 에디터"
+        description={<>AI 초안을 다듬은 뒤 <strong className="text-brand">복사·다운로드</strong>해 신문사 편집시스템에서 마무리하세요. (자동 임시저장)</>}
+      />
 
       {msg && <p className="whitespace-pre-line rounded-lg border border-brand/15 bg-brand/5 p-3 text-sm">{msg}</p>}
 
