@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { listMyArticles, deleteArticle, STATUS_LABEL, type CitizenArticle } from "@/lib/api/citizen-articles";
+import { PageHeader } from "@/components/page-header";
 
 const STATUS_STYLE: Record<CitizenArticle["status"], string> = {
   draft: "bg-brand/10 text-brand",
@@ -33,13 +34,11 @@ export default function MyArticlesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="eyebrow"><span className="inline-block w-6 h-px bg-accent" aria-hidden /> My Articles</p>
-          <h1 className="mt-3 text-display-sm font-bold text-brand">내 기사</h1>
-        </div>
-        <Link href="/citizen/write" className="btn-accent">+ 새 기사 작성</Link>
-      </header>
+      <PageHeader
+        eyebrow="My Articles"
+        title="내 기사"
+        actions={<Link href="/citizen/write" className="btn-accent">+ 새 기사 작성</Link>}
+      />
 
       {err && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">{err}</p>}
       {!items && !err && <p className="py-10 text-center text-sm text-foreground-muted">불러오는 중…</p>}

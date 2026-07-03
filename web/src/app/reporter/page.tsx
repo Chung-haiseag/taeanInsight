@@ -11,6 +11,7 @@ import {
   type ReporterKeyword, type ReporterAlert,
 } from "@/lib/api/reporter";
 import { PushOptInButton } from "@/components/me/push_opt_in";
+import { PageHeader } from "@/components/page-header";
 
 export default function ReporterPage() {
   const router = useRouter();
@@ -58,12 +59,11 @@ export default function ReporterPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <header className="pt-2">
-        <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> 기자 전용</p>
-        <h1 className="mt-4 font-display text-display-sm text-brand">취재 알림</h1>
-        <p className="mt-2 text-foreground-muted">군청 새 공지·기상 특보·데이터 급변·키워드를 감지해 <strong className="text-brand">즉시 푸시</strong>로 알려드립니다.</p>
-        <span className="accent-rule mt-5" aria-hidden />
-      </header>
+      <PageHeader
+        eyebrow="기자 전용"
+        title="취재 알림"
+        description={<>군청 새 공지·기상 특보·데이터 급변·키워드를 감지해 <strong className="text-brand">즉시 푸시</strong>로 알려드립니다.</>}
+      />
 
       {registered === false && (
         <section className="rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">

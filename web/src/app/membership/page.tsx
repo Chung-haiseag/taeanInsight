@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { submitLead, type PlanId } from "@/lib/api/membership";
+import { PageHeader } from "@/components/page-header";
 
 const PLANS: {
   id: PlanId; name: string; price: string; tagline: string; features: string[]; highlight?: boolean; noteLabel?: string;
@@ -69,14 +70,15 @@ export default function MembershipPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-10 py-8">
-      <header className="text-center">
-        <p className="eyebrow justify-center"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> MEMBERSHIP</p>
-        <h1 className="mt-4 font-display text-display-sm text-brand">태안 인사이트 멤버십</h1>
-        <p className="mt-3 text-foreground-muted">
-          지역신문이 만드는 AI 인텔리전스 — 뉴스를 넘어, <strong className="text-brand">결정에 쓰는 정보</strong>를 드립니다.
-        </p>
-        <p className="mt-2 text-xs text-foreground-muted">지금은 사전 신청 기간입니다. 정식 오픈 시 가장 먼저 안내드리며, 사전 신청자는 첫 달 무료 혜택을 드립니다.</p>
-      </header>
+      <div>
+        <PageHeader
+          align="center"
+          eyebrow="MEMBERSHIP"
+          title="태안 인사이트 멤버십"
+          description={<>지역신문이 만드는 AI 인텔리전스 — 뉴스를 넘어, <strong className="text-brand">결정에 쓰는 정보</strong>를 드립니다.</>}
+        />
+        <p className="mt-3 text-center text-xs text-foreground-muted">지금은 사전 신청 기간입니다. 정식 오픈 시 가장 먼저 안내드리며, 사전 신청자는 첫 달 무료 혜택을 드립니다.</p>
+      </div>
 
       <div className="grid gap-5 md:grid-cols-3">
         {PLANS.map((p) => (

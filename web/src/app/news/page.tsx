@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { getNews, type NewsResponse } from "@/lib/api/news";
+import { PageHeader } from "@/components/page-header";
 
 const CATEGORY_ORDER = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
 
@@ -44,17 +45,11 @@ export default function NewsPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="eyebrow">
-          <span className="inline-block w-6 h-px bg-accent" aria-hidden="true" />
-          Taean News
-        </p>
-        <h1 className="mt-4 text-display-sm font-bold text-brand">태안뉴스</h1>
-        <p className="mt-2 text-foreground-muted">
-          {data?.source ?? "주간태안신문"}의 최신 기사를 관심 도메인별로 모았습니다. 제목·발췌만 보여드리며, 원문은
-          태안신문에서 확인하세요.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Taean News"
+        title="태안뉴스"
+        description={<>{data?.source ?? "주간태안신문"}의 최신 기사를 관심 도메인별로 모았습니다. 제목·발췌만 보여드리며, 원문은 태안신문에서 확인하세요.</>}
+      />
 
       {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
       {error && (

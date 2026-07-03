@@ -8,6 +8,7 @@ import {
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = {
   title: "지금 태안",
@@ -35,16 +36,11 @@ export default async function LivePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="border-b-2 border-brand/15 pb-6">
-        <p className="eyebrow">
-          <span className="inline-block h-px w-6 bg-accent" aria-hidden />
-          LIVE · 지금 태안
-        </p>
-        <h1 className="mt-3 font-display text-display text-brand">지금 태안</h1>
-        <p className="mt-2 max-w-prose text-base leading-relaxed text-foreground-muted">
-          실시간 날씨·대기질·바다·물때·관광 수요를 한 화면에.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="LIVE · 지금 태안"
+        title="지금 태안"
+        description="실시간 날씨·대기질·바다·물때·관광 수요를 한 화면에."
+      />
 
       {!metrics ? (
         <div className="mt-10 rounded-2xl border border-brand/10 bg-white/60 p-8 text-center shadow-soft">

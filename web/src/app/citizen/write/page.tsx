@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 import { createArticle, getMyArticle, submitArticle, updateArticle } from "@/lib/api/citizen-articles";
 import { getArchiveArticle, type ArchiveArticle } from "@/lib/api/archive";
 
+import { PageHeader } from "@/components/page-header";
 import {
   copilotAssist,
   copilotCheck,
@@ -230,16 +231,11 @@ function CopilotEditorPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="eyebrow">
-          <span className="inline-block w-6 h-px bg-accent" aria-hidden="true" />
-          Citizen Co-Pilot
-        </p>
-        <h1 className="mt-3 text-display-sm font-bold text-brand">시민기자 에디터</h1>
-        <p className="mt-1 text-foreground-muted">
-          AI가 사실·맥락 확인과 거버넌스를 돕고, 편집부가 모든 글을 검토(HITL)합니다.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Citizen Co-Pilot"
+        title="시민기자 에디터"
+        description="AI가 사실·맥락 확인과 거버넌스를 돕고, 편집부가 모든 글을 검토(HITL)합니다."
+      />
 
       {/* 임시저장 상태 바 */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand/10 bg-brand/[0.02] px-3 py-2 text-xs">

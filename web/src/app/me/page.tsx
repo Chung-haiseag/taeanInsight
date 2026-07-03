@@ -15,6 +15,7 @@ import { BriefingAudio } from "@/components/briefing-audio";
 const FULL_WIDTH = new Set(["my_news", "personalized_report", "team_workspace", "b2g_department_space", "gov_notices"]);
 import { canToggleTone, preferredTone, REGION_OPTIONS, SEGMENT_LIMITS, type MeResponse } from "@/lib/types";
 import { getMe } from "@/lib/api/me";
+import { PageHeader } from "@/components/page-header";
 
 export default function MePage() {
   const [data, setData] = useState<MeResponse | null>(null);
@@ -73,14 +74,11 @@ function MeDashboard({ data }: { data: MeResponse }) {
     <div className="mx-auto max-w-4xl space-y-10">
       {/* 에디토리얼 헤더 */}
       <header className="pt-2">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="eyebrow"><span className="inline-block w-6 h-px bg-accent" aria-hidden /> My Page · 초개인화</p>
-            <h1 className="mt-4 font-display text-display-sm text-brand">내 관심사로 본 태안</h1>
-          </div>
-          {showToneToggle && <ToneToggleBar tone={tone} onChange={setTone} />}
-        </div>
-        <span className="accent-rule mt-5" aria-hidden />
+        <PageHeader
+          eyebrow="My Page · 초개인화"
+          title="내 관심사로 본 태안"
+          actions={showToneToggle ? <ToneToggleBar tone={tone} onChange={setTone} /> : undefined}
+        />
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-brand/5 border border-brand/10 px-3 py-1 text-xs font-medium text-foreground-muted">{segLabel}</span>
           {regionLabels.map((r) => (
