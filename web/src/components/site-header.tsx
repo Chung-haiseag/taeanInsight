@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/query", label: "AI 질의" },
   { href: "/citizen", label: "시민기자" },
   { href: "/reporter", label: "취재 알림" },
+  { href: "/membership", label: "멤버십" },
   { href: "/me", label: "내 페이지" },
 ];
 

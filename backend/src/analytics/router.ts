@@ -73,3 +73,59 @@ analyticsRouter.get("/", async (c) => {
     generatedAt: new Date().toISOString(),
   });
 });
+
+// GET /api/admin/analytics/roi — 경영 성과(투자 대비 가시 효과). 실데이터 + 투명한 환산식.
+analyticsRouter.get("/roi", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const row = await db.prepare(`SELECT
+    (SELECT COUNT(*) FROM archive_articles) total_articles,
+    (SELECT COUNT(*) FROM archive_articles WHERE idxno >= 90000001) digitized,
+    (SELECT MIN(year) FROM archive_articles) year_from,
+    (SELECT MAX(year) FROM archive_articles) year_to,
+    (SELECT COUNT(*) FROM weekly_reports WHERE status='published') reports_published,
+    (SELECT COUNT(*) FROM news_clips) clips,
+    (SELECT COUNT(*) FROM gov_notices) gov_notices,
+    (SELECT COUNT(*) FROM reporter_alerts) reporter_alerts,
+    (SELECT COUNT(*) FROM user_preferences) onboarded,
+    (SELECT COUNT(*) FROM push_subscriptions) push_subs,
+    (SELECT COUNT(*) FROM users) accounts,
+    (SELECT COUNT(*) FROM reading_events) reads,
+    (SELECT COUNT(*) FROM usage_events WHERE type='audio_play') audio_plays,
+    (SELECT COUNT(*) FROM usage_events WHERE type='ai_query') ai_queries
+  `).first<Record<string, number>>() ?? {};
+
+  // 멤버십 사전 신청(수요 검증)
+  const leads = (await db.prepare("SELECT plan, COUNT(*) n FROM subscription_leads GROUP BY plan").all<{ plan: string; n: number }>()).results ?? [];
+  const recentLeads = (await db.prepare("SELECT email, plan, name, note, created_at FROM subscription_leads ORDER BY id DESC LIMIT 20").all()).results ?? [];
+
+  // 환산(보수적 가정 — 식을 함께 반환해 검증 가능하게)
+  const WAGE = 20000; // 기자 인건비 추정 시급(원)
+  const digitizedValue = (row.digitized ?? 0) * 2000;                    // 외주 OCR+교정 최저단가 2,000원/건
+  const reportValue = (row.reports_published ?? 0) * 4 * WAGE;           // 리포트 1회 = 리서치·작성 4h
+  const clipValue = Math.round((row.clips ?? 0) * 3 / 60 * WAGE);        // 클리핑 1건 = 검색·정리 3분
+  const alertValue = Math.round((row.reporter_alerts ?? 0) * 10 / 60 * WAGE); // 알림 1건 = 모니터링 10분
+  const govValue = Math.round((row.gov_notices ?? 0) * 5 / 60 * WAGE);   // 군청소식 1건 = 확인·정리 5분
+
+  return c.json({
+    assets: {
+      totalArticles: row.total_articles ?? 0,
+      digitized: row.digitized ?? 0,
+      yearRange: `${row.year_from ?? "-"}~${row.year_to ?? "-"}`,
+    },
+    automation: [
+      { item: "지면 디지털화(1990~2001)", actual: `${(row.digitized ?? 0).toLocaleString()}건`, valueKrw: digitizedValue, formula: "건당 외주 최저단가 2,000원" },
+      { item: "주간 리포트 자동 생성·발행", actual: `${row.reports_published ?? 0}회`, valueKrw: reportValue, formula: "회당 리서치·작성 4시간 × 시급 2만원" },
+      { item: "언론 클리핑 자동 수집", actual: `${row.clips ?? 0}건`, valueKrw: clipValue, formula: "건당 검색·정리 3분 × 시급 2만원" },
+      { item: "군청 소식 자동 수집", actual: `${row.gov_notices ?? 0}건`, valueKrw: govValue, formula: "건당 확인·정리 5분 × 시급 2만원" },
+      { item: "기자 취재 알림", actual: `${row.reporter_alerts ?? 0}건`, valueKrw: alertValue, formula: "건당 모니터링 10분 × 시급 2만원" },
+    ],
+    totalValueKrw: digitizedValue + reportValue + clipValue + alertValue + govValue,
+    audience: {
+      onboarded: row.onboarded ?? 0, pushSubs: row.push_subs ?? 0, accounts: row.accounts ?? 0,
+      reads: row.reads ?? 0, audioPlays: row.audio_plays ?? 0, aiQueries: row.ai_queries ?? 0,
+    },
+    demand: { leads, recentLeads },
+    generatedAt: new Date().toISOString(),
+  });
+});

@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
-import { getCostSummary, getAnalytics, type MonthlyCostReport, type AnalyticsData } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, type MonthlyCostReport, type AnalyticsData, type RoiData } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -89,8 +89,9 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
   );
 }
 
-type AdminTab = "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
+type AdminTab = "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
+  { key: "roi", label: "💎 성과" },
   { key: "analytics", label: "📊 분석" },
   { key: "cost", label: "💰 비용" },
   { key: "report", label: "📅 주간 리포트" },
@@ -167,6 +168,7 @@ export default function AdminPage() {
         ))}
       </div>
 
+      <div className={tab === "roi" ? "" : "hidden"}><RoiSection /></div>
       <div className={tab === "analytics" ? "" : "hidden"}><AnalyticsSection /></div>
       <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
       <div className={tab === "report" ? "" : "hidden"}><ReportPublishSection /></div>
@@ -203,6 +205,80 @@ function AudioAutomationStatus() {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+// ── 경영 성과(ROI) — 자동화 환산가치·자산·수요 검증 ─────────────
+const PLAN_LABEL: Record<string, string> = { reader: "독자", business: "비즈니스(사장님)", org: "기관" };
+function RoiSection() {
+  const [d, setD] = useState<RoiData | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { getRoi().then(setD).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패")); }, []);
+  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  const won = (n: number) => `${Math.round(n / 10000).toLocaleString()}만원`;
+  return (
+    <section className="space-y-6">
+      <div className="rounded-2xl border border-accent/40 bg-accent-subtle/20 p-5">
+        <p className="text-sm font-semibold text-brand">자동화·디지털화 환산 가치 (보수적 추정)</p>
+        <p className="mt-1 text-3xl font-bold text-brand">{won(d.totalValueKrw)}<span className="ml-2 text-sm font-normal text-foreground-muted">상당</span></p>
+        <p className="mt-1 text-xs text-foreground-muted">아카이브 자산 {d.assets.totalArticles.toLocaleString()}건({d.assets.yearRange}) · 그중 지면 디지털화 {d.assets.digitized.toLocaleString()}건</p>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-brand">자동화가 대신한 일 (실적 → 환산)</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
+              <th className="py-2 pr-3">항목</th><th className="py-2 pr-3">실적</th><th className="py-2 pr-3">환산</th><th className="py-2">산정 근거</th>
+            </tr></thead>
+            <tbody>
+              {d.automation.map((a, i) => (
+                <tr key={i} className="border-b border-brand/5">
+                  <td className="py-2 pr-3 font-medium">{a.item}</td>
+                  <td className="py-2 pr-3">{a.actual}</td>
+                  <td className="py-2 pr-3 font-semibold text-brand">{won(a.valueKrw)}</td>
+                  <td className="py-2 text-xs text-foreground-muted">{a.formula}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-brand">독자 기반 (성장 추적)</h3>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 text-center">
+          {[["온보딩", d.audience.onboarded], ["푸시 구독", d.audience.pushSubs], ["계정", d.audience.accounts], ["기사 조회", d.audience.reads], ["오디오 재생", d.audience.audioPlays], ["AI 질의", d.audience.aiQueries]].map(([l, v]) => (
+            <div key={String(l)} className="rounded-lg border border-brand/10 p-3">
+              <div className="text-xl font-bold text-brand">{v as number}</div>
+              <div className="text-[11px] text-foreground-muted">{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-brand">멤버십 사전 신청 (수요 검증)</h3>
+        {d.demand.leads.length === 0 ? (
+          <p className="text-sm text-foreground-muted">아직 신청이 없습니다. /membership 페이지를 홍보해 실수요를 확인하세요.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {d.demand.leads.map((l) => (
+                <span key={l.plan} className="rounded-full bg-brand/5 border border-brand/10 px-3 py-1 text-sm"><strong className="text-brand">{PLAN_LABEL[l.plan] ?? l.plan}</strong> {l.n}명</span>
+              ))}
+            </div>
+            <ul className="mt-3 space-y-1 text-xs text-foreground-muted">
+              {d.demand.recentLeads.slice(0, 10).map((l, i) => (
+                <li key={i}>{l.created_at.slice(0, 10)} · {PLAN_LABEL[l.plan] ?? l.plan} · {l.email}{l.name ? ` (${l.name})` : ""}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <p className="text-xs text-foreground-muted">기준 {new Date(d.generatedAt).toLocaleString("ko-KR")} · 환산은 보수적 가정, 산정식 병기</p>
     </section>
   );
 }
