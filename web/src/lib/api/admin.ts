@@ -58,3 +58,15 @@ export interface JobStatus {
 export async function getJobs(): Promise<{ jobs: JobStatus[]; generatedAt: string }> {
   return apiFetch<{ jobs: JobStatus[]; generatedAt: string }>("/api/admin/analytics/jobs");
 }
+
+// 회원 관리 — backend /api/admin/users
+export interface AdminUser {
+  id: number; email: string; display_name: string | null; role: string; plan: string;
+  provider: string; created_at: string; last_login_at: string | null;
+}
+export async function getUsers(): Promise<{ users: AdminUser[] }> {
+  return apiFetch<{ users: AdminUser[] }>("/api/admin/users");
+}
+export async function setUserAccess(id: number, patch: { role?: string; plan?: string }): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/admin/users/set", { method: "POST", body: JSON.stringify({ id, ...patch }) });
+}

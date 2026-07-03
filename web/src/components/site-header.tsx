@@ -14,15 +14,26 @@ const NAV_ITEMS = [
   { href: "/reports", label: "주간 리포트" },
   { href: "/query", label: "AI 질의" },
   { href: "/citizen", label: "시민기자" },
-  { href: "/reporter", label: "취재 알림" },
+  { href: "/reporter", label: "취재 알림", reporterOnly: true },
   { href: "/membership", label: "멤버십" },
   { href: "/me", label: "내 페이지" },
-];
+] as { href: string; label: string; reporterOnly?: boolean }[];
+
+// 기자 전용 메뉴 노출 — 계정 role(reporter/admin) 또는 이 기기에서 기자 등록 이력
+function canSeeReporter(): boolean {
+  try {
+    const role = localStorage.getItem("taean-role");
+    return role === "reporter" || role === "admin" || localStorage.getItem("taean-reporter") === "1";
+  } catch { return false; }
+}
 
 export function SiteHeader() {
   const { fontSize, setFontSize, theme, setTheme } = useAccessibility();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [showReporter, setShowReporter] = useState(false);
+  useEffect(() => { setShowReporter(canSeeReporter()); }, [pathname]);
+  const navItems = NAV_ITEMS.filter((i) => !i.reporterOnly || showReporter);
 
   // 경로 바뀌면 모바일 메뉴 닫기
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -73,7 +84,7 @@ export function SiteHeader() {
         </Link>
 
         <nav aria-label="주요 메뉴" className="hidden md:flex gap-7 text-sm">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
@@ -115,7 +126,7 @@ export function SiteHeader() {
         <div id="mobile-menu" className="md:hidden border-t border-brand/10 bg-background">
           <nav aria-label="주요 메뉴(모바일)" className="container mx-auto max-w-7xl px-4 py-2">
             <ul className="divide-y divide-brand/5">
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <li key={item.href}>
