@@ -273,3 +273,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-03 · 수익화 기반: /membership(3플랜 패키징+사전신청 leads, 028) + /admin "💎 성과" 탭(자동화 환산가치·아카이브 자산·독자기반·수요검증 — /api/admin/analytics/roi, 산정식 병기). 네비 멤버십 추가
 
 - 2026-07-03 · 자동작업 현황(/admin ⚙️ 자동화): 10개 파이프라인(뉴스·군청·CCTV·클리핑·공공데이터·환경일일·리포트발행·팟캐스트·기사낭독·취재알림) 최근실행·결과·신선도(주기×2 초과 ⚠️). GET /api/admin/analytics/jobs. 구 오디오 카드 대체
+
+- 2026-07-03 · 회원 구분 체계: users.role(user/reporter/admin)+plan(free/reader/business/org)(029). /admin 👥회원 탭(역할·플랜 부여), /api/admin/users. 취재알림 메뉴·페이지 기자 전용(비기자 안내), /api/reporter/draft 등록기자만(403), 리포트 게이팅에 계정 plan 연동(planTier). /api/auth/me role·plan 반환

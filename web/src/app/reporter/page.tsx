@@ -35,7 +35,10 @@ export default function ReporterPage() {
 
   async function refresh() {
     const me = await getReporterMe().catch(() => null);
-    if (me) { setRegistered(me.registered); setKeywords(me.keywords); }
+    if (me) {
+      setRegistered(me.registered); setKeywords(me.keywords);
+      if (me.registered) { try { localStorage.setItem("taean-reporter", "1"); } catch { /* */ } }
+    }
     const a = await getReporterAlerts().catch(() => null);
     if (a) setAlerts(a.alerts);
   }
@@ -64,9 +67,21 @@ export default function ReporterPage() {
 
       {registered === false && (
         <section className="rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">
-          <p className="font-semibold text-brand">📡 취재 알림 받기</p>
-          <p className="mt-1 text-sm text-foreground-muted">등록하면 취재거리가 생길 때 알림을 보내드립니다. 브라우저 알림도 함께 허용해 주세요.</p>
-          <button type="button" onClick={enable} disabled={busy} className="btn-accent mt-3 px-4 py-2 text-sm disabled:opacity-60">취재 알림 등록</button>
+          {(() => { try { const r = localStorage.getItem("taean-role"); return r === "reporter" || r === "admin"; } catch { return false; } })() ? (
+            <>
+              <p className="font-semibold text-brand">📡 취재 알림 받기</p>
+              <p className="mt-1 text-sm text-foreground-muted">등록하면 취재거리가 생길 때 알림을 보내드립니다. 브라우저 알림도 함께 허용해 주세요.</p>
+              <button type="button" onClick={enable} disabled={busy} className="btn-accent mt-3 px-4 py-2 text-sm disabled:opacity-60">취재 알림 등록</button>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-brand">🔒 기자 전용 서비스입니다</p>
+              <p className="mt-1 text-sm text-foreground-muted">
+                취재 알림·AI 기사 초안은 태안신문 기자용 도구입니다. 이용하시려면
+                편집국에 문의해 기자 권한을 받은 뒤 로그인해 주세요.
+              </p>
+            </>
+          )}
         </section>
       )}
 

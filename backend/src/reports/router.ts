@@ -84,6 +84,16 @@ async function loadPrefs(c: { env: Env; req: { header: (k: string) => string | u
   try { return await new D1PreferencesRepo(c.env.ARCHIVE_DB).get(uid); } catch { return null; }
 }
 
+// 계정 plan 기반 tier — 유료 플랜(reader/business/org)이면 premium 취급
+async function planTier(c: { env: Env; req: { header: (k: string) => string | undefined } }): Promise<string | null> {
+  const uid = c.req.header("X-Taean-Uid");
+  if (!uid || !c.env.ARCHIVE_DB) return null;
+  try {
+    const u = await c.env.ARCHIVE_DB.prepare("SELECT plan FROM users WHERE uid=?").bind(uid).first<{ plan: string }>();
+    return u && u.plan !== "free" ? "premium" : null;
+  } catch { return null; }
+}
+
 // 구독 게이팅 — 전체 열람권이 없으면 요약 + 둘째 섹션 일부만, 나머지는 잠금
 function gate(report: StoredReport, tier?: string | null): GatedReport {
   const full = !report.premiumOnly || isPremium(tier);
@@ -146,7 +156,7 @@ reportsRouter.get("/latest", async (c) => {
   const report = await repo.latestPublished();
   if (!report) return c.json({ report: null });
   const prefs = await loadPrefs(c);
-  const tier = c.req.query("tier") ?? prefs?.segment; // 등급은 선호도(저장된 세그먼트)로
+  const tier = c.req.query("tier") ?? (await planTier(c)) ?? prefs?.segment; // 등급은 선호도(저장된 세그먼트)로
   return c.json({ report: personalize(gate(report, tier), prefs) });
 });
 
@@ -207,7 +217,7 @@ reportsRouter.get("/:weekId", async (c) => {
   const report = await repo.get(c.req.param("weekId"));
   if (!report || report.status !== "published") return c.json({ error: "not_found" }, 404);
   const prefs = await loadPrefs(c);
-  const tier = c.req.query("tier") ?? prefs?.segment;
+  const tier = c.req.query("tier") ?? (await planTier(c)) ?? prefs?.segment;
   return c.json({ report: personalize(gate(report, tier), prefs) });
 });
 

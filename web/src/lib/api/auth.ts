@@ -4,7 +4,11 @@ import { getUid, setUid, resetUid } from "../uid";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 const AUTH_KEY = "taean-auth-token";
 
-export interface Account { email: string; uid: string; displayName: string | null }
+export interface Account { email: string; uid: string; displayName: string | null; role?: string; plan?: string }
+
+// 역할 캐시 — 헤더 메뉴 필터용(로그인 시 설정, 로그아웃 시 제거)
+export function cachedRole(): string | null { try { return localStorage.getItem("taean-role"); } catch { return null; } }
+function setRoleCache(role?: string | null) { try { role ? localStorage.setItem("taean-role", role) : localStorage.removeItem("taean-role"); } catch { /* */ } }
 
 export function getAuthToken(): string | null {
   try { return localStorage.getItem(AUTH_KEY); } catch { return null; }
@@ -48,7 +52,8 @@ export async function getSession(): Promise<Account | null> {
     const u = data.user;
     if (!u) { setAuthToken(null); return null; }
     setUid(String(u.uid)); // 다른 기기 로그인 상태 반영
-    return { email: u.email, uid: u.uid, displayName: u.displayName ?? null };
+    setRoleCache(u.role);
+    return { email: u.email, uid: u.uid, displayName: u.displayName ?? null, role: u.role, plan: u.plan };
   } catch { return null; }
 }
 
@@ -97,5 +102,6 @@ export async function logout(): Promise<void> {
   const token = getAuthToken();
   try { if (token) await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }); } catch { /* 무시 */ }
   setAuthToken(null);
+  setRoleCache(null);
   resetUid(); // 새 익명 uid(공유기기 대비)
 }

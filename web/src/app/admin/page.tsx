@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
-import { getCostSummary, getAnalytics, getRoi, getJobs, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -89,9 +89,10 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
   );
 }
 
-type AdminTab = "jobs" | "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
+type AdminTab = "users" | "jobs" | "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
   { key: "jobs", label: "⚙️ 자동화" },
+  { key: "users", label: "👥 회원" },
   { key: "roi", label: "💎 성과" },
   { key: "analytics", label: "📊 분석" },
   { key: "cost", label: "💰 비용" },
@@ -168,6 +169,7 @@ export default function AdminPage() {
       </div>
 
       <div className={tab === "jobs" ? "" : "hidden"}><JobsSection /></div>
+      <div className={tab === "users" ? "" : "hidden"}><UsersSection /></div>
       <div className={tab === "roi" ? "" : "hidden"}><RoiSection /></div>
       <div className={tab === "analytics" ? "" : "hidden"}><AnalyticsSection /></div>
       <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
@@ -177,6 +179,57 @@ export default function AdminPage() {
       <div className={tab === "governance" ? "" : "hidden"}><GovernanceSection /></div>
       <div className={tab === "ebook" ? "" : "hidden"}><EbookReviewSection /></div>
     </div>
+  );
+}
+
+// ── 회원 관리 — role(기자/관리자)·plan(유료) 수동 부여 ─────────
+function UsersSection() {
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState<number | null>(null);
+  const load = () => getUsers().then((r) => setUsers(r.users)).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
+  useEffect(() => { void load(); }, []);
+  async function patch(id: number, p: { role?: string; plan?: string }) {
+    setSaving(id);
+    try { await setUserAccess(id, p); await load(); } finally { setSaving(null); }
+  }
+  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (!users) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-bold text-brand">👥 회원 관리</h2>
+      <p className="text-xs text-foreground-muted">역할(기자·관리자)과 플랜(유료)을 부여합니다. 결제 연동 전에는 입금 확인 후 여기서 수동 전환하세요.</p>
+      {users.length === 0 ? <p className="text-sm text-foreground-muted">가입 회원이 없습니다.</p> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
+              <th className="py-2 pr-3">이메일</th><th className="py-2 pr-3">이름</th><th className="py-2 pr-3">가입</th><th className="py-2 pr-3">역할</th><th className="py-2">플랜</th>
+            </tr></thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} className="border-b border-brand/5">
+                  <td className="py-2 pr-3">{u.email}<span className="ml-1 text-[10px] text-foreground-muted">{u.provider === "kakao" ? "카카오" : ""}</span></td>
+                  <td className="py-2 pr-3">{u.display_name ?? "-"}</td>
+                  <td className="py-2 pr-3 text-xs text-foreground-muted">{u.created_at.slice(0, 10)}</td>
+                  <td className="py-2 pr-3">
+                    <select value={u.role} disabled={saving === u.id} onChange={(e) => void patch(u.id, { role: e.target.value })}
+                      className="rounded border border-brand/20 bg-background px-2 py-1 text-xs">
+                      <option value="user">일반</option><option value="reporter">기자</option><option value="admin">관리자</option>
+                    </select>
+                  </td>
+                  <td className="py-2">
+                    <select value={u.plan} disabled={saving === u.id} onChange={(e) => void patch(u.id, { plan: e.target.value })}
+                      className="rounded border border-brand/20 bg-background px-2 py-1 text-xs">
+                      <option value="free">무료</option><option value="reader">독자(유료)</option><option value="business">비즈니스</option><option value="org">기관</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

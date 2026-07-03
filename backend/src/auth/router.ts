@@ -105,12 +105,12 @@ authRouter.get("/me", async (c) => {
   const token = bearer(c);
   if (!db || !token) return c.json({ user: null });
   const row = await db.prepare(
-    `SELECT u.email, u.uid, u.display_name FROM sessions s JOIN users u ON u.id=s.user_id
+    `SELECT u.email, u.uid, u.display_name, u.role, u.plan FROM sessions s JOIN users u ON u.id=s.user_id
       WHERE s.token=? AND s.expires_at > ?`)
     .bind(token, new Date().toISOString())
-    .first<{ email: string; uid: string; display_name: string | null }>();
+    .first<{ email: string; uid: string; display_name: string | null; role: string; plan: string }>();
   if (!row) return c.json({ user: null });
-  return c.json({ user: { email: row.email, uid: row.uid, displayName: row.display_name } });
+  return c.json({ user: { email: row.email, uid: row.uid, displayName: row.display_name, role: row.role, plan: row.plan } });
 });
 
 // 세션 토큰 → 사용자 조회(계정 관리 공용)
