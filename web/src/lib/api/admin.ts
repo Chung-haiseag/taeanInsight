@@ -36,3 +36,16 @@ export interface AnalyticsData {
 export async function getAnalytics(): Promise<AnalyticsData> {
   return apiFetch<AnalyticsData>("/api/admin/analytics");
 }
+
+// 경영 성과(ROI) — backend /api/admin/analytics/roi
+export interface RoiData {
+  assets: { totalArticles: number; digitized: number; yearRange: string };
+  automation: { item: string; actual: string; valueKrw: number; formula: string }[];
+  totalValueKrw: number;
+  audience: { onboarded: number; pushSubs: number; accounts: number; reads: number; audioPlays: number; aiQueries: number };
+  demand: { leads: { plan: string; n: number }[]; recentLeads: { email: string; plan: string; name: string | null; note: string | null; created_at: string }[] };
+  generatedAt: string;
+}
+export async function getRoi(): Promise<RoiData> {
+  return apiFetch<RoiData>("/api/admin/analytics/roi");
+}
