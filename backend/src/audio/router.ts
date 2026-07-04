@@ -8,7 +8,7 @@ import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
-const KEY = (idxno: number) => `audio/news/${idxno}-hd3.mp3`; // -hd2: Chirp3-HD + TTS 정규화(구 캐시 무효화)
+const KEY = (idxno: number) => `audio/news/${idxno}-hd4.mp3`; // -hd4: 큰 청크(문장 묶음)로 seam 감소(구 -hd3 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
 // 온디맨드 오디오 생성(유료 호출) 레이트리밋 — 캐시 미스 시에만 호출
@@ -85,8 +85,9 @@ async function ttsSilence(env: Env, ms = 500): Promise<Uint8Array | null> {
   } catch { return null; }
 }
 
-// 문장 단위 청크 — Chirp3-HD는 긴 문장을 거부하므로 짧게 나눔(긴 문장은 강제 분할)
-function chunkText(text: string, max = 170): string[] {
+// 문장 단위 청크 — Chirp3-HD는 "긴 문장"만 거부(총량 아님)하므로, 문장은 통째로 두되
+// 여러 문장을 한 요청에 묶어(≈550자) 이어붙임 seam을 줄여 자연스러운 낭독을 만든다.
+function chunkText(text: string, max = 550): string[] {
   const sents = text.replace(/\s+/g, " ").trim().split(/(?<=[.!?。…])\s+/);
   const pieces: string[] = [];
   for (const s of sents) {
