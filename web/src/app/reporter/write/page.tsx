@@ -89,7 +89,7 @@ export default function ReporterWritePage() {
   if (!allowed) {
     return (
       <div className="mx-auto max-w-xl py-12 text-center space-y-3">
-        <p className="text-lg font-bold text-brand">🔒 기자 전용 에디터입니다</p>
+        <p className="text-lg font-bold text-brand">기자 전용 에디터입니다</p>
         <p className="text-sm text-foreground-muted">편집국에 문의해 기자 권한을 받은 뒤 이용해 주세요.</p>
         <Link href="/" className="text-sm text-accent hover:underline">홈으로</Link>
       </div>
@@ -125,7 +125,7 @@ export default function ReporterWritePage() {
 
       {sources.length > 0 && (
         <section className="rounded-xl border border-brand/10 bg-background p-4 text-sm">
-          <p className="font-semibold text-brand">📚 관련 과거 보도 (배경 참고)</p>
+          <p className="font-semibold text-brand">관련 과거 보도 <span className="font-normal text-foreground-muted">— 배경 참고</span></p>
           <ul className="mt-2 space-y-1">
             {sources.map((s, i) => (
               <li key={i}><Link href={s.url} className="text-foreground-muted hover:text-brand hover:underline">- {s.title}</Link></li>

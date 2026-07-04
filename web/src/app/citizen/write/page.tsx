@@ -259,7 +259,7 @@ function CopilotEditorPage() {
 
       {/* 키워드로 AI 초안 생성 */}
       <section className="rounded-2xl border border-accent/30 bg-accent-subtle/20 p-4 space-y-2">
-        <p className="text-sm font-bold text-brand">✨ 키워드로 초안 생성</p>
+        <p className="text-sm font-bold text-brand">키워드로 초안 생성</p>
         <p className="text-xs text-foreground-muted">핵심 키워드 몇 개만 넣으면 AI가 기사 골격을 만들어 드립니다. <strong className="text-brand">초안을 직접 확인·수정</strong>하고, 수치·인용 등 <code className="rounded bg-brand/5 px-1">[확인 필요]</code> 부분을 취재로 채우세요.</p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -414,7 +414,7 @@ function GovernancePanel({ check }: { check: CheckResult | null }) {
   const clean = check && check.pii.count === 0 && check.sensitive.topics.length === 0;
   return (
     <section className="rounded-2xl border border-brand/15 bg-background p-4 space-y-3">
-      <h2 className="text-sm font-bold text-brand">🛡️ 실시간 점검</h2>
+      <h2 className="text-sm font-bold text-brand">실시간 점검</h2>
       {!check && <p className="text-xs text-foreground-muted">작성을 시작하면 개인정보·민감주제를 확인합니다.</p>}
       {check && clean && <p className="text-sm text-green-700">✅ 감지된 위험 없음</p>}
       {check && !clean && (
@@ -486,7 +486,7 @@ function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) 
 
   return (
     <section className="rounded-2xl border border-brand/15 bg-background p-4 space-y-3">
-      <h2 className="text-sm font-bold text-brand">🤖 AI 글쓰기 보조</h2>
+      <h2 className="text-sm font-bold text-brand">AI 글쓰기 보조</h2>
       <div className="flex flex-wrap gap-2">
         {buttons.map(([mode, label]) => (
           <button
@@ -608,7 +608,7 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
 
   return (
     <section className="rounded-2xl border border-brand/15 bg-background p-4 space-y-3">
-      <h2 className="text-sm font-bold text-brand">📚 관련 과거 보도</h2>
+      <h2 className="text-sm font-bold text-brand">관련 과거 보도</h2>
       {!items.length && (
         <p className="text-xs text-foreground-muted">
           {loading ? "태안신문 아카이브 검색 중…" : "주제를 입력하면 태안신문이 다룬 과거 기사를 찾아드립니다. 맥락·중복·후속취재 확인용."}
