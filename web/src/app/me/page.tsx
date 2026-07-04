@@ -113,7 +113,7 @@ function MeDashboard({ data }: { data: MeResponse }) {
           .map(({ key, node }) => (
             <section
               key={key}
-              className={`rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6 ${FULL_WIDTH.has(key) ? "md:col-span-2" : ""}`}
+              className={`card p-5 sm:p-6 ${FULL_WIDTH.has(key) ? "md:col-span-2" : ""}`}
             >
               {node}
             </section>

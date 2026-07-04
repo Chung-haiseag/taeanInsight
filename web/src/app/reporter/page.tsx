@@ -66,7 +66,7 @@ export default function ReporterPage() {
       />
 
       {registered === false && (
-        <section className="rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">
+        <section className="card-accent p-5">
           {(() => { try { const r = localStorage.getItem("taean-role"); return r === "reporter" || r === "admin"; } catch { return false; } })() ? (
             <>
               <p className="font-semibold text-brand">📡 취재 알림 받기</p>
@@ -87,13 +87,13 @@ export default function ReporterPage() {
 
       {registered && (
         <>
-          <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6 space-y-3">
+          <section className="card p-5 sm:p-6 space-y-3">
             <p className="font-semibold text-brand">🔔 알림 수신</p>
             <PushOptInButton vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
             <button type="button" onClick={disable} disabled={busy} className="text-xs text-foreground-muted underline hover:text-brand">취재 알림 해제</button>
           </section>
 
-          <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
+          <section className="card p-5 sm:p-6">
             <p className="font-semibold text-brand">🔎 키워드 감시</p>
             <p className="mt-1 text-xs text-foreground-muted">등록한 키워드가 새 기사·군청 공지 제목에 나오면 알립니다(최대 20개).</p>
             <div className="mt-3 flex gap-2">
@@ -114,7 +114,7 @@ export default function ReporterPage() {
         </>
       )}
 
-      <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
+      <section className="card p-5 sm:p-6">
         <p className="font-semibold text-brand">📨 최근 취재 알림</p>
         {alerts.length === 0 ? (
           <p className="mt-2 text-sm text-foreground-muted">아직 알림이 없습니다. 트리거가 발생하면 여기에 쌓입니다.</p>

@@ -279,3 +279,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-03 · 기자 전용 초안 에디터(/reporter/write): 취재알림→AI초안 핸드오프 목적지를 시민기자 에디터에서 분리. 다듬기·제목제안·사실점검(copilot 재사용)+복사·다운로드(제출·검수 흐름 없음, 신문사 편집시스템으로 가져가는 용도). 기자 전용 게이트·자동 임시저장
 
 - 2026-07-03 · 공용 PageHeader 컴포넌트: 9개 페이지(뉴스·아카이브·지금태안·내페이지·취재알림·기자에디터·멤버십·시민기자 에디터·내기사) 헤더를 한 규격으로 통일(간격·타이포·강조선 편차 제거, eyebrow/제목/설명/actions/center 지원)
+
+- 2026-07-04 · 카드 토큰 통일(.card·.card-accent): 테두리 brand/10·/12·/15·배경 bg-background·bg-white/60·그림자 shadow-card·shadow-soft로 갈리던 카드 28곳을 2종 유틸로 수렴(패딩 보존, bg-background로 고대비 테마 대응 개선)
