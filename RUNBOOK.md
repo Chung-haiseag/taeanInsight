@@ -283,3 +283,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-04 · 카드 토큰 통일(.card·.card-accent): 테두리 brand/10·/12·/15·배경 bg-background·bg-white/60·그림자 shadow-card·shadow-soft로 갈리던 카드 28곳을 2종 유틸로 수렴(패딩 보존, bg-background로 고대비 테마 대응 개선)
 
 - 2026-07-04 · 이모지 절제(공개페이지): 섹션 제목 장식 이모지 제거(📡🔔🔎📨📰📚🏪💡✨🛡🤖 등) — 취재알림·기자에디터·시민기자·사장님보드·기사상세. 유지: 날씨·바다 데이터 카테고리(⛅🌊), 업종 아이콘, 상태(⚠✅), 기능버튼(📋💾), 카카오(💬). 관리자 내부도구는 유지
+
+- 2026-07-04 · 지금태안 헤더 실시간 시계(LiveClock): KST 기준 오늘 날짜·요일 + 시:분:초 매초 갱신, PageHeader actions 슬롯 우측 배치. 하이드레이션 안전

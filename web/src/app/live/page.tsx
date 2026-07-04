@@ -9,6 +9,7 @@ import {
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { PageHeader } from "@/components/page-header";
+import { LiveClock } from "@/components/live-clock";
 
 export const metadata: Metadata = {
   title: "지금 태안",
@@ -40,6 +41,7 @@ export default async function LivePage() {
         eyebrow="LIVE · 지금 태안"
         title="지금 태안"
         description="실시간 날씨·대기질·바다·물때·관광 수요를 한 화면에."
+        actions={<LiveClock />}
       />
 
       {!metrics ? (
