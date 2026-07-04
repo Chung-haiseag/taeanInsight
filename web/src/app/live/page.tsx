@@ -43,7 +43,7 @@ export default async function LivePage() {
       />
 
       {!metrics ? (
-        <div className="mt-10 rounded-2xl border border-brand/10 bg-white/60 p-8 text-center shadow-soft">
+        <div className="mt-10 card p-8 text-center">
           <p className="text-4xl" aria-hidden>📡</p>
           <p className="mt-4 text-sm text-foreground-muted">실시간 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
         </div>

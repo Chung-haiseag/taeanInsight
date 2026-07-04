@@ -30,7 +30,7 @@ export function EmailSignup() {
   }
 
   return (
-    <div className="no-print mt-10 rounded-2xl border border-brand/10 bg-white/60 p-5 shadow-soft">
+    <div className="no-print mt-10 card p-5">
       <p className="text-sm font-semibold text-brand">📮 이메일로 주간 리포트 받기</p>
       <p className="mt-1 text-xs text-foreground-muted">매주 발행 시 요약을 메일로. 광고 없이, 언제든 해지 가능.</p>
       <form onSubmit={submit} className="mt-3 flex flex-wrap gap-2">

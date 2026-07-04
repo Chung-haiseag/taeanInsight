@@ -53,7 +53,7 @@ export function MeOwnerBoard() {
       </div>
 
       {brief.actions.length > 0 && (
-        <section className="rounded-2xl border border-brand/10 bg-background p-5 shadow-card sm:p-6">
+        <section className="card p-5 sm:p-6">
           <h2 className="text-lg font-bold text-brand">💡 오늘의 실행 제안</h2>
           <div className="mt-3 space-y-2">
             {brief.actions.map((a, i) => (

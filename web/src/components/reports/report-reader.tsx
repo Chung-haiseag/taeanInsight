@@ -109,7 +109,7 @@ export function ReportReader({
     return (
       <div className="mx-auto max-w-3xl">
         <Masthead weekLabel="" publishedAt="" aiLabel="ai_assisted" gated={false} />
-        <div className="mt-10 rounded-2xl border border-brand/10 bg-white/60 p-8 text-center shadow-soft">
+        <div className="mt-10 card p-8 text-center">
           <p className="text-4xl" aria-hidden>🗞️</p>
           <p className="mt-4 text-lg font-semibold text-brand">아직 발행된 리포트가 없습니다</p>
           <p className="mt-2 text-sm text-foreground-muted">첫 호가 곧 발행됩니다. 매주 금요일에 만나요.</p>

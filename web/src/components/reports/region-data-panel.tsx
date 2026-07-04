@@ -97,7 +97,7 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 
 function Panel({ title, csv, children }: { title: string; csv?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-brand/12 bg-background p-5 shadow-card">
+    <section className="card p-5">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-brand">{title}</h3>
         {csv && <a href={csv} className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5">⬇ CSV</a>}

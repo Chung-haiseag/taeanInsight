@@ -92,7 +92,7 @@ function OwnerLive() {
         {brief.actions.length > 0 ? (
           <div className="mt-4 space-y-2.5">
             {brief.actions.map((a, i) => (
-              <article key={i} className="card-lift flex gap-4 rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">
+              <article key={i} className="card-lift flex gap-4 card-accent p-5">
                 <span className="text-2xl" aria-hidden>{a.icon}</span>
                 <div>
                   <p className="font-semibold text-brand">
@@ -154,7 +154,7 @@ function wonFmt(manwon: number): string {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <article className="rounded-2xl border border-brand/12 bg-background p-5 shadow-card">
+    <article className="card p-5">
       <p className="text-xs text-foreground-muted">{label}</p>
       <p className="mt-1 font-display text-2xl text-brand">{value}</p>
       {sub && <p className="mt-1 text-xs text-accent">{sub}</p>}
@@ -611,7 +611,7 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <section className="rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">
+    <section className="card-accent p-5">
       <p className="font-semibold text-brand">🏪 내 가게 정보 설정</p>
       <p className="mt-1 text-sm text-foreground-muted">업종·지역에 맞춘 실행 제안을 받으려면 가게 정보를 알려주세요.</p>
       <div className="mt-4 space-y-3">
@@ -678,7 +678,7 @@ function OwnerSample() {
         <h2 className="text-xl font-bold text-brand">이번 주말 수요 예측</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {WEEKEND.map((d) => (
-            <article key={d.day} className="rounded-2xl border border-brand/12 bg-background p-5 shadow-card">
+            <article key={d.day} className="card p-5">
               <span className="font-display text-2xl text-brand">{d.day}</span>
               <p className="mt-4 text-sm">{d.weather} · {d.index}</p>
             </article>
@@ -689,7 +689,7 @@ function OwnerSample() {
         <h2 className="text-xl font-bold text-brand">오늘의 실행 제안</h2>
         <div className="mt-4 space-y-2.5">
           {ACTIONS.map((a) => (
-            <article key={a.title} className="flex gap-4 rounded-2xl border border-accent/30 bg-accent-subtle/20 p-5">
+            <article key={a.title} className="flex gap-4 card-accent p-5">
               <span className="text-2xl" aria-hidden>{a.icon}</span>
               <div><p className="font-semibold text-brand">{a.title}</p><p className="mt-1 text-sm text-foreground-muted">{a.why}</p></div>
             </article>
