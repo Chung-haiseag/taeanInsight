@@ -68,7 +68,7 @@ newsRouter.get("/", async (c) => {
     try {
       const cutoffDt = new Date(Date.now() - 35 * 86_400_000).toISOString().slice(0, 10);
       const rs = await c.env.ARCHIVE_DB
-        .prepare("SELECT idxno, title, published_at, category, excerpt, author FROM archive_articles WHERE published_at >= ? AND title NOT LIKE '%광고%' ORDER BY published_at DESC LIMIT 400")
+        .prepare("SELECT idxno, title, published_at, category, excerpt, author FROM archive_articles WHERE published_at >= ? AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 400")
         .bind(cutoffDt)
         .all<{ idxno: number; title: string; published_at: string; category: string | null; excerpt: string | null; author: string | null }>();
       const have = new Set(items.map((i) => String(i.id)));
@@ -102,7 +102,9 @@ newsRouter.get("/", async (c) => {
 
   // 목록은 항상 최신순(발행일 내림차순) — 관심사는 강조 표시용으로만 전달(재정렬 안 함)
   const personalized = false;
-  filtered = filtered.slice().sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : a.publishedAt > b.publishedAt ? -1 : 0));
+  // 최신순 — 같은 시각이면 글번호(idxno) 내림차순으로 확정(오디오 생성기와 순서 일치)
+  filtered = filtered.slice().sort((a, b) =>
+    a.publishedAt < b.publishedAt ? 1 : a.publishedAt > b.publishedAt ? -1 : (Number(b.id) || 0) - (Number(a.id) || 0));
 
   // 기본 상한 60건(최신순) — 화면 정돈 + D1 바인드 파라미터 한도(100) 보호. 그 이전은 /archive.
   filtered = filtered.slice(0, limit > 0 ? limit : 60);

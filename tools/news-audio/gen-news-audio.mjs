@@ -109,7 +109,7 @@ async function main() {
   // 최신 주요 기사(본문 충분·광고 제외) 최신순 — 최신 MAX개
   const rows = d1(`SELECT idxno, title, substr(COALESCE(body, excerpt, ''),1,1500) AS body FROM archive_articles
     WHERE published_at >= date('now','-60 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
-    ORDER BY published_at DESC LIMIT ${MAX}`);
+    ORDER BY published_at DESC, idxno DESC LIMIT ${MAX}`);
   console.log(`  대상 ${rows.length}건`);
   let done = 0, skip = 0, fail = 0;
   for (const a of rows) {
