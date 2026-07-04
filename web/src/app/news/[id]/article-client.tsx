@@ -220,7 +220,7 @@ function RelatedArticles({ idxno }: { idxno: number }) {
   return (
     <section className="border-t border-brand/10 pt-6 space-y-3">
       <div className="flex items-baseline justify-between">
-        <p className="eyebrow">📚 관련 뉴스</p>
+        <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden />관련 뉴스</p>
         {total > 0 && <span className="text-xs text-foreground-muted">총 {total}건 · 최근순</span>}
       </div>
       <ul className="grid gap-2 sm:grid-cols-2">
@@ -423,7 +423,7 @@ function OriginalPage({ src, label }: { src: string; label: string }) {
         className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-brand"
         aria-expanded={open}
       >
-        <span>📰 원본 지면 보기 <span className="ml-1 font-normal text-foreground-muted">({label})</span></span>
+        <span>원본 지면 보기 <span className="ml-1 font-normal text-foreground-muted">({label})</span></span>
         <span aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>
       {open && (

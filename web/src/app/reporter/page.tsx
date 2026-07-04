@@ -69,13 +69,13 @@ export default function ReporterPage() {
         <section className="card-accent p-5">
           {(() => { try { const r = localStorage.getItem("taean-role"); return r === "reporter" || r === "admin"; } catch { return false; } })() ? (
             <>
-              <p className="font-semibold text-brand">📡 취재 알림 받기</p>
+              <p className="font-semibold text-brand">취재 알림 받기</p>
               <p className="mt-1 text-sm text-foreground-muted">등록하면 취재거리가 생길 때 알림을 보내드립니다. 브라우저 알림도 함께 허용해 주세요.</p>
               <button type="button" onClick={enable} disabled={busy} className="btn-accent mt-3 px-4 py-2 text-sm disabled:opacity-60">취재 알림 등록</button>
             </>
           ) : (
             <>
-              <p className="font-semibold text-brand">🔒 기자 전용 서비스입니다</p>
+              <p className="font-semibold text-brand">기자 전용 서비스입니다</p>
               <p className="mt-1 text-sm text-foreground-muted">
                 취재 알림·AI 기사 초안은 태안신문 기자용 도구입니다. 이용하시려면
                 편집국에 문의해 기자 권한을 받은 뒤 로그인해 주세요.
@@ -88,13 +88,13 @@ export default function ReporterPage() {
       {registered && (
         <>
           <section className="card p-5 sm:p-6 space-y-3">
-            <p className="font-semibold text-brand">🔔 알림 수신</p>
+            <p className="font-semibold text-brand">알림 수신</p>
             <PushOptInButton vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
             <button type="button" onClick={disable} disabled={busy} className="text-xs text-foreground-muted underline hover:text-brand">취재 알림 해제</button>
           </section>
 
           <section className="card p-5 sm:p-6">
-            <p className="font-semibold text-brand">🔎 키워드 감시</p>
+            <p className="font-semibold text-brand">키워드 감시</p>
             <p className="mt-1 text-xs text-foreground-muted">등록한 키워드가 새 기사·군청 공지 제목에 나오면 알립니다(최대 20개).</p>
             <div className="mt-3 flex gap-2">
               <input value={kw} onChange={(e) => setKw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addKw()}
@@ -115,7 +115,7 @@ export default function ReporterPage() {
       )}
 
       <section className="card p-5 sm:p-6">
-        <p className="font-semibold text-brand">📨 최근 취재 알림</p>
+        <p className="font-semibold text-brand">최근 취재 알림</p>
         {alerts.length === 0 ? (
           <p className="mt-2 text-sm text-foreground-muted">아직 알림이 없습니다. 트리거가 발생하면 여기에 쌓입니다.</p>
         ) : (
@@ -132,7 +132,7 @@ export default function ReporterPage() {
                 </a>
                 <button type="button" onClick={() => makeDraft(a, i)} disabled={drafting === i}
                   className="mt-1 text-xs font-semibold text-accent hover:underline disabled:opacity-60">
-                  {drafting === i ? "초안 생성 중…" : "📝 이 건으로 기사 초안"}
+                  {drafting === i ? "초안 생성 중…" : "이 건으로 기사 초안"}
                 </button>
               </li>
             ))}
@@ -151,7 +151,7 @@ function NewsClips() {
   if (!clips || clips.length === 0) return null;
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-bold text-brand">📰 언론 클리핑 <span className="text-xs font-normal text-foreground-muted">— 태안 관련 외부 매체 보도</span></h2>
+      <h2 className="text-lg font-bold text-brand">언론 클리핑 <span className="text-xs font-normal text-foreground-muted">— 태안 관련 외부 매체 보도</span></h2>
       <ul className="mt-3 divide-y divide-brand/10">
         {clips.map((c, i) => (
           <li key={i} className="py-2.5">

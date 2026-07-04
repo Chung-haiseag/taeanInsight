@@ -25,7 +25,7 @@ export function MeOwnerBoard() {
         <TripPlanner brief={brief} />
         <button type="button" onClick={() => setOpen(true)}
           className="w-full rounded-2xl border border-dashed border-accent/40 bg-accent-subtle/15 p-4 text-left hover:bg-accent-subtle/25">
-          <p className="font-semibold text-brand">🏪 사장님이세요? 가게 정보를 입력하세요</p>
+          <p className="font-semibold text-brand">사장님이세요? 가게 정보를 입력하세요</p>
           <p className="mt-0.5 text-sm text-foreground-muted">업종(숙박·음식·카페·낚시·염전·농업 등)을 넣으면 <strong className="text-brand">맞춤 운영 보드</strong>를 드려요. →</p>
         </button>
       </div>
@@ -54,7 +54,7 @@ export function MeOwnerBoard() {
 
       {brief.actions.length > 0 && (
         <section className="card p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-brand">💡 오늘의 실행 제안</h2>
+          <h2 className="text-lg font-bold text-brand">오늘의 실행 제안</h2>
           <div className="mt-3 space-y-2">
             {brief.actions.map((a, i) => (
               <article key={i} className="flex gap-3 rounded-xl border border-accent/20 bg-accent-subtle/15 p-3">
