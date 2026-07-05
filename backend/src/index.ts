@@ -107,8 +107,8 @@ export default {
   //  · "0 13 * * 4" (목 22:00 KST) — 주간 리포트 초안 생성(Workers AI). 발행은 HITL 검토 후 수동.
   //  · "0 15 * * *" (매일 00:00 KST) — 뉴스 적재 + 환경 스냅샷 + 비용 집계.
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    // ── 주간 리포트 초안 (금 16:00 KST) — 검토·발행은 17시 편집부 수동 ──
-    if (_event.cron === "0 7 * * 5") {
+    // ── 주간 리포트 초안 (금 18:00 KST) — 거버넌스 통과 시 자동발행 ──
+    if (_event.cron === "0 9 * * 5") {
       // 생성 전에 군청 목록(제목·날짜·링크) 먼저 갱신 → 초안에 최신 군정 반영
       try {
         const { crawlGovLists } = await import("./gov/list_crawler");
