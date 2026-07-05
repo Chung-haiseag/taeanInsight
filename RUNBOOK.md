@@ -293,3 +293,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-05 · 주간 리포트 크론 16:00→18:00 KST 변경(0 7→0 9 UTC 금). W27은 최신 기사까지 반영해 수동 재생성·발행(푸시 재발송 없음, manual-refresh)
 
 - 2026-07-05 · 주간 개인화 푸시 09:00→19:00 KST 변경(0 0→0 10 UTC 금). 리포트 발행(18시) 1시간 뒤 발송
+
+- 2026-07-05 · 저녁 뉴스 브리핑 Gemini 멀티스피커화(NotebookLM급): tools/podcast/gen-briefing.mjs(최근14일 주요기사5→2인대담→멀티스피커 WAV, audio/briefing/<날짜>-gem.wav). Worker /briefing이 gem.wav 우선 서빙(구 Llama+Chirp3 폴백). VPS 타이머 매일 17:00(taean-briefing). 무료 키(.gemini_keys 공유)

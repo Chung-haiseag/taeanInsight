@@ -1,0 +1,11 @@
+[Unit]
+Description=Taean 저녁 뉴스 브리핑 생성 (Gemini 멀티스피커, 한국 IP)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean.env
+WorkingDirectory=__REPO__
+ExecStart=/usr/bin/node tools/podcast/gen-briefing.mjs
+Nice=10
+TimeoutStartSec=600

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 태안 크롤러를 기존 카페24/리눅스 VPS에 공존 설치(echotwin 등과 나란히).
-#   태안 전용 `taean-` 네임스페이스 systemd 유닛 4개. 다른 프로젝트와 충돌 없음.
+#   태안 전용 `taean-` 네임스페이스 systemd 유닛 5개. 다른 프로젝트와 충돌 없음.
 #   전제: 이 저장소를 VPS에 git clone 후 → sudo bash tools/vps/install.sh
 set -euo pipefail
 
@@ -31,14 +31,14 @@ if [ ! -f "$ENV_FILE" ]; then
 else echo "  이미 존재 — 유지"; fi
 
 echo "▸ 3) systemd 유닛 설치(taean- 네임스페이스, WorkingDirectory=$REPO)"
-for u in taean-gov taean-cctv taean-podcast taean-newsaudio; do
+for u in taean-gov taean-cctv taean-podcast taean-newsaudio taean-briefing; do
   sed "s#__REPO__#$REPO#g" "$REPO/tools/vps/$u.service" > "/etc/systemd/system/$u.service"
   cp "$REPO/tools/vps/$u.timer" "/etc/systemd/system/$u.timer"
 done
 systemctl daemon-reload
 
 echo "▸ 4) 타이머 활성화"
-systemctl enable --now taean-gov.timer taean-cctv.timer taean-podcast.timer taean-newsaudio.timer
+systemctl enable --now taean-gov.timer taean-cctv.timer taean-podcast.timer taean-newsaudio.timer taean-briefing.timer
 systemctl list-timers --no-pager | grep taean || true
 
 cat <<MSG

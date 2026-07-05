@@ -1,0 +1,7 @@
+[Unit]
+Description=태안 저녁 브리핑 매일 17:00 (KST)
+[Timer]
+OnCalendar=*-*-* 17:00:00
+Persistent=true
+[Install]
+WantedBy=timers.target
