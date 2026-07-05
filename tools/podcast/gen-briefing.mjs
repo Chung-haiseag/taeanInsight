@@ -52,16 +52,18 @@ async function gemini(model, body, attempt = 0) {
   }
 }
 
-// 2인 대담 대본 — 저녁 브리핑(주간보다 짧고 가볍게)
+// 2인 대담 대본 — 저녁 뉴스 브리핑(3분 이내: 군정·신문·외부보도 종합)
 async function makeDialogue(src) {
   const sys =
-    "너는 따뜻한 지역 라디오의 '저녁 뉴스 브리핑' 작가다. 아래 오늘의 태안 주요 소식을 두 진행자의 진짜 대화처럼 각색하라.\n" +
+    "너는 따뜻한 지역 라디오의 '오늘 저녁 태안 뉴스' 진행 대본 작가다. 아래 오늘자 태안 소식(군정·태안신문·외부 언론보도)을 두 진행자의 진짜 대화처럼 각색하라.\n" +
     "진행자 A: 밝고 호기심 많은 메인 진행자(질문·반응). 진행자 B: 차분한 해설자(배경·의미).\n" +
     "- 진짜 대화처럼 짧게 주고받고 맞장구(\"그렇군요\",\"맞아요\")·연결어 사용. 한 줄 1~2문장.\n" +
     "- 딱딱한 보도체 금지, 쉬운 구어체 존댓말. 진행자 이름·호칭·자기소개 절대 금지.\n" +
-    "- 오프닝은 이름 없이 '오늘 저녁 태안 소식' 정도로 가볍게 시작, 클로징은 짧은 인사.\n" +
-    "- 주어진 소식만 다루고 없는 사실 창작 금지. 소식마다 1~2회 주고받으며 자연 전환.\n" +
-    "- 각 줄을 정확히 'A: ...' 또는 'B: ...' 로만. 16~24줄(간결하게).";
+    "- 오프닝은 이름 없이 '오늘 저녁 태안 소식' 정도로 가볍게, 클로징은 짧은 인사.\n" +
+    "- 세 갈래(군정 소식 → 지역 주요 기사 → 외부 언론이 본 태안)를 자연스럽게 전환하며 다뤄라. 중요한 것 위주로 추리고, 비슷한 소식은 묶어라.\n" +
+    "- 주어진 소식만 다루고 없는 사실 창작 금지. 외부 보도는 '한 매체 보도에 따르면' 식으로 출처를 가볍게 언급.\n" +
+    "- ★분량 제한: 전체 낭독이 3분을 넘지 않게 22~26줄, 총 950자 이내로 간결하게.\n" +
+    "- 각 줄을 정확히 'A: ...' 또는 'B: ...' 로만.";
   const j = await gemini(TEXT_MODEL, {
     systemInstruction: { parts: [{ text: sys }] },
     contents: [{ parts: [{ text: src }] }],
@@ -112,12 +114,22 @@ async function main() {
     catch { /* 없음 → 생성 */ }
   }
 
-  // 최근 14일 주요 기사 5건 — Worker /briefing과 동일 소스
-  const since = new Date(Date.now() + 9 * 3600_000 - 14 * 86400_000).toISOString().slice(0, 10);
-  const items = d1(`SELECT title, substr(COALESCE(body, excerpt, ''),1,300) AS brief FROM archive_articles WHERE published_at >= '${since}' AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 5`);
-  if (!items.length) { console.log("대상 기사 없음 — 종료"); return; }
-  const src = items.map((it) => `- ${it.title}: ${(it.brief || "").replace(/\s+/g, " ").trim()}`).join("\n");
-  console.log(`  소스 기사 ${items.length}건`);
+  // 오늘 저녁 뉴스 소스 3갈래(오늘 우선, 부족하면 최근 3일 보강)
+  const clean = (s) => (s || "").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;|&#\d+;/g, " ").replace(/\s+/g, " ").trim();
+  // 1) 군정 소식(최근 3일 상위 3)
+  const gov = d1(`SELECT title, dept FROM gov_notices WHERE fetched_at >= datetime('now','-3 day') ORDER BY published_at DESC LIMIT 3`);
+  // 2) 태안신문 주요 기사(최근 3일 상위 4)
+  const news = d1(`SELECT title, substr(COALESCE(body, excerpt, ''),1,220) AS brief FROM archive_articles WHERE published_at >= date('now','+9 hours','-3 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 4`);
+  // 3) 외부 언론(네이버, 태안신문 제외, 최근 2일 상위 3)
+  const clips = d1(`SELECT title, source, substr(COALESCE(description,''),1,140) AS brief FROM news_clips WHERE created_at >= datetime('now','-2 day') AND source NOT LIKE '%태안신문%' GROUP BY title ORDER BY pub_date DESC, id DESC LIMIT 3`);
+
+  const parts = [];
+  if (gov.length) parts.push(`[오늘의 군정 소식]\n${gov.map((g) => `- ${clean(g.title)}${g.dept ? ` (${g.dept})` : ""}`).join("\n")}`);
+  if (news.length) parts.push(`[태안신문 주요 기사]\n${news.map((n) => `- ${clean(n.title)}: ${clean(n.brief)}`).join("\n")}`);
+  if (clips.length) parts.push(`[외부 언론이 본 태안]\n${clips.map((c) => `- [${clean(c.source)}] ${clean(c.title)}${c.brief ? `: ${clean(c.brief)}` : ""}`).join("\n")}`);
+  if (!parts.length) { console.log("대상 소식 없음 — 종료"); return; }
+  const src = parts.join("\n\n");
+  console.log(`  소스: 군정 ${gov.length} · 신문 ${news.length} · 외부 ${clips.length}`);
 
   console.log("▸ 대본 생성(Gemini)…");
   const dialogue = await makeDialogue(src);
