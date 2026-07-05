@@ -237,6 +237,10 @@ audioRouter.get("/briefing", async (c) => {
   const date = `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}-${String(k.getUTCDate()).padStart(2, "0")}`;
   const cacheKey = `audio/briefing/${date}-pod.mp3`; // -pod: 2인 대담(구 단일낭독 캐시 무효화)
 
+  // 0) 로컬 잡이 올린 Gemini 멀티스피커 브리핑(NotebookLM급) 우선
+  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.wav`);
+  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=21600" } });
+
   const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
   if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
 
