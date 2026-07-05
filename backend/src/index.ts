@@ -134,8 +134,8 @@ export default {
       return;
     }
 
-    // ── 주간 개인화 푸시 (금 09:00 KST) — 구독자에게 본인 업종 보드/여행 플래너 요약 ──
-    if (_event.cron === "0 0 * * 5") {
+    // ── 주간 개인화 푸시 (금 19:00 KST) — 리포트 발행 후 구독자에게 업종 보드/여행 플래너 요약 ──
+    if (_event.cron === "0 10 * * 5") {
       try {
         const { sendWeeklyOwnerPush } = await import("./owner/weekly_push");
         const r = await sendWeeklyOwnerPush(env);

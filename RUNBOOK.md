@@ -291,3 +291,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-04 · 뉴스 최신순 확정(idxno DESC tiebreak): 같은 시각(07-03T16:00 등) 기사 동순위 정렬이 뒤죽박죽이라 /news 표시순과 오디오 생성순이 어긋남→맨위 기사에 Chirp3 폴백이 뜸. /news 목록·최종병합·gen-news-audio 정렬 모두 published_at DESC, idxno DESC로 통일. 맨위=Gemini 일치
 
 - 2026-07-05 · 주간 리포트 크론 16:00→18:00 KST 변경(0 7→0 9 UTC 금). W27은 최신 기사까지 반영해 수동 재생성·발행(푸시 재발송 없음, manual-refresh)
+
+- 2026-07-05 · 주간 개인화 푸시 09:00→19:00 KST 변경(0 0→0 10 UTC 금). 리포트 발행(18시) 1시간 뒤 발송
