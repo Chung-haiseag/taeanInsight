@@ -108,7 +108,7 @@ export function ReportReader({
   // ── 발행 전 ──
   if (!report) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-4xl">
         <Masthead weekLabel="" publishedAt="" aiLabel="ai_assisted" gated={false} />
         <div className="mt-10 card p-8 text-center">
           <p className="text-4xl" aria-hidden><Icon name="news" /></p>

@@ -70,7 +70,7 @@ export function QueryClient() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8">
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <AILabelBadge kind="ai_assisted" />

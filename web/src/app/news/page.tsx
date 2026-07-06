@@ -45,7 +45,7 @@ export default function NewsPage() {
   }, [data, interests]);
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8">
       <PageHeader
         eyebrow="Taean News"
         title="태안뉴스"

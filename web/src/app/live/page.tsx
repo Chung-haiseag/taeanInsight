@@ -36,7 +36,7 @@ export default async function LivePage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <PageHeader
         eyebrow="LIVE · 지금 태안"
         title="지금 태안"
