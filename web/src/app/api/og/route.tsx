@@ -22,11 +22,11 @@ export async function GET(req: Request) {
   try {
   return new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "#1a2b4a", color: "#f5f5f0", padding: "72px", justifyContent: "space-between", borderLeft: "24px solid #c9a227", fontFamily: font ? "KOR" : "sans-serif" }}>
-        <div style={{ display: "flex", fontSize: 30, color: "#c9a227", letterSpacing: 2, fontWeight: 700 }}>{tag}</div>
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "#1a2b4a", color: "#f5f5f0", padding: "72px", justifyContent: "space-between", borderLeft: "24px solid #4FB3BD", fontFamily: font ? "KOR" : "sans-serif" }}>
+        <div style={{ display: "flex", fontSize: 30, color: "#4FB3BD", letterSpacing: 2, fontWeight: 700 }}>{tag}</div>
         <div style={{ display: "flex", fontSize: 66, lineHeight: 1.25 }}>{title}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 28, color: "#c9a227" }}>
-          <div style={{ width: 48, height: 8, background: "#c9a227" }} /> insight.taeannews.co.kr
+        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 28, color: "#4FB3BD" }}>
+          <div style={{ width: 48, height: 8, background: "#4FB3BD" }} /> insight.taeannews.co.kr
         </div>
       </div>
     ),
