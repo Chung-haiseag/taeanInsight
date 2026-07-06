@@ -98,7 +98,7 @@ export default function ReporterWritePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader
         eyebrow="기자 전용"
         title="기사 초안 에디터"

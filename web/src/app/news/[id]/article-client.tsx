@@ -130,7 +130,7 @@ export default function ArticleClient() {
     );
 
   return (
-    <article className="mx-auto max-w-7xl space-y-6">
+    <article className="mx-auto max-w-4xl space-y-6">
       {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
       <ReadingTracker idxno={Number(params.id)} category={article.category} />
       <div className="flex gap-4 text-sm text-foreground-muted">
