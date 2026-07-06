@@ -18,7 +18,7 @@ export default {
           ink: "#0E5860",     // 크림 위 텍스트용(대비 AA) — eyebrow/강조 텍스트
         },
         background: {
-          DEFAULT: "#FAF9F6", // 오프화이트
+          DEFAULT: "#F5F7F7", // 쿨 페이퍼(페트롤 액센트와 조화, 크림=AI클러스터 탈피)
           highcontrast: "#FFFFFF",
         },
         foreground: {
@@ -29,6 +29,7 @@ export default {
       },
       fontFamily: {
         sans: [
+          "var(--font-sans)",
           "Pretendard",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -36,8 +37,8 @@ export default {
           "Roboto",
           "sans-serif",
         ],
-        // 에디토리얼 디스플레이 — 큰 숫자·라틴 헤드라인용 세리프
-        display: ['"Iowan Old Style"', '"Apple Garamond"', "Georgia", '"Times New Roman"', "serif"],
+        // 에디토리얼 디스플레이 — 라틴 숫자·헤드라인용 세리프(Fraunces), 한글은 sans로 폴백
+        display: ["var(--font-display)", "var(--font-sans)", "Georgia", '"Times New Roman"', "serif"],
       },
       fontSize: {
         // 사용자 글자 크기 옵션 3단계 — Tailwind plugin 없이 CSS 변수로 동적 스케일링
