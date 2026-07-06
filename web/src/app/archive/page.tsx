@@ -29,6 +29,8 @@ export default function ArchivePage() {
   const [hits, setHits] = useState<ArchiveHit[] | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<ArchiveStats | null>(null);
@@ -43,6 +45,8 @@ export default function ArchivePage() {
       const r = await searchArchive({ q, category, year, page: p });
       setHits(r.items);
       setHasMore(r.hasMore ?? false);
+      setTotal(r.total ?? r.items.length);
+      setTotalPages(r.totalPages ?? 1);
       setPage(p);
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -120,8 +124,11 @@ export default function ArchivePage() {
       {/* 결과 */}
       {hits !== null && (
         <section className="space-y-1">
-          <p className="text-sm text-foreground-muted">
-            {page > 1 || hasMore ? `${page}페이지 · ${hits.length}건` : `${hits.length}건`}
+          <p className="text-sm">
+            <span className="font-semibold text-brand">검색 결과 {total.toLocaleString()}건</span>
+            {totalPages > 1 && (
+              <span className="text-foreground-muted"> · {page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
+            )}
           </p>
           {hits.length === 0 ? (
             <p className="rounded-lg border border-brand/15 p-6 text-center text-sm text-foreground-muted">
@@ -166,7 +173,7 @@ export default function ArchivePage() {
             </ul>
           )}
 
-          {/* 페이지 이동 — 전체 건수 대신 이전/다음(거대 COUNT 회피) */}
+          {/* 페이지 이동 */}
           {(page > 1 || hasMore) && (
             <div className="flex items-center justify-center gap-3 pt-6">
               <button
@@ -177,7 +184,7 @@ export default function ArchivePage() {
               >
                 ← 이전
               </button>
-              <span className="text-sm text-foreground-muted">{page}페이지</span>
+              <span className="text-sm text-foreground-muted tabular-nums">{page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
               <button
                 type="button"
                 onClick={() => load(page + 1)}
