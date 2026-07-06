@@ -303,3 +303,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-06 · 저녁 브리핑 마지막 멘트 고정: "OOOO년 O월 O일 저녁 태안 소식이었습니다"(KST 날짜 프로그램 계산·마지막 줄 append). VPS Gemini(dialogue.push)·Worker 폴백(synthBriefingMono closing 인자) 양쪽. LLM엔 날짜 직접 말하지 말라 지시
 
 - 2026-07-06 · 리디자인 감사 TIER1 적용(안전): 404/error 페이지·news·archive loading 대신 메타데이터 layout, 버튼 active:scale, eyebrow 대비개선(accent.ink #7A5C0A), 포커스링 네이비, 고대비 토글 실버그 수정(body 스코프), text-wrap balance/pretty+히어로 br제거, 종이 grain 오버레이(2.2
+- 2026-07-06 · 리디자인 감사 TIER1(안전): 404/error 페이지, news/archive 메타데이터 layout, 버튼 active:scale, eyebrow 대비(accent.ink #7A5C0A), 포커스링 네이비, 고대비 토글 실버그 수정, text-wrap balance/pretty, 종이 grain 오버레이(z-1), min-h-dvh. 폰트 자체호스팅(#1)·아이콘·색대비는 사용자 결정/육안검증 대기
