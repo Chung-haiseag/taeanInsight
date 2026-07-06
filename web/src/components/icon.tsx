@@ -30,7 +30,7 @@ const MAP: Record<string, ComponentType<PhosphorProps>> = {
 export type IconName = keyof typeof MAP;
 
 export function Icon({
-  name, size = "1.1em", weight = "regular", className, label,
+  name, size = "0.9em", weight = "regular", className, label,
 }: {
   name: IconName;
   size?: number | string;
