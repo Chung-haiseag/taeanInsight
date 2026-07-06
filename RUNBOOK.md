@@ -301,3 +301,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-06 · 저녁 브리핑 신선도/정확성 감사 수정(멀티에이전트 검증 8건): (1)브리핑 캐시헤더 21600→600+must-revalidate(날짜없는 고정URL의 6시간 캐시가 어제 것 재생시킴) (2)Worker 폴백 covered.json dedup+신선분 없으면 404(반복 방지) (3)폴백 소스쿼리 개별실패 격리(allSettled) (4)gen-briefing 후보 LIMIT 30으로 dedup-before-LIMIT 해소 (5)covered.json 로드 오류를 최초실행과 구분(조용한 dedup 비활성 방지) (6)FORCE 재실행 자기오염 방지 (7)covered 저장실패 로그 (8)팟캐스트 force=1 관리자 무효화. -pod.mp3→-mono.mp3(단일진행자 자연낭독)
 
 - 2026-07-06 · 저녁 브리핑 마지막 멘트 고정: "OOOO년 O월 O일 저녁 태안 소식이었습니다"(KST 날짜 프로그램 계산·마지막 줄 append). VPS Gemini(dialogue.push)·Worker 폴백(synthBriefingMono closing 인자) 양쪽. LLM엔 날짜 직접 말하지 말라 지시
+
+- 2026-07-06 · 리디자인 감사 TIER1 적용(안전): 404/error 페이지·news·archive loading 대신 메타데이터 layout, 버튼 active:scale, eyebrow 대비개선(accent.ink #7A5C0A), 포커스링 네이비, 고대비 토글 실버그 수정(body 스코프), text-wrap balance/pretty+히어로 br제거, 종이 grain 오버레이(2.2

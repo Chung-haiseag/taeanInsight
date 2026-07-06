@@ -69,7 +69,7 @@ export default function MembershipPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10 py-8">
+    <div className="mx-auto max-w-4xl space-y-10">
       <div>
         <PageHeader
           align="center"

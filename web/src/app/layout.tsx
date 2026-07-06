@@ -51,7 +51,7 @@ export default function RootLayout({
           본문으로 건너뛰기
         </a>
         <AccessibilityProvider>
-          <div className="min-h-screen flex flex-col">
+          <div className="min-h-dvh flex flex-col">
             <SiteHeader />
             <main id="main" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
               {children}

@@ -16,9 +16,7 @@ export function GenericHome() {
           태안 AI 인텔리전스 커먼즈
         </p>
         <h1 className="mt-5 font-sans text-display text-brand">
-          태안의 다음 주를
-          <br />
-          AI로 미리 봅니다.
+          태안의 다음 주를 AI로 미리 봅니다.
         </h1>
         <span className="accent-rule mt-6" aria-hidden="true" />
         <p className="mt-6 max-w-prose text-lg leading-relaxed text-foreground-muted">
