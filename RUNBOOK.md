@@ -304,3 +304,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 
 - 2026-07-06 · 리디자인 감사 TIER1 적용(안전): 404/error 페이지·news·archive loading 대신 메타데이터 layout, 버튼 active:scale, eyebrow 대비개선(accent.ink #7A5C0A), 포커스링 네이비, 고대비 토글 실버그 수정(body 스코프), text-wrap balance/pretty+히어로 br제거, 종이 grain 오버레이(2.2
 - 2026-07-06 · 리디자인 감사 TIER1(안전): 404/error 페이지, news/archive 메타데이터 layout, 버튼 active:scale, eyebrow 대비(accent.ink #7A5C0A), 포커스링 네이비, 고대비 토글 실버그 수정, text-wrap balance/pretty, 종이 grain 오버레이(z-1), min-h-dvh. 폰트 자체호스팅(#1)·아이콘·색대비는 사용자 결정/육안검증 대기
+
+- 2026-07-06 · 브랜드 액센트 황토→갯벌 페트롤(#116E7A, AI 크림+테라코타 클러스터 탈피): accent DEFAULT #116E7A / subtle #CFE3E6 / ink #0E5860, ::selection, OG카드 #c9a227→#4FB3BD(네이비 위 가시). 토큰화돼 있어 전 사이트 즉시 반영

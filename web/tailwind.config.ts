@@ -13,9 +13,9 @@ export default {
           light: "#3A4B73",
         },
         accent: {
-          DEFAULT: "#B8860B", // 황토색 (채움·보더·AI 라벨 배경용)
-          subtle: "#E8D7A4",
-          ink: "#7A5C0A",     // 크림 위 텍스트용(대비 ~6:1, WCAG AA) — eyebrow/강조 텍스트
+          DEFAULT: "#116E7A", // 갯벌 페트롤(딥틸) — 채움·보더·AI 라벨 배경용
+          subtle: "#CFE3E6",
+          ink: "#0E5860",     // 크림 위 텍스트용(대비 AA) — eyebrow/강조 텍스트
         },
         background: {
           DEFAULT: "#FAF9F6", // 오프화이트
