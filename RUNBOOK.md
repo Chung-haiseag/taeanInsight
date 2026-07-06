@@ -297,3 +297,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-05 · 저녁 뉴스 브리핑 Gemini 멀티스피커화(NotebookLM급): tools/podcast/gen-briefing.mjs(최근14일 주요기사5→2인대담→멀티스피커 WAV, audio/briefing/<날짜>-gem.wav). Worker /briefing이 gem.wav 우선 서빙(구 Llama+Chirp3 폴백). VPS 타이머 매일 17:00(taean-briefing). 무료 키(.gemini_keys 공유)
 
 - 2026-07-05 · 저녁 브리핑 소스 확장+3분 제한: 군정공지·태안신문·네이버외부보도 3갈래 종합(오늘 우선, 최근 3일 보강). 3분 이내(22~26줄·950자 지시). gen-briefing.mjs
+
+- 2026-07-06 · 저녁 브리핑 신선도/정확성 감사 수정(멀티에이전트 검증 8건): (1)브리핑 캐시헤더 21600→600+must-revalidate(날짜없는 고정URL의 6시간 캐시가 어제 것 재생시킴) (2)Worker 폴백 covered.json dedup+신선분 없으면 404(반복 방지) (3)폴백 소스쿼리 개별실패 격리(allSettled) (4)gen-briefing 후보 LIMIT 30으로 dedup-before-LIMIT 해소 (5)covered.json 로드 오류를 최초실행과 구분(조용한 dedup 비활성 방지) (6)FORCE 재실행 자기오염 방지 (7)covered 저장실패 로그 (8)팟캐스트 force=1 관리자 무효화. -pod.mp3→-mono.mp3(단일진행자 자연낭독)
