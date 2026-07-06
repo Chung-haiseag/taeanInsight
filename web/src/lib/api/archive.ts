@@ -20,6 +20,8 @@ export interface ArchiveSearchResult {
   page: number;
   pageSize: number;
   mode?: string;
+  total?: number;        // 현재 검색 조건의 전체 결과 건수
+  totalPages?: number;   // 전체 페이지 수
   hasMore?: boolean;
   note?: string;
 }

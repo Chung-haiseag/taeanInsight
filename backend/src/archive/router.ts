@@ -37,26 +37,38 @@ archiveRouter.get("/search", async (c) => {
 
   const cols = "idxno,title,published_at,year,section,category,author,excerpt,lead_image,members_only";
 
-  // FTS5 트라이그램은 3글자 이상만 매칭 → 긴 질의는 FTS, 짧은 질의는 LIKE
+  // FTS5 트라이그램은 3글자 이상만 매칭 → 긴 질의는 FTS, 짧은 질의는 LIKE.
+  // 항목 쿼리와 COUNT를 병렬 실행해 전체 건수·페이지수를 함께 반환(지연 최소화).
   async function ftsSearch() {
     const where = ["archive_fts MATCH ?", ...filters].join(" AND ");
-    const sql =
-      `SELECT ${cols.replace(/(\w+)/g, "a.$1")} FROM archive_fts f JOIN archive_articles a ON a.idxno = f.rowid ` +
-      `WHERE ${where} ORDER BY a.published_at DESC LIMIT ? OFFSET ?`;
-    return adb.prepare(sql).bind(q, ...binds, PAGE_SIZE, offset).all();
+    const base = `FROM archive_fts f JOIN archive_articles a ON a.idxno = f.rowid WHERE ${where}`;
+    const sql = `SELECT ${cols.replace(/(\w+)/g, "a.$1")} ${base} ORDER BY a.published_at DESC LIMIT ? OFFSET ?`;
+    const [rows, cnt] = await Promise.all([
+      adb.prepare(sql).bind(q, ...binds, PAGE_SIZE, offset).all(),
+      adb.prepare(`SELECT COUNT(*) AS n ${base}`).bind(q, ...binds).first<{ n: number }>(),
+    ]);
+    return { rows, total: cnt?.n ?? 0 };
   }
-  // 짧은 질의(2글자) 폴백 — 본문 LIKE 풀스캔(~104k행, 2s+)을 피해 제목만 검색.
-  // 3글자↑ 본문 매칭은 FTS가 담당하므로 LIKE는 제목 한정으로 충분히 빠름.
+  // 짧은 질의(2글자) 폴백 — 본문 LIKE 풀스캔(~104k행, 2s+)을 피해 제목만 검색(제목은 짧아 COUNT도 빠름).
   async function likeSearch() {
     const where = ["a.title LIKE ?", ...filters].join(" AND ");
-    const sql =
-      `SELECT ${cols} FROM archive_articles a WHERE ${where} ORDER BY published_at DESC LIMIT ? OFFSET ?`;
-    return adb.prepare(sql).bind(`%${q}%`, ...binds, PAGE_SIZE, offset).all();
+    const base = `FROM archive_articles a WHERE ${where}`;
+    const sql = `SELECT ${cols} ${base} ORDER BY published_at DESC LIMIT ? OFFSET ?`;
+    const [rows, cnt] = await Promise.all([
+      adb.prepare(sql).bind(`%${q}%`, ...binds, PAGE_SIZE, offset).all(),
+      adb.prepare(`SELECT COUNT(*) AS n ${base}`).bind(`%${q}%`, ...binds).first<{ n: number }>(),
+    ]);
+    return { rows, total: cnt?.n ?? 0 };
   }
   async function listOnly() {
     const where = filters.length ? "WHERE " + filters.join(" AND ") : "";
-    const sql = `SELECT ${cols} FROM archive_articles a ${where} ORDER BY published_at DESC LIMIT ? OFFSET ?`;
-    return adb.prepare(sql).bind(...binds, PAGE_SIZE, offset).all();
+    const base = `FROM archive_articles a ${where}`;
+    const sql = `SELECT ${cols} ${base} ORDER BY published_at DESC LIMIT ? OFFSET ?`;
+    const [rows, cnt] = await Promise.all([
+      adb.prepare(sql).bind(...binds, PAGE_SIZE, offset).all(),
+      adb.prepare(`SELECT COUNT(*) AS n ${base}`).bind(...binds).first<{ n: number }>(),
+    ]);
+    return { rows, total: cnt?.n ?? 0 };
   }
 
   // 검색 목록 성능: 전자북 기사의 lead_image는 520KB 지면 스캔이라 20개면 ~10MB.
@@ -67,18 +79,21 @@ archiveRouter.get("/search", async (c) => {
       return n >= 90000001 && n <= 90099999 ? { ...it, lead_image: null } : it;
     });
 
-  // 다음 페이지 존재 여부: 이번 페이지가 가득 찼으면(=PAGE_SIZE) 더 있을 수 있음.
-  // COUNT 전체 스캔(특히 2글자 LIKE)을 피하려고 hasMore 방식 사용.
-  const reply = (rows: D1Result, mode: string) => {
-    const items = rows.results ?? [];
-    return c.json({ items: lite(items), page, pageSize: PAGE_SIZE, mode, hasMore: items.length === PAGE_SIZE });
+  const reply = (res: { rows: D1Result; total: number }, mode: string) => {
+    const items = res.rows.results ?? [];
+    return c.json({
+      items: lite(items), page, pageSize: PAGE_SIZE, mode,
+      total: res.total,
+      totalPages: Math.max(1, Math.ceil(res.total / PAGE_SIZE)),
+      hasMore: page * PAGE_SIZE < res.total,
+    });
   };
 
   try {
     if (!q) return reply(await listOnly(), "list");
     if (q.length >= 3) {
-      const rows = await ftsSearch();
-      if ((rows.results?.length ?? 0) > 0) return reply(rows, "fts");
+      const r = await ftsSearch();
+      if ((r.rows.results?.length ?? 0) > 0) return reply(r, "fts");
     }
     return reply(await likeSearch(), "like"); // 짧은 질의 또는 FTS 0건
   } catch (e) {
