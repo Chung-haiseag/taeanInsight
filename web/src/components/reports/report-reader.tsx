@@ -120,7 +120,7 @@ export function ReportReader({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <Masthead
         weekLabel={formatWeek(report.weekId)}
         publishedAt={report.publishedAt}

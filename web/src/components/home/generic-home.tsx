@@ -47,7 +47,7 @@ export function GenericHome() {
             4대 핵심 서비스
           </h2>
         </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <ProductCard
             index="01"
             href="/reports"

@@ -40,14 +40,14 @@ export default function HomePage() {
   return (
     <>
       {state === "entitled" && (
-        <div className="space-y-6">
+        <div className="mx-auto max-w-4xl space-y-6">
           <EntitledBanner onCancel={() => { setDemoHomeState("preview"); setState("preview"); }} />
           <OwnerHome />
         </div>
       )}
 
       {state === "preview" && (
-        <div className="space-y-6">
+        <div className="mx-auto max-w-4xl space-y-6">
           <PreviewBanner />
           <UpsellPaywall product={MOCK_ADDON} onSubscribe={subscribe}>
             <OwnerHome blurred />
@@ -56,7 +56,7 @@ export default function HomePage() {
       )}
 
       {state === "anonymous" && (
-        <div className="space-y-6">
+        <div className="mx-auto max-w-4xl space-y-6">
           <AnonymousBanner />
           <GenericHome />
         </div>
