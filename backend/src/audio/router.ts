@@ -119,7 +119,7 @@ async function synthLong(env: Env, text: string, voice = "ko-KR-Chirp3-HD-Aoede"
 
 // 브리핑 폴백(Gemini 부재 시) — 다중소스를 Workers AI 자연 요약(모놀로그)으로 정리 → Chirp3-HD 단일 진행자 낭독.
 // 2인 Llama 대담은 어색해서 폐기. 단일 진행자 요약이 훨씬 자연스럽다(청크 크게).
-async function synthBriefingMono(env: Env, src: string): Promise<Uint8Array | null> {
+async function synthBriefingMono(env: Env, src: string, closing?: string): Promise<Uint8Array | null> {
   if (!env.AI) return null;
   let script = "";
   try {
@@ -131,7 +131,8 @@ async function synthBriefingMono(env: Env, src: string): Promise<Uint8Array | nu
         { role: "system", content:
           "너는 지역 라디오의 '오늘 저녁 태안 뉴스' 아나운서다. 아래 오늘의 소식(군정·지역기사·외부보도)을 " +
           "차분하고 자연스러운 한 편의 뉴스 낭독 원고로 정리하라. 짧은 인사로 시작해 소식을 문단으로 매끄럽게 " +
-          "이어 전하고 한 줄 마무리로 끝낸다. 개조식·목록 금지, 구어체 존댓말, 없는 사실 창작 금지. " +
+          "이어 전하고 한 줄 마무리로 끝낸다. 날짜는 직접 말하지 말 것(마지막 날짜 멘트는 자동으로 붙음). " +
+          "개조식·목록 금지, 구어체 존댓말, 없는 사실 창작 금지. " +
           "외부 보도는 '한 매체 보도에 따르면' 식으로 출처를 가볍게. 전체 3분 이내(약 500~700자). 진행자 이름·자기소개 금지." },
         { role: "user", content: src },
       ],
@@ -139,6 +140,7 @@ async function synthBriefingMono(env: Env, src: string): Promise<Uint8Array | nu
     script = (res.content ?? "").replace(/\s+/g, " ").trim();
   } catch { /* 무시 */ }
   if (script.length < 40) return null;
+  if (closing) script = `${script} ${closing}`; // 마지막 날짜 마무리 멘트 고정
   return synthLong(env, script);
 }
 
@@ -263,7 +265,8 @@ audioRouter.get("/briefing", async (c) => {
   if (!parts.length) return c.json({ error: "no_news" }, 404); // 새 소식 없으면 어제 것 반복 대신 없음 처리
   const src = parts.join("\n\n");
 
-  const bytes = await synthBriefingMono(c.env, src);
+  const dateKo = date.replace(/(\d+)-(\d+)-(\d+)/, (_, y, m, d) => `${y}년 ${+m}월 ${+d}일`);
+  const bytes = await synthBriefingMono(c.env, src, `${dateKo} 저녁 태안 소식이었습니다.`);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(cacheKey, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
   return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": BRIEF_CACHE } });
