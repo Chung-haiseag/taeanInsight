@@ -1,6 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
+import { Fraunces } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
+
+// 본문·UI — Pretendard 가변(자체 호스팅). 전 방문자에게 브랜드 타입 확실 전달.
+const pretendard = localFont({
+  src: "./fonts/PretendardVariable.woff2",
+  variable: "--font-sans",
+  display: "swap",
+  weight: "45 920",
+});
+// 디스플레이 — 라틴 숫자·라벨용 올드스타일 세리프(한글은 Pretendard로 폴백). 지오메트릭 산스 × 세리프 페어링.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+  weight: ["400", "600", "700"],
+  style: ["normal", "italic"],
+});
 import { SiteFooter } from "@/components/site-footer";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
 
@@ -45,7 +63,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={`${pretendard.variable} ${fraunces.variable}`}>
       <body>
         <a href="#main" className="skip-link">
           본문으로 건너뛰기
