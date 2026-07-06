@@ -114,22 +114,42 @@ async function main() {
     catch { /* 없음 → 생성 */ }
   }
 
-  // 오늘 저녁 뉴스 소스 3갈래(오늘 우선, 부족하면 최근 3일 보강)
+  // 오늘 저녁 뉴스 소스 3갈래 — 최근성 우선 + 어제 다룬 항목 제외(매일 다른 브리핑)
   const clean = (s) => (s || "").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;|&#\d+;/g, " ").replace(/\s+/g, " ").trim();
-  // 1) 군정 소식(최근 3일 상위 3)
-  const gov = d1(`SELECT title, dept FROM gov_notices WHERE fetched_at >= datetime('now','-3 day') ORDER BY published_at DESC LIMIT 3`);
-  // 2) 태안신문 주요 기사(최근 3일 상위 4)
-  const news = d1(`SELECT title, substr(COALESCE(body, excerpt, ''),1,220) AS brief FROM archive_articles WHERE published_at >= date('now','+9 hours','-3 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 4`);
-  // 3) 외부 언론(네이버, 태안신문 제외, 최근 2일 상위 3)
-  const clips = d1(`SELECT title, source, substr(COALESCE(description,''),1,140) AS brief FROM news_clips WHERE created_at >= datetime('now','-2 day') AND source NOT LIKE '%태안신문%' GROUP BY title ORDER BY pub_date DESC, id DESC LIMIT 3`);
+  const norm = (t) => clean(t).slice(0, 44);
+  // 최근 브리핑에서 다룬 제목 로드(중복 회피). 최대 2일치 롤링.
+  let coveredPrev = new Set();
+  try {
+    const prev = JSON.parse(wrangler(["r2", "object", "get", `${BUCKET}/audio/briefing/covered.json`, "--remote", "--pipe"], { stdio: ["ignore", "pipe", "pipe"] }));
+    // FORCE 재실행 시 오늘 저장분으로 자기오염 방지(같은 날 재생성이 스스로를 dedup)
+    if (!(FORCE && prev.date === date)) (prev.titles || []).forEach((t) => coveredPrev.add(norm(t)));
+  } catch (e) {
+    // 객체 없음(최초)은 정상. 그 외 오류는 dedup을 조용히 끄지 말고 경고(다음날 중복 위험 인지).
+    const err = String((e && (e.stderr || e.message)) || e);
+    if (!/not exist|not found|NoSuchKey|404|could not be found/i.test(err)) console.warn("⚠ covered.json 로드 실패(중복방지 약화):", err.slice(0, 120));
+  }
+  const fresh = (arr) => arr.filter((x) => !coveredPrev.has(norm(x.title)));
+  // 최근 창 우선 → 신선분이 min 미만이면 넓은 창으로 보강(둘 다 어제 것 제외)
+  const pick = (recentSql, wideSql, min) => { let r = fresh(d1(recentSql)); if (r.length < min) r = fresh(d1(wideSql)); return r; };
+
+  const gov = pick(
+    `SELECT title, dept FROM gov_notices WHERE fetched_at >= datetime('now','-40 hours') ORDER BY published_at DESC LIMIT 30`,
+    `SELECT title, dept FROM gov_notices WHERE fetched_at >= datetime('now','-4 day') ORDER BY published_at DESC LIMIT 30`, 2).slice(0, 3);
+  const news = pick(
+    `SELECT title, substr(COALESCE(body, excerpt, ''),1,220) AS brief FROM archive_articles WHERE published_at >= date('now','+9 hours','-40 hours') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 30`,
+    `SELECT title, substr(COALESCE(body, excerpt, ''),1,220) AS brief FROM archive_articles WHERE published_at >= date('now','+9 hours','-4 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 30`, 1).slice(0, 4);
+  const clips = pick(
+    `SELECT title, source, substr(COALESCE(description,''),1,140) AS brief FROM news_clips WHERE created_at >= datetime('now','-30 hours') AND source NOT LIKE '%태안신문%' GROUP BY title ORDER BY pub_date DESC, id DESC LIMIT 30`,
+    `SELECT title, source, substr(COALESCE(description,''),1,140) AS brief FROM news_clips WHERE created_at >= datetime('now','-3 day') AND source NOT LIKE '%태안신문%' GROUP BY title ORDER BY pub_date DESC, id DESC LIMIT 30`, 2).slice(0, 3);
 
   const parts = [];
   if (gov.length) parts.push(`[오늘의 군정 소식]\n${gov.map((g) => `- ${clean(g.title)}${g.dept ? ` (${g.dept})` : ""}`).join("\n")}`);
   if (news.length) parts.push(`[태안신문 주요 기사]\n${news.map((n) => `- ${clean(n.title)}: ${clean(n.brief)}`).join("\n")}`);
   if (clips.length) parts.push(`[외부 언론이 본 태안]\n${clips.map((c) => `- [${clean(c.source)}] ${clean(c.title)}${c.brief ? `: ${clean(c.brief)}` : ""}`).join("\n")}`);
-  if (!parts.length) { console.log("대상 소식 없음 — 종료"); return; }
+  if (!parts.length) { console.log("새 소식 없음(어제와 중복 제외 후) — 종료"); return; }
   const src = parts.join("\n\n");
-  console.log(`  소스: 군정 ${gov.length} · 신문 ${news.length} · 외부 ${clips.length}`);
+  const coveredNow = [...gov, ...news, ...clips].map((x) => x.title);
+  console.log(`  소스: 군정 ${gov.length} · 신문 ${news.length} · 외부 ${clips.length} (어제 다룬 ${coveredPrev.size}건 제외)`);
 
   console.log("▸ 대본 생성(Gemini)…");
   const dialogue = await makeDialogue(src);
@@ -145,13 +165,20 @@ async function main() {
     console.log(`▸ R2 업로드 → ${key}`);
     wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]);
     console.log("✅ 완료 — 저녁 브리핑이 NotebookLM급으로 교체됩니다.");
+    // 오늘 다룬 항목 저장 → 내일 중복 회피(최근 2일 롤링 유지)
+    try {
+      const rolled = [...coveredNow, ...coveredPrev].slice(0, 24);
+      const ctmp = join(tmpdir(), "briefing-covered.json");
+      writeFileSync(ctmp, JSON.stringify({ date, titles: rolled }));
+      try { wrangler(["r2", "object", "put", `${BUCKET}/audio/briefing/covered.json`, "--file", ctmp, "--content-type", "application/json", "--remote"]); } finally { rmSync(ctmp, { force: true }); }
+    } catch { /* 무시 */ }
     try {
       let cur = {};
       try { cur = JSON.parse(wrangler(["r2", "object", "get", `${BUCKET}/audio/status.json`, "--remote", "--pipe"], { stdio: ["ignore", "pipe", "ignore"] })); } catch { /* 최초 */ }
       const stmp = join(tmpdir(), "audio-status.json");
       writeFileSync(stmp, JSON.stringify({ ...cur, briefing: { date, ok: true, at: new Date().toISOString() } }));
       try { wrangler(["r2", "object", "put", `${BUCKET}/audio/status.json`, "--file", stmp, "--content-type", "application/json", "--remote"]); } finally { rmSync(stmp, { force: true }); }
-    } catch { /* 무시 */ }
+    } catch (e) { console.warn("⚠ covered.json 저장 실패(내일 중복 가능):", String(e).slice(0, 120)); }
   } finally { rmSync(tmp, { force: true }); }
 }
 

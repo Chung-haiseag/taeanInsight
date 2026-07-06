@@ -117,45 +117,29 @@ async function synthLong(env: Env, text: string, voice = "ko-KR-Chirp3-HD-Aoede"
   return merged;
 }
 
-// 뉴스 소식(src) → 2인 대담 대본(Workers AI) → Chirp3-HD 2보이스+무음 mp3. 브리핑 공용.
-async function synthNewsPodcast(env: Env, src: string, topic: string): Promise<Uint8Array | null> {
+// 브리핑 폴백(Gemini 부재 시) — 다중소스를 Workers AI 자연 요약(모놀로그)으로 정리 → Chirp3-HD 단일 진행자 낭독.
+// 2인 Llama 대담은 어색해서 폐기. 단일 진행자 요약이 훨씬 자연스럽다(청크 크게).
+async function synthBriefingMono(env: Env, src: string): Promise<Uint8Array | null> {
   if (!env.AI) return null;
-  let dialogue: { sp: "A" | "B"; text: string }[] = [];
+  let script = "";
   try {
     const { WorkersAiLlmClient } = await import("../llm/workers_ai");
     const client = new WorkersAiLlmClient({ ai: env.AI });
     const res = await client.complete({
-      channel: "realtime", maxTokens: 900, temperature: 0.75,
+      channel: "realtime", maxTokens: 700, temperature: 0.6,
       messages: [
         { role: "system", content:
-          `너는 지역 라디오 팟캐스트 작가다. 아래 '${topic}'을 두 진행자의 짧은 대담으로 각색하라.\n` +
-          "진행자 A(밝은 진행·질문)·B(차분한 해설)가 자연스럽게 주고받는다. 맞장구·구어체 존댓말.\n" +
-          "오프닝에서 오늘 소식임을 가볍게 언급(이름·자기소개 금지). 없는 사실 창작 금지.\n" +
-          "각 줄을 정확히 'A: ...' 또는 'B: ...' 로만. 14~20줄. 마지막은 짧은 마무리." },
+          "너는 지역 라디오의 '오늘 저녁 태안 뉴스' 아나운서다. 아래 오늘의 소식(군정·지역기사·외부보도)을 " +
+          "차분하고 자연스러운 한 편의 뉴스 낭독 원고로 정리하라. 짧은 인사로 시작해 소식을 문단으로 매끄럽게 " +
+          "이어 전하고 한 줄 마무리로 끝낸다. 개조식·목록 금지, 구어체 존댓말, 없는 사실 창작 금지. " +
+          "외부 보도는 '한 매체 보도에 따르면' 식으로 출처를 가볍게. 전체 3분 이내(약 500~700자). 진행자 이름·자기소개 금지." },
         { role: "user", content: src },
       ],
     });
-    dialogue = (res.content ?? "").split("\n").map((l) => l.trim()).map((l) => {
-      const m = l.match(/^([AB])\s*[:：]\s*(.+)$/);
-      return m ? { sp: m[1] as "A" | "B", text: m[2].trim().replace(/^["']|["']$/g, "") } : null;
-    }).filter((x): x is { sp: "A" | "B"; text: string } => !!x && x.text.length > 1).slice(0, 22);
+    script = (res.content ?? "").replace(/\s+/g, " ").trim();
   } catch { /* 무시 */ }
-  if (dialogue.length < 4) return null;
-
-  const VOICE = { A: "ko-KR-Chirp3-HD-Aoede", B: "ko-KR-Chirp3-HD-Charon" } as const;
-  const gap = await ttsSilence(env, 450);
-  const chunks: Uint8Array[] = [];
-  for (let i = 0; i < dialogue.length; i++) {
-    const b = await googleTts(env, dialogue[i].text, VOICE[dialogue[i].sp]);
-    if (b) chunks.push(b);
-    if (gap && i < dialogue.length - 1) chunks.push(gap);
-  }
-  if (!chunks.length) return null;
-  const total = chunks.reduce((s, b) => s + b.length, 0);
-  const merged = new Uint8Array(total);
-  let off = 0;
-  for (const b of chunks) { merged.set(b, off); off += b.length; }
-  return merged;
+  if (script.length < 40) return null;
+  return synthLong(env, script);
 }
 
 // GET /api/audio/podcast — 주간 리포트로 2인 대담 AI 팟캐스트(주차별 R2 캐시)
@@ -228,39 +212,61 @@ async function genPodcast(c: Context<{ Bindings: Env }>, force = false) {
   await c.env.ARCHIVE_PHOTOS.put(`audio/podcast/${rep.week_id}-v2.mp3`, merged, { httpMetadata: { contentType: "audio/mpeg" } });
   return new Response(merged, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
 }
-audioRouter.get("/podcast", (c) => genPodcast(c));
+// force=1은 관리자만(리포트 수정 후 재생성용) — 공개 남용 방지
+audioRouter.get("/podcast", (c) => genPodcast(c, c.req.query("force") === "1" && c.req.header("X-Admin-Token") === (c.env as Env & { ADMIN_TOKEN?: string }).ADMIN_TOKEN));
 
 // GET /api/audio/briefing — 오늘의 주요 뉴스를 2인 대담 팟캐스트로(날짜별 R2 캐시, Chirp3-HD)
 audioRouter.get("/briefing", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
   const k = new Date(Date.now() + 9 * 3600 * 1000);
   const date = `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}-${String(k.getUTCDate()).padStart(2, "0")}`;
-  const cacheKey = `audio/briefing/${date}-pod.mp3`; // -pod: 2인 대담(구 단일낭독 캐시 무효화)
+  const cacheKey = `audio/briefing/${date}-mono.mp3`; // -mono: 다중소스 단일 진행자 자연 낭독(구 어색한 2인 Llama 캐시 무효화)
+
+  // 브리핑은 날짜 없는 고정 URL — 짧은 캐시(세션 재생용) + 만료 후 재검증으로 날짜/생성 교체를 곧 반영.
+  const BRIEF_CACHE = "private, max-age=600, must-revalidate";
 
   // 0) 로컬 잡이 올린 Gemini 멀티스피커 브리핑(NotebookLM급) 우선
   const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.wav`);
-  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=21600" } });
+  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": BRIEF_CACHE } });
 
   const cached = await c.env.ARCHIVE_PHOTOS.get(cacheKey);
-  if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
+  if (cached) return new Response(cached.body, { headers: { "content-type": "audio/mpeg", "cache-control": BRIEF_CACHE } });
 
   if (await overAudioLimit(c)) return c.json({ error: "rate_limited" }, 429);
   if (!(c.env as Env & { GOOGLE_TTS_KEY?: string }).GOOGLE_TTS_KEY || !c.env.AI) return c.json({ error: "unconfigured" }, 503);
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const db = c.env.ARCHIVE_DB;
 
-  // 최근 주요 기사 5건(본문 충분·광고 제외)
-  const since = `${new Date(Date.now() + 9 * 3600_000 - 14 * 86400_000).toISOString().slice(0, 10)}`;
-  const r = await c.env.ARCHIVE_DB
-    .prepare("SELECT title, substr(COALESCE(body, excerpt, ''),1,300) AS brief FROM archive_articles WHERE published_at >= ? AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC LIMIT 5")
-    .bind(since).all<{ title: string; brief: string }>();
-  const items = r.results ?? [];
-  if (!items.length) return c.json({ error: "no_news" }, 404);
-  const src = items.map((it) => `- ${it.title}: ${(it.brief ?? "").replace(/\s+/g, " ").trim()}`).join("\n");
+  // 폴백 소스 3갈래(군정·태안신문·외부보도). 개별 쿼리 실패 격리(하나 죽어도 나머지로 진행).
+  const q = <T>(sql: string) => db.prepare(sql).all<T>().then((r) => r.results ?? []).catch(() => [] as T[]);
+  const [gov, news, clips] = await Promise.all([
+    q<{ title: string; dept: string }>("SELECT title, dept FROM gov_notices WHERE fetched_at >= datetime('now','-3 day') ORDER BY published_at DESC LIMIT 8"),
+    q<{ title: string; brief: string }>("SELECT title, substr(COALESCE(body, excerpt, ''),1,220) AS brief FROM archive_articles WHERE published_at >= date('now','+9 hours','-3 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT 8"),
+    q<{ title: string; source: string }>("SELECT title, source FROM news_clips WHERE created_at >= datetime('now','-2 day') AND source NOT LIKE '%태안신문%' GROUP BY title ORDER BY pub_date DESC, id DESC LIMIT 8"),
+  ]);
 
-  const bytes = await synthNewsPodcast(c.env, src, "오늘의 태안 주요 소식");
+  // 어제 다룬 항목 제외(covered.json, VPS Gemini 잡과 동일) → 폴백도 반복 방지
+  const strip = (s?: string) => (s ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const norm = (t: string) => strip(t).slice(0, 44);
+  const covered = new Set<string>();
+  try {
+    const cj = await c.env.ARCHIVE_PHOTOS.get("audio/briefing/covered.json");
+    if (cj) ((await cj.json<{ titles?: string[] }>()).titles ?? []).forEach((t) => covered.add(norm(t)));
+  } catch { /* 무시 */ }
+  const nc = <T extends { title: string }>(arr: T[]) => arr.filter((x) => !covered.has(norm(x.title)));
+  const govF = nc(gov).slice(0, 3), newsF = nc(news).slice(0, 4), clipsF = nc(clips).slice(0, 3);
+
+  const parts: string[] = [];
+  if (govF.length) parts.push("[군정 소식]\n" + govF.map((g) => `- ${strip(g.title)}${g.dept ? ` (${g.dept})` : ""}`).join("\n"));
+  if (newsF.length) parts.push("[태안신문 주요 기사]\n" + newsF.map((n) => `- ${strip(n.title)}: ${strip(n.brief)}`).join("\n"));
+  if (clipsF.length) parts.push("[외부 언론]\n" + clipsF.map((cl) => `- [${strip(cl.source)}] ${strip(cl.title)}`).join("\n"));
+  if (!parts.length) return c.json({ error: "no_news" }, 404); // 새 소식 없으면 어제 것 반복 대신 없음 처리
+  const src = parts.join("\n\n");
+
+  const bytes = await synthBriefingMono(c.env, src);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(cacheKey, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
-  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=21600" } });
+  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": BRIEF_CACHE } });
 });
 
 // GET /api/audio/status — 오디오 자동생성 현황(로컬 잡이 기록한 status.json + 이번주 팟캐스트 존재)
