@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { apiFetch } from "@/lib/api/client";
 
 type Status = "unknown" | "unsupported" | "default" | "granted" | "denied" | "subscribing" | "subscribed" | "error";
@@ -105,7 +106,7 @@ export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
   if (status === "denied") {
     return (
       <div className="border border-brand/10 rounded p-3 bg-background text-sm text-foreground-muted">
-        🔕 알림이 차단되어 있습니다. 다시 받으려면 브라우저 사이트 설정에서 알림을 허용해주세요.
+        <Icon name="bell-off" /> 알림이 차단되어 있습니다. 다시 받으려면 브라우저 사이트 설정에서 알림을 허용해주세요.
       </div>
     );
   }

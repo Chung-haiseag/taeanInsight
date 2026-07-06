@@ -14,6 +14,7 @@ import { createArticle, getMyArticle, submitArticle, updateArticle } from "@/lib
 import { getArchiveArticle, type ArchiveArticle } from "@/lib/api/archive";
 
 import { PageHeader } from "@/components/page-header";
+import { Icon } from "@/components/icon";
 import {
   copilotAssist,
   copilotCheck,
@@ -240,16 +241,16 @@ function CopilotEditorPage() {
       {/* 임시저장 상태 바 */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand/10 bg-brand/[0.02] px-3 py-2 text-xs">
         <span className="text-foreground-muted">
-          {restored ? "📄 임시저장 글을 불러왔습니다 · " : ""}
+          {restored ? <><Icon name="doc" /> 임시저장 글을 불러왔습니다 · </> : ""}
           {savedAt ? `자동 저장됨 ${new Date(savedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}` : "작성하면 자동으로 임시저장됩니다"}
         </span>
         <div className="flex items-center gap-3">
-          <Link href="/citizen/articles" className="text-foreground-muted hover:text-brand">📑 내 기사</Link>
+          <Link href="/citizen/articles" className="text-foreground-muted hover:text-brand"><Icon name="clipboard" /> 내 기사</Link>
           <button type="button" onClick={onSaveDraft} disabled={serverSaving || (!title && !body)} className="font-semibold text-brand hover:underline disabled:opacity-40">
-            {serverSaving ? "저장 중…" : "💾 초안 저장"}
+            {serverSaving ? "저장 중…" : <><Icon name="download" /> 초안 저장</>}
           </button>
           <button type="button" onClick={() => setPreview((v) => !v)} className="font-semibold text-accent hover:underline">
-            {preview ? "✏️ 작성으로" : "👁 미리보기"}
+            {preview ? <><Icon name="pen" /> 작성으로</> : <><Icon name="eye" /> 미리보기</>}
           </button>
           {(title || body) && (
             <button type="button" onClick={() => { if (window.confirm("작성 중인 내용을 모두 지울까요?")) clearDraft(); }} className="text-foreground-muted hover:text-red-600">초기화</button>
@@ -311,7 +312,7 @@ function CopilotEditorPage() {
                 <input ref={fileInput} type="file" accept="image/*" onChange={onPickImage} className="hidden" />
                 <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
                   className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5 disabled:opacity-50">
-                  {uploading ? "업로드 중…" : "🖼 사진 추가"}
+                  {uploading ? "업로드 중…" : <><Icon name="image" /> 사진 추가</>}
                 </button>
                 <DataInsertButton onInsert={(text) => setBody((b) => `${b}${b && !b.endsWith("\n") ? "\n\n" : ""}${text}\n\n`)} />
                 {uploadErr && <span className="text-[11px] text-red-600">{uploadErr}</span>}
@@ -478,11 +479,17 @@ function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) 
   }
 
   const buttons: [AssistMode, string][] = [
-    ["polish", "✍️ 다듬기"],
-    ["summarize", "📝 요약"],
-    ["title", "💡 제목 추천"],
-    ["factcheck", "🔍 사실 점검"],
+    ["polish", "다듬기"],
+    ["summarize", "요약"],
+    ["title", "제목 추천"],
+    ["factcheck", "사실 점검"],
   ];
+  const buttonIcons: Record<AssistMode, "pen" | "write" | "idea" | "search"> = {
+    polish: "pen",
+    summarize: "write",
+    title: "idea",
+    factcheck: "search",
+  };
 
   return (
     <section className="rounded-2xl border border-brand/15 bg-background p-4 space-y-3">
@@ -496,7 +503,7 @@ function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) 
             disabled={busy !== null}
             className="rounded-full border border-brand/20 px-3 py-1.5 text-sm text-brand hover:bg-brand/5 disabled:opacity-50"
           >
-            {busy === mode ? "생성 중…" : label}
+            {busy === mode ? "생성 중…" : <><Icon name={buttonIcons[mode]} /> {label}</>}
           </button>
         ))}
       </div>
@@ -685,7 +692,7 @@ function DataInsertButton({ onInsert }: { onInsert: (text: string) => void }) {
     <div className="relative">
       <button type="button" onClick={toggle}
         className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5">
-        📊 데이터 넣기
+<Icon name="chart" /> 데이터 넣기
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-lg border border-brand/15 bg-background p-2 shadow-lg">

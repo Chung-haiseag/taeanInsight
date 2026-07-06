@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getSession, logout, type Account } from "@/lib/api/auth";
+import { Icon } from "@/components/icon";
 
 export function AccountNav() {
   const [acct, setAcct] = useState<Account | null | undefined>(undefined); // undefined=로딩
@@ -20,7 +21,7 @@ export function AccountNav() {
   const label = acct.displayName || acct.email.split("@")[0];
   return (
     <div className="hidden md:flex items-center gap-2 text-xs">
-      <Link href="/account" className="font-semibold text-brand hover:underline" title={acct.email}>👤 {label}</Link>
+      <Link href="/account" className="font-semibold text-brand hover:underline" title={acct.email}><Icon name="user" /> {label}</Link>
       <button type="button" onClick={async () => { await logout(); location.reload(); }} className="text-foreground-muted hover:text-brand">로그아웃</button>
     </div>
   );

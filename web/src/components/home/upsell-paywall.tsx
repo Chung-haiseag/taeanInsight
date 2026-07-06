@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { AddonProduct } from "@/lib/types";
+import { Icon } from "@/components/icon";
 
 export function UpsellPaywall({
   product,
@@ -36,7 +37,7 @@ export function UpsellPaywall({
       {/* 오버레이 */}
       <div className="absolute inset-0 flex items-start justify-center pt-10 bg-gradient-to-b from-background/20 to-background">
         <div className="w-full max-w-md rounded-2xl border border-accent/40 bg-background shadow-lift p-7 space-y-5 text-center">
-          <p className="eyebrow justify-center">🔒 별도 구독 상품</p>
+          <p className="eyebrow justify-center"><Icon name="lock" /> 별도 구독 상품</p>
           <div>
             <h2 className="text-2xl font-bold text-brand">{product.name}</h2>
             <p className="text-sm text-foreground-muted mt-1.5">{product.description}</p>

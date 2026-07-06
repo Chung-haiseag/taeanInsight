@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import { PushOptInButton } from "@/components/me/push_opt_in";
 import { DemandGauge } from "@/components/reports/report-charts";
 import { REGION_OPTIONS } from "@/lib/types";
@@ -195,7 +196,7 @@ export function LodgingBoardCard({ board, nearby }: { board: LodgingBoard; nearb
         </ul>
       )}
       {board.recommendedPrice == null && (
-        <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">객실 수·주말 기본가</strong>를 입력하면 권장가·예상 매출이 계산됩니다.</p>
+        <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">객실 수·주말 기본가</strong>를 입력하면 권장가·예상 매출이 계산됩니다.</p>
       )}
 
       {/* 주변 숙박 수 + 실시간 요금 확인(외부) */}
@@ -251,7 +252,7 @@ export function FoodBoardCard({ board }: { board: FoodBoard }) {
         </ul>
       )}
       {board.expectedCovers == null && (
-        <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">좌석 수·객단가</strong>를 입력하면 예상 손님·매출이 계산됩니다.</p>
+        <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">좌석 수·객단가</strong>를 입력하면 예상 손님·매출이 계산됩니다.</p>
       )}
       <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 위치·메뉴·단골에 따라 차이가 큽니다.</p>
     </section>
@@ -289,7 +290,7 @@ export function LeisureBoardCard({ board }: { board: LeisureBoard }) {
         </ul>
       )}
       {board.expectedGuests == null && (
-        <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">정원·체험료</strong>를 입력하면 예상 참가자·매출이 계산됩니다.</p>
+        <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">정원·체험료</strong>를 입력하면 예상 참가자·매출이 계산됩니다.</p>
       )}
       <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요·날씨·파고 기반 추정치 — 야외 활동은 기상에 크게 좌우됩니다.</p>
     </section>
@@ -328,7 +329,7 @@ export function RetailBoardCard({ board }: { board: RetailBoard }) {
         </ul>
       )}
       {board.expectedVisitors == null && (
-        <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">평일 평균 방문객·객단가</strong>를 입력하면 예상 방문·매출이 계산됩니다.</p>
+        <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">평일 평균 방문객·객단가</strong>를 입력하면 예상 방문·매출이 계산됩니다.</p>
       )}
       <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 입지·업태에 따라 차이가 큽니다.</p>
     </section>
@@ -444,7 +445,7 @@ export function TravelBoardCard({ board }: { board: TravelBoard }) {
   return (
     <section className="rounded-2xl border-2 border-accent/40 bg-accent-subtle/20 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-brand">🧭 여행사 운영 보드</h2>
+        <h2 className="text-xl font-bold text-brand"><Icon name="compass" /> 여행사 운영 보드</h2>
         <span className="text-xs text-foreground-muted">{board.weekend.sat.slice(5)}~{board.weekend.sun.slice(5)} 주말 · 수요 ‘{board.level}’</span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -467,7 +468,7 @@ export function TravelBoardCard({ board }: { board: TravelBoard }) {
         <ul className="mt-3 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>
       )}
       {board.expectedBookings == null && (
-        <p className="mt-3 text-xs text-foreground-muted">💡 가게 정보에 <strong className="text-brand">일 투어 정원·1인 상품가</strong>를 입력하면 예상 예약·매출이 계산됩니다.</p>
+        <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">일 투어 정원·1인 상품가</strong>를 입력하면 예상 예약·매출이 계산됩니다.</p>
       )}
       <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요·날씨·파고 기반 추정치 — 섬·해상 투어는 기상 영향 큼.</p>
     </section>
@@ -612,7 +613,7 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
 
   return (
     <section className="card-accent p-5">
-      <p className="font-semibold text-brand">🏪 내 가게 정보 설정</p>
+      <p className="font-semibold text-brand"><Icon name="store" /> 내 가게 정보 설정</p>
       <p className="mt-1 text-sm text-foreground-muted">업종·지역에 맞춘 실행 제안을 받으려면 가게 정보를 알려주세요.</p>
       <div className="mt-4 space-y-3">
         <div className="flex flex-wrap gap-2">

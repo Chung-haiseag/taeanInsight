@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/icon";
 
 // 원본 지면 전체화면 뷰어 — 확대(최대 4배)·축소·드래그 이동. ESC/배경클릭/✕ 닫기.
 export function PageViewer({ src, label, onClose }: { src: string; label: string; onClose: () => void }) {
@@ -36,7 +37,7 @@ export function PageViewer({ src, label, onClose }: { src: string; label: string
     <div className="fixed inset-0 z-[100] flex flex-col bg-black/90" role="dialog" aria-modal="true" aria-label={`원본 지면 뷰어 (${label})`}>
       {/* 컨트롤 바 */}
       <div className="flex items-center justify-between gap-3 bg-black/60 px-4 py-2.5 text-white">
-        <span className="truncate text-sm">📰 주간태안신문 · {label}</span>
+        <span className="truncate text-sm"><Icon name="news" /> 주간태안신문 · {label}</span>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setZoom((z) => Math.max(1, z - 0.25))} className="rounded bg-white/15 px-3 py-1.5 text-sm font-bold hover:bg-white/30" aria-label="축소">−</button>
           <span className="w-14 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>

@@ -4,6 +4,7 @@
 // 긴 텍스트는 일부 브라우저가 중간에 끊으므로 문장 단위로 쪼개 큐로 재생한다.
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/icon";
 
 // TTS용 정규화 — 기호를 자연스러운 낭독으로(백엔드 normalizeForTts와 동일 취지)
 function normalizeForTts(t: string): string {
@@ -105,7 +106,7 @@ export function ReportTTS({ text, label = "음성으로 듣기" }: { text: strin
       aria-label={speaking ? "음성 정지" : label}
       className="btn-ghost no-print inline-flex items-center gap-1.5 px-4 py-2 text-xs"
     >
-      <span aria-hidden>{speaking ? "⏹" : "🔊"}</span>
+      <span aria-hidden>{speaking ? "⏹" : <Icon name="speaker" />}</span>
       {speaking ? "정지" : label}
     </button>
   );

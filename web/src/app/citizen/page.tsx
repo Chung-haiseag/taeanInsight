@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AILabelBadge } from "@/components/ai-label-badge";
+import { Icon } from "@/components/icon";
 
 export const metadata: Metadata = {
   title: "AI 증강 시민기자단",
@@ -30,7 +31,7 @@ export default function CitizenPage() {
         </p>
         <div className="pt-2">
           <Link href="/citizen/write" className="btn-accent">
-            ✍️ 시민기자 에디터 열기 (코파일럿)
+            <Icon name="pen" /> 시민기자 에디터 열기 (코파일럿)
           </Link>
         </div>
       </header>
@@ -40,7 +41,7 @@ export default function CitizenPage() {
         className="border-2 border-accent rounded-lg p-6 bg-accent-subtle/30"
       >
         <h2 id="recruit-heading" className="text-xl font-bold text-brand mb-2">
-          📢 2026년 시민기자 모집 안내
+          <Icon name="megaphone" /> 2026년 시민기자 모집 안내
         </h2>
         <ul className="text-sm text-foreground-muted space-y-1">
           <li>· 모집 시기: 2026년 7월 중순 (사업 일정 v1.5 조정 반영)</li>
@@ -99,7 +100,7 @@ export default function CitizenPage() {
           ))}
         </div>
         <p className="text-xs text-foreground-muted mt-4">
-          🚧 시민기자 전용 에디터 UI 구현 예정 — REQ-CITIZEN-001 / TaskMaster #25
+          <Icon name="wrench" /> 시민기자 전용 에디터 UI 구현 예정 — REQ-CITIZEN-001 / TaskMaster #25
         </p>
       </section>
     </div>

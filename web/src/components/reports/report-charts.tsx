@@ -3,6 +3,7 @@
 
 import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices } from "@/lib/api/reports";
 import { FRONT_REGION } from "@/lib/region";
+import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
 function wonFmt(n: number): string {
@@ -84,7 +85,7 @@ export function SummaryInfographic({ metrics, govCount = 0 }: { metrics: ReportM
   return (
     <div className="mt-5 overflow-hidden rounded-2xl border border-brand/10 bg-gradient-to-br from-accent-subtle/40 via-white/40 to-white/20 shadow-soft">
       <div className="flex items-center gap-2 border-b border-brand/10 px-5 py-3">
-        <span className="text-lg" aria-hidden>📊</span>
+        <span className="text-lg" aria-hidden><Icon name="chart" /></span>
         <span className="text-sm font-bold tracking-wide text-brand">이번 주 핵심 지표</span>
       </div>
       <div className="grid grid-cols-2 gap-px bg-brand/5 sm:grid-cols-3 lg:grid-cols-4">

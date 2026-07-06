@@ -3,11 +3,12 @@
 // 태안뉴스 — 주간태안신문 RSS를 수집해 플랫폼 도메인으로 분류한 피드.
 // 발췌 + 원문 링크(저작권 안전). 카테고리 탭 필터.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import { getNews, type NewsResponse } from "@/lib/api/news";
 import { PageHeader } from "@/components/page-header";
+import { Icon } from "@/components/icon";
 
 const CATEGORY_ORDER = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
 
@@ -60,7 +61,7 @@ export default function NewsPage() {
         <>
           {data.personalized && data.interests?.length ? (
             <div className="flex items-center gap-2 rounded-xl bg-accent-subtle/30 px-4 py-2.5 text-sm">
-              <span aria-hidden>⭐</span>
+              <Icon name="star" />
               <span className="text-brand">
                 <strong>{data.interests.map((c) => data.labels[c] ?? c).join("·")}</strong> 관심사 기사를 먼저 보여드려요
               </span>
@@ -73,7 +74,7 @@ export default function NewsPage() {
             {tabs.map((c) => (
               <Tab
                 key={c}
-                label={`${interests.has(c) ? "⭐ " : ""}${data.labels[c]} ${data.counts[c]}`}
+                label={<>{interests.has(c) ? <><Icon name="star" /> </> : null}{data.labels[c]} {data.counts[c]}</>}
                 active={active === c}
                 onClick={() => setActive(c)}
               />
@@ -128,7 +129,7 @@ export default function NewsPage() {
   );
 }
 
-function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function Tab({ label, active, onClick }: { label: ReactNode; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"

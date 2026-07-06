@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import { GenericHome } from "@/components/home/generic-home";
 import { OwnerHome } from "@/components/home/owner-home";
 import { UpsellPaywall } from "@/components/home/upsell-paywall";
@@ -80,7 +81,7 @@ function EntitledBanner({ onCancel }: { onCancel: () => void }) {
 function PreviewBanner() {
   return (
     <div className="bg-brand/5 border border-brand/15 rounded-lg px-4 py-2 text-sm text-foreground-muted">
-      👀 <strong className="text-brand">미리보기</strong> — 사장님 맞춤 홈은 별도 구독(사장님 Pro)입니다. 아래에서 내 가게 화면을 확인하세요.
+      <Icon name="eye" /> <strong className="text-brand">미리보기</strong> — 사장님 맞춤 홈은 별도 구독(사장님 Pro)입니다. 아래에서 내 가게 화면을 확인하세요.
     </div>
   );
 }
@@ -89,7 +90,7 @@ function AnonymousBanner() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 bg-brand/5 border border-brand/15 rounded-lg px-4 py-3 text-sm">
       <span className="text-foreground-muted">
-        🏪 펜션·식당·카페 사장님이세요? <strong className="text-brand">사장님 Pro</strong>로 주말 수요 예측과 실행 제안을 받아보세요.
+        <Icon name="store" /> 펜션·식당·카페 사장님이세요? <strong className="text-brand">사장님 Pro</strong>로 주말 수요 예측과 실행 제안을 받아보세요.
       </span>
       <Link href="/me/onboarding" className="font-semibold text-accent hover:underline">
         시작하기 →

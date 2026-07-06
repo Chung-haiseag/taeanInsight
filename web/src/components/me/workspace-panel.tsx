@@ -3,6 +3,7 @@
 // 팀(B2B)·부서(B2G) 공유 워크스페이스 패널 — 공유 코드 가입, 멤버·공유자료·공유메모.
 import { useEffect, useState } from "react";
 
+import { Icon } from "@/components/icon";
 import {
   getWorkspace, createWorkspace, joinWorkspace, leaveWorkspace,
   addNote, deleteNote, addItem, deleteItem, type WSView,
@@ -49,7 +50,7 @@ export function WorkspacePanel({ kind }: { kind: "team" | "dept" }) {
       <div className="flex flex-wrap gap-1.5">
         {view.members.map((m) => (
           <span key={m.userId} className="inline-flex items-center rounded-full bg-brand/5 border border-brand/15 px-2.5 py-0.5 text-xs text-foreground-muted">
-            {m.role === "admin" ? "👑 " : ""}{m.displayName || "이름없음"}
+            {m.role === "admin" ? <Icon name="crown" label="관리자" /> : null}{m.role === "admin" ? " " : ""}{m.displayName || "이름없음"}
           </span>
         ))}
       </div>
@@ -70,7 +71,7 @@ function WsItems({ view, busy, act }: { view: WSView; busy: boolean; act: (fn: (
   const [url, setUrl] = useState("");
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-brand">📎 공유 자료</p>
+      <p className="text-sm font-semibold text-brand"><Icon name="clip" /> 공유 자료</p>
       <ul className="space-y-1">
         {view.items.map((i) => (
           <li key={i.id} className="flex items-center gap-2 text-sm">
@@ -94,7 +95,7 @@ function WsNotes({ view, busy, act }: { view: WSView; busy: boolean; act: (fn: (
   const [body, setBody] = useState("");
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-brand">📝 공유 메모</p>
+      <p className="text-sm font-semibold text-brand"><Icon name="write" /> 공유 메모</p>
       <ul className="space-y-1.5">
         {view.notes.map((n) => (
           <li key={n.id} className="rounded bg-foreground-muted/5 px-3 py-2 text-sm">

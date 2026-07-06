@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import { getReadingFeed, getArticleSummary, type ReadingFeed } from "@/lib/api/reading";
 import { getNews, type NewsItem } from "@/lib/api/news";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -54,7 +55,7 @@ function PickRow({ it, showExcerpt, offerSummary }: { it: Pick; showExcerpt: boo
           <div className="mb-2 whitespace-pre-line rounded-lg bg-background/70 p-2.5 text-xs text-foreground">{summary}</div>
         ) : (
           <button type="button" onClick={loadSummary} disabled={loading} className="mb-2 text-xs font-semibold text-accent hover:underline disabled:opacity-60">
-            {loading ? "요약 생성 중…" : "✨ AI 3줄 요약"}
+            {loading ? "요약 생성 중…" : <><Icon name="sparkle" /> AI 3줄 요약</>}
           </button>
         )
       )}

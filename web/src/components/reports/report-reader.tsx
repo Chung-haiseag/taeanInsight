@@ -4,10 +4,11 @@
 // 서버가 익명 미리보기를 initialReport로 주입 → 마운트 후 로그인 등급(segment)을 감지해
 // 구독자면 전체본으로 자동 교체. 잠금 섹션은 블러+자물쇠 카드.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
+import { Icon } from "@/components/icon";
 import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGauge, MarineCard, SummaryInfographic, SeasonalFoodCard, OilCard } from "@/components/reports/report-charts";
 import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
@@ -35,12 +36,12 @@ function formatWeek(weekId: string): string {
 }
 
 // 섹션 키별 아이콘 (시각적 구분)
-const SECTION_ICON: Record<string, string> = {
-  summary: "📋",
+const SECTION_ICON: Record<string, ReactNode> = {
+  summary: <Icon name="clipboard" />,
   tourism_weather: "⛅",
   environment: "🌊",
   realestate: "🏘",
-  events: "📅",
+  events: <Icon name="calendar" />,
 };
 
 const FILLER =
@@ -110,7 +111,7 @@ export function ReportReader({
       <div className="mx-auto max-w-3xl">
         <Masthead weekLabel="" publishedAt="" aiLabel="ai_assisted" gated={false} />
         <div className="mt-10 card p-8 text-center">
-          <p className="text-4xl" aria-hidden>🗞️</p>
+          <p className="text-4xl" aria-hidden><Icon name="news" /></p>
           <p className="mt-4 text-lg font-semibold text-brand">아직 발행된 리포트가 없습니다</p>
           <p className="mt-2 text-sm text-foreground-muted">첫 호가 곧 발행됩니다. 매주 금요일에 만나요.</p>
         </div>
@@ -135,7 +136,7 @@ export function ReportReader({
 
       {report.personalized && report.interests?.length ? (
         <div className="no-print mt-6 flex items-center gap-2 rounded-xl bg-accent-subtle/30 px-4 py-2.5 text-sm">
-          <span aria-hidden>⭐</span>
+          <span aria-hidden><Icon name="star" /></span>
           <span className="text-brand">
             <strong>{report.interests.map((c) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] ?? c).join("·")}</strong> 관심사 기준으로 정렬됐어요
           </span>
@@ -158,7 +159,7 @@ export function ReportReader({
                 {s.title}
               </h2>
               {s.matched && (
-                <span className="rounded-full bg-accent px-2 py-0.5 text-[0.7rem] font-semibold text-background">⭐ 내 관심</span>
+                <span className="rounded-full bg-accent px-2 py-0.5 text-[0.7rem] font-semibold text-background"><Icon name="star" /> 내 관심</span>
               )}
             </div>
             <span className="accent-rule mt-3" aria-hidden />
@@ -170,7 +171,7 @@ export function ReportReader({
                   {FILLER}
                 </p>
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/60">
-                  <span className="text-2xl" aria-hidden>🔒</span>
+                  <span className="text-2xl" aria-hidden><Icon name="lock" /></span>
                   <span className="text-sm font-medium text-brand">구독자 전용 섹션</span>
                   <Link href="/me" className="btn-accent no-print px-5 py-2 text-xs">
                     구독하고 전체 보기
@@ -306,7 +307,7 @@ export function ReportReader({
       <details id="data" className="mt-16 break-inside-avoid rounded-2xl border-t-2 border-brand/15 pt-8 no-print">
         <summary className="cursor-pointer list-none">
           <span className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> 데이터 부록</span>
-          <h2 className="mt-3 text-display-sm font-bold text-brand">📊 지역 데이터 (추세·다운로드) <span className="align-middle text-sm font-normal text-accent">펼치기 ▾</span></h2>
+          <h2 className="mt-3 text-display-sm font-bold text-brand"><Icon name="chart" /> 지역 데이터 (추세·다운로드) <span className="align-middle text-sm font-normal text-accent">펼치기 ▾</span></h2>
           <p className="mt-1 text-sm text-foreground-muted">관광 수요·환경·부동산·유가의 기간별 추세와 CSV. 관광협회·숙박체인·부동산·연구 기관용.</p>
         </summary>
         <div className="mt-6"><RegionDataPanel /></div>
@@ -381,7 +382,7 @@ function CardNewsCarousel({ items }: { items: GovNoticeItem[] }) {
 
         {/* 크게 보기 버튼 (고정) */}
         <div className="absolute right-2 top-2">
-          <button type="button" onClick={() => setPopupOpen(true)} aria-label="크게 보기" className="h-9 w-9 rounded-full bg-accent text-sm text-background shadow hover:opacity-90">⛶</button>
+          <button type="button" onClick={() => setPopupOpen(true)} aria-label="크게 보기" className="h-9 w-9 rounded-full bg-accent text-sm text-background shadow hover:opacity-90"><Icon name="expand" /></button>
         </div>
 
         {slides.length > 1 && (
@@ -551,7 +552,7 @@ function Masthead({
             onClick={() => window.print()}
             className="btn-ghost no-print ml-auto px-4 py-2 text-xs"
           >
-            🖨 PDF로 저장
+            <Icon name="print" /> PDF로 저장
           </button>
         )}
       </div>

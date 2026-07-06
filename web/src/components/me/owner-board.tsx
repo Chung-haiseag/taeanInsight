@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import { fetchOwnerBrief, type OwnerBrief } from "@/lib/api/owner";
 import { LodgingBoardCard, FoodBoardCard, LeisureBoardCard, RetailBoardCard, FishingBoardCard, SaltBoardCard, FarmingBoardCard, TravelBoardCard, RealtorBoardCard, GolfBoardCard, AquaBoardCard, ShopSetup } from "@/components/home/owner-home";
 
@@ -48,7 +49,7 @@ export function MeOwnerBoard() {
 
       <div className="text-right">
         <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-accent hover:underline">
-          ✏️ 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : brief.industry === "leisure" ? "(정원·체험료)" : brief.industry === "retail" ? "(방문객·객단가)" : brief.industry === "fishing" ? "(정원·승선료)" : brief.industry === "travel" ? "(정원·상품가)" : brief.industry === "golf" ? "(정원·그린피)" : ""}
+          <Icon name="pen" /> 가게 정보 수정{brief.industry === "lodging" ? "(객실수·요금)" : brief.industry === "food" || brief.industry === "cafe" ? "(좌석수·객단가)" : brief.industry === "leisure" ? "(정원·체험료)" : brief.industry === "retail" ? "(방문객·객단가)" : brief.industry === "fishing" ? "(정원·승선료)" : brief.industry === "travel" ? "(정원·상품가)" : brief.industry === "golf" ? "(정원·그린피)" : ""}
         </button>
       </div>
 
@@ -105,7 +106,7 @@ function TripPlanner({ brief }: { brief: OwnerBrief }) {
           <p className="text-sm text-foreground">일 {fc(d?.weather?.sun)}</p>
         </div>
         <div className="rounded-xl bg-background/70 p-3">
-          <p className="text-xs font-semibold text-brand">🧭 혼잡·자외선</p>
+          <p className="text-xs font-semibold text-brand"><Icon name="compass" /> 혼잡·자외선</p>
           <p className="mt-1 text-sm text-foreground">관광객 {d?.available ? (crowd[d.level] ?? d.level) : "—"}{d?.available ? ` (지수 ${d.index})` : ""}</p>
           <p className="text-sm text-foreground">자외선 {brief.uv?.level ?? "—"}</p>
         </div>
@@ -121,7 +122,7 @@ function TripPlanner({ brief }: { brief: OwnerBrief }) {
         </div>
       </div>
       {fest && (
-        <p className="mt-3 rounded-xl bg-accent-subtle/30 p-2.5 text-sm text-brand">🎉 {fest.title} {fest.dday === 0 ? "오늘!" : `D-${fest.dday}`}</p>
+        <p className="mt-3 rounded-xl bg-accent-subtle/30 p-2.5 text-sm text-brand"><Icon name="party" /> {fest.title} {fest.dday === 0 ? "오늘!" : `D-${fest.dday}`}</p>
       )}
       <div className="mt-3 flex gap-3 text-xs font-semibold">
         <Link href="/live" className="text-accent hover:underline">실시간 현황 →</Link>
