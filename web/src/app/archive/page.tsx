@@ -58,7 +58,7 @@ export default function ArchivePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8">
       <div>
         <PageHeader
           eyebrow="Archive Search"
