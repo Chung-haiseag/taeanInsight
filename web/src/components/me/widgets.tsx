@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { AILabelBadge } from "../ai-label-badge";
 import { WorkspacePanel } from "./workspace-panel";
+import { Icon } from "@/components/icon";
 import { apiFetch } from "@/lib/api/client";
 import type { UserFavorite, UserPreferences } from "@/lib/types";
 import { CATEGORY_LABELS, REGION_OPTIONS } from "@/lib/types";
@@ -195,7 +196,7 @@ export function MyNews({ preferences }: { preferences: UserPreferences }) {
     <section aria-labelledby="mynews-heading">
       <div className="flex items-center justify-between mb-3">
         <h2 id="mynews-heading" className="text-lg font-bold text-brand">
-          📰 내 관심 분야 뉴스
+          <Icon name="news" /> 내 관심 분야 뉴스
         </h2>
         <Link href="/news" className="text-xs font-semibold text-accent hover:underline">
           전체 →
@@ -254,7 +255,7 @@ export function KpiCards({
   return (
     <section aria-labelledby="kpi-heading" className={position === "top" ? "" : "pt-2"}>
       <h2 id="kpi-heading" className="text-lg font-bold text-brand mb-3">
-        📊 핵심 지표
+        <Icon name="chart" /> 핵심 지표
       </h2>
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((m) => (
@@ -293,7 +294,7 @@ export function FavoritesList({
   return (
     <section aria-labelledby="favs-heading">
       <h2 id="favs-heading" className="text-lg font-bold text-brand mb-3">
-        ⭐ {heading}
+        <Icon name="star" /> {heading}
       </h2>
       {favorites.length === 0 ? (
         <EmptyNote>
@@ -335,7 +336,7 @@ export function PersonalizedReport({ preferences }: { preferences: UserPreferenc
     <section aria-labelledby="report-heading" className="-mx-5 -my-5 rounded-2xl border-l-4 border-accent bg-accent-subtle/20 p-5 sm:-mx-6 sm:-my-6 sm:p-6">
       <div className="flex items-center justify-between mb-2">
         <h2 id="report-heading" className="text-lg font-bold text-brand">
-          📋 내 맞춤 주간 리포트{report ? ` · ${report.weekId}` : ""}
+          <Icon name="clipboard" /> 내 맞춤 주간 리포트{report ? ` · ${report.weekId}` : ""}
         </h2>
         <AILabelBadge kind="ai_assisted" />
       </div>
@@ -373,7 +374,7 @@ export function ArchivePicks({ preferences }: { preferences: UserPreferences }) 
     <section aria-labelledby="archive-heading">
       <div className="flex items-center justify-between mb-3">
         <h2 id="archive-heading" className="text-lg font-bold text-brand">
-          📜 아카이브에서 · “{q}”
+          <Icon name="books" /> 아카이브에서 · “{q}”
         </h2>
         <Link href="/archive" className="text-xs font-semibold text-accent hover:underline">
           검색 →

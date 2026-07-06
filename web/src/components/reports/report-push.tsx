@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { apiFetch } from "@/lib/api/client";
 
 type Status = "idle" | "unsupported" | "denied" | "subscribing" | "subscribed";
@@ -53,7 +54,7 @@ export function ReportPushButton() {
     return <span className="no-print inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-accent">✅ 발행 알림 켜짐</span>;
   }
   if (status === "denied") {
-    return <span className="no-print inline-flex items-center gap-1 px-3 py-2 text-xs text-foreground-muted" title="브라우저 사이트 설정에서 알림을 허용해주세요">🔕 알림 차단됨</span>;
+    return <span className="no-print inline-flex items-center gap-1 px-3 py-2 text-xs text-foreground-muted" title="브라우저 사이트 설정에서 알림을 허용해주세요"><Icon name="bell-off" /> 알림 차단됨</span>;
   }
   return (
     <button
@@ -62,7 +63,7 @@ export function ReportPushButton() {
       disabled={status === "subscribing"}
       className="btn-ghost no-print inline-flex items-center gap-1.5 px-4 py-2 text-xs disabled:opacity-60"
     >
-      <span aria-hidden>🔔</span>
+      <Icon name="bell" />
       {status === "subscribing" ? "구독 중…" : "발행 알림 받기"}
     </button>
   );

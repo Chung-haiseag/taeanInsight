@@ -4,6 +4,7 @@
 // 시간대에 따라 라벨만 바뀜(출근길/오늘/저녁). 데이터 없으면 숨김.
 
 import { useRef, useState } from "react";
+import { Icon } from "@/components/icon";
 import { trackEvent } from "@/lib/api/reading";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
@@ -37,7 +38,7 @@ export function BriefingAudio() {
         {state !== "playing" && (
           <button type="button" onClick={play} disabled={state === "loading"}
             className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-60">
-            {state === "loading" ? "여는 중…(최초 ~20초)" : "▶ 듣기"}
+            {state === "loading" ? "여는 중…(최초 ~20초)" : <><Icon name="play" /> 듣기</>}
           </button>
         )}
       </div>

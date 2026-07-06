@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { copilotAssist, type AssistMode } from "@/lib/api/copilot";
 import { PageHeader } from "@/components/page-header";
+import { Icon } from "@/components/icon";
 
 const DRAFT_KEY = "reporter-write-draft";
 
@@ -113,14 +114,14 @@ export default function ReporterWritePage() {
 
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={!!busy} onClick={() => assist("polish", "다듬기")}
-          className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">{busy === "polish" ? "다듬는 중…" : "🪄 다듬기"}</button>
+          className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">{busy === "polish" ? "다듬는 중…" : <><Icon name="wand" /> 다듬기</>}</button>
         <button type="button" disabled={!!busy} onClick={() => assist("title", "제목 제안")}
-          className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">{busy === "title" ? "생성 중…" : "✏️ 제목 제안"}</button>
+          className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">{busy === "title" ? "생성 중…" : <><Icon name="pen" /> 제목 제안</>}</button>
         <button type="button" disabled={!!busy} onClick={() => assist("factcheck", "사실 점검")}
           className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5 disabled:opacity-60">{busy === "factcheck" ? "점검 중…" : "✅ 사실 점검"}</button>
         <span className="flex-1" />
-        <button type="button" onClick={copyAll} className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-background hover:bg-brand/90">📋 전체 복사</button>
-        <button type="button" onClick={download} className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5">💾 다운로드</button>
+        <button type="button" onClick={copyAll} className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-background hover:bg-brand/90"><Icon name="clipboard" /> 전체 복사</button>
+        <button type="button" onClick={download} className="rounded-full border border-brand/20 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5"><Icon name="download" /> 다운로드</button>
       </div>
 
       {sources.length > 0 && (

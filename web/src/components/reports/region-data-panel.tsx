@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 
+import { Icon } from "@/components/icon";
 import {
   fetchReportMetrics, fetchDashboardSeries, dashboardCsvUrl,
   type ReportMetrics, type DashEnvPoint, type DashDemandPoint,
@@ -100,7 +101,7 @@ function Panel({ title, csv, children }: { title: string; csv?: string; children
     <section className="card p-5">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-brand">{title}</h3>
-        {csv && <a href={csv} className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5">⬇ CSV</a>}
+        {csv && <a href={csv} className="rounded-full border border-brand/20 px-3 py-1 text-xs font-medium text-brand hover:bg-brand/5"><Icon name="download" /> CSV</a>}
       </div>
       <div className="mt-3">{children}</div>
     </section>

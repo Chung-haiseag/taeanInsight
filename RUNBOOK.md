@@ -308,3 +308,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-06 · 브랜드 액센트 황토→갯벌 페트롤(#116E7A, AI 크림+테라코타 클러스터 탈피): accent DEFAULT #116E7A / subtle #CFE3E6 / ink #0E5860, ::selection, OG카드 #c9a227→#4FB3BD(네이비 위 가시). 토큰화돼 있어 전 사이트 즉시 반영
 
 - 2026-07-06 · 폰트 자체호스팅 + 쿨 배경(리디자인): Pretendard Variable(next/font/local, woff2 2MB 번들, 전 방문자 전달) + Fraunces(next/font/google, 라틴 숫자·라벨 세리프). 배경 크림 #FAF9F6→쿨페이퍼 #F5F7F7(페트롤 조화·AI클러스터 탈피). tailwind sans/display를 CSS변수로
+
+- 2026-07-06 · 이모지 아이콘→통일 라인 아이콘(Phosphor, 리디자인 TIER3): components/icon.tsx 래퍼(43개 시맨틱명→Phosphor, currentColor·1.1em). 26파일 71개 기능 이모지 교체(병렬 워크플로+타입검증). 날씨·해양·관광 데이터 글리프·화살표·상태(✅⚠)는 유지

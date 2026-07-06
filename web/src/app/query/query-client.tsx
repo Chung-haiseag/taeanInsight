@@ -6,6 +6,7 @@
 import { useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
+import { Icon } from "@/components/icon";
 import { ApiError } from "@/lib/api/client";
 import { askQuery, type QueryResult } from "@/lib/api/query";
 import { trackEvent } from "@/lib/api/reading";
@@ -106,7 +107,7 @@ export function QueryClient() {
             maxLength={500}
           />
           <p id="query-help" className="text-xs text-foreground-muted">
-            💡 무료 사용자는 일 5회, B2B는 일 30회까지 질의할 수 있습니다. (⌘/Ctrl+Enter 전송)
+            <Icon name="idea" /> 무료 사용자는 일 5회, B2B는 일 30회까지 질의할 수 있습니다. (⌘/Ctrl+Enter 전송)
           </p>
           <button
             type="submit"
@@ -164,7 +165,7 @@ export function QueryClient() {
           {result.evidence && result.evidence.length > 0 && (
             <details className="pt-2 border-t border-accent/20">
               <summary className="cursor-pointer text-sm font-semibold text-brand">
-                🔍 AI가 참고한 실시간 근거 {result.evidence.length}건 (RAG)
+                <Icon name="search" /> AI가 참고한 실시간 근거 {result.evidence.length}건 (RAG)
               </summary>
               <ul className="mt-2 space-y-2">
                 {result.evidence.map((e) => (

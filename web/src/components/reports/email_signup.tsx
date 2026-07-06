@@ -3,6 +3,7 @@
 // 이메일 뉴스레터 구독 — 수집(동의). 발송은 추후(도메인 온보딩 후). 해지는 메일 내 링크.
 import { useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { apiFetch } from "@/lib/api/client";
 
 export function EmailSignup() {
@@ -31,7 +32,7 @@ export function EmailSignup() {
 
   return (
     <div className="no-print mt-10 card p-5">
-      <p className="text-sm font-semibold text-brand">📮 이메일로 주간 리포트 받기</p>
+      <p className="text-sm font-semibold text-brand"><Icon name="mail" /> 이메일로 주간 리포트 받기</p>
       <p className="mt-1 text-xs text-foreground-muted">매주 발행 시 요약을 메일로. 광고 없이, 언제든 해지 가능.</p>
       <form onSubmit={submit} className="mt-3 flex flex-wrap gap-2">
         <input

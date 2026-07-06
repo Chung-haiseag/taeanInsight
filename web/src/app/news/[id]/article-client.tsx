@@ -20,6 +20,7 @@ import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
+import { Icon } from "@/components/icon";
 
 interface Reader {
   title: string;
@@ -159,7 +160,7 @@ export default function ArticleClient() {
           <p className="text-lg leading-relaxed text-foreground">{article.excerpt}</p>
           {member ? (
             <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
-              📚 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
+              <Icon name="books" /> 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
               {article.url && (
                 <a href={article.url} target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-brand hover:underline">
                   원문 보기 ↗
@@ -368,7 +369,7 @@ function FullBody({ article }: { article: Reader }) {
 function MemberGate({ hasFullText, onUnlock }: { hasFullText: boolean; onUnlock: () => void }) {
   return (
     <div className="relative rounded-2xl border border-accent/40 bg-accent-subtle/20 p-7 text-center space-y-4">
-      <p className="eyebrow justify-center">🔒 회원 전용</p>
+      <p className="eyebrow justify-center"><Icon name="lock" /> 회원 전용</p>
       <h2 className="text-xl font-bold text-brand">
         {hasFullText ? "이 기사의 전문은 태안 인텔리전스 회원에게 제공됩니다" : "회원이 되시면 더 많은 기능을 이용하실 수 있어요"}
       </h2>
@@ -436,7 +437,7 @@ function OriginalPage({ src, label }: { src: string; label: string }) {
               onClick={() => setViewer(true)}
               className="shrink-0 rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
             >
-              🔍 전체화면
+              <Icon name="search" /> 전체화면
             </button>
           </div>
           <ZoomPanImage src={src} fullSrc={fullSrc} maxHeightClass="max-h-[40rem]" />
