@@ -51,6 +51,7 @@ interface GatedSection extends ReportSection {
 interface GatedReport {
   weekId: string;
   publishedAt: string;
+  generatedAt?: string;
   aiLabel: StoredReport["aiLabel"];
   visibilityTier: StoredReport["visibilityTier"];
   premiumOnly: boolean;
@@ -108,6 +109,7 @@ function gate(report: StoredReport, tier?: string | null): GatedReport {
   return {
     weekId: report.weekId,
     publishedAt: report.publishedAt,
+    generatedAt: report.generatedAt,
     aiLabel: report.aiLabel,
     visibilityTier: report.visibilityTier,
     premiumOnly: report.premiumOnly,
@@ -143,6 +145,7 @@ reportsRouter.get("/", async (c) => {
       weekId: r.weekId,
       summary: r.summary,
       publishedAt: r.publishedAt,
+      generatedAt: r.generatedAt,
       aiLabel: r.aiLabel,
       visibilityTier: r.visibilityTier,
       premiumOnly: r.premiumOnly,

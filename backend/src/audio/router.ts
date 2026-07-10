@@ -280,14 +280,20 @@ audioRouter.get("/status", async (c) => {
     const s = await c.env.ARCHIVE_PHOTOS.get("audio/status.json");
     if (s) status = await s.json();
   } catch { /* 없음 */ }
-  // 이번(최신 발행) 주차 팟캐스트가 Gemini(-gem.wav)로 존재하는지
-  let podcastLive = false, week = "";
+  // 이번(최신 발행) 주차 팟캐스트가 Gemini(-gem.wav)로 존재하는지 + 생성(업로드)시각
+  let podcastLive = false, week = "", podcastAt: string | null = null;
   if (c.env.ARCHIVE_DB) {
     const rep = await c.env.ARCHIVE_DB.prepare("SELECT week_id FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1").first<{ week_id: string }>();
     week = rep?.week_id ?? "";
-    if (week) podcastLive = !!(await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${week}-gem.wav`));
+    if (week) {
+      const gem = await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${week}-gem.wav`);
+      podcastLive = !!gem;
+      // 생성시각 = 서빙되는 파일의 R2 업로드 시각(gem 우선, 없으면 워커 폴백 mp3)
+      const obj = gem ?? (await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${week}-v2.mp3`));
+      podcastAt = obj?.uploaded ? obj.uploaded.toISOString() : null;
+    }
   }
-  return c.json({ ...status, podcastLive, week, checkedAt: new Date().toISOString() });
+  return c.json({ ...status, podcastLive, podcastAt, week, checkedAt: new Date().toISOString() });
 });
 
 audioRouter.get("/news/:idxno", async (c) => {

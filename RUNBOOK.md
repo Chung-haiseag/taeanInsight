@@ -312,3 +312,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 
 - 2026-07-06 · 이모지 아이콘→통일 라인 아이콘(Phosphor, 리디자인 TIER3): components/icon.tsx 래퍼(43개 시맨틱명→Phosphor, currentColor·1.1em). 26파일 71개 기능 이모지 교체(병렬 워크플로+타입검증). 날씨·해양·관광 데이터 글리프·화살표·상태(✅⚠)는 유지
 - 2026-07-07 · 아카이브 검색결과 총 건수·전체 페이지수 표시: search API가 항목쿼리와 병렬 COUNT로 total·totalPages 반환(FTS/LIKE/목록 3모드). 상단 "검색 결과 N건 · p/전체페이지", 페이저 "p / 전체" 표시
+- 2026-07-10 · 주간리포트·팟캐스트 생성일시 표시: reports API가 D1 generated_at을 generatedAt으로 노출→마스트헤드 "AI 생성 M월 D일 HH:mm", audio/status가 팟캐스트 R2 업로드시각(podcastAt, gem 우선→v2 폴백) 반환→팟캐스트 위젯 "생성" 표기
