@@ -124,6 +124,7 @@ export function ReportReader({
       <Masthead
         weekLabel={formatWeek(report.weekId)}
         publishedAt={report.publishedAt}
+        generatedAt={report.generatedAt}
         aiLabel={report.aiLabel}
         gated={report.gated}
       />
@@ -517,11 +518,13 @@ function BoardBadge({ name }: { name: string }) {
 function Masthead({
   weekLabel,
   publishedAt,
+  generatedAt,
   aiLabel,
   gated,
 }: {
   weekLabel: string;
   publishedAt: string;
+  generatedAt?: string;
   aiLabel: "human" | "ai_assisted" | "ai_generated";
   gated: boolean;
 }) {
@@ -543,7 +546,12 @@ function Masthead({
         <AILabelBadge kind={aiLabel} />
         {publishedAt && (
           <span className="text-foreground-muted">
-            {new Date(publishedAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })} 발행
+            {new Date(publishedAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Seoul" })} 발행
+          </span>
+        )}
+        {generatedAt && (
+          <span className="text-xs text-foreground-muted/80">
+            AI 생성 {new Date(generatedAt).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" })}
           </span>
         )}
         {!gated && weekLabel && (

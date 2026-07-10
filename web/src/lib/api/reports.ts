@@ -26,6 +26,7 @@ export interface ReportSectionView {
 export interface WeeklyReportView {
   weekId: string;
   publishedAt: string;
+  generatedAt?: string;
   aiLabel: AiLabelKind;
   visibilityTier: "critical" | "community" | "personal";
   premiumOnly: boolean;
@@ -40,6 +41,7 @@ export interface ReportListItem {
   weekId: string;
   summary: string;
   publishedAt: string;
+  generatedAt?: string;
   aiLabel: AiLabelKind;
   premiumOnly: boolean;
 }
