@@ -28,8 +28,13 @@ export default function HomePage() {
     setState(getDemoHomeState());
   }, []);
 
-  // 초기 렌더(SSR/하이드레이션 전)는 일반 홈
-  if (state === null) return <GenericHome />;
+  // 초기 렌더(SSR/하이드레이션 전)는 일반 홈 — 하이드레이션 후 상태와 동일하게 4xl로 감싸 폭 점프 방지
+  if (state === null)
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <GenericHome />
+      </div>
+    );
 
   function subscribe() {
     // 데모: 결제 성공 가정 → 구독 상태로 전환. 실서비스는 subscribeAddon() 호출.
