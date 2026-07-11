@@ -40,6 +40,26 @@ export async function getNews(category?: string, limit?: number): Promise<NewsRe
   return apiFetch<NewsResponse>(`/api/news${q ? `?${q}` : ""}`);
 }
 
+// 태안군TV(유튜브) 영상 — 서버 저장 없이 백엔드가 채널 RSS를 패스스루
+export interface TvVideo {
+  id: string;
+  title: string;
+  url: string;
+  thumbnail: string;
+  publishedAt: string;
+  description: string;
+}
+
+export interface TvNewsResponse {
+  items: TvVideo[];
+  source: string;
+  channelUrl: string;
+}
+
+export async function getTvNews(): Promise<TvNewsResponse> {
+  return apiFetch<TvNewsResponse>("/api/news/tv");
+}
+
 export interface NewsArticle extends NewsItem {
   categoryLabel: string;
   bodySource: "rss_excerpt" | "archive_fulltext";
