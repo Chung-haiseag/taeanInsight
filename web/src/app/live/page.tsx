@@ -8,6 +8,7 @@ import {
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
+import { TvVideoGrid } from "@/components/tv-video-grid";
 import { PageHeader } from "@/components/page-header";
 import { LiveClock } from "@/components/live-clock";
 
@@ -140,32 +141,15 @@ export default async function LivePage() {
             </section>
           )}
 
-          {/* 태안군TV — 유튜브 공식 채널 최신 영상(자체 저장 없음, 링크·썸네일만) */}
+          {/* 태안군TV — 유튜브 공식 채널 최신 영상(자체 저장 없음, 클릭 시 페이지 안에서 임베드 재생) */}
           {tvNews.length > 0 && (
             <section>
               <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📺</span>태안군TV</h2>
               <span className="accent-rule mt-3" aria-hidden />
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                {tvNews.map((v) => (
-                  <a
-                    key={v.id}
-                    href={v.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group overflow-hidden rounded-2xl border border-brand/15 transition-shadow hover:shadow-md"
-                  >
-                    <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={v.thumbnail} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/15 transition-colors group-hover:bg-black/30">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-sm text-white" aria-hidden>▶</span>
-                      </span>
-                    </div>
-                    <p className="p-3 text-sm font-semibold leading-snug text-brand group-hover:underline">{v.title}</p>
-                  </a>
-                ))}
+              <div className="mt-4">
+                <TvVideoGrid videos={tvNews} columns={3} compact />
               </div>
-              <p className="mt-2 text-xs text-foreground-muted">태안군 공식 유튜브 · 클릭 시 유튜브에서 재생 · <Link href="/news" className="font-semibold text-accent hover:underline">태안뉴스의 태안군TV 탭</Link>에서 더 보기</p>
+              <p className="mt-2 text-xs text-foreground-muted">태안군 공식 유튜브 · 클릭 시 이 페이지에서 재생 · <Link href="/news" className="font-semibold text-accent hover:underline">태안뉴스의 태안군TV 탭</Link>에서 더 보기</p>
             </section>
           )}
 

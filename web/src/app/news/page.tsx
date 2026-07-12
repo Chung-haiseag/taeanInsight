@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { getNews, getTvNews, type NewsResponse, type TvNewsResponse } from "@/lib/api/news";
 import { PageHeader } from "@/components/page-header";
+import { TvVideoGrid } from "@/components/tv-video-grid";
 import { Icon } from "@/components/icon";
 
 const CATEGORY_ORDER = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
@@ -151,10 +152,8 @@ export default function NewsPage() {
   );
 }
 
-// 태안군TV 그리드 — 썸네일 클릭 시 그 자리에서 유튜브 임베드 재생(자체 서버 경유 없음)
+// 태안군TV 탭 본문 — 공용 클릭-투-플레이 그리드 + 출처 표기
 function TvVideoSection({ tv, error }: { tv: TvNewsResponse | null; error: string | null }) {
-  const [playing, setPlaying] = useState<string | null>(null);
-
   if (error) {
     return <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error}</p>;
   }
@@ -162,42 +161,7 @@ function TvVideoSection({ tv, error }: { tv: TvNewsResponse | null; error: strin
 
   return (
     <>
-      <div className="grid gap-6 sm:grid-cols-2">
-        {tv.items.map((v) => (
-          <figure key={v.id} className="overflow-hidden rounded-2xl border border-brand/15">
-            {playing === v.id ? (
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1`}
-                title={v.title}
-                className="aspect-video w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setPlaying(v.id)}
-                className="group relative block w-full"
-                aria-label={`재생: ${v.title}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={v.thumbnail} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-                <span className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/35">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/60 text-2xl text-white" aria-hidden>▶</span>
-                </span>
-              </button>
-            )}
-            <figcaption className="space-y-1 bg-background p-4">
-              <p className="text-xs text-foreground-muted">{formatTvDate(v.publishedAt)}</p>
-              <p className="font-bold leading-snug text-brand">{v.title}</p>
-              {v.description && <p className="text-sm text-foreground-muted line-clamp-2">{v.description}</p>}
-              <a href={v.url} target="_blank" rel="noopener noreferrer" className="inline-block pt-1 text-xs font-semibold text-accent hover:underline">
-                유튜브에서 보기 ↗
-              </a>
-            </figcaption>
-          </figure>
-        ))}
-      </div>
+      <TvVideoGrid videos={tv.items} />
       <p className="text-xs text-foreground-muted">
         출처: {tv.source} · 영상은 유튜브에서 직접 재생(자체 저장 없음) ·{" "}
         <a href={tv.channelUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">채널 바로가기 ↗</a>
@@ -219,13 +183,6 @@ function Tab({ label, active, onClick }: { label: ReactNode; active: boolean; on
       {label}
     </button>
   );
-}
-
-function formatTvDate(iso: string): string {
-  // ISO(UTC 오프셋 포함) → 보는 사람 시간대 기준 "7/9 19:14"
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function formatDate(s: string): string {
