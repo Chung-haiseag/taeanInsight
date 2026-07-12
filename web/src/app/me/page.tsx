@@ -8,6 +8,7 @@ import { ToneToggleBar, useToneToggle } from "@/components/me/tone_toggle";
 import { PushOptInButton } from "@/components/me/push_opt_in";
 import { MeHeroStrip } from "@/components/me/hero-strip";
 import { MeOwnerBoard } from "@/components/me/owner-board";
+import { MyCorrections } from "@/components/me/my-corrections";
 import { ReaderPicks } from "@/components/me/reader-picks";
 import { BriefingAudio } from "@/components/briefing-audio";
 
@@ -100,6 +101,9 @@ function MeDashboard({ data }: { data: MeResponse }) {
 
       {/* 사장님 보드 — 가게 정보가 있으면 운영 보드, 없으면 입력 안내 */}
       <MeOwnerBoard />
+
+      {/* 내 수정 요청 — 전자북 오탈자 제보 처리 현황(없으면 미표시) */}
+      <MyCorrections />
 
       {/* Push 옵트인 — 알림 채널에 webpush 있으면 노출 */}
       {preferences.notificationChannels.includes("webpush") && (
