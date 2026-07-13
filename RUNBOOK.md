@@ -312,3 +312,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 
 - 2026-07-06 · 이모지 아이콘→통일 라인 아이콘(Phosphor, 리디자인 TIER3): components/icon.tsx 래퍼(43개 시맨틱명→Phosphor, currentColor·1.1em). 26파일 71개 기능 이모지 교체(병렬 워크플로+타입검증). 날씨·해양·관광 데이터 글리프·화살표·상태(✅⚠)는 유지
 - 2026-07-07 · 아카이브 검색결과 총 건수·전체 페이지수 표시: search API가 항목쿼리와 병렬 COUNT로 total·totalPages 반환(FTS/LIKE/목록 3모드). 상단 "검색 결과 N건 · p/전체페이지", 페이저 "p / 전체" 표시
+- 2026-07-13 · 주간리포트 발행 자기복구: 자정 크론 catchUpWeeklyReport(발행 예정 지난 최근 주 미발행 시 재시도, 금~일은 초안 생성부터) + 금요 크론 생성/발행 try 분리(W28 미발행 장애 재발 방지) · backend/reports/scheduled.ts, index.ts
