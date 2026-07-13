@@ -312,3 +312,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 
 - 2026-07-06 · 이모지 아이콘→통일 라인 아이콘(Phosphor, 리디자인 TIER3): components/icon.tsx 래퍼(43개 시맨틱명→Phosphor, currentColor·1.1em). 26파일 71개 기능 이모지 교체(병렬 워크플로+타입검증). 날씨·해양·관광 데이터 글리프·화살표·상태(✅⚠)는 유지
 - 2026-07-07 · 아카이브 검색결과 총 건수·전체 페이지수 표시: search API가 항목쿼리와 병렬 COUNT로 total·totalPages 반환(FTS/LIKE/목록 3모드). 상단 "검색 결과 N건 · p/전체페이지", 페이저 "p / 전체" 표시
+- 2026-07-11 · 태안군TV 영상(서버 미저장): /api/news/tv가 태안군 공식 유튜브(@taeangun, tv.taean.go.kr 뉴스태안 동일) RSS 패스스루(엣지캐시 15분, D1 미사용). /news "📺 태안군TV" 탭(클릭 시 인라인 유튜브 재생) + /live 최신 3편 카드

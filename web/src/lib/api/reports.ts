@@ -207,6 +207,19 @@ export async function fetchOnThisDay(limit = 30): Promise<OnThisDayItem[]> {
   }
 }
 
+// 태안군TV(유튜브 채널) 최신 영상 — 백엔드가 RSS 패스스루(서버 저장 없음)
+export interface TvNewsVideo { id: string; title: string; url: string; thumbnail: string; publishedAt: string; description: string }
+export async function fetchTvNews(limit = 3): Promise<TvNewsVideo[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/news/tv`, { next: { revalidate: 900 } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { items: TvNewsVideo[] };
+    return (data.items ?? []).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 // 도로 실시간 CCTV(ITS, D1 미러) — 태안 국도 카메라(HLS)
 export interface CctvCamera { name: string; url: string; lat: number; lon: number; road: string }
 export async function fetchCctv(): Promise<{ available: boolean; cameras: CctvCamera[]; updatedAt: string | null }> {
