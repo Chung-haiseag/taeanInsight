@@ -36,59 +36,6 @@ function decodeEntities(s: string): string {
     .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, " ");   // 남은 알 수 없는 엔티티 → 공백
 }
 
-// 원문 글자를 100% 보존하고 hint(재띄어쓰기본)의 "띄어쓰기"만 LCS로 이식.
-// 결과의 내용 글자열은 원문과 항상 동일 → LLM이 글자를 바꿔/지어내도 뉴스 내용 왜곡 0.
-function transferSpacing(orig: string, hint: string): string | null {
-  const parse = (s: string) => {
-    const chars: string[] = [], gap: string[] = []; let g = "";
-    for (const ch of s) { if (/\s/.test(ch)) g += ch; else { chars.push(ch); gap.push(g); g = ""; } }
-    return { chars, gap };
-  };
-  const O = parse(orig), H = parse(hint);
-  const n = O.chars.length, m = H.chars.length;
-  if (n === 0) return orig;
-  if (n * m > 6_000_000) return null;               // 과대 → 호출측에서 원문 유지
-  const W = m + 1;
-  const dp = new Int32Array((n + 1) * W);
-  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
-    dp[i * W + j] = O.chars[i] === H.chars[j]
-      ? dp[(i + 1) * W + (j + 1)] + 1
-      : Math.max(dp[(i + 1) * W + j], dp[i * W + (j + 1)]);
-  }
-  const matchedH = new Int32Array(n).fill(-1);
-  let i = 0, j = 0;
-  while (i < n && j < m) {
-    if (O.chars[i] === H.chars[j]) { matchedH[i] = j; i++; j++; }
-    else if (dp[(i + 1) * W + j] >= dp[i * W + (j + 1)]) i++; else j++;
-  }
-  let out = O.gap[0];
-  for (let k = 0; k < n; k++) {
-    if (k > 0) { const a = matchedH[k - 1], b = matchedH[k]; out += (a !== -1 && b === a + 1) ? H.gap[b] : O.gap[k]; }
-    out += O.chars[k];
-  }
-  return out;
-}
-
-// Workers AI(무료)로 한국어 띄어쓰기 교정 후, transferSpacing으로 글자 보존 이식.
-// 실패·응답부실·LCS과대 시 원문을 그대로 반환(낭독이 멈추지 않게 항상 안전).
-async function respaceKorean(env: Env, text: string): Promise<string> {
-  if (!env.AI || text.length < 12) return text;
-  try {
-    const { WorkersAiLlmClient } = await import("../llm/workers_ai");
-    const client = new WorkersAiLlmClient({ ai: env.AI });
-    const res = await client.complete({
-      channel: "realtime", temperature: 0, maxTokens: Math.min(1500, Math.ceil(text.length * 1.3) + 64),
-      messages: [
-        { role: "system", content: "너는 한국어 띄어쓰기 교정기다. 입력 문장의 '띄어쓰기'만 바로잡아 교정된 문장만 출력한다. 단어·표현·문장부호·순서·숫자는 절대 바꾸지 말고, 설명이나 따옴표도 붙이지 마라." },
-        { role: "user", content: text },
-      ],
-    });
-    const hint = (res.content ?? "").trim();
-    if (hint.length < text.length * 0.5) return text;   // 응답 부실 → 원문
-    return transferSpacing(text, hint) ?? text;
-  } catch { return text; }
-}
-
 // TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로 바꿔 "삼각형·대괄호" 같은 오낭독 방지.
 // 뉴스 기사(태안신문)는 ▲를 항목 불릿으로 쓰고, 리포트/기사에 대괄호·따옴표·단위기호가 섞여 온다.
 function normalizeForTts(t: string): string {
@@ -406,9 +353,10 @@ audioRouter.get("/news/:idxno", async (c) => {
   if (!row) return c.json({ error: "not_found" }, 404);
   const script = `${row.title}.\n${(row.snippet ?? "").replace(/\s+/g, " ").trim()}`;
 
-  // 3) 띄어쓰기 교정(엔티티 디코딩 후 Workers AI 재띄어쓰기·글자보존) → Chirp3-HD 문장 청크 → R2 저장
-  const spaced = await respaceKorean(c.env, decodeEntities(script));
-  const bytes = await synthLong(c.env, spaced);
+  // 3) 생성(Chirp3-HD 문장 청크) → R2 저장. 띄어쓰기 교정은 지연을 유발하는 LLM 호출이라
+  //    사용자를 막지 않는 우선경로(로컬 Gemini -gem2, 프롬프트 교정·사전생성)에서만 수행.
+  //    온디맨드 Chirp 폴백은 엔티티 디코딩·특수문자 정규화(normalizeForTts, 무지연)만 적용.
+  const bytes = await synthLong(c.env, script);
   if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
   await c.env.ARCHIVE_PHOTOS.put(key, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
   return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
