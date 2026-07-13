@@ -8,7 +8,7 @@ import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
-const KEY = (idxno: number) => `audio/news/${idxno}-hd5.mp3`; // -hd5: 특수문자 정규화 보강(▲·괄호·단위)로 재생성(구 -hd4 캐시 무효화)
+const KEY = (idxno: number) => `audio/news/${idxno}-hd6.mp3`; // -hd6: HTML 엔티티 디코딩 추가(&lsquo; 등)로 재생성(구 -hd5 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
 // 온디맨드 오디오 생성(유료 호출) 레이트리밋 — 캐시 미스 시에만 호출
@@ -20,10 +20,26 @@ async function overAudioLimit(c: { env: Env; req: { header: (k: string) => strin
   return rl ? !(await rl.limit({ key: `audio:${clientIp(c)}` })).success : false;
 }
 
+// HTML 엔티티 디코딩 — 기사 본문에 &lsquo;·&ldquo;·&nbsp; 등이 섞여 오는데, 디코딩 안 하면
+// TTS가 "그리고 lsquo" 같은 잡음을 읽는다. 정규화보다 먼저 실행해야 한다.
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lsquo;|&rsquo;|&#8216;|&#8217;/g, "'")
+    .replace(/&ldquo;|&rdquo;|&#8220;|&#8221;/g, '"')
+    .replace(/&hellip;|&#8230;/g, "…").replace(/&middot;|&#183;/g, "·")
+    .replace(/&ndash;|&#8211;/g, "-").replace(/&mdash;|&#8212;/g, "-")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return " "; } })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return " "; } })
+    .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, " ");   // 남은 알 수 없는 엔티티 → 공백
+}
+
 // TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로 바꿔 "삼각형·대괄호" 같은 오낭독 방지.
 // 뉴스 기사(태안신문)는 ▲를 항목 불릿으로 쓰고, 리포트/기사에 대괄호·따옴표·단위기호가 섞여 온다.
 function normalizeForTts(t: string): string {
-  return t
+  return decodeEntities(t)
     // 0) 낭독 가치 없는 노이즈 제거(백슬래시·언더스코어·별표·해시·캐럿·파이프·틸드꼴)
     .replace(/[\\_*#^|]/g, " ")
     // 1) 숫자 범위: 3~4·3-4·3·4 → "3에서 4"
