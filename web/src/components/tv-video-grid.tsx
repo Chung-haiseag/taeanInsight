@@ -3,7 +3,7 @@
 // 태안군TV 클릭-투-플레이 그리드 — 썸네일 클릭 시 그 자리에서 유튜브 임베드 재생(자체 서버 경유 없음).
 // /news 태안군TV 탭과 /live 섹션이 공용.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export interface TvGridVideo {
   id: string;
@@ -71,9 +71,15 @@ export function TvVideoGrid({ videos, columns = 2, compact = false }: {
 export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
   const [currentId, setCurrentId] = useState<string | null>(videos[0]?.id ?? null);
   const [playing, setPlaying] = useState(false);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   const current = videos.find((v) => v.id === currentId) ?? videos[0];
   if (!current) return null;
+
+  const scrollStrip = (dir: -1 | 1) => {
+    const el = stripRef.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
 
   return (
     <div className="space-y-3">
@@ -107,8 +113,25 @@ export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
         </figcaption>
       </figure>
 
-      {/* 좌우 스크롤 선택 스트립 */}
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" role="list" aria-label="다른 영상 선택">
+      {/* 좌우 스크롤 선택 스트립 — 양끝 화살표 버튼으로도 이동 */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => scrollStrip(-1)}
+          className="absolute -left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-brand/15 bg-background/90 text-brand shadow-md transition-colors hover:bg-brand hover:text-background"
+          aria-label="이전 영상 목록"
+        >
+          ◀
+        </button>
+        <button
+          type="button"
+          onClick={() => scrollStrip(1)}
+          className="absolute -right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-brand/15 bg-background/90 text-brand shadow-md transition-colors hover:bg-brand hover:text-background"
+          aria-label="다음 영상 목록"
+        >
+          ▶
+        </button>
+      <div ref={stripRef} className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" role="list" aria-label="다른 영상 선택">
         {videos.map((v) => {
           const active = v.id === current.id;
           return (
@@ -125,20 +148,36 @@ export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={v.thumbnail} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-              <span className={`block px-2.5 py-2 text-xs font-semibold leading-snug ${active ? "text-accent" : "text-brand"} line-clamp-2`}>
-                {v.title}
+              <span className="block px-2.5 py-2">
+                {v.publishedAt && (
+                  <span className="block text-[11px] text-foreground-muted">{formatTvDay(v.publishedAt)}</span>
+                )}
+                <span className={`block text-xs font-semibold leading-snug ${active ? "text-accent" : "text-brand"} line-clamp-2`}>
+                  {v.title}
+                </span>
               </span>
             </button>
           );
         })}
       </div>
+      </div>
     </div>
   );
 }
 
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 function formatTvDate(iso: string): string {
-  // ISO(UTC 오프셋 포함) → 보는 사람 시간대 기준 "7/9 19:14"
+  // ISO(UTC 오프셋 포함) → 보는 사람 시간대 기준 "7/9 (수) 19:14"
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// 게시일(날짜만) — 스트립 카드용 "7/7 (화)", 연도가 다르면 "2025.12.30 (화)"
+function formatTvDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const day = `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
+  return d.getFullYear() === new Date().getFullYear() ? day : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
 }
