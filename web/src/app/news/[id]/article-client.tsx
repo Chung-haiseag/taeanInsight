@@ -21,6 +21,7 @@ import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
 import { Icon } from "@/components/icon";
+import { CorrectionRequest } from "./correction-request";
 
 interface Reader {
   title: string;
@@ -153,7 +154,7 @@ export default function ArticleClient() {
       </header>
 
       {member && article.hasFullText ? (
-        <FullBody article={article} />
+        <FullBody article={article} idxno={Number(params.id)} />
       ) : (
         <>
           {/* 리드(발췌) */}
@@ -319,8 +320,9 @@ function splitParagraphs(text: string): string[] {
   return paras.length ? paras : [t];
 }
 
-function FullBody({ article }: { article: Reader }) {
+function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
   const paras = splitParagraphs(article.body || "");
+  const isEbook = idxno >= 90000001 && idxno <= 90099999;
   return (
     <div className="space-y-5">
       <div className="space-y-5 text-[1.05rem] leading-[1.9] text-foreground">
@@ -349,6 +351,9 @@ function FullBody({ article }: { article: Reader }) {
           ⚠ 완벽하게 OCR이 되지 않아, 기사 내용을 확인하려면 아래 <span className="underline">원본 지면</span>을 확인하세요.
         </p>
       )}
+
+      {/* 전자북: 오탈자 수정 요청(회원) — 본문 드래그 → 요청 폼 */}
+      {isEbook && <CorrectionRequest idxno={idxno} />}
 
       {/* 전자북: 원본 지면 스캔 (디지털화 본문과 대조 가능) */}
       {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} />}

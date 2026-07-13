@@ -16,6 +16,7 @@ import { citizenArticlesRouter } from "./citizen/articles_router";
 import { dashboardRouter } from "./dashboard/router";
 import { newsRouter } from "./news/router";
 import { archiveRouter } from "./archive/router";
+import { correctionsRouter, adminCorrectionsRouter } from "./archive/corrections";
 import { ebookReviewRouter } from "./archive/ebook_review";
 import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
@@ -80,7 +81,9 @@ app.route("/api/admin/citizen", citizenRouter);
 app.route("/api/citizen/articles", citizenArticlesRouter);
 app.route("/api/admin/ebook", ebookReviewRouter);
 app.route("/api/news", newsRouter);
+app.route("/api/archive/corrections", correctionsRouter); // archiveRouter보다 먼저(경로 겹침 방지)
 app.route("/api/archive", archiveRouter);
+app.route("/api/admin/corrections", adminCorrectionsRouter);
 app.route("/api/dashboard", dashboardRouter);
 app.route("/api/copilot", copilotRouter);
 app.route("/api/query", queryRouter);

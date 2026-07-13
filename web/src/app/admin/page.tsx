@@ -45,6 +45,7 @@ import {
   runAutoPublish,
   type AdminReport,
 } from "@/lib/api/admin-reports";
+import { CorrectionsSection } from "./corrections-tab";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import {
@@ -89,7 +90,7 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
   );
 }
 
-type AdminTab = "users" | "jobs" | "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook";
+type AdminTab = "users" | "jobs" | "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
   { key: "jobs", label: "⚙️ 자동화" },
   { key: "users", label: "👥 회원" },
@@ -101,6 +102,7 @@ const ADMIN_TABS: { key: AdminTab; label: string }[] = [
   { key: "citizen", label: "🧑‍💻 시민기자" },
   { key: "governance", label: "📏 민감규칙" },
   { key: "ebook", label: "📰 전자북 검수" },
+  { key: "corrections", label: "✏️ 수정요청" },
 ];
 
 export default function AdminPage() {
@@ -178,6 +180,7 @@ export default function AdminPage() {
       <div className={tab === "citizen" ? "" : "hidden"}><CitizenOpsSection /></div>
       <div className={tab === "governance" ? "" : "hidden"}><GovernanceSection /></div>
       <div className={tab === "ebook" ? "" : "hidden"}><EbookReviewSection /></div>
+      <div className={tab === "corrections" ? "" : "hidden"}><CorrectionsSection /></div>
     </div>
   );
 }

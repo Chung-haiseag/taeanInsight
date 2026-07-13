@@ -313,4 +313,6 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-06 · 이모지 아이콘→통일 라인 아이콘(Phosphor, 리디자인 TIER3): components/icon.tsx 래퍼(43개 시맨틱명→Phosphor, currentColor·1.1em). 26파일 71개 기능 이모지 교체(병렬 워크플로+타입검증). 날씨·해양·관광 데이터 글리프·화살표·상태(✅⚠)는 유지
 - 2026-07-07 · 아카이브 검색결과 총 건수·전체 페이지수 표시: search API가 항목쿼리와 병렬 COUNT로 total·totalPages 반환(FTS/LIKE/목록 3모드). 상단 "검색 결과 N건 · p/전체페이지", 페이저 "p / 전체" 표시
 - 2026-07-11 · 태안군TV 영상(서버 미저장): /api/news/tv가 태안군 공식 유튜브(@taeangun, tv.taean.go.kr 뉴스태안 동일) RSS 패스스루(엣지캐시 15분, D1 미사용). /news "📺 태안군TV" 탭(클릭 시 인라인 유튜브 재생) + /live 극장형(큰 플레이어+좌우 스크롤 스트립)
+- 2026-07-12 · 전자북 기사 수정 요청: 회원이 본문 드래그→수정 요청(/api/archive/corrections, D1 article_corrections), 관리자 /admin ✏️수정요청 탭에서 확인·치환·본문교정 후 승인/반려, 내 페이지 "내 수정 요청" 현황. FTS UPDATE 트리거(030) 추가로 본문 수정 검색 반영
 - 2026-07-13 · 주간리포트 발행 자기복구: 자정 크론 catchUpWeeklyReport(발행 예정 지난 최근 주 미발행 시 재시도, 금~일은 초안 생성부터) + 금요 크론 생성/발행 try 분리(W28 미발행 장애 재발 방지) · backend/reports/scheduled.ts, index.ts
+- 2026-07-13 · 실거래가 RTMS 일시오류 재시도: metrics 동시 팬아웃 시 순간제한에 걸린 응답이 빈결과로 삼켜져 최근달 누락되던 것 → resultCode 검사+지수백오프 3회 · backend/env/realestate.ts
