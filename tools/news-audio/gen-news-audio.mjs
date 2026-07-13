@@ -87,7 +87,7 @@ async function ttsOnce(key, text) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${key}`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `다음 뉴스 기사를 아나운서처럼 차분하고 또렷하게 읽어줘:\n\n${normalize(text)}` }] }],
+      contents: [{ parts: [{ text: `다음 뉴스 기사를 아나운서처럼 차분하고 또렷하게 읽어줘. 띄어쓰기가 어색한 부분은 자연스럽게 교정해서 읽되 내용은 그대로 둬:\n\n${normalize(text)}` }] }],
       generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } },
     }),
   });
