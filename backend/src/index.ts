@@ -118,18 +118,23 @@ export default {
       } catch (e) {
         console.warn("[cron] 군청 목록 실패:", e instanceof Error ? e.message : e);
       }
-      try {
-        if (env.AI && env.ARCHIVE_DB) {
-          const { buildWeeklyDraft, autoPublishIfClean } = await import("./reports/scheduled");
+      if (env.AI && env.ARCHIVE_DB) {
+        const { buildWeeklyDraft, autoPublishIfClean } = await import("./reports/scheduled");
+        // 생성 실패해도 기존 초안이 있으면 발행은 시도(장애 격리) — 최종 안전망은 자정 따라잡기 크론
+        try {
           const r = await buildWeeklyDraft(env);
           console.log(`[cron] 주간 리포트 초안 생성: ${r.weekId} (${r.sections}개 섹션)`);
+        } catch (e) {
+          console.warn("[cron] 주간 리포트 초안 실패:", e instanceof Error ? e.message : e);
+        }
+        try {
           // B안 — 거버넌스 통과 시 자동 발행(off면 초안 유지, 막히면 사람 검토)
-          const ap = await autoPublishIfClean(env, r.weekId);
+          const ap = await autoPublishIfClean(env);
           if (ap.published) console.log(`[cron] 주간 리포트 자동발행: ${ap.weekId}`);
           else console.log(`[cron] 자동발행 보류: ${ap.skipped ?? (ap.reasons ? `거버넌스(${ap.reasons.join(",")})` : "?")}`);
+        } catch (e) {
+          console.warn("[cron] 주간 리포트 발행 실패:", e instanceof Error ? e.message : e);
         }
-      } catch (e) {
-        console.warn("[cron] 주간 리포트 초안/발행 실패:", e instanceof Error ? e.message : e);
       }
       return;
     }
@@ -283,6 +288,16 @@ export default {
       if (n) console.log(`[cron] 군청 목록 갱신: ${n}건`);
     } catch (e) {
       console.warn("[cron] 군청 목록 실패:", e instanceof Error ? e.message : e);
+    }
+    // 주간 리포트 따라잡기 — 금 18:00 발행 크론이 실패한 주를 매일 재시도(발행 시각 전이면 no-op)
+    try {
+      const { catchUpWeeklyReport } = await import("./reports/scheduled");
+      const r = await catchUpWeeklyReport(env);
+      if (r.published) console.log(`[cron] 주간 리포트 따라잡기 발행: ${r.weekId}${r.generated ? " (초안 재생성)" : ""}`);
+      else if (r.skipped !== "already_published" && r.skipped !== "no_draft")
+        console.warn(`[cron] 리포트 따라잡기 보류: ${r.weekId} ${r.skipped ?? r.reasons?.join(",") ?? ""}`);
+    } catch (e) {
+      console.warn("[cron] 리포트 따라잡기 실패:", e instanceof Error ? e.message : e);
     }
     const { runHourlyAggregation } = await import("./cost/scheduled");
     await runHourlyAggregation(env);
