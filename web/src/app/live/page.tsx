@@ -8,7 +8,7 @@ import {
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
-import { TvVideoGrid } from "@/components/tv-video-grid";
+import { TvVideoTheater } from "@/components/tv-video-grid";
 import { PageHeader } from "@/components/page-header";
 import { LiveClock } from "@/components/live-clock";
 
@@ -34,7 +34,7 @@ export default async function LivePage() {
     fetchCctv(),
     fetchSeafog(),
     latest ? fetchWeeklyNews(latest.weekId) : Promise.resolve([]),
-    fetchTvNews(3),
+    fetchTvNews(8),
   ]);
 
   return (
@@ -147,7 +147,7 @@ export default async function LivePage() {
               <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📺</span>태안군TV</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <div className="mt-4">
-                <TvVideoGrid videos={tvNews} columns={3} compact />
+                <TvVideoTheater videos={tvNews} />
               </div>
               <p className="mt-2 text-xs text-foreground-muted">태안군 공식 유튜브 · 클릭 시 이 페이지에서 재생 · <Link href="/news" className="font-semibold text-accent hover:underline">태안뉴스의 태안군TV 탭</Link>에서 더 보기</p>
             </section>
