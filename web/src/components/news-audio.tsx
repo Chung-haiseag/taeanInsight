@@ -14,7 +14,7 @@ export function NewsAudio({ idxno }: { idxno: number }) {
 
   function play() {
     const el = ref.current; if (!el) return;
-    if (!el.src) el.src = `${API_BASE}/api/audio/news/${idxno}?v=hd3`;
+    if (!el.src) el.src = `${API_BASE}/api/audio/news/${idxno}?v=hd7`; // 백엔드 오디오 버전과 동기화(엔티티·특수문자·띄어쓰기 교정본). 오디오 파이프라인 변경 시 함께 올릴 것.
     setState("loading");
     el.play().then(() => { trackEvent("audio_play", `news:${idxno}`); setState("playing"); }).catch(() => setState("error"));
   }
