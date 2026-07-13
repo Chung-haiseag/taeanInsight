@@ -8,7 +8,7 @@ import type { Env } from "../types";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
-const KEY = (idxno: number) => `audio/news/${idxno}-hd4.mp3`; // -hd4: 큰 청크(문장 묶음)로 seam 감소(구 -hd3 캐시 무효화)
+const KEY = (idxno: number) => `audio/news/${idxno}-hd5.mp3`; // -hd5: 특수문자 정규화 보강(▲·괄호·단위)로 재생성(구 -hd4 캐시 무효화)
 const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
 // 온디맨드 오디오 생성(유료 호출) 레이트리밋 — 캐시 미스 시에만 호출
@@ -20,17 +20,35 @@ async function overAudioLimit(c: { env: Env; req: { header: (k: string) => strin
   return rl ? !(await rl.limit({ key: `audio:${clientIp(c)}` })).success : false;
 }
 
-// TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로(가운뎃점·물결표 범위·괄호·단위)
+// TTS용 텍스트 정규화 — 기호를 자연스러운 낭독으로 바꿔 "삼각형·대괄호" 같은 오낭독 방지.
+// 뉴스 기사(태안신문)는 ▲를 항목 불릿으로 쓰고, 리포트/기사에 대괄호·따옴표·단위기호가 섞여 온다.
 function normalizeForTts(t: string): string {
   return t
-    .replace(/(\d)\s*[~∼〜･·]\s*(\d)/g, "$1에서 $2")   // 숫자 범위(18~45, 18·45) → 에서
-    .replace(/[·・‧∙•ㆍ]/g, ", ")                        // 가운뎃점 나열 → 쉼표 휴지
-    .replace(/[~∼〜]/g, " ")                              // 남은 물결표 제거
-    .replace(/[（(]/g, ", ").replace(/[）)]/g, ", ")      // 괄호 → 쉼표 휴지
-    .replace(/(\d)\s*%/g, "$1 퍼센트")
-    .replace(/㎡/g, "제곱미터").replace(/㎞/g, "킬로미터").replace(/㎏/g, "킬로그램")
-    .replace(/\s*[·]\s*/g, ", ")
-    .replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1")
+    // 0) 낭독 가치 없는 노이즈 제거(백슬래시·언더스코어·별표·해시·캐럿·파이프·틸드꼴)
+    .replace(/[\\_*#^|]/g, " ")
+    // 1) 숫자 범위: 3~4·3-4·3·4 → "3에서 4"
+    .replace(/(\d)\s*[-–—~∼〜･·]\s*(\d)/g, "$1에서 $2")
+    // 2) 단위 기호 → 한글
+    .replace(/㎡/g, "제곱미터").replace(/㎥/g, "세제곱미터")
+    .replace(/㎞/g, "킬로미터").replace(/㎝/g, "센티미터").replace(/㎜/g, "밀리미터")
+    .replace(/㎏/g, "킬로그램").replace(/[ℓ㎖]/g, "리터").replace(/㎍/g, "마이크로그램")
+    .replace(/℃/g, "도").replace(/°C?/g, "도")
+    .replace(/\//g, " ")                                  // 슬래시(㎍/㎥ 등) → 공백('슬래시' 낭독 방지)
+    // 3) 연산·통화 기호
+    .replace(/\s*%/g, " 퍼센트")
+    .replace(/(?<=\d)\s*\+|\+\s*(?=\d)/g, " 플러스 ").replace(/&/g, " 그리고 ")
+    // 4) 불릿·추세·나열 기호 → 쉼표 휴지("삼각형" 낭독 방지)
+    .replace(/[▲▼△▽▴▾◆◇◈●○◎■□▶▷◀◁★☆※]/g, ", ")
+    .replace(/[·・‧∙•ㆍ]/g, ", ")
+    // 5) 괄호·대괄호·중괄호 → 쉼표 휴지 / 따옴표류 → 제거
+    .replace(/[（(［[【｛{]/g, ", ").replace(/[）)］\]】｝}]/g, ", ")
+    .replace(/[“”"„«»「」『』〈〉《》]/g, "").replace(/[‘’']/g, "")
+    // 6) 잔여 물결·말줄임·대시·골뱅이
+    .replace(/[~∼〜]/g, " ").replace(/…|\.{3,}/g, ", ").replace(/[-–—]/g, " ").replace(/@/g, " ")
+    // 7) 공백·중복 쉼표 정리
+    .replace(/,\s*(?=[,.])/g, "").replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1")
+    .replace(/(^|[.!?]\s*),\s*/g, "$1")   // 문두의 불필요 쉼표 제거
     .trim();
 }
 
@@ -296,7 +314,8 @@ audioRouter.get("/news/:idxno", async (c) => {
   const key = KEY(idxno);
 
   // 0) 로컬 잡이 올린 Gemini 낭독(자연 음성) 우선 — 있으면 그걸
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem.wav`);
+  //    -gem2: 특수문자 정규화 보강분(구 -gem.wav는 ▲ 등 오낭독이라 무효화, 로컬 잡이 재생성)
+  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.wav`);
   if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=604800" } });
 
   // 1) Chirp3-HD R2 캐시

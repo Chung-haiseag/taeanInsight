@@ -77,8 +77,22 @@ async function makeDialogue(src) {
   return lines;
 }
 
+// TTS 낭독용 특수문자 정규화(backend audio/router.ts normalizeForTts와 동일 규칙) — '삼각형·대괄호' 오낭독 방지
+function ttsClean(t) {
+  return (t || "")
+    .replace(/[\\_*#^|]/g, " ")
+    .replace(/(\d)\s*[-–—~∼〜･·]\s*(\d)/g, "$1에서 $2")
+    .replace(/㎡/g, "제곱미터").replace(/㎥/g, "세제곱미터").replace(/㎞/g, "킬로미터").replace(/㎝/g, "센티미터").replace(/㎜/g, "밀리미터")
+    .replace(/㎏/g, "킬로그램").replace(/[ℓ㎖]/g, "리터").replace(/㎍/g, "마이크로그램").replace(/℃/g, "도").replace(/°C?/g, "도").replace(/\//g, " ")
+    .replace(/\s*%/g, " 퍼센트").replace(/(?<=\d)\s*\+|\+\s*(?=\d)/g, " 플러스 ").replace(/&/g, " 그리고 ")
+    .replace(/[▲▼△▽▴▾◆◇◈●○◎■□▶▷◀◁★☆※]/g, ", ").replace(/[·・‧∙•ㆍ]/g, ", ")
+    .replace(/[（(［[【｛{]/g, ", ").replace(/[）)］\]】｝}]/g, ", ").replace(/[“”"„«»「」『』〈〉《》]/g, "").replace(/[‘’']/g, "")
+    .replace(/[~∼〜]/g, " ").replace(/…|\.{3,}/g, ", ").replace(/[-–—]/g, " ").replace(/@/g, " ")
+    .replace(/,\s*(?=[,.])/g, "").replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1").replace(/(^|[.!?]\s*),\s*/g, "$1").trim();
+}
+
 async function synthesize(dialogue) {
-  const transcript = dialogue.map((d) => `${d.sp === "A" ? "Speaker1" : "Speaker2"}: ${d.text}`).join("\n");
+  const transcript = dialogue.map((d) => `${d.sp === "A" ? "Speaker1" : "Speaker2"}: ${ttsClean(d.text)}`).join("\n");
   const j = await gemini(TTS_MODEL, {
     contents: [{ parts: [{ text: `다음 두 진행자의 저녁 라디오 브리핑을 자연스럽고 생동감 있게 읽어줘:\n\n${transcript}` }] }],
     generationConfig: {

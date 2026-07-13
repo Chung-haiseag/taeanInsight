@@ -4,7 +4,7 @@
 //
 //   키: tools/news-audio/.gemini_keys (한 줄에 하나, 무료 등급 키) — chmod 600
 //   사용: node tools/news-audio/gen-news-audio.mjs [--max=24] [--force]
-//   업로드: audio/news/<idxno>-gem.wav  (Worker가 있으면 우선 서빙)
+//   업로드: audio/news/<idxno>-gem2.wav  (Worker가 있으면 우선 서빙)
 
 import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
@@ -50,10 +50,19 @@ function r2Has(key) {
   catch { return false; }
 }
 
+// TTS 낭독용 특수문자 정규화(backend audio/router.ts normalizeForTts와 동일 규칙).
+// 태안신문 기사는 ▲를 항목 불릿으로 써서, 미처리 시 TTS가 '삼각형'이라 읽는다.
 function normalize(t) {
-  return t.replace(/(\d)\s*[~∼〜]\s*(\d)/g, "$1에서 $2").replace(/[·・‧∙•ㆍ]/g, ", ").replace(/[~∼〜]/g, " ")
-    .replace(/[（(]/g, ", ").replace(/[）)]/g, ", ").replace(/(\d)\s*%/g, "$1 퍼센트")
-    .replace(/㎡/g, "제곱미터").replace(/㎞/g, "킬로미터").replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").trim();
+  return (t || "")
+    .replace(/[\\_*#^|]/g, " ")
+    .replace(/(\d)\s*[-–—~∼〜･·]\s*(\d)/g, "$1에서 $2")
+    .replace(/㎡/g, "제곱미터").replace(/㎥/g, "세제곱미터").replace(/㎞/g, "킬로미터").replace(/㎝/g, "센티미터").replace(/㎜/g, "밀리미터")
+    .replace(/㎏/g, "킬로그램").replace(/[ℓ㎖]/g, "리터").replace(/㎍/g, "마이크로그램").replace(/℃/g, "도").replace(/°C?/g, "도").replace(/\//g, " ")
+    .replace(/\s*%/g, " 퍼센트").replace(/(?<=\d)\s*\+|\+\s*(?=\d)/g, " 플러스 ").replace(/&/g, " 그리고 ")
+    .replace(/[▲▼△▽▴▾◆◇◈●○◎■□▶▷◀◁★☆※]/g, ", ").replace(/[·・‧∙•ㆍ]/g, ", ")
+    .replace(/[（(［[【｛{]/g, ", ").replace(/[）)］\]】｝}]/g, ", ").replace(/[“”"„«»「」『』〈〉《》]/g, "").replace(/[‘’']/g, "")
+    .replace(/[~∼〜]/g, " ").replace(/…|\.{3,}/g, ", ").replace(/[-–—]/g, " ").replace(/@/g, " ")
+    .replace(/,\s*(?=[,.])/g, "").replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1").replace(/(^|[.!?]\s*),\s*/g, "$1").trim();
 }
 
 const exhausted = new Set(); // 429/한도 도달 키
@@ -113,7 +122,7 @@ async function main() {
   console.log(`  대상 ${rows.length}건`);
   let done = 0, skip = 0, fail = 0;
   for (const a of rows) {
-    const key = `audio/news/${a.idxno}-gem.wav`;
+    const key = `audio/news/${a.idxno}-gem2.wav`;
     if (!FORCE && r2Has(key)) { skip++; continue; }
     const script = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     const r = await geminiTts(script);

@@ -6,7 +6,7 @@
 ## 구조
 ```
 맥(한국 IP·매일) → 최근 주요 기사 N건 Gemini 낭독(무료 키 victory·holyroad 로테이션)
-  → R2 audio/news/<idxno>-gem.wav 업로드
+  → R2 audio/news/<idxno>-gem2.wav 업로드
 Worker → -gem.wav 있으면 그걸(Gemini 자연 음성), 없으면 Chirp3-HD(무료 폴백)
 ```
 - 무료 키 **키당 ~15건/일** → 2개면 **~30건/일 무료**. 소진되면 자동 중단(나머지는 Chirp3-HD).

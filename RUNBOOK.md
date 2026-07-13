@@ -316,3 +316,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-12 · 전자북 기사 수정 요청: 회원이 본문 드래그→수정 요청(/api/archive/corrections, D1 article_corrections), 관리자 /admin ✏️수정요청 탭에서 확인·치환·본문교정 후 승인/반려, 내 페이지 "내 수정 요청" 현황. FTS UPDATE 트리거(030) 추가로 본문 수정 검색 반영
 - 2026-07-13 · 주간리포트 발행 자기복구: 자정 크론 catchUpWeeklyReport(발행 예정 지난 최근 주 미발행 시 재시도, 금~일은 초안 생성부터) + 금요 크론 생성/발행 try 분리(W28 미발행 장애 재발 방지) · backend/reports/scheduled.ts, index.ts
 - 2026-07-13 · 실거래가 RTMS 일시오류 재시도: metrics 동시 팬아웃 시 순간제한에 걸린 응답이 빈결과로 삼켜져 최근달 누락되던 것 → resultCode 검사+지수백오프 3회 · backend/env/realestate.ts
+- 2026-07-14 · TTS 낭독 특수문자 정규화 보강: 태안신문 ▲불릿을 '삼각형'이라 읽던 문제 등(대괄호·중괄호·따옴표·단위·@·백슬래시) 4경로(Chirp normalizeForTts, gen-news-audio·gen-podcast·gen-briefing) 동일 규칙 적용. 캐시무효화 뉴스 -hd5·-gem2 · backend/src/audio/router.ts, tools/{news-audio,podcast}
