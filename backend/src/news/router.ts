@@ -139,6 +139,62 @@ newsRouter.get("/", async (c) => {
   });
 });
 
+// 태안군TV(유튜브 채널 @taeangun) 최신 영상 — tv.taean.go.kr '뉴스태안'과 동일 콘텐츠.
+// 서버 저장 없음: 공식 채널 RSS를 요청 시 파싱, 엣지 캐시(Cache API) 15분만. 썸네일·재생은 유튜브에서 직접.
+// 주의: /:id 라우트보다 먼저 등록해야 함.
+const TV_CHANNEL_ID = "UCuOJUGTBucxV_ywzT4-KaEQ";
+const TV_FEED_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${TV_CHANNEL_ID}`;
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+newsRouter.get("/tv", async (c) => {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  let xml: string;
+  try {
+    const r = await fetch(TV_FEED_URL);
+    if (!r.ok) throw new Error(`feed_status_${r.status}`);
+    xml = await r.text();
+  } catch (e) {
+    return c.json({ error: "feed_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
+  }
+
+  const items = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)]
+    .map((m) => {
+      const entry = m[1];
+      const pick = (re: RegExp) => decodeXmlEntities(entry.match(re)?.[1]?.trim() ?? "");
+      const id = pick(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+      return {
+        id,
+        title: pick(/<title>([^<]*)<\/title>/),
+        url: `https://www.youtube.com/watch?v=${id}`,
+        thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        publishedAt: pick(/<published>([^<]+)<\/published>/),
+        description: pick(/<media:description>([\s\S]*?)<\/media:description>/).slice(0, 200),
+      };
+    })
+    .filter((v) => v.id);
+
+  const res = c.json({
+    items,
+    source: "태안군TV (유튜브 @taeangun)",
+    channelUrl: "https://www.youtube.com/@taeangun",
+  });
+  res.headers.set("Cache-Control", "public, s-maxage=900");
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+});
+
 // 기사 1건 (자체 리더용). 현재 본문은 RSS 발췌 기준 — 아카이브 백필(D1) 연동 시 전문으로 교체.
 newsRouter.get("/:id", async (c) => {
   let items;

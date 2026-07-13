@@ -9,13 +9,16 @@
     <string>/bin/bash</string>
     <string>/Applications/taean/tools/podcast/run-podcast.sh</string>
   </array>
-  <!-- 매주 금요일 18:00 KST (리포트 자동발행 16:00 이후) -->
+  <!-- 하루 4회 — 이미 생성된 주는 스킵(무비용). 금 18:00 자동발행(+20분 뒤 픽업)과
+       자정 따라잡기 발행(00:00, +40분 뒤 픽업) 모두 커버. 금요일 정각 1회였을 땐
+       발행(18:00~18:02)보다 먼저 돌아 새 주를 놓치고 한 주 내내 폴백이 서빙됐음. -->
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Weekday</key><integer>5</integer>
-    <key>Hour</key><integer>18</integer>
-    <key>Minute</key><integer>0</integer>
-  </dict>
+  <array>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>20</integer></dict>
+  </array>
   <key>StandardOutPath</key>
   <string>/Applications/taean/tools/podcast/podcast.log</string>
   <key>StandardErrorPath</key>

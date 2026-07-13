@@ -6,8 +6,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 
-import { getNews, type NewsResponse } from "@/lib/api/news";
+import { getNews, getTvNews, type NewsResponse, type TvNewsResponse } from "@/lib/api/news";
 import { PageHeader } from "@/components/page-header";
+import { TvVideoGrid } from "@/components/tv-video-grid";
 import { Icon } from "@/components/icon";
 
 const CATEGORY_ORDER = ["tourism", "environment", "industry", "policy", "realestate", "culture", "society"];
@@ -17,6 +18,8 @@ export default function NewsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<string>("all");
+  const [tv, setTv] = useState<TvNewsResponse | null>(null);
+  const [tvError, setTvError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -29,6 +32,18 @@ export default function NewsPage() {
       }
     })();
   }, []);
+
+  // 태안군TV 탭은 첫 진입 시에만 로드(유튜브 RSS 패스스루 — 서버 저장 없음)
+  useEffect(() => {
+    if (active !== "tv" || tv || tvError) return;
+    (async () => {
+      try {
+        setTv(await getTvNews());
+      } catch (e) {
+        setTvError(e instanceof Error ? e.message : "영상을 불러오지 못했습니다");
+      }
+    })();
+  }, [active, tv, tvError]);
 
   const items = useMemo(() => {
     if (!data) return [];
@@ -79,8 +94,14 @@ export default function NewsPage() {
                 onClick={() => setActive(c)}
               />
             ))}
+            <Tab label={<>📺 태안군TV</>} active={active === "tv"} onClick={() => setActive("tv")} />
           </div>
 
+          {/* 태안군TV 영상 — 유튜브 직접 재생(콘텐츠 미저장) */}
+          {active === "tv" ? (
+            <TvVideoSection tv={tv} error={tvError} />
+          ) : (
+            <>
           {/* 기사 리스트 — 클릭 시 자체 리더로 */}
           <ul className="divide-y divide-brand/10">
             {items.map((it) => (
@@ -123,9 +144,29 @@ export default function NewsPage() {
           <p className="text-xs text-foreground-muted">
             출처: {data.source} · 10분마다 갱신 · AI 자동 분류(휴리스틱) · 전문은 회원 전용
           </p>
+            </>
+          )}
         </>
       )}
     </div>
+  );
+}
+
+// 태안군TV 탭 본문 — 공용 클릭-투-플레이 그리드 + 출처 표기
+function TvVideoSection({ tv, error }: { tv: TvNewsResponse | null; error: string | null }) {
+  if (error) {
+    return <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error}</p>;
+  }
+  if (!tv) return <p className="text-sm text-foreground-muted">영상을 불러오는 중…</p>;
+
+  return (
+    <>
+      <TvVideoGrid videos={tv.items} />
+      <p className="text-xs text-foreground-muted">
+        출처: {tv.source} · 영상은 유튜브에서 직접 재생(자체 저장 없음) ·{" "}
+        <a href={tv.channelUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">채널 바로가기 ↗</a>
+      </p>
+    </>
   );
 }
 
