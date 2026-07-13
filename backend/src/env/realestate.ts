@@ -64,13 +64,32 @@ function parseItems(text: string): Array<Record<string, string>> {
   return items;
 }
 
-// 여러 엔드포인트를 403일 때만 다음으로 폴백하며 시도
+// 응답 본문의 성공/오류 코드 — 정상은 resultCode 000, 게이트웨이 오류는 returnReasonCode(쿼터초과 22 등)
+function rtmsCode(text: string): string {
+  const m = text.match(/"resultCode"\s*:\s*"?0*(\d+)|<resultCode>\s*0*(\d+)|<returnReasonCode>\s*0*(\d+)/);
+  return m ? (m[1] ?? m[2] ?? m[3]) : "";
+}
+
+// 여러 엔드포인트를 403일 때만 다음으로 폴백하며 시도.
+// 일시 오류(타임아웃·5xx/429·쿼터/트래픽 코드)는 지수 백오프 재시도 — metrics 팬아웃이
+// 같은 data.go.kr 키로 동시에 나가며 순간 제한에 걸리면 조용히 빈 결과가 되던 문제 방지.
 async function rtmsGet(urls: string[], key: string, lawd: string, ym: string): Promise<Array<Record<string, string>>> {
   const sp = new URLSearchParams({ serviceKey: key, LAWD_CD: lawd, DEAL_YMD: ym, pageNo: "1", numOfRows: "100", _type: "json" });
   for (const url of urls) {
-    const res = await fetch(`${url}?${sp}`, { signal: AbortSignal.timeout(8000) });
-    if (res.status === 403) continue; // 미승인/미반영 → 다음 엔드포인트
-    return parseItems(await res.text());
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
+      let res: Response;
+      try {
+        res = await fetch(`${url}?${sp}`, { signal: AbortSignal.timeout(8000) });
+      } catch {
+        continue; // 타임아웃/네트워크 → 재시도
+      }
+      if (res.status === 403) break; // 미승인/미반영 → 다음 엔드포인트
+      const text = await res.text();
+      const code = rtmsCode(text);
+      if (res.ok && (code === "" || code === "0")) return parseItems(text); // "000"→"0" 정규화
+      // 5xx·429·쿼터/트래픽 초과 코드 → 재시도
+    }
   }
   return [];
 }
