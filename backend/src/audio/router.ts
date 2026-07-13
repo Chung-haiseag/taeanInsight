@@ -351,13 +351,33 @@ audioRouter.get("/news/:idxno", async (c) => {
     .prepare("SELECT title, substr(COALESCE(body, excerpt, ''),1,1500) AS snippet FROM archive_articles WHERE idxno=?")
     .bind(idxno).first<{ title: string; snippet: string }>();
   if (!row) return c.json({ error: "not_found" }, 404);
-  const script = `${row.title}.\n${(row.snippet ?? "").replace(/\s+/g, " ").trim()}`;
+  // 3) 스트리밍 생성 — 제목을 짧은 첫 청크로 먼저 내보내 재생이 ~수초 내 시작되게 하고,
+  //    본문 청크는 병렬로 합성하되 순서대로 흘려보낸다(첫 바이트=제목 합성 시간, 총시간=가장 느린 청크).
+  //    엔티티 디코딩·특수문자 정규화는 googleTts 내부 normalizeForTts가 청크별로 수행(무지연).
+  //    띄어쓰기 교정은 지연을 유발하는 LLM이라 우선경로(로컬 Gemini -gem2, 사전생성)에서만.
+  const VOICE = "ko-KR-Chirp3-HD-Aoede";
+  const parts = [`${row.title}.`, ...chunkText((row.snippet ?? "").replace(/\s+/g, " ").trim())]
+    .filter((p) => p.trim().length > 0);
+  const promises = parts.map((p) => googleTts(c.env, p, VOICE)); // 전부 즉시 착수(병렬)
+  const first = await promises[0];
+  if (!first || first.length < 100) return c.json({ error: "tts_failed" }, 502);
 
-  // 3) 생성(Chirp3-HD 문장 청크) → R2 저장. 띄어쓰기 교정은 지연을 유발하는 LLM 호출이라
-  //    사용자를 막지 않는 우선경로(로컬 Gemini -gem2, 프롬프트 교정·사전생성)에서만 수행.
-  //    온디맨드 Chirp 폴백은 엔티티 디코딩·특수문자 정규화(normalizeForTts, 무지연)만 적용.
-  const bytes = await synthLong(c.env, script);
-  if (!bytes || bytes.length < 200) return c.json({ error: "tts_failed" }, 502);
-  await c.env.ARCHIVE_PHOTOS.put(key, bytes, { httpMetadata: { contentType: "audio/mpeg" } });
-  return new Response(bytes, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
+  const collected: Uint8Array[] = [];
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      for (let i = 0; i < promises.length; i++) {
+        const b = i === 0 ? first : await promises[i];   // 순서 보장(뒤 청크는 이미 병렬 진행 중)
+        if (b) { controller.enqueue(b); collected.push(b); }
+      }
+      controller.close();
+      // 전 청크가 정상일 때만 R2 캐시(부분 실패분은 캐시 안 해 다음 요청에 재생성)
+      if (collected.length === parts.length) {
+        const total = collected.reduce((s, b) => s + b.length, 0);
+        const merged = new Uint8Array(total);
+        let off = 0; for (const b of collected) { merged.set(b, off); off += b.length; }
+        c.executionCtx.waitUntil(c.env.ARCHIVE_PHOTOS.put(key, merged, { httpMetadata: { contentType: "audio/mpeg" } }));
+      }
+    },
+  });
+  return new Response(stream, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
 });
