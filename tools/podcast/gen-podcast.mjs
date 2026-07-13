@@ -83,8 +83,20 @@ async function makeDialogue(src) {
 
 // 3) 멀티스피커 TTS → PCM(L16) → WAV
 // TTS 낭독용 특수문자 정규화(backend audio/router.ts normalizeForTts와 동일 규칙) — '삼각형·대괄호' 오낭독 방지
+function decodeEntities(s) {
+  return (s || "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lsquo;|&rsquo;|&#8216;|&#8217;/g, "'").replace(/&ldquo;|&rdquo;|&#8220;|&#8221;/g, '"')
+    .replace(/&hellip;|&#8230;/g, "\u2026").replace(/&middot;|&#183;/g, "\u00b7")
+    .replace(/&ndash;|&#8211;/g, "-").replace(/&mdash;|&#8212;/g, "-")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return " "; } })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return " "; } })
+    .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, " ");
+}
+
 function ttsClean(t) {
-  return (t || "")
+  return decodeEntities(t)
     .replace(/[\\_*#^|]/g, " ")
     .replace(/(\d)\s*[-–—~∼〜･·]\s*(\d)/g, "$1에서 $2")
     .replace(/㎡/g, "제곱미터").replace(/㎥/g, "세제곱미터").replace(/㎞/g, "킬로미터").replace(/㎝/g, "센티미터").replace(/㎜/g, "밀리미터")
