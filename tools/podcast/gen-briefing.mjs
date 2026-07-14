@@ -8,6 +8,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ttsClean } from "../lib/tts-normalize.mjs";
 
 // 키: .gemini_keys(뉴스낭독과 공유) 첫 줄 우선, 없으면 GEMINI_API_KEY env
 function loadKey() {
@@ -75,32 +76,6 @@ async function makeDialogue(src) {
     .filter((x) => x && x.text.length > 1).slice(0, 26);
   if (lines.length < 4) throw new Error("대본 생성 실패");
   return lines;
-}
-
-// TTS 낭독용 특수문자 정규화(backend audio/router.ts normalizeForTts와 동일 규칙) — '삼각형·대괄호' 오낭독 방지
-function decodeEntities(s) {
-  return (s || "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lsquo;|&rsquo;|&#8216;|&#8217;/g, "'").replace(/&ldquo;|&rdquo;|&#8220;|&#8221;/g, '"')
-    .replace(/&hellip;|&#8230;/g, "\u2026").replace(/&middot;|&#183;/g, "\u00b7")
-    .replace(/&ndash;|&#8211;/g, "-").replace(/&mdash;|&#8212;/g, "-")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return " "; } })
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return " "; } })
-    .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, " ");
-}
-
-function ttsClean(t) {
-  return decodeEntities(t)
-    .replace(/[\\_*#^|]/g, " ")
-    .replace(/(\d)\s*[-–—~∼〜･·]\s*(\d)/g, "$1에서 $2")
-    .replace(/㎡/g, "제곱미터").replace(/㎥/g, "세제곱미터").replace(/㎞/g, "킬로미터").replace(/㎝/g, "센티미터").replace(/㎜/g, "밀리미터")
-    .replace(/㎏/g, "킬로그램").replace(/[ℓ㎖]/g, "리터").replace(/㎍/g, "마이크로그램").replace(/℃/g, "도").replace(/°C?/g, "도").replace(/\//g, " ")
-    .replace(/\s*%/g, " 퍼센트").replace(/(?<=\d)\s*\+|\+\s*(?=\d)/g, " 플러스 ").replace(/&/g, " 그리고 ")
-    .replace(/[▲▼△▽▴▾◆◇◈●○◎■□▶▷◀◁★☆※]/g, ", ").replace(/[·・‧∙•ㆍ]/g, ", ")
-    .replace(/[（(［[【｛{]/g, ", ").replace(/[）)］\]】｝}]/g, ", ").replace(/[“”"„«»「」『』〈〉《》]/g, "").replace(/[‘’']/g, "")
-    .replace(/[~∼〜]/g, " ").replace(/…|\.{3,}/g, ", ").replace(/[-–—]/g, " ").replace(/@/g, " ")
-    .replace(/,\s*(?=[,.])/g, "").replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1").replace(/(^|[.!?]\s*),\s*/g, "$1").trim();
 }
 
 async function synthesize(dialogue) {
