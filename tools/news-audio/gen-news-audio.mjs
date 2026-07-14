@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
@@ -48,34 +49,6 @@ function writeStatus(patch) {
 function r2Has(key) {
   try { wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "ignore", "ignore"] }); return true; }
   catch { return false; }
-}
-
-// HTML 엔티티 디코딩(정규화보다 먼저) — &lsquo;·&ldquo;·&nbsp; 등을 안 풀면 TTS가 "그리고 lsquo"를 읽는다.
-function decodeEntities(s) {
-  return (s || "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lsquo;|&rsquo;|&#8216;|&#8217;/g, "'").replace(/&ldquo;|&rdquo;|&#8220;|&#8221;/g, '"')
-    .replace(/&hellip;|&#8230;/g, "…").replace(/&middot;|&#183;/g, "·")
-    .replace(/&ndash;|&#8211;/g, "-").replace(/&mdash;|&#8212;/g, "-")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return " "; } })
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return " "; } })
-    .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, " ");
-}
-
-// TTS 낭독용 특수문자 정규화(backend audio/router.ts normalizeForTts와 동일 규칙).
-// 태안신문 기사는 ▲를 항목 불릿으로 써서, 미처리 시 TTS가 '삼각형'이라 읽는다.
-function normalize(t) {
-  return decodeEntities(t)
-    .replace(/[\\_*#^|]/g, " ")
-    .replace(/(\d)\s*[-–—~∼〜･·]\s*(\d)/g, "$1에서 $2")
-    .replace(/㎡/g, "제곱미터").replace(/㎥/g, "세제곱미터").replace(/㎞/g, "킬로미터").replace(/㎝/g, "센티미터").replace(/㎜/g, "밀리미터")
-    .replace(/㎏/g, "킬로그램").replace(/[ℓ㎖]/g, "리터").replace(/㎍/g, "마이크로그램").replace(/℃/g, "도").replace(/°C?/g, "도").replace(/\//g, " ")
-    .replace(/\s*%/g, " 퍼센트").replace(/(?<=\d)\s*\+|\+\s*(?=\d)/g, " 플러스 ").replace(/&/g, " 그리고 ")
-    .replace(/[▲▼△▽▴▾◆◇◈●○◎■□▶▷◀◁★☆※]/g, ", ").replace(/[·・‧∙•ㆍ]/g, ", ")
-    .replace(/[（(［[【｛{]/g, ", ").replace(/[）)］\]】｝}]/g, ", ").replace(/[“”"„«»「」『』〈〉《》]/g, "").replace(/[‘’']/g, "")
-    .replace(/[~∼〜]/g, " ").replace(/…|\.{3,}/g, ", ").replace(/[-–—]/g, " ").replace(/@/g, " ")
-    .replace(/,\s*(?=[,.])/g, "").replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+([.,!?])/g, "$1").replace(/(^|[.!?]\s*),\s*/g, "$1").trim();
 }
 
 const exhausted = new Set(); // 429/한도 도달 키
