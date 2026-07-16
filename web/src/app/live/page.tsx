@@ -63,7 +63,7 @@ export default async function LivePage() {
 
           {/* 날씨·대기질 */}
           <section>
-            <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>⛅</span>날씨·대기질</h2>
+            <h2 className="text-display-sm font-bold text-brand">날씨·대기질</h2>
             <span className="accent-rule mt-3" aria-hidden />
             <WeatherCards env={metrics.environment} />
             <AirQualityTrend env={metrics.environment} />
@@ -71,14 +71,14 @@ export default async function LivePage() {
 
           {/* 바다 */}
           <section>
-            <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>🌊</span>바다·해변</h2>
+            <h2 className="text-display-sm font-bold text-brand">바다·해변</h2>
             <span className="accent-rule mt-3" aria-hidden />
             <MarineCard marine={metrics.tourism.marine} />
           </section>
 
           {/* 관광 */}
           <section>
-            <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>🧳</span>관광·이벤트</h2>
+            <h2 className="text-display-sm font-bold text-brand">관광·이벤트</h2>
             <span className="accent-rule mt-3" aria-hidden />
             <DemandGauge demand={metrics.tourism.demand} />
             <FestivalList tour={metrics.tourism} />
@@ -87,7 +87,7 @@ export default async function LivePage() {
 
           {/* 지역경제 */}
           <section>
-            <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>🏘</span>지역경제</h2>
+            <h2 className="text-display-sm font-bold text-brand">지역경제</h2>
             <span className="accent-rule mt-3" aria-hidden />
             <OilCard oil={metrics.oil} />
           </section>
@@ -95,7 +95,7 @@ export default async function LivePage() {
           {/* 도로 실시간 CCTV */}
           {cctv.available && (
             <section>
-              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📹</span>도로 실시간 CCTV</h2>
+              <h2 className="text-display-sm font-bold text-brand">도로 실시간 CCTV</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <div className="mt-4"><CctvPlayer cameras={cctv.cameras} updatedAt={cctv.updatedAt} /></div>
             </section>
@@ -104,7 +104,7 @@ export default async function LivePage() {
           {/* 해무 관측 스틸컷 */}
           {seafog.available && (
             <section>
-              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>🌫</span>해안 해무 관측</h2>
+              <h2 className="text-display-sm font-bold text-brand">해안 해무 관측</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {seafog.stills.map((s) => (
@@ -125,7 +125,7 @@ export default async function LivePage() {
           {/* 최신 태안뉴스 */}
           {news.length > 0 && (
             <section>
-              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📰</span>최신 태안뉴스</h2>
+              <h2 className="text-display-sm font-bold text-brand">최신 태안뉴스</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <ul className="mt-4 divide-y divide-brand/10">
                 {news.slice(0, 12).map((n) => (
@@ -144,7 +144,7 @@ export default async function LivePage() {
           {/* 태안군TV — 유튜브 공식 채널 최신 영상(자체 저장 없음, 클릭 시 페이지 안에서 임베드 재생) */}
           {tvNews.length > 0 && (
             <section>
-              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📺</span>태안군TV</h2>
+              <h2 className="text-display-sm font-bold text-brand">태안군TV</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <div className="mt-4">
                 <TvVideoTheater videos={tvNews} />
@@ -156,7 +156,7 @@ export default async function LivePage() {
           {/* 역대 오늘, 태안 — 같은 날짜 과거 주요뉴스 랜덤 */}
           {onThisDay.length > 0 && (
             <section>
-              <h2 className="text-display-sm font-bold text-brand"><span className="mr-2" aria-hidden>📜</span>역대 오늘, 태안</h2>
+              <h2 className="text-display-sm font-bold text-brand">역대 오늘, 태안</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <p className="mt-2 text-sm text-foreground-muted">오늘과 같은 날짜, 창간호까지 거슬러 그해의 주요 뉴스 · 새로고침마다 다르게</p>
               <ul className="mt-4 divide-y divide-brand/10">
