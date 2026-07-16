@@ -13,19 +13,22 @@ interface IntentRule {
   patterns: RegExp[];
 }
 
+// 순서 주의: factcheck를 prediction보다 먼저 검사한다. 구체적인 과거-사실 패턴
+// (예: "언제 생겼")이 prediction의 일반 "언제"에 가려지지 않도록. 둘 다 prediction_agent로
+// 라우팅되므로 라우팅에는 영향이 없고, intent 라벨·캐시 timeWindow만 정확해진다.
 const INTENT_RULES: IntentRule[] = [
-  {
-    intent: "prediction",
-    patterns: [
-      /다음 ?주/, /이번 ?주말/, /내일/, /예측/, /예보/, /전망/, /추세/,
-      /얼마나 ?(올|많|혼잡)/, /몇 ?명/, /언제/, /시세/,
-    ],
-  },
   {
     intent: "factcheck",
     patterns: [
       /사실인가/, /정말/, /확인/, /맞나/, /진짜/,
       /언제 ?(생|발생|발견|만들|시작)/, /어디/, /몇 ?살/, /누구/,
+    ],
+  },
+  {
+    intent: "prediction",
+    patterns: [
+      /다음 ?주/, /이번 ?주말/, /내일/, /예측/, /예보/, /전망/, /추세/,
+      /얼마나 ?(올|많|혼잡)/, /몇 ?명/, /언제/, /시세/,
     ],
   },
   {
