@@ -75,11 +75,11 @@ export function SiteHeader() {
       {/* 상단 황토 라인 */}
       <div className="h-1 bg-gradient-to-r from-accent via-accent/60 to-transparent" aria-hidden="true" />
       <div className="container mx-auto px-4 max-w-7xl flex items-center justify-between h-16">
-        <Link href="/" className="flex items-center gap-2.5 text-brand" aria-label="태안 AI 인텔리전스 홈">
+        <Link href="/" className="flex items-center gap-2.5 text-brand" aria-label="태안 인사이트 홈">
           <span className="inline-block w-2 h-7 bg-accent rounded-sm" aria-hidden="true" />
           <span className="flex flex-col leading-none">
             <span className="text-[10px] uppercase tracking-kicker text-foreground-muted">Taean Insight</span>
-            <span className="font-bold tracking-tight">태안 AI 인텔리전스</span>
+            <span className="font-bold tracking-tight">태안 인사이트</span>
           </span>
         </Link>
 

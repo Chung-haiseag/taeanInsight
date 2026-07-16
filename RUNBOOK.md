@@ -318,3 +318,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-13 · 실거래가 RTMS 일시오류 재시도: metrics 동시 팬아웃 시 순간제한에 걸린 응답이 빈결과로 삼켜져 최근달 누락되던 것 → resultCode 검사+지수백오프 3회 · backend/env/realestate.ts
 - 2026-07-14 · TTS 낭독 특수문자 정규화 보강: 태안신문 ▲불릿을 '삼각형'이라 읽던 문제 등(대괄호·중괄호·따옴표·단위·@·백슬래시) 4경로(Chirp normalizeForTts, gen-news-audio·gen-podcast·gen-briefing) 동일 규칙 적용. 캐시무효화 뉴스 -hd5·-gem2 · backend/src/audio/router.ts, tools/{news-audio,podcast}
 - 2026-07-16 · 홈·라이브 '탈 AI스러움' 에디토리얼 정리(시스템 색·타이포 불변): 홈 카피에서 'AI' 남발 제거(가치어로)·서비스 4카드+01–04넘버 → 괘선 인덱스·그라데이션 블러 오브 삭제·내부용어(HITL·PRD) 사용자언어화, /live 섹션 이모지 마커 9개 제거(accent-rule로 위계) · web/components/home/generic-home.tsx, web/app/live/page.tsx
+- 2026-07-16 · 브랜드명 '태안 AI 인텔리전스' → '태안 인사이트'(도메인 taean-insight 일치, 로고는 TAEAN INSIGHT 영문+국문 락업): 헤더·푸터·메타 title/template/siteName·OG 9곳 일괄 · web/components/site-header·footer, layout.tsx, live/reports/news OG
