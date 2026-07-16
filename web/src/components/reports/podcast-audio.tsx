@@ -23,7 +23,7 @@ export function PodcastAudio() {
     <section className="no-print rounded-2xl border border-accent/30 bg-gradient-to-br from-accent-subtle/30 to-background p-5 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-brand"><Icon name="mic" /> 이번 주 AI 팟캐스트</h2>
+          <h2 className="text-lg font-bold text-brand"><Icon name="mic" /> 이번 주 팟캐스트</h2>
           <p className="mt-0.5 text-xs text-foreground-muted">진행자 두 명이 이번 주 태안 소식을 대담으로 · AI 생성</p>
         </div>
         {state !== "playing" && (

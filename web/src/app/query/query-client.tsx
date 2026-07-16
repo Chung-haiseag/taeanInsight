@@ -74,9 +74,9 @@ export function QueryClient() {
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <AILabelBadge kind="ai_assisted" />
-          <span className="text-sm text-foreground-muted">캐싱 우선 · 출처 표기</span>
+          <span className="text-sm text-foreground-muted">빠른 답변 · 출처 표기</span>
         </div>
-        <h1 className="text-3xl font-bold text-brand">AI Query Agent</h1>
+        <h1 className="text-3xl font-bold text-brand">무엇이든 물어보세요</h1>
         <p className="text-foreground-muted">
           태안의 관광·환경·부동산에 대해 자연어로 물어보세요. 답변에는 항상 출처가 표기됩니다.
         </p>
@@ -137,7 +137,7 @@ export function QueryClient() {
             </span>
           </div>
           <h2 id="answer-heading" className="sr-only">
-            AI 답변
+            답변
           </h2>
           <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
             {result.answer || "(빈 응답)"}
@@ -165,7 +165,7 @@ export function QueryClient() {
           {result.evidence && result.evidence.length > 0 && (
             <details className="pt-2 border-t border-accent/20">
               <summary className="cursor-pointer text-sm font-semibold text-brand">
-                <Icon name="search" /> AI가 참고한 실시간 근거 {result.evidence.length}건 (RAG)
+                <Icon name="search" /> 참고한 실시간 근거 {result.evidence.length}건
               </summary>
               <ul className="mt-2 space-y-2">
                 {result.evidence.map((e) => (

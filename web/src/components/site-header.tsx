@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { href: "/news", label: "태안뉴스" },
   { href: "/archive", label: "아카이브" },
   { href: "/reports", label: "주간 리포트" },
-  { href: "/query", label: "AI 질의" },
+  { href: "/query", label: "질의응답" },
   { href: "/citizen", label: "시민기자" },
   { href: "/reporter", label: "취재 알림", reporterOnly: true },
   { href: "/membership", label: "멤버십" },
