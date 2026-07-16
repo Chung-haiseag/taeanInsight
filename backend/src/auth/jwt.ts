@@ -68,17 +68,19 @@ export async function verifyJwt(token: string, secret: string): Promise<JwtPaylo
   const [headerB64, payloadB64, sigB64] = parts;
   const data = `${headerB64}.${payloadB64}`;
 
-  const key = await importHmacKey(secret, "verify");
-  const sigBytes = base64UrlDecode(sigB64);
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    sigBytes,
-    new TextEncoder().encode(data),
-  );
-  if (!valid) return null;
-
+  // 서명 디코딩·검증·페이로드 파싱을 모두 감싼다 — 잘못된 형식(base64 아님 등)은
+  // atob가 던지므로, 예외를 흘리지 않고 null로 처리(검증 실패 = 무효 토큰).
   try {
+    const key = await importHmacKey(secret, "verify");
+    const sigBytes = base64UrlDecode(sigB64);
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      sigBytes,
+      new TextEncoder().encode(data),
+    );
+    if (!valid) return null;
+
     const payloadStr = new TextDecoder().decode(base64UrlDecode(payloadB64));
     const payload = JSON.parse(payloadStr) as JwtPayload;
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
