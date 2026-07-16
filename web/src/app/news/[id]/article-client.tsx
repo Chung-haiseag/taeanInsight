@@ -376,7 +376,7 @@ function MemberGate({ hasFullText, onUnlock }: { hasFullText: boolean; onUnlock:
     <div className="relative rounded-2xl border border-accent/40 bg-accent-subtle/20 p-7 text-center space-y-4">
       <p className="eyebrow justify-center"><Icon name="lock" /> 회원 전용</p>
       <h2 className="text-xl font-bold text-brand">
-        {hasFullText ? "이 기사의 전문은 태안 인텔리전스 회원에게 제공됩니다" : "회원이 되시면 더 많은 기능을 이용하실 수 있어요"}
+        {hasFullText ? "이 기사의 전문은 태안 인사이트 회원에게 제공됩니다" : "회원이 되시면 더 많은 기능을 이용하실 수 있어요"}
       </h2>
       <p className="text-sm text-foreground-muted">
         로그인하시면 전문과 AI 요약·관련 기사까지 한곳에서 보실 수 있어요.

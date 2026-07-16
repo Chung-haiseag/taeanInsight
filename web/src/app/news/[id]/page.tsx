@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title,
       description: desc,
       openGraph: {
-        title, description: desc, type: "article", locale: "ko_KR", siteName: "태안 AI 인텔리전스",
+        title, description: desc, type: "article", locale: "ko_KR", siteName: "태안 인사이트",
         url: `/news/${id}`,
         images: [{ url: img, width: 1200, height: 630 }],
       },

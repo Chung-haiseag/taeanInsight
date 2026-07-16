@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    openGraph: { title, description, type: "article", locale: "ko_KR", siteName: "태안 AI 인텔리전스", images: [{ url: img, width: 1200, height: 630 }] },
+    openGraph: { title, description, type: "article", locale: "ko_KR", siteName: "태안 인사이트", images: [{ url: img, width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title, description, images: [img] },
   };
 }

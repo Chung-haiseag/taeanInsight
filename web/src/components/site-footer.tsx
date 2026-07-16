@@ -12,7 +12,7 @@ export function SiteFooter() {
       <div className="container mx-auto px-4 max-w-7xl py-12 grid gap-8 md:grid-cols-3 text-sm">
         <div>
           <p className="text-[10px] uppercase tracking-kicker text-accent-subtle mb-2">Taean Insight</p>
-          <p className="font-bold text-base mb-2">태안 AI 인텔리전스</p>
+          <p className="font-bold text-base mb-2">태안 인사이트</p>
           <p className="text-background/70 leading-relaxed">
             태안의 관광·환경·부동산 예측 인사이트를 AI로.
             <br />

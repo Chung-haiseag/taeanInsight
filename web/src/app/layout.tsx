@@ -25,20 +25,20 @@ import { AccessibilityProvider } from "@/components/accessibility-provider";
 export const metadata: Metadata = {
   metadataBase: new URL("https://insight.taeannews.co.kr"),
   title: {
-    default: "태안 AI 인텔리전스 | 태안신문",
-    template: "%s | 태안 AI 인텔리전스",
+    default: "태안 인사이트 | 태안신문",
+    template: "%s | 태안 인사이트",
   },
   description:
     "태안의 관광·환경·부동산 예측 인사이트를 AI로. 매주 발행되는 주간 리포트와 시민 참여형 저널리즘.",
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    siteName: "태안 AI 인텔리전스",
+    siteName: "태안 인사이트",
     images: [{ url: "/og.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "태안 AI 인텔리전스 | 태안신문",
+    title: "태안 인사이트 | 태안신문",
     description: "태안의 관광·환경·부동산 예측 인사이트를 AI로.",
     images: ["/og.png"],
   },
