@@ -23,7 +23,7 @@ import { Icon } from "@/components/icon";
 import { CATEGORY_ORDER, sortCategoryTabs } from "./newsarchive-helpers";
 
 const FIRST_YEAR = 1990;
-const THIS_YEAR = 2026;
+const THIS_YEAR = new Date().getFullYear(); // 매해 자동 갱신 — 하드코딩 금지(1월마다 수동 갱신 불필요)
 const YEARS = Array.from({ length: THIS_YEAR - FIRST_YEAR + 1 }, (_, i) => String(THIS_YEAR - i));
 
 export default function NewsArchivePage() {
@@ -155,7 +155,7 @@ export default function NewsArchivePage() {
       {/* 상단 카테고리 탭(전체 아카이브 건수) + 태안군TV */}
       <div className="flex flex-wrap gap-2 border-b border-brand/10 pb-3">
         <Tab
-          label={<>전체{stats ? ` ${stats.total.toLocaleString()}` : ""}</>}
+          label={<>전체{stats && stats.total > 0 ? ` ${stats.total.toLocaleString()}` : ""}</>}
           active={category === "all"}
           onClick={() => setCategory("all")}
         />
