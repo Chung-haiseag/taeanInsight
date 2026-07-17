@@ -104,6 +104,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-19 · 내 페이지(/me) 초개인화 위젯 실데이터화: 오늘의태안(날씨·대기질)·내분야뉴스·맞춤리포트요약·아카이브픽·군정소식 + KPI 실값(— 제거). 위젯별 로딩·에러 격리, 세그먼트별 배치 · web/components/me/widgets,widget_registry
 - 2026-06-19 · CORS allowHeaders에 X-Taean-Uid 추가(익명 디바이스 식별 헤더 preflight 차단 → Failed to fetch 해결) · backend/src/index.ts
 - 2026-07-09 · 메인 홈 초기 렌더 폭 점프 제거: SSR·하이드레이션 전 GenericHome이 7xl로 떴다 4xl로 스냅되던 CLS 해소(state===null 분기도 max-w-4xl 래퍼로 통일) · web/src/app/page.tsx
+- 2026-07-17 · 태안뉴스+아카이브를 '뉴스아카이브' 단일 메뉴로 통합(첫 화면 최신순·탭 건수·전체검색) · web /news, backend /api/archive/stats
 <!-- 새 기능 추가 시 위에 한 줄 -->
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
