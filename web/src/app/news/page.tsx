@@ -4,7 +4,7 @@
 // 상단 카테고리 탭·키워드 검색·연도 필터로 좁힌다. 태안군TV는 유튜브 패스스루.
 // 화면 전체를 /api/archive/search가 구동(검색어 없으면 최신순 목록).
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import {
@@ -42,6 +42,7 @@ export default function NewsArchivePage() {
   const [interests, setInterests] = useState<string[]>([]);
   const [tv, setTv] = useState<TvNewsResponse | null>(null);
   const [tvError, setTvError] = useState<string | null>(null);
+  const requestSeq = useRef(0); // 최신 요청만 상태에 반영하기 위한 순번 가드
 
   useEffect(() => { getArchiveStats().then(setStats).catch(() => {}); }, []);
   useEffect(() => { getMe().then((m) => setInterests(m.preferences?.categories ?? [])).catch(() => {}); }, []);
@@ -52,10 +53,12 @@ export default function NewsArchivePage() {
     const cat = catRaw === "all" || catRaw === "tv" ? "" : catRaw;
     const query = opts?.q ?? q;
     const yr = opts?.year ?? year;
+    const seq = ++requestSeq.current; // 이 호출의 순번을 캡처 — 이후 더 최신 요청이 시작되면 무시
     setLoading(true);
     setError(null);
     try {
       const r = await searchArchive({ q: query, category: cat, year: yr, page: p });
+      if (seq !== requestSeq.current) return; // 응답 도착 전에 새 요청이 시작됨 → 낡은 응답 폐기
       setHits(r.items);
       setTotal(r.total ?? r.items.length);
       setTotalPages(r.totalPages ?? 1);
@@ -63,9 +66,10 @@ export default function NewsArchivePage() {
       setPage(p);
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setError(err instanceof Error ? err.message : "불러오지 못했습니다");
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }
 
@@ -172,84 +176,89 @@ export default function NewsArchivePage() {
         <Tab label={<>📺 태안군TV</>} active={category === "tv"} onClick={() => setCategory("tv")} />
       </div>
 
-      {error && <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error}</p>}
+      {category !== "tv" && error && (
+        <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error}</p>
+      )}
 
       {/* 태안군TV 탭 */}
       {category === "tv" ? (
         <TvVideoSection tv={tv} error={tvError} />
       ) : (
-        hits !== null && (
-          <section className="space-y-1">
-            <p className="text-sm">
-              <span className="font-semibold text-brand">{q ? "검색 결과 " : "기사 "}{total.toLocaleString()}건</span>
-              {totalPages > 1 && (
-                <span className="text-foreground-muted"> · {page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
-              )}
-            </p>
-            {hits.length === 0 ? (
-              <p className="rounded-lg border border-brand/15 p-6 text-center text-sm text-foreground-muted">
-                결과가 없습니다. (아카이브 백필이 아직 적재 중이면 결과가 비어 있을 수 있어요.)
+        <>
+          {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+          {hits !== null && (
+            <section className="space-y-1">
+              <p className="text-sm">
+                <span className="font-semibold text-brand">{q ? "검색 결과 " : "기사 "}{total.toLocaleString()}건</span>
+                {totalPages > 1 && (
+                  <span className="text-foreground-muted"> · {page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
+                )}
               </p>
-            ) : (
-              <ul className="divide-y divide-brand/10">
-                {hits.map((h) => (
-                  <li key={h.idxno}>
-                    <Link
-                      href={`/news/${h.idxno}`}
-                      className="group flex gap-4 py-5 -mx-3 px-3 rounded-lg transition-colors hover:bg-brand/[0.02]"
-                    >
-                      {h.lead_image && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={h.lead_image}
-                          alt=""
-                          className="h-20 w-28 shrink-0 rounded object-cover bg-brand/5"
-                          loading="lazy"
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="rounded-full bg-accent/15 px-2 py-0.5 font-semibold text-accent">
-                            {ARCHIVE_CATEGORY_LABELS[h.category] ?? h.category}
-                          </span>
-                          <span className="text-foreground-muted">{(h.published_at ?? "").slice(0, 10)}</span>
-                          {h.author && <span className="text-foreground-muted">· {h.author}</span>}
-                        </div>
-                        <h2 className="mt-1 font-bold text-brand group-hover:underline">{decodeEntities(h.title)}</h2>
-                        {h.excerpt && (
-                          <p className="mt-1 text-sm text-foreground-muted line-clamp-2">{decodeEntities(h.excerpt)}</p>
+              {hits.length === 0 ? (
+                <p className="rounded-lg border border-brand/15 p-6 text-center text-sm text-foreground-muted">
+                  결과가 없습니다. (아카이브 백필이 아직 적재 중이면 결과가 비어 있을 수 있어요.)
+                </p>
+              ) : (
+                <ul className="divide-y divide-brand/10">
+                  {hits.map((h) => (
+                    <li key={h.idxno}>
+                      <Link
+                        href={`/news/${h.idxno}`}
+                        className="group flex gap-4 py-5 -mx-3 px-3 rounded-lg transition-colors hover:bg-brand/[0.02]"
+                      >
+                        {h.lead_image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={h.lead_image}
+                            alt=""
+                            className="h-20 w-28 shrink-0 rounded object-cover bg-brand/5"
+                            loading="lazy"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          />
                         )}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="rounded-full bg-accent/15 px-2 py-0.5 font-semibold text-accent">
+                              {ARCHIVE_CATEGORY_LABELS[h.category] ?? h.category}
+                            </span>
+                            <span className="text-foreground-muted">{(h.published_at ?? "").slice(0, 10)}</span>
+                            {h.author && <span className="text-foreground-muted">· {h.author}</span>}
+                          </div>
+                          <h2 className="mt-1 font-bold text-brand group-hover:underline">{decodeEntities(h.title)}</h2>
+                          {h.excerpt && (
+                            <p className="mt-1 text-sm text-foreground-muted line-clamp-2">{decodeEntities(h.excerpt)}</p>
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-            {(page > 1 || hasMore) && (
-              <div className="flex items-center justify-center gap-3 pt-6">
-                <button
-                  type="button"
-                  onClick={() => load(page - 1)}
-                  disabled={page <= 1 || loading}
-                  className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
-                >
-                  ← 이전
-                </button>
-                <span className="text-sm text-foreground-muted tabular-nums">{page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
-                <button
-                  type="button"
-                  onClick={() => load(page + 1)}
-                  disabled={!hasMore || loading}
-                  className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
-                >
-                  다음 →
-                </button>
-              </div>
-            )}
-          </section>
-        )
+              {(page > 1 || hasMore) && (
+                <div className="flex items-center justify-center gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => load(page - 1)}
+                    disabled={page <= 1 || loading}
+                    className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
+                  >
+                    ← 이전
+                  </button>
+                  <span className="text-sm text-foreground-muted tabular-nums">{page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
+                  <button
+                    type="button"
+                    onClick={() => load(page + 1)}
+                    disabled={!hasMore || loading}
+                    className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
+                  >
+                    다음 →
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
 
       <p className="text-xs text-foreground-muted">
