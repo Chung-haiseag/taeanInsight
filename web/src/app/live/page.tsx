@@ -169,7 +169,7 @@ export default async function LivePage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/archive" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">아카이브 전체 보기 →</Link>
+              <Link href="/news" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">아카이브 전체 보기 →</Link>
             </section>
           )}
 

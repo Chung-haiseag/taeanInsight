@@ -6,7 +6,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticPages = ["", "/news", "/archive", "/reports", "/query", "/live", "/citizen"].map((p) => ({
+  const staticPages = ["", "/news", "/reports", "/query", "/live", "/citizen"].map((p) => ({
     url: `${SITE}${p}`,
     changeFrequency: "daily" as const,
     priority: p === "" ? 1 : 0.7,

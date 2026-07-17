@@ -376,7 +376,7 @@ export function ArchivePicks({ preferences }: { preferences: UserPreferences }) 
         <h2 id="archive-heading" className="text-lg font-bold text-brand">
           <Icon name="books" /> 아카이브에서 · “{q}”
         </h2>
-        <Link href="/archive" className="text-xs font-semibold text-accent hover:underline">
+        <Link href="/news" className="text-xs font-semibold text-accent hover:underline">
           검색 →
         </Link>
       </div>
