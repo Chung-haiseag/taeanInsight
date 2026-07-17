@@ -12,6 +12,13 @@ export const archiveRouter = new Hono<{ Bindings: Env }>();
 
 const PAGE_SIZE = 20;
 
+// stats 카테고리 집계 — GROUP BY 결과 행을 { category: count } 맵으로.
+export function toCategoryCounts(rows: { category: string; n: number }[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) if (r.category) out[r.category] = r.n;
+  return out;
+}
+
 // 검색 — FTS5 우선, 미지원/오류 시 LIKE 폴백
 archiveRouter.get("/search", async (c) => {
   const db = c.env.ARCHIVE_DB;
@@ -123,18 +130,30 @@ const ON_THIS_DAY_MAJOR = `(
   AND title NOT GLOB '[0-9][0-9][0-9][0-9]*면'   -- 'YYYY... NN면' 제목 누락 아티팩트 제외
 )`;
 
-// 아카이브 전체 통계 — 총 건수·연도 범위(엣지 1시간 캐시).
+// 아카이브 전체 통계 — 총 건수·연도 범위·카테고리별 건수(엣지 1시간 캐시).
 archiveRouter.get("/stats", async (c) => {
   const db = c.env.ARCHIVE_DB;
-  if (!db) return c.json({ total: 0, minYear: null, maxYear: null });
+  if (!db) return c.json({ total: 0, minYear: null, maxYear: null, categories: {} });
   try {
-    const r = await db.prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles").first<{ total: number; minYear: number | null; maxYear: number | null }>();
+    const [agg, cats] = await Promise.all([
+      db
+        .prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles")
+        .first<{ total: number; minYear: number | null; maxYear: number | null }>(),
+      db
+        .prepare("SELECT category, COUNT(*) AS n FROM archive_articles WHERE category IS NOT NULL GROUP BY category")
+        .all<{ category: string; n: number }>(),
+    ]);
     return c.json(
-      { total: r?.total ?? 0, minYear: r?.minYear ?? null, maxYear: r?.maxYear ?? null },
+      {
+        total: agg?.total ?? 0,
+        minYear: agg?.minYear ?? null,
+        maxYear: agg?.maxYear ?? null,
+        categories: toCategoryCounts(cats.results ?? []),
+      },
       { headers: { "cache-control": "public, max-age=3600" } },
     );
   } catch {
-    return c.json({ total: 0, minYear: null, maxYear: null });
+    return c.json({ total: 0, minYear: null, maxYear: null, categories: {} });
   }
 });
 
