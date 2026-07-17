@@ -5,15 +5,14 @@ import { Icon } from "@/components/icon";
 
 export const metadata: Metadata = {
   title: "AI 증강 시민기자단",
-  description: "12명 시민기자가 AI Co-Pilot으로 함께 쓰는 지역 저널리즘",
+  description: "8명 시민기자가 AI Co-Pilot으로 함께 쓰는 지역 저널리즘",
 };
 
 const TIMELINE = [
   { phase: "준비", date: "2026-06 말", task: "공고문·지원서·평가 기준 확정" },
-  { phase: "모집·선발", date: "2026-07 중순", task: "12명 선발 (읍·면 균형·연령 다양성)" },
+  { phase: "모집·선발", date: "2026-07 중순", task: "8명 선발 (읍·면 균형·연령 다양성)" },
   { phase: "교육", date: "2026-07 말 ~ 08", task: "6회 교육 + AI Co-Pilot 실습" },
-  { phase: "활동·발행", date: "2026-09 ~ 11", task: "월 4~6편, 총 12~18편/인" },
-  { phase: "평가·시상", date: "2026-12", task: "우수 기자 인센티브 30만원" },
+  { phase: "활동·발행", date: "2026-09 ~ 11", task: "1인당 3개월 총 6편" },
 ];
 
 export default function CitizenPage() {
@@ -22,7 +21,7 @@ export default function CitizenPage() {
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <AILabelBadge kind="human" />
-          <span className="text-sm text-foreground-muted">12명 시민기자 + AI Co-Pilot</span>
+          <span className="text-sm text-foreground-muted">8명 시민기자 + AI Co-Pilot</span>
         </div>
         <h1 className="text-3xl font-bold text-brand">AI 증강 시민기자단</h1>
         <p className="text-foreground-muted">
@@ -45,11 +44,10 @@ export default function CitizenPage() {
         </h2>
         <ul className="text-sm text-foreground-muted space-y-1">
           <li>· 모집 시기: 2026년 7월 중순 (사업 일정 v1.5 조정 반영)</li>
-          <li>· 선발 인원: 12명 (읍·면별 균형, 20~60대 연령 다양성)</li>
+          <li>· 선발 인원: 8명 (읍·면별 균형, 20~60대 연령 다양성)</li>
           <li>· 활동 기간: 2026년 9월 ~ 11월 (3개월)</li>
-          <li>· 발행량: 1인당 월 4~6편, 총 12~18편</li>
-          <li>· 원고료: 편당 5만~10만원 (매월 말 자동 정산)</li>
-          <li>· 인센티브: 연말 우수 기자 30만원</li>
+          <li>· 발행량: 1인당 3개월 총 6편</li>
+          <li>· 원고료: 편당 5만원 (매월 말 자동 정산)</li>
         </ul>
       </section>
 
