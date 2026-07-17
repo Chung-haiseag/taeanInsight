@@ -135,8 +135,7 @@ export default function ArticleClient() {
       {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
       <ReadingTracker idxno={Number(params.id)} category={article.category} />
       <div className="flex gap-4 text-sm text-foreground-muted">
-        <Link href="/news" className="hover:text-brand">← 태안뉴스</Link>
-        <Link href="/archive" className="hover:text-brand">아카이브 검색</Link>
+        <Link href="/news" className="hover:text-brand">← 뉴스아카이브</Link>
       </div>
 
       <header className="space-y-3 border-b border-brand/10 pb-6">
