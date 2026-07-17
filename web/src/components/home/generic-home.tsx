@@ -66,7 +66,7 @@ export function GenericHome() {
           <ServiceRow
             href="/citizen"
             title="시민기자단"
-            description="12명이 함께 쓰는 지역 저널리즘"
+            description="8명이 함께 쓰는 지역 저널리즘"
           />
         </nav>
         <p className="mt-4 text-sm text-foreground-muted">
