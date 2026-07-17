@@ -23,6 +23,7 @@ import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
 import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
+import { completeAvoidingGarble } from "./answer_quality";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -352,7 +353,8 @@ queryRouter.post("/", async (c) => {
 
     if (parts.length) {
       const context = parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
-      const res = await client.complete({
+      // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
+      const res = await completeAvoidingGarble(client, {
         channel: "realtime",
         maxTokens: 800,
         temperature: 0.2,

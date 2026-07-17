@@ -9,6 +9,11 @@ import { VendorError } from "./types";
 // 기본 모델 — llama-3.1-8b-instruct는 2026-05-30 폐기됨. 현행 고속 모델로 교체.
 const DEFAULT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
+// fp8 고속 모델이 간헐적으로 같은 토큰을 폭주시키는 붕괴(salad)를 억제.
+// 한국어 답변엔 완만한 값이 안전 — 조사·어미 반복을 과도히 벌하지 않도록.
+const DEFAULT_REPETITION_PENALTY = 1.1;
+const DEFAULT_FREQUENCY_PENALTY = 0.3;
+
 export interface WorkersAiClientOptions {
   ai: Ai;
   channel?: LlmChannel;
@@ -39,6 +44,8 @@ export class WorkersAiLlmClient implements LlmClient {
         messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
         max_tokens: request.maxTokens ?? 512,
         temperature: request.temperature ?? 0.2,
+        repetition_penalty: DEFAULT_REPETITION_PENALTY,
+        frequency_penalty: DEFAULT_FREQUENCY_PENALTY,
       } as never)) as { response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } };
 
       const content = (res.response ?? "").trim();
