@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "태안뉴스",
-  description: "주간태안신문의 최신 기사를 관심 도메인별로 모았습니다. 태안의 오늘을 한눈에.",
+  title: "뉴스아카이브",
+  description: "태안신문 최신 기사부터 1990년 창간호까지 — 한 곳에서 보고 검색하세요.",
 };
 
 export default function NewsLayout({ children }: { children: React.ReactNode }) {

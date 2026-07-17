@@ -9,8 +9,7 @@ import { AccountNav } from "./account-nav";
 
 const NAV_ITEMS = [
   { href: "/live", label: "지금 태안" },
-  { href: "/news", label: "태안뉴스" },
-  { href: "/archive", label: "아카이브" },
+  { href: "/news", label: "뉴스아카이브" },
   { href: "/reports", label: "주간 리포트" },
   { href: "/query", label: "질의응답" },
   { href: "/citizen", label: "시민기자" },
