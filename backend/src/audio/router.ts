@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Env } from "../types";
 import { normalizeForTts, chunkText } from "./text";
+import { aggregateManifest } from "./manifest";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
@@ -256,6 +257,37 @@ audioRouter.get("/status", async (c) => {
     if (week) podcastLive = !!(await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${week}-gem.wav`));
   }
   return c.json({ ...status, podcastLive, week, checkedAt: new Date().toISOString() });
+});
+
+// GET /api/audio/manifest — R2 오디오 파일 포맷별 집계(관리자, 읽기 전용). 저품질·구버전 정리용.
+//   헤더 X-Admin-Token = ADMIN_TOKEN. ?prefix= (기본 audio/news/), ?keys=1 이면 포맷별 키 목록도 반환.
+audioRouter.get("/manifest", async (c) => {
+  const env = c.env as Env & { ADMIN_TOKEN?: string };
+  if (!env.ADMIN_TOKEN || c.req.header("X-Admin-Token") !== env.ADMIN_TOKEN) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "no_r2" }, 503);
+  const bucket = c.env.ARCHIVE_PHOTOS; // 클로저/루프에서 narrowing 유지
+  const prefix = c.req.query("prefix") || "audio/news/";
+  const withKeys = c.req.query("keys") === "1";
+
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  // R2 list 페이지네이션(1000/page). 안전 상한 200페이지(=20만 오브젝트).
+  for (let i = 0; i < 200; i++) {
+    const res = await bucket.list({ prefix, cursor, limit: 1000 });
+    for (const o of res.objects) keys.push(o.key);
+    if (!res.truncated) break;
+    cursor = res.cursor;
+  }
+
+  const m = aggregateManifest(keys);
+  return c.json({
+    prefix,
+    total: m.total,
+    byFormat: m.byFormat,
+    ...(withKeys ? { keysByFormat: m.keysByFormat } : {}),
+  });
 });
 
 audioRouter.get("/news/:idxno", async (c) => {
