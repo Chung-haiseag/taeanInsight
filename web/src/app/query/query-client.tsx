@@ -148,7 +148,12 @@ export function QueryClient() {
               <h3 className="text-sm font-semibold text-brand mb-2">출처</h3>
               <ul className="space-y-1 text-sm">
                 {result.sources.map((s, i) => (
-                  <li key={i}>
+                  <li key={i} className="flex items-center gap-2">
+                    {s.kind === "web" && (
+                      <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                        웹{(() => { try { return " · " + new URL(s.url ?? "").hostname.replace(/^www\./, ""); } catch { return ""; } })()}
+                      </span>
+                    )}
                     {s.url ? (
                       <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-accent underline">
                         {s.title}
@@ -156,7 +161,7 @@ export function QueryClient() {
                     ) : (
                       <span>{s.title}</span>
                     )}
-                    {s.publisher && <span className="text-foreground-muted"> · {s.publisher}</span>}
+                    {s.publishedAt && <span className="text-xs text-foreground-muted">· {s.publishedAt}</span>}
                   </li>
                 ))}
               </ul>

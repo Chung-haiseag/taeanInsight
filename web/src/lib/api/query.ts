@@ -6,9 +6,9 @@ export type QueryDomain = "tourism" | "environment" | "realestate" | "general";
 
 export interface QuerySource {
   title: string;
-  url?: string;
+  url: string | null;
+  kind?: string;
   publishedAt?: string;
-  publisher?: string;
 }
 
 export interface QueryEvidence { n: number; source: string; text: string }
