@@ -24,6 +24,7 @@ import { loadMarine } from "../tour/marine";
 import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
 import { completeAvoidingGarble } from "./answer_quality";
+import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -84,28 +85,17 @@ function isPureWeather(query: string): boolean {
 
 export const queryRouter = new Hono<{ Bindings: Env }>();
 
-// 질문에서 핵심 키워드 추출 → 아카이브(FTS5 우선, LIKE 폴백)에서 근거 기사 검색
-const QUERY_STOP = new Set([
-  "알려줘", "알려", "주세요", "관해서", "관하여", "대해서", "대하여", "대해", "무엇", "어떤", "어떻게",
-  "현황", "정보", "궁금해", "궁금", "관련", "입니다", "인가", "무슨", "그리고", "에서", "에게", "으로",
-  "저것", "이것", "그것", "있나", "있는", "되나", "보여줘", "찾아줘",
-]);
+// 질문에서 핵심 키워드 추출 → 아카이브(FTS5 우선, LIKE 폴백)에서 근거 기사 검색.
+// 키워드 정규화(조사 제거·지역어 희석 제거)는 keywords.ts 참고.
 async function retrieveArchive(
   db: D1Database,
   query: string,
 ): Promise<Array<{ idxno: number; title: string; published_at: string; body: string }>> {
-  const tokens = [
-    ...new Set(
-      query
-        .replace(/[^가-힣0-9a-zA-Z]/g, " ")
-        .split(/\s+/)
-        .filter((t) => t.length >= 2 && !QUERY_STOP.has(t)),
-    ),
-  ];
+  const tokens = extractKeywords(query);
   if (!tokens.length) return [];
   const cols = "a.idxno, a.title, a.published_at, substr(a.body,1,1300) AS body";
-  // FTS5(트라이그램)는 3글자 이상만 매칭 — 특정 키워드는 FTS, 없으면 가장 긴 토큰 LIKE
-  const ftsTokens = tokens.filter((t) => t.length >= 3).map((t) => `"${t.replace(/"/g, "")}"`);
+  // FTS5(트라이그램)는 3글자 이상만 매칭 — ubiquitous 지역어(태안/태안군)는 순위 희석되어 제외.
+  const ftsTokens = ftsRankTokens(tokens).map((t) => `"${t.replace(/"/g, "")}"`);
   if (ftsTokens.length) {
     try {
       const r = await db
@@ -118,7 +108,9 @@ async function retrieveArchive(
       if (r.results?.length) return r.results;
     } catch { /* LIKE 폴백 */ }
   }
-  const kw = `%${tokens.sort((a, b) => b.length - a.length)[0]}%`;
+  // LIKE 폴백 — ubiquitous 지역어를 뺀 가장 긴 토큰 우선(지역명만 남으면 그거라도).
+  const likePool = tokens.filter((t) => !UBIQUITOUS.has(t));
+  const kw = `%${(likePool.length ? likePool : tokens).sort((a, b) => b.length - a.length)[0]}%`;
   const r = await db
     .prepare(
       `SELECT ${cols} FROM archive_articles a WHERE a.title LIKE ?1 OR a.body LIKE ?1 ` +
