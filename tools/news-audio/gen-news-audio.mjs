@@ -1,6 +1,6 @@
 // 주요 기사 Gemini 낭독 생성기(로컬·한국 IP) — 팟캐스트급 자연 음성, 무료.
 //   Worker는 Gemini 지역차단 → 한국 IP 맥에서 생성해 R2 업로드.
-//   무료 키 2개(victory·holyroad) 로테이션 → 하루 ~30건 무료. 소진 시 중단(나머지는 Worker Chirp3-HD 폴백).
+//   무료 키 3개(victory·holyroad·taeannews) 로테이션 → 하루 ~45건 무료. 소진 시 중단(나머지는 Worker Chirp3-HD 폴백).
 //
 //   키: tools/news-audio/.gemini_keys (한 줄에 하나, 무료 등급 키) — chmod 600
 //   사용: node tools/news-audio/gen-news-audio.mjs [--max=24] [--force]
@@ -14,7 +14,7 @@ import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
-const MAX = Number((process.argv.find((a) => a.startsWith("--max=")) || "--max=30").split("=")[1]);
+const MAX = Number((process.argv.find((a) => a.startsWith("--max=")) || "--max=45").split("=")[1]);
 const FORCE = process.argv.includes("--force");
 const PER_KEY = Number(process.env.PER_KEY || "15"); // 키당 하루 안전 상한
 
@@ -24,7 +24,7 @@ function loadKeys() {
   if (existsSync(f)) return readFileSync(f, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
   if (process.env.GEMINI_API_KEY) return [process.env.GEMINI_API_KEY];
   if (existsSync("tools/podcast/.gemini_key")) return [readFileSync("tools/podcast/.gemini_key", "utf8").trim()];
-  throw new Error("키 없음: tools/news-audio/.gemini_keys 에 무료 키(victory·holyroad) 한 줄씩");
+  throw new Error("키 없음: tools/news-audio/.gemini_keys 에 무료 키(victory·holyroad·taeannews) 한 줄씩");
 }
 const KEYS = loadKeys();
 const used = KEYS.map(() => 0); // 키별 사용량

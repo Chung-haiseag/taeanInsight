@@ -1,31 +1,33 @@
 # 주요 기사 Gemini 낭독 생성기 (로컬·무료 키 로테이션)
 
-주요 기사를 **팟캐스트급 Gemini 음성**으로 낭독 생성해 R2에 올린다. **비용 0**(무료 키 2개 로테이션).
+주요 기사를 **팟캐스트급 Gemini 음성**으로 낭독 생성해 R2에 올린다. **비용 0**(무료 키 3개 로테이션).
 (Worker는 Gemini 지역차단 → 한국 IP 맥에서 생성)
 
 ## 구조
 ```
-맥(한국 IP·매일) → 최근 주요 기사 N건 Gemini 낭독(무료 키 victory·holyroad 로테이션)
+맥(한국 IP·매일) → 최근 주요 기사 N건 Gemini 낭독(무료 키 victory·holyroad·taeannews 로테이션)
   → R2 audio/news/<idxno>-gem2.wav 업로드
 Worker → -gem.wav 있으면 그걸(Gemini 자연 음성), 없으면 Chirp3-HD(무료 폴백)
 ```
-- 무료 키 **키당 ~15건/일** → 2개면 **~30건/일 무료**. 소진되면 자동 중단(나머지는 Chirp3-HD).
+- 무료 키 **키당 ~15건/일** → 3개면 **~45건/일 무료**. 소진되면 자동 중단(나머지는 Chirp3-HD).
+- ⚠️ 한 계정의 무료 프로젝트를 여러 개 묶는 건 구글 무료 등급 약관상 한도 우회로, 계정 정지 위험이 있음. 위험 없는 대안은 프로젝트 1개를 종량제로 전환(TTS는 저렴).
 
 ## 1회 설정
 ```bash
-# 무료 등급 키 2개를 한 줄에 하나씩(순서 무관)
+# 무료 등급 키 3개를 한 줄에 하나씩(순서 무관)
 cat > tools/news-audio/.gemini_keys <<'KEYS'
 victory_무료키_값
 holyroad_무료키_값
+taeannews_무료키_값
 KEYS
 chmod 600 tools/news-audio/.gemini_keys
 
 # 수동 실행(검증)
-sh tools/news-audio/run-news-audio.sh --max=30
+sh tools/news-audio/run-news-audio.sh --max=45
 ```
 
 ## 옵션
-- `--max=N` : 최대 N건(기본 30)
+- `--max=N` : 최대 N건(기본 45 — 무료 키 3개 × 키당 15)
 - `--force` : 이미 있는 것도 재생성
 - `PER_KEY=15` : 키당 하루 안전 상한(기본 15, 유료 전환 방지)
 
