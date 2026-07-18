@@ -229,7 +229,7 @@ readingRouter.post("/embed-backfill", async (c) => {
   const token = c.req.header("X-Admin-Token");
   const expected = (c.env as Env & { ADMIN_TOKEN?: string }).ADMIN_TOKEN;
   if (!expected || token !== expected) return c.json({ error: "unauthorized" }, 401);
-  const after = Number(c.req.query("after")) || 0;
-  const limit = Math.min(200, Number(c.req.query("limit")) || 100);
+  const after = Math.max(0, Number(c.req.query("after")) || 0);
+  const limit = Math.max(1, Math.min(200, Number(c.req.query("limit")) || 100));
   return c.json(await embedBackfillBatch(c.env, after, limit));
 });
