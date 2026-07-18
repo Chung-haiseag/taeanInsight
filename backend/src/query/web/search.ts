@@ -45,6 +45,7 @@ export async function searchWeb(env: Env, query: string): Promise<WebSource[]> {
   }
 
   try {
+    // 전체 웹 단계 타임아웃: 6s 초과 시 로컬로 폴백 (abort → catch → [])
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -55,6 +56,7 @@ export async function searchWeb(env: Env, query: string): Promise<WebSource[]> {
         include_domains: WEB_WHITELIST,
         search_depth: "basic",
       }),
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return [];
     const j = (await res.json()) as { results?: unknown };
