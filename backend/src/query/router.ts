@@ -89,6 +89,9 @@ function isPureWeather(query: string): boolean {
 
 export const queryRouter = new Hono<{ Bindings: Env }>();
 
+// Vectorize cosine 유사도 하한 — 약한(무관) 매치 배제
+const MIN_SEMANTIC_SCORE = 0.5;
+
 // 질문에서 핵심 키워드 추출 → 아카이브(FTS5 키워드 + Vectorize 의미)에서 근거 기사 검색, RRF 병합.
 // 키워드 정규화(조사 제거·지역어 희석 제거)는 keywords.ts 참고.
 async function retrieveArchive(
@@ -135,6 +138,7 @@ async function retrieveArchive(
       if (vec) {
         const q = await env.VECTORIZE.query(vec, { topK: 8, returnMetadata: true });
         for (const m of q.matches ?? []) {
+          if ((m.score ?? 0) < MIN_SEMANTIC_SCORE) continue;
           const md = (m.metadata ?? {}) as Record<string, unknown>;
           const idxno = Number(md.idxno ?? m.id);
           if (idxno) vecIds.push(idxno);
@@ -147,10 +151,14 @@ async function retrieveArchive(
   const ids = rrfMerge([ftsIds, vecIds], { topN: 6 });
   if (!ids.length) return [];
   const ord = new Map(ids.map((id, i) => [id, i]));
-  const rows = await db
-    .prepare(`SELECT ${cols} FROM archive_articles a WHERE a.idxno IN (${ids.join(",")})`)
-    .all<{ idxno: number; title: string; published_at: string; body: string }>();
-  return (rows.results ?? []).sort((a, b) => (ord.get(a.idxno) ?? 99) - (ord.get(b.idxno) ?? 99));
+  try {
+    const rows = await db
+      .prepare(`SELECT ${cols} FROM archive_articles a WHERE a.idxno IN (${ids.join(",")})`)
+      .all<{ idxno: number; title: string; published_at: string; body: string }>();
+    return (rows.results ?? []).sort((a, b) => (ord.get(a.idxno) ?? 99) - (ord.get(b.idxno) ?? 99));
+  } catch {
+    return [];
+  }
 }
 
 // 아이솔레이트 단위 공유 캐시 — 동일 워커 인스턴스 내 반복 질의 히트
