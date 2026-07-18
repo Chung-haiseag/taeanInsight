@@ -4,19 +4,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../types";
+import { embedText } from "../lib/embed";
 
 export const readingRouter = new Hono<{ Bindings: Env }>();
 
 // ── Phase 2: 기사 임베딩(bge-m3 1024d) + Vectorize 맥락 추천 ──
 interface RecItem { idxno: number; title: string; category: string; publishedAt: string; excerpt: string }
-
-async function embedText(env: Env, text: string): Promise<number[] | null> {
-  if (!env.AI) return null;
-  try {
-    const r = (await env.AI.run("@cf/baai/bge-m3", { text: [text.slice(0, 1500)] })) as { data?: number[][] };
-    return r.data?.[0] ?? null;
-  } catch { return null; }
-}
 
 // 최근 기사 N건 임베딩 → Vectorize 적재(id=idxno, 메타데이터에 표시정보). 재실행 안전(upsert).
 export async function embedRecentArticles(env: Env, limit = 400, sinceDays = 120): Promise<{ embedded: number }> {

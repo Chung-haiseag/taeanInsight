@@ -27,6 +27,8 @@ import { completeAvoidingGarble } from "./answer_quality";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
+import { rrfMerge } from "./rrf";
+import { embedText } from "../lib/embed";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -87,40 +89,68 @@ function isPureWeather(query: string): boolean {
 
 export const queryRouter = new Hono<{ Bindings: Env }>();
 
-// 질문에서 핵심 키워드 추출 → 아카이브(FTS5 우선, LIKE 폴백)에서 근거 기사 검색.
+// 질문에서 핵심 키워드 추출 → 아카이브(FTS5 키워드 + Vectorize 의미)에서 근거 기사 검색, RRF 병합.
 // 키워드 정규화(조사 제거·지역어 희석 제거)는 keywords.ts 참고.
 async function retrieveArchive(
-  db: D1Database,
+  env: Env,
   query: string,
 ): Promise<Array<{ idxno: number; title: string; published_at: string; body: string }>> {
-  const tokens = extractKeywords(query);
-  if (!tokens.length) return [];
+  const db = env.ARCHIVE_DB;
+  if (!db) return [];
   const cols = "a.idxno, a.title, a.published_at, substr(a.body,1,1300) AS body";
-  // FTS5(트라이그램)는 3글자 이상만 매칭 — ubiquitous 지역어(태안/태안군)는 순위 희석되어 제외.
-  const ftsTokens = ftsRankTokens(tokens).map((t) => `"${t.replace(/"/g, "")}"`);
-  if (ftsTokens.length) {
-    try {
+
+  // (1) 키워드 — FTS5(트라이그램) 우선, 짧은 질의 LIKE 폴백. idxno 순위 리스트.
+  const tokens = extractKeywords(query);
+  const ftsIds: number[] = [];
+  if (tokens.length) {
+    const ftsTokens = ftsRankTokens(tokens).map((t) => `"${t.replace(/"/g, "")}"`);
+    if (ftsTokens.length) {
+      try {
+        const r = await db
+          .prepare(
+            `SELECT a.idxno FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid ` +
+              `WHERE archive_fts MATCH ? ORDER BY bm25(archive_fts) LIMIT 8`,
+          )
+          .bind(ftsTokens.join(" OR "))
+          .all<{ idxno: number }>();
+        for (const x of r.results ?? []) ftsIds.push(x.idxno);
+      } catch { /* LIKE 폴백 */ }
+    }
+    if (!ftsIds.length) {
+      const likePool = tokens.filter((t) => !UBIQUITOUS.has(t));
+      const kw = `%${(likePool.length ? likePool : tokens).sort((a, b) => b.length - a.length)[0]}%`;
       const r = await db
-        .prepare(
-          `SELECT ${cols} FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid ` +
-            `WHERE archive_fts MATCH ? ORDER BY bm25(archive_fts) LIMIT 5`, // 관련도순(최신순 아님)
-        )
-        .bind(ftsTokens.join(" OR "))
-        .all<{ idxno: number; title: string; published_at: string; body: string }>();
-      if (r.results?.length) return r.results;
-    } catch { /* LIKE 폴백 */ }
+        .prepare(`SELECT idxno FROM archive_articles WHERE title LIKE ?1 OR body LIKE ?1 ORDER BY published_at DESC LIMIT 8`)
+        .bind(kw)
+        .all<{ idxno: number }>();
+      for (const x of r.results ?? []) ftsIds.push(x.idxno);
+    }
   }
-  // LIKE 폴백 — ubiquitous 지역어를 뺀 가장 긴 토큰 우선(지역명만 남으면 그거라도).
-  const likePool = tokens.filter((t) => !UBIQUITOUS.has(t));
-  const kw = `%${(likePool.length ? likePool : tokens).sort((a, b) => b.length - a.length)[0]}%`;
-  const r = await db
-    .prepare(
-      `SELECT ${cols} FROM archive_articles a WHERE a.title LIKE ?1 OR a.body LIKE ?1 ` +
-        `ORDER BY a.published_at DESC LIMIT 6`,
-    )
-    .bind(kw)
+
+  // (2) 의미 — 질의 임베딩 → Vectorize 최근접. 실패 시 빈 리스트(키워드만).
+  const vecIds: number[] = [];
+  if (env.VECTORIZE && env.AI) {
+    try {
+      const vec = await embedText(env, query);
+      if (vec) {
+        const q = await env.VECTORIZE.query(vec, { topK: 8, returnMetadata: true });
+        for (const m of q.matches ?? []) {
+          const md = (m.metadata ?? {}) as Record<string, unknown>;
+          const idxno = Number(md.idxno ?? m.id);
+          if (idxno) vecIds.push(idxno);
+        }
+      }
+    } catch { /* 키워드만 */ }
+  }
+
+  // (3) RRF 병합 → 상위 6 idxno → 본문 일괄 로드(병합 순서 유지)
+  const ids = rrfMerge([ftsIds, vecIds], { topN: 6 });
+  if (!ids.length) return [];
+  const ord = new Map(ids.map((id, i) => [id, i]));
+  const rows = await db
+    .prepare(`SELECT ${cols} FROM archive_articles a WHERE a.idxno IN (${ids.join(",")})`)
     .all<{ idxno: number; title: string; published_at: string; body: string }>();
-  return r.results ?? [];
+  return (rows.results ?? []).sort((a, b) => (ord.get(a.idxno) ?? 99) - (ord.get(b.idxno) ?? 99));
 }
 
 // 아이솔레이트 단위 공유 캐시 — 동일 워커 인스턴스 내 반복 질의 히트
@@ -339,7 +369,7 @@ queryRouter.post("/", async (c) => {
 
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend && !hasMyShop) {
-      const rows = await retrieveArchive(c.env.ARCHIVE_DB, query);
+      const rows = await retrieveArchive(c.env, query);
       for (const r of rows) {
         parts.push({ text: `${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`, source: { title: r.title, url: `/news/${r.idxno}`, publishedAt: r.published_at } });
       }
