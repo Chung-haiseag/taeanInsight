@@ -321,3 +321,5 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-16 · 홈·라이브 '탈 AI스러움' 에디토리얼 정리(시스템 색·타이포 불변): 홈 카피에서 'AI' 남발 제거(가치어로)·서비스 4카드+01–04넘버 → 괘선 인덱스·그라데이션 블러 오브 삭제·내부용어(HITL·PRD) 사용자언어화, /live 섹션 이모지 마커 9개 제거(accent-rule로 위계) · web/components/home/generic-home.tsx, web/app/live/page.tsx
 - 2026-07-16 · 브랜드명 '태안 AI 인텔리전스' → '태안 인사이트'(도메인 taean-insight 일치, 로고는 TAEAN INSIGHT 영문+국문 락업): 헤더·푸터·메타 title/template/siteName·OG 9곳 일괄 · web/components/site-header·footer, layout.tsx, live/reports/news OG
 - 2026-07-16 · /query·/reports 카피 탈AI스러움(신뢰 라벨은 유지): 나브 'AI 질의'→'질의응답', h1 'AI Query Agent'→'무엇이든 물어보세요', 'AI 답변'→'답변', 내부용어 '(RAG)'·'(HITL)'·'캐싱 우선' 제거, '이번 주 AI 팟캐스트'→'이번 주 팟캐스트'. AI 생성/보조/작성 표기는 거버넌스 요건이라 존치 · web/app/query, web/components/reports, site-header
+- 2026-07-18 · AI 질의 하이브리드 검색: 키워드 FTS + Vectorize 의미검색(bge-m3 1024d) RRF 병합, cosine 유사도 하한 0.5. 본문충실 아카이브 ~59k 임베딩 백필. Vectorize/AI 실패 시 키워드 폴백(회귀 0) · backend/src/query/{router,rrf}, lib/embed, reading/embed-backfill
+- 2026-07-18 · 뉴스 나래이션 무료 키 3키 로테이션(45건/일) + R2 오디오 manifest 관리 엔드포인트 + 저품질 고아 오디오 123개 정리 + 역순 백필(남는 용량으로 과거 최신순) · tools/news-audio, backend/audio/manifest
