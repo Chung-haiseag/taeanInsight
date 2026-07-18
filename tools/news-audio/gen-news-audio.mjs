@@ -14,8 +14,10 @@ import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
+const API_BASE = process.env.API_BASE || "https://taean-insight-api.chs9182.workers.dev";
 const MAX = Number((process.argv.find((a) => a.startsWith("--max=")) || "--max=45").split("=")[1]);
 const FORCE = process.argv.includes("--force");
+const DRY = process.argv.includes("--dry"); // 생성 없이 선택 대상만 출력(백필 검증)
 const PER_KEY = Number(process.env.PER_KEY || "15"); // 키당 하루 안전 상한
 
 // 무료 키 로드(.gemini_keys 우선, 없으면 팟캐스트 키 재사용)
@@ -99,17 +101,56 @@ function pcmToWav(pcm, rate) {
   return Buffer.concat([h, pcm]);
 }
 
+// 이미 gem2(양질 Gemini 낭독)가 있는 기사 idxno 집합 — manifest 엔드포인트 1회 호출로 취득.
+// 관리자 토큰 없거나 실패하면 null → 개별 r2Has 폴백.
+function loadAdminToken() {
+  if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN;
+  try {
+    const m = readFileSync(new URL("../../backend/.dev.vars", import.meta.url), "utf8").match(/^ADMIN_TOKEN=(.*)$/m);
+    if (m) return m[1].trim().replace(/^"|"$/g, "");
+  } catch { /* */ }
+  return null;
+}
+async function loadGem2Set() {
+  const token = loadAdminToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/audio/manifest?keys=1`, { headers: { "X-Admin-Token": token } });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return new Set((j.keysByFormat?.gem2 || []).map((k) => k.match(/\/(\d+)-gem2\.wav$/)?.[1]).filter(Boolean));
+  } catch { return null; }
+}
+
 async function main() {
   console.log(`▸ 무료 키 ${KEYS.length}개 · 키당 상한 ${PER_KEY} · 최대 ${MAX}건`);
-  // 최신 주요 기사(본문 충분·광고 제외) 최신순 — 최신 MAX개
-  const rows = d1(`SELECT idxno, title, substr(COALESCE(body, excerpt, ''),1,1500) AS body FROM archive_articles
-    WHERE published_at >= date('now','-60 day') AND length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
-    ORDER BY published_at DESC, idxno DESC LIMIT ${MAX}`);
-  console.log(`  대상 ${rows.length}건`);
-  let done = 0, skip = 0, fail = 0;
+  // 역순 백필 — 최신 기사부터, gem2 없는 것만 MAX개 선택. 새 기사 없는 날은 자동으로 과거를 최신순으로 채움.
+  const gem2 = FORCE ? null : await loadGem2Set();
+  console.log(gem2 ? `  기존 gem2 ${gem2.size}건(manifest)` : "  gem2 목록 없음 → 개별 확인(폴백)");
+  const win = MAX + (gem2 ? gem2.size : MAX * 8) + 50; // gem2 있는 것 걸러내도 MAX개 남게 넉넉히
+  const idRows = d1(`SELECT idxno, published_at FROM archive_articles
+    WHERE length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
+    ORDER BY published_at DESC, idxno DESC LIMIT ${win}`);
+  const picked = [];
+  for (const r of idRows) {
+    const id = String(r.idxno);
+    if (!FORCE && (gem2 ? gem2.has(id) : r2Has(`audio/news/${id}-gem2.wav`))) continue;
+    picked.push(r);
+    if (picked.length >= MAX) break;
+  }
+  console.log(`  대상 ${picked.length}건 (최신 ${picked[0]?.published_at?.slice(0, 10) ?? "-"} ~ ${picked[picked.length - 1]?.published_at?.slice(0, 10) ?? "-"})`);
+  if (DRY) { console.log("  --dry: 생성 없이 종료. idxno:", picked.map((p) => p.idxno).join(",")); return; }
+  if (!picked.length) { console.log("완료 — 대상 없음(전부 gem2 보유)"); return; }
+
+  // 선택분 본문 로드(최신순 유지)
+  const ids = picked.map((p) => p.idxno);
+  const ord = new Map(ids.map((id, i) => [String(id), i]));
+  const rows = d1(`SELECT idxno, title, substr(COALESCE(body, excerpt, ''),1,1500) AS body
+    FROM archive_articles WHERE idxno IN (${ids.join(",")})`).sort((a, b) => ord.get(String(a.idxno)) - ord.get(String(b.idxno)));
+
+  let done = 0, fail = 0;
   for (const a of rows) {
     const key = `audio/news/${a.idxno}-gem2.wav`;
-    if (!FORCE && r2Has(key)) { skip++; continue; }
     const script = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     const r = await geminiTts(script);
     if (r.exhausted) { console.log(`  ⚠ 무료 한도 소진 — 나머지는 Chirp3-HD 폴백. (생성 ${done})`); break; }
@@ -122,7 +163,7 @@ async function main() {
     console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(r.audio.length / 1024).toFixed(0)}KB)`);
     await sleep(1500); // rate 여유
   }
-  console.log(`완료 — 생성 ${done} · 스킵(이미있음) ${skip} · 실패건너뜀 ${fail} · 키사용 ${used.join("/")}`);
-  writeStatus({ news: { generated: done, skipped: skip, failed: fail, target: rows.length, at: new Date().toISOString() } });
+  console.log(`완료 — 생성 ${done} · 건너뜀 ${fail} · 키사용 ${used.join("/")}`);
+  writeStatus({ news: { generated: done, failed: fail, target: picked.length, at: new Date().toISOString() } });
 }
 main().catch((e) => { console.error("실패:", e.message); process.exit(1); });
