@@ -36,6 +36,36 @@ export async function embedRecentArticles(env: Env, limit = 400, sinceDays = 120
   return { embedded };
 }
 
+// 아카이브 임베딩 백필 — after(idxno) 이후 본문충실·광고제외 기사를 idxno 오름차순으로 배치 임베딩.
+// 재실행 안전(upsert). 로컬 루프가 done까지 반복 호출.
+export async function embedBackfillBatch(env: Env, after: number, limit: number): Promise<{ embedded: number; lastIdxno: number | null; done: boolean }> {
+  if (!env.ARCHIVE_DB || !env.VECTORIZE || !env.AI) return { embedded: 0, lastIdxno: null, done: true };
+  const r = await env.ARCHIVE_DB
+    .prepare(
+      "SELECT idxno, title, category, published_at, substr(COALESCE(body, excerpt, ''),1,1200) AS snippet " +
+        "FROM archive_articles WHERE idxno > ? AND length(COALESCE(body,''))>500 AND title NOT LIKE '%광고%' " +
+        "ORDER BY idxno ASC LIMIT ?",
+    )
+    .bind(after, limit)
+    .all<{ idxno: number; title: string; category: string; published_at: string; snippet: string }>();
+  const rows = r.results ?? [];
+  let embedded = 0, lastIdxno: number | null = after || null;
+  for (const a of rows) {
+    lastIdxno = a.idxno;
+    const vec = await embedText(env, `${a.title}\n${a.snippet}`);
+    if (!vec) continue;
+    try {
+      await env.VECTORIZE.upsert([{
+        id: String(a.idxno),
+        values: vec,
+        metadata: { idxno: a.idxno, category: a.category ?? "", title: a.title.slice(0, 180), publishedAt: a.published_at ?? "", excerpt: (a.snippet ?? "").slice(0, 200) },
+      }]);
+      embedded += 1;
+    } catch { /* 개별 실패 무시 */ }
+  }
+  return { embedded, lastIdxno, done: rows.length < limit };
+}
+
 // 독자가 읽은 기사 벡터 평균 → 최근접 추천(읽은 것 제외)
 async function vectorRecommend(env: Env, readIdxnos: number[]): Promise<RecItem[]> {
   if (!env.VECTORIZE || !readIdxnos.length) return [];
@@ -192,4 +222,14 @@ readingRouter.post("/embed-recent", async (c) => {
   if (!expected || token !== expected) return c.json({ error: "unauthorized" }, 401);
   const limit = Math.min(800, Number(c.req.query("limit")) || 400);
   return c.json(await embedRecentArticles(c.env, limit));
+});
+
+// POST /api/reading/embed-backfill?after=&limit= — 아카이브 임베딩 백필(관리자 ADMIN_TOKEN)
+readingRouter.post("/embed-backfill", async (c) => {
+  const token = c.req.header("X-Admin-Token");
+  const expected = (c.env as Env & { ADMIN_TOKEN?: string }).ADMIN_TOKEN;
+  if (!expected || token !== expected) return c.json({ error: "unauthorized" }, 401);
+  const after = Number(c.req.query("after")) || 0;
+  const limit = Math.min(200, Number(c.req.query("limit")) || 100);
+  return c.json(await embedBackfillBatch(c.env, after, limit));
 });
