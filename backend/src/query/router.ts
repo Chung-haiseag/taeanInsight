@@ -25,6 +25,8 @@ import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
 import { completeAvoidingGarble } from "./answer_quality";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
+import { needsWeb } from "./web/gate";
+import { searchWeb } from "./web/search";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -145,7 +147,7 @@ queryRouter.post("/", async (c) => {
   // ── ① RAG: 실시간 관측(날씨·대기질) + 태안뉴스·아카이브를 근거로 답변(출처 표기) ──
   const client = new WorkersAiLlmClient({ ai: c.env.AI });
   try {
-    const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string } }> = [];
+    const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string; kind?: string } }> = [];
     const recommend = RECOMMEND_RE.test(query); // 추천 질문 → 오늘 날씨·바다·행사·수요 종합
     // 타지역만 언급(태안 용어 없음) → 태안 실시간 데이터 주입 차단(강남 날씨에 태안값 오표기 방지)
     const offRegion = OTHER_REGION_RE.test(query) && !AREA_RE.test(query);
@@ -343,6 +345,19 @@ queryRouter.post("/", async (c) => {
       }
     }
 
+    // (c) 로컬 근거가 약하거나 최신-상황 질문이면 화이트리스트 웹 검색으로 보강(게이트·캐시·fail-open)
+    if (!offRegion && needsWeb(query, parts)) {
+      try {
+        const web = await searchWeb(c.env, query);
+        for (const w of web) {
+          parts.push({
+            text: `${w.title}${w.publishedAt ? ` (${w.publishedAt})` : ""}\n${w.text}`,
+            source: { title: w.title, url: w.url, publishedAt: w.publishedAt, kind: "web" },
+          });
+        }
+      } catch { /* 웹 실패는 무시(로컬로) */ }
+    }
+
     if (parts.length) {
       const context = parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
       // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
@@ -361,6 +376,7 @@ queryRouter.post("/", async (c) => {
               "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
               "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
               "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
+              "- 웹 출처(공식 .go.kr·관광공사·지역언론)는 최신 정보다. 원문을 그대로 베끼지 말고 요약하며, 공식 출처를 우선하라.\n" +
               "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
               "- '이번 주/다음 주' 행사는 군청 주간행사계획·축제 일정을 우선 사용하고, 이미 끝난 과거 행사는 답에 넣지 마라.\n" +
               "- '오늘 뭐하지/추천' 류 질문이면 오늘의 날씨·바다(물때·일출몰)·진행 중 축제·행사를 종합해 구체적인 활동을 추천하라(예: 맑고 낮 간조면 갯벌체험, 비 예보면 실내). 과거 기사로 답하지 마라.\n" +
