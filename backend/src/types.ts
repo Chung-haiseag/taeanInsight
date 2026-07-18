@@ -18,6 +18,7 @@ export interface Env {
   TAEAN_ID?: string;              // 태안신문 회원 로그인 ID (전문 수집용)
   TAEAN_PW?: string;              // 태안신문 회원 로그인 PW
   DATA_GO_KR_KEY?: string;        // 공공데이터포털 인증키 (날씨·대기질)
+  WEB_SEARCH_API_KEY?: string;    // 웹 보강 RAG 검색(Tavily 등) 키. 미설정 시 웹 비활성.
   TAEAN_NX?: string;              // 기상청 격자 X (기본 51)
   TAEAN_NY?: string;              // 기상청 격자 Y (기본 109)
   TAEAN_AIR_STATION?: string;     // 에어코리아 측정소명 (기본 태안읍)
