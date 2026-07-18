@@ -49,20 +49,21 @@ export async function embedBackfillBatch(env: Env, after: number, limit: number)
     .bind(after, limit)
     .all<{ idxno: number; title: string; category: string; published_at: string; snippet: string }>();
   const rows = r.results ?? [];
-  let embedded = 0, lastIdxno: number | null = after || null;
-  for (const a of rows) {
-    lastIdxno = a.idxno;
+  const lastIdxno: number | null = rows.length ? rows[rows.length - 1].idxno : (after || null);
+  // 배치 내 병렬 임베딩(속도) → 성공분만 단일 upsert(호출 1회). 개별 임베딩 실패는 null로 제외.
+  const vectors = (await Promise.all(rows.map(async (a) => {
     const vec = await embedText(env, `${a.title}\n${a.snippet}`);
-    if (!vec) continue;
-    try {
-      await env.VECTORIZE.upsert([{
-        id: String(a.idxno),
-        values: vec,
-        metadata: { idxno: a.idxno, category: a.category ?? "", title: a.title.slice(0, 180), publishedAt: a.published_at ?? "", excerpt: (a.snippet ?? "").slice(0, 200) },
-      }]);
-      embedded += 1;
-    } catch { /* 개별 실패 무시 */ }
-  }
+    if (!vec) return null;
+    return {
+      id: String(a.idxno),
+      values: vec,
+      metadata: { idxno: a.idxno, category: a.category ?? "", title: a.title.slice(0, 180), publishedAt: a.published_at ?? "", excerpt: (a.snippet ?? "").slice(0, 200) },
+    };
+  }))).filter((v): v is NonNullable<typeof v> => v !== null);
+  let embedded = 0;
+  try {
+    if (vectors.length) { await env.VECTORIZE.upsert(vectors); embedded = vectors.length; }
+  } catch { /* upsert 실패는 무시(다음 실행 재시도) */ }
   return { embedded, lastIdxno, done: rows.length < limit };
 }
 
