@@ -53,8 +53,12 @@ describe("isGarbledAnswer", () => {
     expect(isGarbledAnswer("안면도 개발사업이 추진되어 更加 다양한 명소와 不同的 특색이 생길 예정입니다.")).toBe(true);
   });
 
-  it("한자 1~2자 병기(정상 한국어)는 붕괴가 아니다", () => {
-    expect(isGarbledAnswer("태안의 6미(六味)는 지역 대표 음식으로, 우럭젓국과 간장게장이 유명합니다.")).toBe(false);
+  it("한자 2자 조각(施设 등 중국어 누수)도 붕괴로 판정", () => {
+    expect(isGarbledAnswer("각 지구에는 호텔, 施设, 편의점 등 다양한 시설이 들어설 예정입니다.")).toBe(true);
+  });
+
+  it("외국 글자 없는 정상 한국어는 붕괴가 아니다", () => {
+    expect(isGarbledAnswer("태안의 대표 음식은 우럭젓국과 간장게장으로, 담백하고 개운한 맛이 일품입니다.")).toBe(false);
   });
 
   it("데바나가리 등 다른 스크립트가 섞여도 붕괴로 판정", () => {
