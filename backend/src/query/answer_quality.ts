@@ -13,11 +13,11 @@ export function isGarbledAnswer(text: string): boolean {
   const letters = hangul + latin;
   if (letters >= 30 && hangul / letters < 0.2) return true;
 
-  // (1-2) CJK 누수 — 일본어 가나(한국어 답변엔 항상 오류) 또는 한자 3자+(중국어 혼입).
-  //   한자 1~2자는 정상 병기(예: 六味) 허용. Llama가 간헐적으로 다른 언어 글자를 섞는 붕괴.
-  const kana = (t.match(/[぀-ヿ]/g) ?? []).length;
-  const han = (t.match(/[一-鿿]/g) ?? []).length;
-  if (kana >= 1 || han >= 3) return true;
+  // (1-2) 외국어 스크립트 누수 — 한글·라틴 외의 글자(가나·데바나가리·키릴·태국어·한자 다수 등).
+  //   Llama가 간헐적으로 다른 언어 글자를 섞는 붕괴. 한자 1~2자 병기(예: 六味)만 허용.
+  const foreign = (t.match(/\p{L}/gu) ?? []).filter((c) => !/[\p{Script=Hangul}\p{Script=Latin}]/u.test(c));
+  const han = foreign.filter((c) => /\p{Script=Han}/u.test(c)).length;
+  if (foreign.length - han >= 1 || han >= 3) return true;
 
   const words = t.split(/\s+/).filter(Boolean);
 
@@ -44,13 +44,16 @@ export function isGarbledAnswer(text: string): boolean {
   return false;
 }
 
-// 답변이 붕괴(salad)면 1회만 재시도해 정상 응답을 얻는다.
-// 무료 모델이라 재시도 비용은 0. 두 번째도 붕괴면(극히 드묾) 그 결과를 그대로 반환(최선).
+// 답변이 붕괴(salad·외국어 누수)면 정상이 나올 때까지 최대 maxRetries회 재시도.
+// 무료 모델이라 재시도 비용은 0. 누수율이 높아(~50%) 1회로는 부족 → 기본 3회.
 export async function completeAvoidingGarble<Req, Res extends { content: string }>(
   client: { complete: (req: Req) => Promise<Res> },
   request: Req,
+  maxRetries = 3,
 ): Promise<Res> {
-  const first = await client.complete(request);
-  if (!isGarbledAnswer(first.content)) return first;
-  return client.complete(request);
+  let res = await client.complete(request);
+  for (let i = 0; i < maxRetries && isGarbledAnswer(res.content); i++) {
+    res = await client.complete(request);
+  }
+  return res;
 }

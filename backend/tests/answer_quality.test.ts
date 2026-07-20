@@ -56,6 +56,10 @@ describe("isGarbledAnswer", () => {
   it("한자 1~2자 병기(정상 한국어)는 붕괴가 아니다", () => {
     expect(isGarbledAnswer("태안의 6미(六味)는 지역 대표 음식으로, 우럭젓국과 간장게장이 유명합니다.")).toBe(false);
   });
+
+  it("데바나가리 등 다른 스크립트가 섞여도 붕괴로 판정", () => {
+    expect(isGarbledAnswer("안면도는 다양한 आकर्षण을 가진 대표 관광지로, 꽃지 해안공원이 유명합니다.")).toBe(true);
+  });
 });
 
 describe("completeAvoidingGarble", () => {
@@ -81,5 +85,20 @@ describe("completeAvoidingGarble", () => {
     const res = await completeAvoidingGarble(client, { messages: [] });
     expect(res.content).toContain("우럭젓국");
     expect(calls).toBe(2);
+  });
+
+  it("연속 붕괴면 여러 번(최대 3회) 재시도해 정상을 찾는다", async () => {
+    const outputs = [
+      "안면도는 다양한 आकर्षण을 가진 관광지입니다.",           // 데바나가리 누수
+      "안면도 관광지는 更加 다양한 명소가 있습니다 不同的.",     // 중국어 누수
+      "안면도의 대표 관광지는 꽃지 해안공원과 안면도자연휴양림입니다.", // 정상
+    ];
+    let calls = 0;
+    const client = {
+      complete: async () => { const c = outputs[calls] ?? outputs[outputs.length - 1]; calls++; return { content: c }; },
+    };
+    const res = await completeAvoidingGarble(client, { messages: [] });
+    expect(res.content).toContain("꽃지 해안공원");
+    expect(calls).toBe(3);
   });
 });
