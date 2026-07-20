@@ -13,11 +13,10 @@ export function isGarbledAnswer(text: string): boolean {
   const letters = hangul + latin;
   if (letters >= 30 && hangul / letters < 0.2) return true;
 
-  // (1-2) 외국어 스크립트 누수 — 한글·라틴 외의 글자(가나·데바나가리·키릴·태국어·한자 다수 등).
-  //   Llama가 간헐적으로 다른 언어 글자를 섞는 붕괴. 한자 1~2자 병기(예: 六味)만 허용.
+  // (1-2) 외국어 스크립트 누수 — 한글·라틴 외의 글자(한자·가나·데바나가리·키릴·태국어 등).
+  //   한국어 답변엔 이런 글자가 사실상 항상 누수(施设·国内·更加 등 2자 조각 포함). 하나라도 있으면 붕괴.
   const foreign = (t.match(/\p{L}/gu) ?? []).filter((c) => !/[\p{Script=Hangul}\p{Script=Latin}]/u.test(c));
-  const han = foreign.filter((c) => /\p{Script=Han}/u.test(c)).length;
-  if (foreign.length - han >= 1 || han >= 3) return true;
+  if (foreign.length >= 1) return true;
 
   const words = t.split(/\s+/).filter(Boolean);
 
