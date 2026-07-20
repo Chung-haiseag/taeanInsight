@@ -44,6 +44,18 @@ describe("isGarbledAnswer", () => {
     expect(isGarbledAnswer("")).toBe(false);
     expect(isGarbledAnswer("   ")).toBe(false);
   });
+
+  it("일본어 가나가 섞이면 붕괴로 판정(한국어 답변엔 부적절)", () => {
+    expect(isGarbledAnswer("안면도 관광지는 魅力を持つ 명소가 많습니다. 꽃지 해안공원을 추천합니다.")).toBe(true);
+  });
+
+  it("중국어 한자가 여럿(3자+) 섞이면 붕괴로 판정", () => {
+    expect(isGarbledAnswer("안면도 개발사업이 추진되어 更加 다양한 명소와 不同的 특색이 생길 예정입니다.")).toBe(true);
+  });
+
+  it("한자 1~2자 병기(정상 한국어)는 붕괴가 아니다", () => {
+    expect(isGarbledAnswer("태안의 6미(六味)는 지역 대표 음식으로, 우럭젓국과 간장게장이 유명합니다.")).toBe(false);
+  });
 });
 
 describe("completeAvoidingGarble", () => {
