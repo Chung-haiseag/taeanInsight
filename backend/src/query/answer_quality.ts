@@ -13,6 +13,12 @@ export function isGarbledAnswer(text: string): boolean {
   const letters = hangul + latin;
   if (letters >= 30 && hangul / letters < 0.2) return true;
 
+  // (1-2) CJK 누수 — 일본어 가나(한국어 답변엔 항상 오류) 또는 한자 3자+(중국어 혼입).
+  //   한자 1~2자는 정상 병기(예: 六味) 허용. Llama가 간헐적으로 다른 언어 글자를 섞는 붕괴.
+  const kana = (t.match(/[぀-ヿ]/g) ?? []).length;
+  const han = (t.match(/[一-鿿]/g) ?? []).length;
+  if (kana >= 1 || han >= 3) return true;
+
   const words = t.split(/\s+/).filter(Boolean);
 
   // (2) 같은 단어가 길게 연속 반복(예: "soap soap soap soap soap").
