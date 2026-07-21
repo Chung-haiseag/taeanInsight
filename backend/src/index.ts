@@ -178,6 +178,11 @@ export default {
         const c = await fetchAndStoreClips(env);
         if (c.inserted) console.log(`[cron12h] 언론 클리핑: 신규 ${c.inserted}/${c.fetched}`);
       } catch (e) { console.warn("[cron12h] 클리핑 실패:", e instanceof Error ? e.message : e); }
+      try {
+        const { ingestRegionalNews } = await import("./news/regional");
+        const g = await ingestRegionalNews(env);
+        if (g.stored) console.log(`[cron12h] 지역언론: 신규 ${g.stored}/${g.fetched}`);
+      } catch (e) { console.warn("[cron12h] 지역언론 실패:", e instanceof Error ? e.message : e); }
       return;
     }
 

@@ -234,3 +234,15 @@ newsRouter.post("/ingest", async (c) => {
     return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502);
   }
 });
+
+// POST /api/news/regional-ingest — 지역언론 RSS 수동 수집 트리거(관리자). cron과 동일 동작.
+newsRouter.post("/regional-ingest", async (c) => {
+  const expected = (c.env as Env & { ADMIN_TOKEN?: string }).ADMIN_TOKEN;
+  if (!expected || c.req.header("X-Admin-Token") !== expected) return c.json({ error: "unauthorized" }, 401);
+  const { ingestRegionalNews } = await import("./regional");
+  try {
+    return c.json({ ok: true, ...(await ingestRegionalNews(c.env)) });
+  } catch (e) {
+    return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
