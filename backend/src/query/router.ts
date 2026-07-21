@@ -383,6 +383,23 @@ queryRouter.post("/", async (c) => {
       }
     }
 
+    // (b-2) 지역언론(최신 태안 소식) — 질의 키워드 매칭 상위 3건(최신순). 원문 링크·요약만(저작권).
+    if (c.env.ARCHIVE_DB && !isPureWeather(query) && !offRegion) {
+      try {
+        const kw = extractKeywords(query).filter((t) => t.length >= 2 && !UBIQUITOUS.has(t)).sort((a, b) => b.length - a.length)[0];
+        if (kw) {
+          const like = `%${kw}%`;
+          const r = await c.env.ARCHIVE_DB
+            .prepare("SELECT source, title, excerpt, published_at, url FROM regional_news WHERE title LIKE ?1 OR excerpt LIKE ?1 ORDER BY published_at DESC LIMIT 3")
+            .bind(like)
+            .all<{ source: string; title: string; excerpt: string | null; published_at: string | null; url: string }>();
+          for (const n of r.results ?? []) {
+            parts.push({ text: `${n.title} (${String(n.published_at ?? "").slice(0, 10)})\n${n.excerpt ?? ""}`, source: { title: `[${n.source}] ${n.title}`, url: n.url, publishedAt: n.published_at ?? undefined, kind: "web" } });
+          }
+        }
+      } catch { /* 지역언론 실패는 무시(로컬로) */ }
+    }
+
     // (c) 로컬 근거가 약하거나 최신-상황 질문이면 화이트리스트 웹 검색으로 보강(게이트·캐시·fail-open)
     if (!offRegion && needsWeb(query, parts)) {
       try {
