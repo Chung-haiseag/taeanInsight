@@ -25,8 +25,11 @@ export function stripHtml(s: string): string {
 // "요즘 태안 근황 알려줘" → "태안 근황". 군더더기만 남으면 원본 유지.
 // (한글엔 \b가 안 통해 정규식 대신 공백 토큰 단위로 제거)
 const FILLERS = new Set([
+  // 질문 말투
   "요즘", "알려줘", "알려주세요", "말해줘", "설명해줘", "정리해줘", "해줘",
   "뭐야", "뭔가요", "뭔가", "어때", "어떤가", "어떤가요", "궁금해", "궁금해요", "좀",
+  // 메타(주제 아님) — 남으면 뉴스 매칭을 흐림. 제거하면 주제어(또는 '태안')만 남아 최신순 검색에 유리
+  "최근", "소식", "근황", "뉴스", "무슨", "무슨일", "상황", "현황", "정보",
 ]);
 export function cleanWebQuery(query: string): string {
   const kept = query.trim().split(/\s+/).filter((t) => t && !FILLERS.has(t));
