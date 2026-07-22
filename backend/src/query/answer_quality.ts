@@ -48,7 +48,7 @@ export function isGarbledAnswer(text: string): boolean {
 export async function completeAvoidingGarble<Req, Res extends { content: string }>(
   client: { complete: (req: Req) => Promise<Res> },
   request: Req,
-  attempts = 2,
+  attempts = 3, // 병렬이라 지연은 생성 1회분 고정. 3개면 모두 누수할 확률 ↓(슬립률 대폭 감소).
 ): Promise<Res> {
   const n = Math.max(1, attempts);
   const results = await Promise.all(Array.from({ length: n }, () => client.complete(request)));
