@@ -324,3 +324,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-18 · AI 질의 하이브리드 검색: 키워드 FTS + Vectorize 의미검색(bge-m3 1024d) RRF 병합, cosine 유사도 하한 0.5. 본문충실 아카이브 ~59k 임베딩 백필. Vectorize/AI 실패 시 키워드 폴백(회귀 0) · backend/src/query/{router,rrf}, lib/embed, reading/embed-backfill
 - 2026-07-18 · 뉴스 나래이션 무료 키 3키 로테이션(45건/일) + R2 오디오 manifest 관리 엔드포인트 + 저품질 고아 오디오 123개 정리 + 역순 백필(남는 용량으로 과거 최신순) · tools/news-audio, backend/audio/manifest
 - 2026-07-21 · 지역언론 수집(태안 필터): 충남일보·디트뉴스24·충청투데이 RSS를 12h cron으로 수집→'태안' 필터→regional_news(url dedup). 질의 시 키워드 매칭 상위 3건 근거 주입(원문 링크·요약, 저작권). '올해/최근' 질문에 현재 데이터 공급 · backend/news/regional, query/router, db/031
+- 2026-07-22 · 질의 fact table(큐레이션 검증사실): facts 테이블+matchFacts 키워드 매칭 주입(확인된 사실 우선)+관리자 upsert(/api/query/_fact). 열거·전수형 질문(섬 명단 등) 보완. 첫 사실 '태안 섬 현황'(114개 공식) seed. 재시도 순차→병렬로 지연 45→10초 · backend/query/facts, db/032
