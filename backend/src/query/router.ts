@@ -375,6 +375,16 @@ queryRouter.post("/", async (c) => {
       } catch { /* 무시 */ }
     }
 
+    // (a-6) 큐레이션 사실(fact table) — 열거·전수형 질문(섬 명단·역대 군수·인구 등)에 검증된 사실 우선 주입.
+    if (c.env.ARCHIVE_DB && !offRegion) {
+      try {
+        const { loadFacts, matchFacts } = await import("./facts");
+        for (const f of matchFacts(query, await loadFacts(c.env.ARCHIVE_DB), 2)) {
+          parts.push({ text: `[확인된 사실] ${f.title}\n${f.content}`, source: { title: f.source ? `${f.title} · ${f.source}` : f.title, url: null } });
+        }
+      } catch { /* 사실 주입 실패는 무시 */ }
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend && !hasMyShop) {
       const rows = await retrieveArchive(c.env, query);
@@ -506,4 +516,19 @@ queryRouter.post("/", async (c) => {
       500,
     );
   }
+});
+
+// POST /api/query/_fact — 큐레이션 사실 upsert(관리자). {id,keywords,title,content,source}
+queryRouter.post("/_fact", async (c) => {
+  const env = c.env as Env & { ADMIN_TOKEN?: string };
+  if (!env.ADMIN_TOKEN || c.req.header("X-Admin-Token") !== env.ADMIN_TOKEN) return c.json({ error: "unauthorized" }, 401);
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const id = String(b.id ?? "").trim();
+  if (!id || !b.keywords || !b.title || !b.content) return c.json({ error: "id·keywords·title·content 필수" }, 400);
+  const { upsertFact } = await import("./facts");
+  await upsertFact(c.env.ARCHIVE_DB, {
+    id, keywords: String(b.keywords), title: String(b.title), content: String(b.content), source: b.source ? String(b.source) : null,
+  });
+  return c.json({ ok: true, id });
 });
