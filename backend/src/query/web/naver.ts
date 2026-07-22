@@ -21,6 +21,19 @@ export function stripHtml(s: string): string {
     .trim();
 }
 
+// 검색 provider에 넘길 질의 정리 — 대화체 군더더기 토큰 제거(네이버 뉴스 매칭 개선). 순수.
+// "요즘 태안 근황 알려줘" → "태안 근황". 군더더기만 남으면 원본 유지.
+// (한글엔 \b가 안 통해 정규식 대신 공백 토큰 단위로 제거)
+const FILLERS = new Set([
+  "요즘", "알려줘", "알려주세요", "말해줘", "설명해줘", "정리해줘", "해줘",
+  "뭐야", "뭔가요", "뭔가", "어때", "어떤가", "어떤가요", "궁금해", "궁금해요", "좀",
+]);
+export function cleanWebQuery(query: string): string {
+  const kept = query.trim().split(/\s+/).filter((t) => t && !FILLERS.has(t));
+  const out = kept.join(" ");
+  return out.length >= 2 ? out : query.trim();
+}
+
 // 네이버 뉴스 items → WebSource[]. 태안 관련만, HTML 제거, 원문링크 우선. 순수.
 export function mapNaverNews(items: unknown, cap = TEXT_CAP): WebSource[] {
   if (!Array.isArray(items)) return [];
@@ -65,7 +78,7 @@ export async function searchNaver(
   max: number,
 ): Promise<WebSource[]> {
   const headers = { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret };
-  const q = encodeURIComponent(query);
+  const q = encodeURIComponent(cleanWebQuery(query));
   const get = async (path: string): Promise<unknown> => {
     try {
       const r = await fetch(`https://openapi.naver.com/v1/search/${path}`, {
