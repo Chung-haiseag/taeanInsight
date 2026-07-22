@@ -105,6 +105,8 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-06-19 · CORS allowHeaders에 X-Taean-Uid 추가(익명 디바이스 식별 헤더 preflight 차단 → Failed to fetch 해결) · backend/src/index.ts
 - 2026-07-09 · 메인 홈 초기 렌더 폭 점프 제거: SSR·하이드레이션 전 GenericHome이 7xl로 떴다 4xl로 스냅되던 CLS 해소(state===null 분기도 max-w-4xl 래퍼로 통일) · web/src/app/page.tsx
 - 2026-07-17 · 태안뉴스+아카이브를 '뉴스아카이브' 단일 메뉴로 통합(첫 화면 최신순·탭 건수·전체검색) · web /news, backend /api/archive/stats
+- 2026-07-22 · AI질의 웹RAG provider에 네이버 검색 추가(뉴스=최신 지역보도 sort=date, 웹문서=공식 .go.kr 화이트리스트). NAVER_CLIENT_ID/SECRET 있으면 네이버 우선, 없으면 Tavily 폴백. 스니펫 기반(원문 fetch 없음). 대화체 질의 정리+HTML 제거. 웹 출처는 답변 인용 시 노출 · backend src/query/web/{naver,search}.ts
+- 2026-07-22 · AI질의 외국문자 누수 최후 방어: 병렬 생성이 모두 누수여도 잔여 한자·가나만 제거해 정상화(stripForeignLetters) · backend src/query/answer_quality.ts
 <!-- 새 기능 추가 시 위에 한 줄 -->
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
