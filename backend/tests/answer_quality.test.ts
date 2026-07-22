@@ -66,34 +66,19 @@ describe("isGarbledAnswer", () => {
   });
 });
 
-describe("completeAvoidingGarble", () => {
-  it("첫 응답이 정상이면 그대로 반환하고 한 번만 호출한다", async () => {
+describe("completeAvoidingGarble (병렬)", () => {
+  it("attempts=1이면 1회만 호출한다", async () => {
     let calls = 0;
     const client = {
       complete: async () => { calls++; return { content: "태안의 정상적인 답변입니다. 우럭젓국이 유명합니다." }; },
     };
-    const res = await completeAvoidingGarble(client, { messages: [] });
+    const res = await completeAvoidingGarble(client, { messages: [] }, 1);
     expect(res.content).toContain("정상적인 답변");
     expect(calls).toBe(1);
   });
 
-  it("첫 응답이 붕괴면 1회 재시도해 정상 응답을 반환한다", async () => {
+  it("병렬 생성 중 정상이 하나라도 있으면 그것을 반환한다", async () => {
     const outputs = [
-      "Arn Arn Arn Arn soap soap soap soap soap soap fal fal Richards Loving Arn Arn",
-      "태안의 대표 음식은 우럭젓국과 간장게장입니다. 담백하고 개운합니다.",
-    ];
-    let calls = 0;
-    const client = {
-      complete: async () => { const c = outputs[calls] ?? outputs[outputs.length - 1]; calls++; return { content: c }; },
-    };
-    const res = await completeAvoidingGarble(client, { messages: [] });
-    expect(res.content).toContain("우럭젓국");
-    expect(calls).toBe(2);
-  });
-
-  it("연속 붕괴면 여러 번(최대 3회) 재시도해 정상을 찾는다", async () => {
-    const outputs = [
-      "안면도는 다양한 आकर्षण을 가진 관광지입니다.",           // 데바나가리 누수
       "안면도 관광지는 更加 다양한 명소가 있습니다 不同的.",     // 중국어 누수
       "안면도의 대표 관광지는 꽃지 해안공원과 안면도자연휴양림입니다.", // 정상
     ];
@@ -101,8 +86,16 @@ describe("completeAvoidingGarble", () => {
     const client = {
       complete: async () => { const c = outputs[calls] ?? outputs[outputs.length - 1]; calls++; return { content: c }; },
     };
-    const res = await completeAvoidingGarble(client, { messages: [] });
+    const res = await completeAvoidingGarble(client, { messages: [] }, 2);
     expect(res.content).toContain("꽃지 해안공원");
-    expect(calls).toBe(3);
+    expect(calls).toBe(2); // 병렬로 2개 생성
+  });
+
+  it("모두 붕괴면 첫 결과를 반환한다(최선)", async () => {
+    const client = {
+      complete: async () => ({ content: "안면도는 다양한 आकर्षण을 가진 관광지입니다." }),
+    };
+    const res = await completeAvoidingGarble(client, { messages: [] }, 2);
+    expect(res.content).toContain("आकर्षण");
   });
 });

@@ -43,16 +43,14 @@ export function isGarbledAnswer(text: string): boolean {
   return false;
 }
 
-// 답변이 붕괴(salad·외국어 누수)면 정상이 나올 때까지 최대 maxRetries회 재시도.
-// 무료 모델이라 재시도 비용은 0. 누수율이 높아(~50%) 1회로는 부족 → 기본 3회.
+// 붕괴(salad·외국어 누수) 방지 — 순차 재시도(지연 곱절) 대신 여러 개를 병렬 생성해 정상을 고른다.
+// 지연은 생성 1회분으로 고정, 시도는 attempts번(누수 방어 유지). 무료 모델이라 비용 0.
 export async function completeAvoidingGarble<Req, Res extends { content: string }>(
   client: { complete: (req: Req) => Promise<Res> },
   request: Req,
-  maxRetries = 3,
+  attempts = 2,
 ): Promise<Res> {
-  let res = await client.complete(request);
-  for (let i = 0; i < maxRetries && isGarbledAnswer(res.content); i++) {
-    res = await client.complete(request);
-  }
-  return res;
+  const n = Math.max(1, attempts);
+  const results = await Promise.all(Array.from({ length: n }, () => client.complete(request)));
+  return results.find((r) => !isGarbledAnswer(r.content)) ?? results[0];
 }
