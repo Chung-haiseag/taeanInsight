@@ -43,6 +43,15 @@ export function isGarbledAnswer(text: string): boolean {
   return false;
 }
 
+// 한글·라틴 외의 '글자'(한자·가나·데바나가리 등)만 제거. 숫자·문장부호·공백은 보존. 순수.
+// 최후 방어용 — 병렬 시도가 모두 외국어 누수일 때 잔여 외국문자를 떼어 읽을 수 있게 한다.
+export function stripForeignLetters(text: string): string {
+  return (text ?? "")
+    .replace(/\p{L}/gu, (c) => (/[\p{Script=Hangul}\p{Script=Latin}]/u.test(c) ? c : ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // 붕괴(salad·외국어 누수) 방지 — 순차 재시도(지연 곱절) 대신 여러 개를 병렬 생성해 정상을 고른다.
 // 지연은 생성 1회분으로 고정, 시도는 attempts번(누수 방어 유지). 무료 모델이라 비용 0.
 export async function completeAvoidingGarble<Req, Res extends { content: string }>(
@@ -52,5 +61,13 @@ export async function completeAvoidingGarble<Req, Res extends { content: string 
 ): Promise<Res> {
   const n = Math.max(1, attempts);
   const results = await Promise.all(Array.from({ length: n }, () => client.complete(request)));
-  return results.find((r) => !isGarbledAnswer(r.content)) ?? results[0];
+  const best = results.find((r) => !isGarbledAnswer(r.content)) ?? results[0];
+  // 최후 방어: 모든 시도가 붕괴여도, 외국문자 누수뿐이면 그 글자만 떼어 정상화(토큰 salad엔 무영향).
+  if (isGarbledAnswer(best.content)) {
+    const cleaned = stripForeignLetters(best.content);
+    if (cleaned && cleaned !== best.content && !isGarbledAnswer(cleaned)) {
+      return { ...best, content: cleaned };
+    }
+  }
+  return best;
 }

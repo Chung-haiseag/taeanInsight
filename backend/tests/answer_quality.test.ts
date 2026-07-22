@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { isGarbledAnswer, completeAvoidingGarble } from "../src/query/answer_quality";
+import { isGarbledAnswer, completeAvoidingGarble, stripForeignLetters } from "../src/query/answer_quality";
 
 // 라이브에서 실제로 잡힌 붕괴 출력(축약) — 한글 거의 없이 라틴 토큰이 반복됨.
 const GARBLED =
@@ -91,11 +91,23 @@ describe("completeAvoidingGarble (병렬)", () => {
     expect(calls).toBe(2); // 병렬로 2개 생성
   });
 
-  it("모두 붕괴면 첫 결과를 반환한다(최선)", async () => {
+  it("모두 붕괴(외국어 누수)면 최후로 외국문자를 제거해 반환한다", async () => {
     const client = {
       complete: async () => ({ content: "안면도는 다양한 आकर्षण을 가진 관광지입니다." }),
     };
     const res = await completeAvoidingGarble(client, { messages: [] }, 2);
-    expect(res.content).toContain("आकर्षण");
+    expect(res.content).not.toMatch(/आकर्षण/);
+    expect(isGarbledAnswer(res.content)).toBe(false); // 외국문자 제거 후엔 정상
+    expect(res.content).toContain("안면도");
+  });
+});
+
+describe("stripForeignLetters", () => {
+  it("한자·외국문자만 제거하고 한글·숫자·부호는 보존한다", () => {
+    expect(stripForeignLetters("군민들 100명(施设 포함)")).toBe("군민들 100명( 포함)");
+    expect(stripForeignLetters("안면도는 다양한 魅力を持つ 명소가 많다")).toBe("안면도는 다양한 명소가 많다");
+  });
+  it("영문 약어는 보존한다", () => {
+    expect(stripForeignLetters("AI Co-Pilot 안내")).toBe("AI Co-Pilot 안내");
   });
 });
