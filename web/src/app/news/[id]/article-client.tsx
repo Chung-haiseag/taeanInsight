@@ -134,7 +134,7 @@ export default function ArticleClient() {
     <article className="mx-auto max-w-4xl space-y-6">
       {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
       <ReadingTracker idxno={Number(params.id)} category={article.category} />
-      <div className="flex gap-4 text-sm text-foreground-muted">
+      <div className="no-print flex gap-4 text-sm text-foreground-muted">
         <Link href="/news" className="hover:text-brand">← 뉴스아카이브</Link>
       </div>
 
@@ -147,8 +147,15 @@ export default function ArticleClient() {
           {article.author && <span className="text-foreground-muted">· {article.author}</span>}
         </div>
         <h1 className="text-display-sm font-bold text-brand">{article.title}</h1>
-        <div className="no-print pt-1">
+        <div className="no-print flex flex-wrap items-center gap-2 pt-1">
           <NewsAudio idxno={Number(params.id)} />
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-background px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5"
+          >
+            <Icon name="print" /> PDF로 저장
+          </button>
         </div>
       </header>
 
@@ -219,7 +226,7 @@ function RelatedArticles({ idxno }: { idxno: number }) {
   const pages = Math.ceil(total / pageSize);
 
   return (
-    <section className="border-t border-brand/10 pt-6 space-y-3">
+    <section className="no-print border-t border-brand/10 pt-6 space-y-3">
       <div className="flex items-baseline justify-between">
         <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden />관련 뉴스</p>
         {total > 0 && <span className="text-xs text-foreground-muted">총 {total}건 · 최근순</span>}
