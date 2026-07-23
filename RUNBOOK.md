@@ -110,6 +110,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-23 · 질의응답 화면 개선: 답변 번호목록 구조화 렌더(AnswerView·parseAnswer, 빈 괄호 정리) + 검색 중 파이프라인 단계 진행 표시(SearchProgress, 지표형) · web src/app/query/
 - 2026-07-23 · AI질의 영어 단어 누수 감지: 한글에 붙은 소문자 4자+ 영단어("existed하며")를 붕괴로 판정해 재생성 회피(약어·고유명사는 오탐 방지) · backend src/query/answer_quality.ts
 - 2026-07-23 · 주간리포트 PDF 세로 잘림 해결: 긴 섹션의 break-inside:avoid가 한 페이지 넘는 섹션을 잘라내던 문제 → 섹션은 break-inside:auto로 이어지게, 작은 단위만 유지. @page A4 여백·이미지 폭 맞춤 · web src/app/globals.css @media print
+- 2026-07-23 · 주간리포트 외국문자 누수 방어: 생성 시 붕괴 재생성+최후 제거(weekly_pipeline), 이미 발행된 리포트는 재생성·재발송 없이 정제하는 관리자 POST /api/admin/reports/:weekId/sanitize · backend src/reports/{weekly_pipeline,router}.ts
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
 - **디지털화 파이프라인**: `tools/ebook/PLAYBOOK.md` (PDF→Vision OCR→Gemini 기사분리→D1/R2).

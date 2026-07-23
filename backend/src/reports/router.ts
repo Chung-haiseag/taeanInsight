@@ -269,6 +269,34 @@ adminReportsRouter.post("/:weekId/unpublish", async (c) => {
   return c.json({ ok: !!r.meta.changes, weekId, reverted: !!r.meta.changes });
 });
 
+// 발행본 재정제 — 저장된 섹션에서 외국문자 누수(한자 化·里的 등)만 제거.
+// 재생성·재발송 없이 즉시 정리(내용·발행상태·publishedAt 유지). 이미 발행된 리포트의 누수 수정용.
+adminReportsRouter.post("/:weekId/sanitize", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const weekId = c.req.param("weekId");
+  const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
+  const report = await repo.get(weekId);
+  if (!report) return c.json({ error: "not_found" }, 404);
+
+  const { stripForeignLetters, isGarbledAnswer } = await import("../query/answer_quality");
+  let changed = 0;
+  const sections = report.sections.map((s) => {
+    if (isGarbledAnswer(s.content)) {
+      const cleaned = stripForeignLetters(s.content);
+      if (cleaned && cleaned !== s.content) { changed++; return { ...s, content: cleaned }; }
+    }
+    return s;
+  });
+  if (changed === 0) return c.json({ ok: true, weekId, changedSections: 0, note: "누수 없음" });
+
+  const summary = sections.find((s) => s.key === "summary")?.content ?? report.summary;
+  await c.env.ARCHIVE_DB
+    .prepare(`UPDATE weekly_reports SET sections=?2, summary=?3, updated_at=datetime('now') WHERE week_id=?1`)
+    .bind(weekId, JSON.stringify(sections), summary)
+    .run();
+  return c.json({ ok: true, weekId, changedSections: changed });
+});
+
 const generateSchema = z.object({ weekId: z.string().regex(/^\d{4}-W\d{2}$/).optional() });
 
 adminReportsRouter.post("/generate", async (c) => {
