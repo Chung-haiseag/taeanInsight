@@ -110,7 +110,7 @@ export function QueryClient() {
             maxLength={500}
           />
           <p id="query-help" className="text-xs text-foreground-muted">
-            <Icon name="idea" /> 무료 사용자는 일 5회, B2B는 일 30회까지 질의할 수 있습니다. (⌘/Ctrl+Enter 전송)
+            <Icon name="idea" /> ⌘/Ctrl+Enter로 전송
           </p>
           <button
             type="submit"
