@@ -12,6 +12,7 @@ import { getIsoWeekId } from "./types";
 import { buildMessages } from "../agents/types";
 import { applyGovernance } from "../governance/middleware";
 import type { AiLabel } from "../governance/ai_label";
+import { isGarbledAnswer, stripForeignLetters } from "../query/answer_quality";
 
 // 섹션 정의 — 5개 표준 섹션
 const SECTION_PLAN: Array<{ key: ReportSectionKey; title: string; prompt: string; maxTokens?: number }> = [
@@ -83,21 +84,32 @@ export class WeeklyReportPipeline {
       const facts = await this.deps.factsLoader?.(weekId, plan.key);
       const userContent = facts ? `${plan.prompt}\n\n[참고 자료]\n${facts}` : plan.prompt;
 
-      const response = await this.deps.llm.route(
-        {
-          intent: "prediction",
-          channel: "batch",
-          messages: buildMessages(SYSTEM_PROMPT, userContent),
-          maxTokens: plan.maxTokens ?? 900,
-          temperature: 0.2,
-        },
-        "best_effort",
-      );
+      // 붕괴·외국문자 누수(한자 "化"·"里的" 등) 방어 — 붕괴 감지 시 재생성(배치라 지연 무관),
+      // 그래도 남으면 최후로 외국문자만 제거. 질의응답과 동일 정책(answer_quality).
+      let content = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const response = await this.deps.llm.route(
+          {
+            intent: "prediction",
+            channel: "batch",
+            messages: buildMessages(SYSTEM_PROMPT, userContent),
+            maxTokens: plan.maxTokens ?? 900,
+            temperature: 0.2,
+          },
+          "best_effort",
+        );
+        content = response.content;
+        if (!isGarbledAnswer(content)) break;
+      }
+      if (isGarbledAnswer(content)) {
+        const cleaned = stripForeignLetters(content);
+        if (cleaned && !isGarbledAnswer(cleaned)) content = cleaned;
+      }
 
       sections.push({
         key: plan.key,
         title: plan.title,
-        content: response.content,
+        content,
         sources: [],     // facts에서 추출한 출처는 별도 채울 수 있음
       });
     }

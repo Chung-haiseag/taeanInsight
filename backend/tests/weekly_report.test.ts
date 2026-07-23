@@ -85,6 +85,31 @@ describe("WeeklyReportPipeline.generate", () => {
     expect(factsCalls).toHaveLength(5);
     expect(factsCalls).toContain("tourism_weather");
   });
+
+  const CLEAN_SEC = "이번 주 태안은 대체로 안정적인 흐름을 보였습니다. 관광과 환경 지표가 평이했습니다.";
+  const GARBLED_SEC = "이번 주 태안은 일자별 化를 보였고 동문里的 거래가 있었습니다.";
+
+  it("생성 중 붕괴(한자 누수) 응답은 재생성해 정상을 쓴다", async () => {
+    let calls = 0;
+    const llm = {
+      route: async () => ({ content: calls++ === 0 ? GARBLED_SEC : CLEAN_SEC }),
+    } as unknown as HybridLlmRouter;
+    const pipeline = new WeeklyReportPipeline({ llm, hitlReviewerId: "u" });
+    const report = await pipeline.generate("2026-W30");
+    expect(report.sections[0].content).toBe(CLEAN_SEC); // 재생성으로 정상 선택
+    expect(calls).toBe(6); // summary 2회(1붕괴+1정상) + 나머지 4섹션 1회
+    for (const s of report.sections) expect(s.content).not.toMatch(/[化里的]/);
+  });
+
+  it("재생성해도 계속 누수면 외국문자를 최후로 제거한다", async () => {
+    const llm = { route: async () => ({ content: GARBLED_SEC }) } as unknown as HybridLlmRouter;
+    const pipeline = new WeeklyReportPipeline({ llm, hitlReviewerId: "u" });
+    const report = await pipeline.generate("2026-W30");
+    for (const s of report.sections) {
+      expect(s.content).not.toMatch(/[化里的]/); // 최후 제거로 한자 사라짐
+      expect(s.content.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe("WeeklyReportPipeline.validateForPublish", () => {
