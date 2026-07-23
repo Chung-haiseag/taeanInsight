@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/archive";
 import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
 import { decodeEntities } from "@/lib/html";
+import { segmentQuotes } from "@/lib/quote-highlight";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
@@ -164,7 +165,7 @@ export default function ArticleClient() {
       ) : (
         <>
           {/* 리드(발췌) */}
-          <p className="text-lg leading-relaxed text-foreground">{article.excerpt}</p>
+          <p className="text-lg leading-relaxed text-foreground"><QuotedText text={article.excerpt} /></p>
           {member ? (
             <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
               <Icon name="books" /> 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
@@ -326,6 +327,21 @@ function splitParagraphs(text: string): string[] {
   return paras.length ? paras : [t];
 }
 
+// 인용부호("…") 구간을 강조색으로 렌더 — 발언·인용을 눈에 띄게.
+function QuotedText({ text }: { text: string }) {
+  return (
+    <>
+      {segmentQuotes(text).map((s, i) =>
+        s.quote ? (
+          <span key={i} className="font-medium text-accent">{s.t}</span>
+        ) : (
+          <span key={i}>{s.t}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
   const paras = splitParagraphs(article.body || "");
   const isEbook = idxno >= 90000001 && idxno <= 90099999;
@@ -333,7 +349,7 @@ function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
     <div className="space-y-5">
       <div className="space-y-5 text-[1.05rem] leading-[1.9] text-foreground">
         {paras.map((p, i) => (
-          <p key={i}>{p}</p>
+          <p key={i}><QuotedText text={p} /></p>
         ))}
       </div>
 
