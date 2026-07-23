@@ -143,6 +143,10 @@ h2[id] {
 }
 
 /* 인쇄/PDF 저장 — 사이트 크롬 숨기고 본문만 깔끔히 (주간 리포트 PDF 다운로드) */
+@page {
+  size: A4 portrait;
+  margin: 14mm 12mm;
+}
 @media print {
   header,
   footer,
@@ -156,12 +160,44 @@ h2[id] {
   body {
     background: #fff !important;
     color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   a {
     color: inherit !important;
     text-decoration: none !important;
   }
-  section {
+
+  /* 핵심: 한 페이지보다 긴 섹션은 '통째로 잘림' 대신 페이지를 넘겨 이어지게 한다.
+     (기존 section/break-inside-avoid가 긴 섹션을 잘라내던 원인 해소) */
+  section,
+  .break-inside-avoid {
+    break-inside: auto !important;
+  }
+  /* 작은 단위(카드·이미지·표 행·항목)만 쪼개지지 않게 유지 */
+  .card,
+  figure,
+  img,
+  svg,
+  table,
+  thead,
+  tr,
+  li {
     break-inside: avoid;
+  }
+  /* 제목이 페이지 끝에 홀로 남지 않게 다음 내용과 붙인다 */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid-page;
+  }
+  /* 이미지·차트가 지면 폭을 넘지 않도록 축소, 가로 스크롤 영역은 잘리지 않게 펼침 */
+  img,
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  .overflow-x-auto {
+    overflow: visible !important;
   }
 }
