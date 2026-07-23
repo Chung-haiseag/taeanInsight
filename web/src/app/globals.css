@@ -147,7 +147,7 @@ h2[id] {
    브라우저 '여백: 없음' 설정이 덮어써도 가장자리(제목·번호)가 안 잘리게 한다. */
 @page {
   size: A4 portrait;
-  margin: 15mm 0; /* 상하 여백(모든 페이지) — 인쇄 '여백=기본'일 때 적용 */
+  margin: 16mm 0; /* 상하 여백(모든 페이지) — 인쇄 '여백=기본'일 때 적용 */
 }
 @media print {
   header,
@@ -160,9 +160,9 @@ h2[id] {
     display: block !important;
   }
   main {
-    /* 좌우 18mm·상하 10mm 여백 — 패딩이라 인쇄 '여백' 설정과 무관하게 유지.
+    /* 좌우 18mm·상하 14mm 여백 — 패딩이라 인쇄 '여백' 설정과 무관하게 유지.
        (상하는 첫/마지막 페이지에 적용. 모든 페이지 상하 여백은 위 @page가 담당) */
-    padding: 10mm 18mm !important;
+    padding: 14mm 18mm !important;
     max-width: 100% !important;
   }
   body {
