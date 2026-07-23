@@ -112,6 +112,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-23 · 주간리포트 PDF 세로 잘림 해결: 긴 섹션의 break-inside:avoid가 한 페이지 넘는 섹션을 잘라내던 문제 → 섹션은 break-inside:auto로 이어지게, 작은 단위만 유지. @page A4 여백·이미지 폭 맞춤 · web src/app/globals.css @media print
 - 2026-07-23 · 주간리포트 외국문자 누수 방어: 생성 시 붕괴 재생성+최후 제거(weekly_pipeline), 이미 발행된 리포트는 재생성·재발송 없이 정제하는 관리자 POST /api/admin/reports/:weekId/sanitize · backend src/reports/{weekly_pipeline,router}.ts
 - 2026-07-24 · 인쇄 여백 개선(좌우 padding 18mm=여백설정 무관, 상하 @page 15mm+padding 10mm) + 뉴스 기사 상세에 'PDF로 저장' 버튼(기사 듣기 옆, breadcrumb·관련뉴스 no-print) · web src/app/globals.css, src/app/news/[id]/article-client.tsx
+- 2026-07-24 · 인쇄 시 기사 제목/메타 유지(main header는 표시, 사이트바만 숨김) + 기사 인용부호("…") 텍스트 accent 색 강조(segmentQuotes, 화면·PDF) · web src/app/globals.css, news/[id]/article-client.tsx, lib/quote-highlight.ts
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
 - **디지털화 파이프라인**: `tools/ebook/PLAYBOOK.md` (PDF→Vision OCR→Gemini 기사분리→D1/R2).
