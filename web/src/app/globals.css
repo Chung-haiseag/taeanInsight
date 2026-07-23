@@ -147,7 +147,7 @@ h2[id] {
    브라우저 '여백: 없음' 설정이 덮어써도 가장자리(제목·번호)가 안 잘리게 한다. */
 @page {
   size: A4 portrait;
-  margin: 12mm 0;
+  margin: 14mm 0;
 }
 @media print {
   header,
@@ -156,7 +156,7 @@ h2[id] {
     display: none !important;
   }
   main {
-    padding: 0 14mm !important; /* 좌우 안전 여백 — '여백 없음'이어도 유지됨 */
+    padding: 0 18mm !important; /* 좌우 여백 — '여백 없음'이어도 유지됨(패딩은 여백설정 무관) */
     max-width: 100% !important;
   }
   body {
