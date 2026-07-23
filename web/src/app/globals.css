@@ -155,6 +155,10 @@ h2[id] {
   .no-print {
     display: none !important;
   }
+  /* 사이트 상단바(main 밖 header)만 숨기고, 기사 제목·메타 등 본문 내부 header는 유지 */
+  main header {
+    display: block !important;
+  }
   main {
     /* 좌우 18mm·상하 10mm 여백 — 패딩이라 인쇄 '여백' 설정과 무관하게 유지.
        (상하는 첫/마지막 페이지에 적용. 모든 페이지 상하 여백은 위 @page가 담당) */

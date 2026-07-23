@@ -401,7 +401,7 @@ function MemberGate({ hasFullText, onUnlock }: { hasFullText: boolean; onUnlock:
 
 function DemoMemberToggle({ member, onChange }: { member: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-brand p-2 text-xs text-background shadow-lg">
+    <div className="no-print fixed bottom-4 right-4 z-50 rounded-lg bg-brand p-2 text-xs text-background shadow-lg">
       <p className="px-1 pb-1 text-background/70">데모: 회원 상태</p>
       <div className="flex gap-1">
         {[
