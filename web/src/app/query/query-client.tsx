@@ -11,6 +11,9 @@ import { ApiError } from "@/lib/api/client";
 import { askQuery, type QueryResult } from "@/lib/api/query";
 import { trackEvent } from "@/lib/api/reading";
 
+import { AnswerView } from "./answer-view";
+import { SearchProgress } from "./search-progress";
+
 const SUGGESTED_QUESTIONS = [
   "다음 주말 안면도 기상 예보 알려줘",
   "꽃지 해수욕장 일몰 시간은?",
@@ -119,6 +122,9 @@ export function QueryClient() {
         </form>
       </section>
 
+      {/* 검색 진행 표시 */}
+      {loading && <SearchProgress />}
+
       {/* 에러 */}
       {error && (
         <div role="alert" className="border border-red-300 bg-red-50 text-red-800 rounded-lg p-4 text-sm">
@@ -139,9 +145,7 @@ export function QueryClient() {
           <h2 id="answer-heading" className="sr-only">
             답변
           </h2>
-          <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
-            {result.answer || "(빈 응답)"}
-          </div>
+          <AnswerView text={result.answer} />
 
           {result.sources.length > 0 && (
             <div className="pt-2 border-t border-accent/20">
