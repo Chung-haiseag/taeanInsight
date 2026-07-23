@@ -143,9 +143,11 @@ h2[id] {
 }
 
 /* 인쇄/PDF 저장 — 사이트 크롬 숨기고 본문만 깔끔히 (주간 리포트 PDF 다운로드) */
+/* 상하 여백만 @page로(모든 페이지). 좌우 여백은 본문 padding으로 줘서
+   브라우저 '여백: 없음' 설정이 덮어써도 가장자리(제목·번호)가 안 잘리게 한다. */
 @page {
   size: A4 portrait;
-  margin: 14mm 12mm;
+  margin: 12mm 0;
 }
 @media print {
   header,
@@ -154,7 +156,7 @@ h2[id] {
     display: none !important;
   }
   main {
-    padding: 0 !important;
+    padding: 0 14mm !important; /* 좌우 안전 여백 — '여백 없음'이어도 유지됨 */
     max-width: 100% !important;
   }
   body {
