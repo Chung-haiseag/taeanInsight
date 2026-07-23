@@ -107,6 +107,8 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-17 · 태안뉴스+아카이브를 '뉴스아카이브' 단일 메뉴로 통합(첫 화면 최신순·탭 건수·전체검색) · web /news, backend /api/archive/stats
 - 2026-07-22 · AI질의 웹RAG provider에 네이버 검색 추가(뉴스=최신 지역보도 sort=date, 웹문서=공식 .go.kr 화이트리스트). NAVER_CLIENT_ID/SECRET 있으면 네이버 우선, 없으면 Tavily 폴백. 스니펫 기반(원문 fetch 없음). 대화체 질의 정리+HTML 제거. 웹 출처는 답변 인용 시 노출 · backend src/query/web/{naver,search}.ts
 - 2026-07-22 · AI질의 외국문자 누수 최후 방어: 병렬 생성이 모두 누수여도 잔여 한자·가나만 제거해 정상화(stripForeignLetters) · backend src/query/answer_quality.ts
+- 2026-07-23 · 질의응답 화면 개선: 답변 번호목록 구조화 렌더(AnswerView·parseAnswer, 빈 괄호 정리) + 검색 중 파이프라인 단계 진행 표시(SearchProgress, 지표형) · web src/app/query/
+- 2026-07-23 · AI질의 영어 단어 누수 감지: 한글에 붙은 소문자 4자+ 영단어("existed하며")를 붕괴로 판정해 재생성 회피(약어·고유명사는 오탐 방지) · backend src/query/answer_quality.ts
 <!-- 새 기능 추가 시 위에 한 줄 -->
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
