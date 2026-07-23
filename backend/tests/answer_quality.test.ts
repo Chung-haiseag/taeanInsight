@@ -61,6 +61,14 @@ describe("isGarbledAnswer", () => {
     expect(isGarbledAnswer("태안의 대표 음식은 우럭젓국과 간장게장으로, 담백하고 개운한 맛이 일품입니다.")).toBe(false);
   });
 
+  it("한글에 붙은 영어 단어 누수(existed하며)를 붕괴로 판정", () => {
+    expect(isGarbledAnswer("이 외에도 여러 명의 군수가 existed하며 각기 다른 정책을 남겼다.")).toBe(true);
+  });
+
+  it("영문 약어·고유명사가 한글에 붙어도 오탐하지 않는다", () => {
+    expect(isGarbledAnswer("태안군은 TourAPI와 AI Co-Pilot을 활용해 관광 정보를 제공합니다. GPS로 위치도 확인합니다.")).toBe(false);
+  });
+
   it("데바나가리 등 다른 스크립트가 섞여도 붕괴로 판정", () => {
     expect(isGarbledAnswer("안면도는 다양한 आकर्षण을 가진 대표 관광지로, 꽃지 해안공원이 유명합니다.")).toBe(true);
   });

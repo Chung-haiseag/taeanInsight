@@ -18,6 +18,11 @@ export function isGarbledAnswer(text: string): boolean {
   const foreign = (t.match(/\p{L}/gu) ?? []).filter((c) => !/[\p{Script=Hangul}\p{Script=Latin}]/u.test(c));
   if (foreign.length >= 1) return true;
 
+  // (1-3) 영어 단어가 한글에 직접 붙은 누수(예: "existed하며", "completed되었다").
+  //   소문자 4자+ 단어(단어 시작, 영문자에 안 이어짐)가 한글과 공백 없이 접하면 번역 잔재로 본다.
+  //   대문자 포함 약어·고유명사(AI·TourAPI·Co-Pilot)는 소문자 조건·단어경계로 걸러 오탐 방지.
+  if (/(?<![A-Za-z])[a-z]{4,}[가-힣]/.test(t)) return true;
+
   const words = t.split(/\s+/).filter(Boolean);
 
   // (2) 같은 단어가 길게 연속 반복(예: "soap soap soap soap soap").
