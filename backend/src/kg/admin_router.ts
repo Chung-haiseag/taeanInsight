@@ -3,6 +3,7 @@ import type { Env } from "../types";
 import { loadOntology, isKnownType, isValidEdge } from "./ontology";
 import { upsertNode, upsertEdge, setVerified, listNodes, getNodeType } from "./repository";
 import { assertVerifiable } from "./import";
+import { articlePersonGraph, personEgo } from "./graph";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -51,6 +52,19 @@ router.post("/verify", async (c) => {
   if (b.table !== "kg_nodes" && b.table !== "kg_edges") return c.json({ error: "table 오류" }, 400);
   await setVerified(c.env.ARCHIVE_DB, b.table, b.id, b.verified ? 1 : 0);
   return c.json({ ok: true });
+});
+
+router.get("/article/:idxno/graph", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const idxno = Number(c.req.param("idxno"));
+  if (!Number.isFinite(idxno)) return c.json({ error: "idxno 오류" }, 400);
+  return c.json(await articlePersonGraph(c.env.ARCHIVE_DB, idxno));
+});
+router.get("/person/:id/ego", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const id = c.req.param("id");
+  const limit = Math.max(1, Math.min(50, Number(c.req.query("limit")) || 12));
+  return c.json(await personEgo(c.env.ARCHIVE_DB, id, limit));
 });
 
 export default router;
