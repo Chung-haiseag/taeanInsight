@@ -41,7 +41,7 @@ export default function KgGraph({ nodes, edges, onNodeClick, height = 420 }: { n
     window.addEventListener("resize", onResize);
     const mq = window.matchMedia("(prefers-color-scheme: dark)"); const onTheme = () => draw(); mq.addEventListener("change", onTheme);
     const mo = new MutationObserver(() => draw()); mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    requestAnimationFrame(resize);
+    raf = requestAnimationFrame(resize);
     return () => { if (raf) cancelAnimationFrame(raf); cv.removeEventListener("pointerdown", onDown); cv.removeEventListener("pointermove", onMove); cv.removeEventListener("pointerleave", onLeave); window.removeEventListener("resize", onResize); mq.removeEventListener("change", onTheme); mo.disconnect(); };
   }, [nodes, edges]);
 
