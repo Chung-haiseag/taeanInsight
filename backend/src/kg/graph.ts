@@ -1,0 +1,63 @@
+// 기사 인물 관계도 조회 — 순수 rankNeighbors + 얇은 D1(그래프 조회 전용, verified 무관).
+
+export interface Edge { a: string; b: string; weight: number }
+export interface Neighbor { id: string; weight: number }
+export interface GraphNode { id: string; name: string; mentions: number }
+
+// 순수: centerId 인접 엣지에서 상대 id·weight 추출 → weight 내림차순(동률 id) → limit. self 제외, 중복은 최대 weight.
+export function rankNeighbors(edges: Edge[], centerId: string, limit: number): Neighbor[] {
+  const acc = new Map<string, number>();
+  for (const e of edges ?? []) {
+    let other: string | null = null;
+    if (e.a === centerId && e.b !== centerId) other = e.b;
+    else if (e.b === centerId && e.a !== centerId) other = e.a;
+    if (!other) continue;
+    const w = Number(e.weight) || 0;
+    if (!acc.has(other) || acc.get(other)! < w) acc.set(other, w);
+  }
+  return [...acc.entries()]
+    .map(([id, weight]) => ({ id, weight }))
+    .sort((x, y) => y.weight - x.weight || (x.id < y.id ? -1 : 1))
+    .slice(0, Math.max(0, limit));
+}
+
+function parseWeight(attrs: string | null): number {
+  try { return Number(JSON.parse(attrs ?? "{}").weight) || 1; } catch { return 1; }
+}
+
+// 얇은 D1: 기사에 등장한 person 노드 + 그 집합 내부 coappears 엣지.
+export async function articlePersonGraph(db: D1Database, idxno: number): Promise<{ nodes: GraphNode[]; edges: Edge[] }> {
+  const m = await db.prepare("SELECT node_id FROM kg_mentions WHERE article_idxno=?").bind(idxno).all<{ node_id: string }>();
+  const ids = [...new Set((m.results ?? []).map((r) => r.node_id))];
+  if (!ids.length) return { nodes: [], edges: [] };
+  const ph = ids.map(() => "?").join(",");
+  const nrows = await db.prepare(
+    `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions ` +
+    `FROM kg_nodes n WHERE n.type='person' AND n.id IN (${ph})`,
+  ).bind(...ids).all<GraphNode>();
+  const erows = await db.prepare(
+    `SELECT src_id, dst_id, attrs_json FROM kg_edges WHERE rel='coappears' AND src_id IN (${ph}) AND dst_id IN (${ph})`,
+  ).bind(...ids, ...ids).all<{ src_id: string; dst_id: string; attrs_json: string | null }>();
+  return {
+    nodes: nrows.results ?? [],
+    edges: (erows.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json) })),
+  };
+}
+
+// 얇은 D1: 인물 ego — 인접 coappears 상위 limit 이웃 + 엣지.
+export async function personEgo(db: D1Database, id: string, limit = 12): Promise<{ center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] }> {
+  const center = await db.prepare("SELECT id, name FROM kg_nodes WHERE id=? AND type='person'").bind(id).first<{ id: string; name: string }>();
+  if (!center) return { center: null, nodes: [], edges: [] };
+  const inc = await db.prepare(
+    "SELECT src_id, dst_id, attrs_json FROM kg_edges WHERE rel='coappears' AND (src_id=? OR dst_id=?)",
+  ).bind(id, id).all<{ src_id: string; dst_id: string; attrs_json: string | null }>();
+  const edges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json) }));
+  const keep = new Set([id, ...rankNeighbors(edges, id, limit).map((n) => n.id)]);
+  const nodeIds = [...keep];
+  const ph = nodeIds.map(() => "?").join(",");
+  const nrows = await db.prepare(
+    `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions ` +
+    `FROM kg_nodes n WHERE n.id IN (${ph})`,
+  ).bind(...nodeIds).all<GraphNode>();
+  return { center: { id: center.id, name: center.name }, nodes: nrows.results ?? [], edges: edges.filter((e) => keep.has(e.a) && keep.has(e.b)) };
+}
