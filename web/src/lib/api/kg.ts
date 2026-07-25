@@ -63,3 +63,17 @@ export function upsertKgEdge(input: UpsertKgEdgeInput): Promise<{ ok: boolean }>
 export function verifyKg(table: "kg_nodes" | "kg_edges", id: string, verified: boolean): Promise<{ ok: boolean }> {
   return apiFetch("/api/admin/kg/verify", { method: "POST", body: JSON.stringify({ table, id, verified }) });
 }
+
+// KG 그래프 시각화 (Task 3: 기사 관계도, 인물 Ego 네트워크)
+export interface KgGraphNode { id: string; name: string; mentions: number }
+export interface KgGraphEdge { a: string; b: string; weight: number }
+export interface KgGraphResp { nodes: KgGraphNode[]; edges: KgGraphEdge[] }
+export interface KgEgoResp { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] }
+
+export async function getArticleGraph(idxno: number): Promise<KgGraphResp> {
+  return apiFetch(`/api/admin/kg/article/${idxno}/graph`);
+}
+
+export async function getPersonEgo(id: string, limit = 12): Promise<KgEgoResp> {
+  return apiFetch(`/api/admin/kg/person/${encodeURIComponent(id)}/ego?limit=${limit}`);
+}
