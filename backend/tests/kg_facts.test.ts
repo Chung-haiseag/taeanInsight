@@ -11,6 +11,11 @@ describe("isGunsuFactQuery", () => {
     expect(isGunsuFactQuery("오늘 태안 날씨")).toBe(false);
     expect(isGunsuFactQuery("군수 관사 위치가 어디")).toBe(false);
   });
+  it("동음이의 軍需(군수품 등)는 미발동", () => {
+    expect(isGunsuFactQuery("군수품 목록")).toBe(false);
+    expect(isGunsuFactQuery("군수물자 조달 현황 목록")).toBe(false);
+    expect(isGunsuFactQuery("역대 군수")).toBe(true); // 郡守는 그대로 발동
+  });
 });
 
 describe("orderLineage / buildGunsuFactBlock", () => {
@@ -30,5 +35,15 @@ describe("orderLineage / buildGunsuFactBlock", () => {
     expect(b.text).toContain("현재");           // end null → '현재'
     expect(b.source.title).toContain("태안군청 연혁");
     expect(b.source.url).toBeNull();
+  });
+  it("ordinal/null 혼재에도 입력 순서와 무관하게 같은 결과(전순서)", () => {
+    const mixed: LineageItem[] = [
+      { name: "A", start: "2020-01", end: null, ordinal: 1 },
+      { name: "B", start: "2010-01", end: null, ordinal: null },
+      { name: "C", start: "2005-01", end: null, ordinal: 3 },
+    ];
+    const forward = orderLineage(mixed).map((i) => i.name);
+    const backward = orderLineage(mixed.slice().reverse()).map((i) => i.name);
+    expect(forward).toEqual(backward);
   });
 });
