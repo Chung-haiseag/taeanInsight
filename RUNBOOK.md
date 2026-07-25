@@ -131,6 +131,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-24 · 인쇄 시 기사 제목/메타 유지(main header는 표시, 사이트바만 숨김) + 기사 인용부호("…") 텍스트 accent 색 강조(segmentQuotes, 화면·PDF) · web src/app/globals.css, news/[id]/article-client.tsx, lib/quote-highlight.ts
 - 2026-07-25 · v1 온톨로지+군수 계보 KG(kg_nodes/edges/ontology, /api/admin/kg) · backend/src/kg/*
 - 2026-07-25 · KG 인물 추출·공동등장 그래프(kg_mentions/coappears, tools/kg/*, verified=0 미주입) · db/034
+- 2026-07-25 · 기사 인물 관계도 UI(관리자 베타, /api/admin/kg/article·person/ego, 자체 캔버스) · web/src/components/kg-graph.tsx
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
 - **디지털화 파이프라인**: `tools/ebook/PLAYBOOK.md` (PDF→Vision OCR→Gemini 기사분리→D1/R2).
