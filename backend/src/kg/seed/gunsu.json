@@ -1,0 +1,6 @@
+{
+  "nodes": [
+    { "id": "office:taean-gunsu", "type": "office", "name": "태안군수", "source": "태안군청 연혁" }
+  ],
+  "edges": []
+}
