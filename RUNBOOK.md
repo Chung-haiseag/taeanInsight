@@ -53,6 +53,13 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 | Google Vision | OCR | GOOGLE_VISION_API_KEY | 작동 |
 | Gemini | 기사분리 | GEMINI_API_KEY | 작동 |
 
+## 4.1. 지식그래프(KG) 운영 — Day-2 절차
+- **타입/관계 추가(additive)**: `/api/admin/kg`(온톨로지 관리) 또는 kg_ontology INSERT → 새 노드/엣지 즉시 허용. 코드·DB 마이그레이션 불필요.
+- **새 군수/인물 추가**: 관리자 폼에서 person 노드 + held 엣지 등록 후 verify. 출처 필수.
+- **검증 원칙**: verified=1은 source 필수. 답변엔 verified=1만 노출. 지어낸 값 금지.
+- **파괴적 변경(이름변경·병합·삭제)**: 마이그레이션 + 사용자 승인 + 백업.
+- **원격 마이그레이션**: `npx wrangler d1 execute taean-archive --remote --file db/migrations/NNN.sql` (승인 후).
+
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
@@ -113,6 +120,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-23 · 주간리포트 외국문자 누수 방어: 생성 시 붕괴 재생성+최후 제거(weekly_pipeline), 이미 발행된 리포트는 재생성·재발송 없이 정제하는 관리자 POST /api/admin/reports/:weekId/sanitize · backend src/reports/{weekly_pipeline,router}.ts
 - 2026-07-24 · 인쇄 여백 개선(좌우 padding 18mm=여백설정 무관, 상하 @page 15mm+padding 10mm) + 뉴스 기사 상세에 'PDF로 저장' 버튼(기사 듣기 옆, breadcrumb·관련뉴스 no-print) · web src/app/globals.css, src/app/news/[id]/article-client.tsx
 - 2026-07-24 · 인쇄 시 기사 제목/메타 유지(main header는 표시, 사이트바만 숨김) + 기사 인용부호("…") 텍스트 accent 색 강조(segmentQuotes, 화면·PDF) · web src/app/globals.css, news/[id]/article-client.tsx, lib/quote-highlight.ts
+- 2026-07-25 · v1 온톨로지+군수 계보 KG(kg_nodes/edges/ontology, /api/admin/kg) · backend/src/kg/*
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
 - **디지털화 파이프라인**: `tools/ebook/PLAYBOOK.md` (PDF→Vision OCR→Gemini 기사분리→D1/R2).
