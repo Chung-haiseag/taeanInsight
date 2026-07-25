@@ -62,6 +62,13 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - **군수 계보 대상 직위 `office:taean-gunsu` 노드**: 마이그레이션 033에서 자동 시드됨. 인물·역임은 `/admin/kg` 폼으로 검증 입력.
 - **역임(held) 엣지 ID 규칙 및 수정**: 엣지 id는 `held:office:taean-gunsu:<대수(ordinal)>`로 결정. 대수를 잘못 입력했으면 (1) 올바른 대수로 다시 등록하고 (2) 잘못된 엣지를 미검증 처리: `POST /api/admin/kg/verify {"table":"kg_edges","id":"held:office:taean-gunsu:<잘못된대수>","verified":false}` (미검증 엣지는 답변에 노출되지 않음).
 
+### KG 인물 추출 실행(3단계)
+- 전제: `export GEMINI_API_KEY=...`(터미널), 034 원격 마이그레이션 적용.
+- 추출: `node tools/kg/extract-persons.mjs <연도...> [--limit N] [--conc 4]` → out/kg_mentions.jsonl (체크포인트로 이어하기).
+- 적재: `node tools/kg/apply-kg.mjs [--dry]` → kg_nodes(person, verified=0)+kg_mentions (원격 D1, 승인 후).
+- 파생: `node tools/kg/derive-coappears.mjs [--dry]` → kg_edges(coappears, verified=0).
+- 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
+
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
@@ -123,6 +130,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-24 · 인쇄 여백 개선(좌우 padding 18mm=여백설정 무관, 상하 @page 15mm+padding 10mm) + 뉴스 기사 상세에 'PDF로 저장' 버튼(기사 듣기 옆, breadcrumb·관련뉴스 no-print) · web src/app/globals.css, src/app/news/[id]/article-client.tsx
 - 2026-07-24 · 인쇄 시 기사 제목/메타 유지(main header는 표시, 사이트바만 숨김) + 기사 인용부호("…") 텍스트 accent 색 강조(segmentQuotes, 화면·PDF) · web src/app/globals.css, news/[id]/article-client.tsx, lib/quote-highlight.ts
 - 2026-07-25 · v1 온톨로지+군수 계보 KG(kg_nodes/edges/ontology, /api/admin/kg) · backend/src/kg/*
+- 2026-07-25 · KG 인물 추출·공동등장 그래프(kg_mentions/coappears, tools/kg/*, verified=0 미주입) · db/034
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
 - **디지털화 파이프라인**: `tools/ebook/PLAYBOOK.md` (PDF→Vision OCR→Gemini 기사분리→D1/R2).
