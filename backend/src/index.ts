@@ -33,6 +33,7 @@ import { reportsRouter, adminReportsRouter } from "./reports/router";
 import { pushRouter } from "./notifications/router";
 import { govRouter } from "./gov/router";
 import { emailRouter } from "./email/router";
+import kgAdminRouter from "./kg/admin_router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -76,6 +77,7 @@ app.route("/api/cost", costRouter);
 app.route("/api/me", meRouter);
 app.route("/api/addons", addonsRouter);
 app.route("/api/admin/review", reviewRouter);
+app.route("/api/admin/kg", kgAdminRouter);
 app.route("/api/admin/rules", rulesRouter);
 app.route("/api/admin/citizen", citizenRouter);
 app.route("/api/citizen/articles", citizenArticlesRouter);
