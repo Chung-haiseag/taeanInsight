@@ -385,6 +385,19 @@ queryRouter.post("/", async (c) => {
       } catch { /* 사실 주입 실패는 무시 */ }
     }
 
+    // (a-6.5) KG 구조 사실 — 군수 계보 등 검증된 지식그래프 사실을 결정론적으로 우선 주입.
+    if (c.env.ARCHIVE_DB && !offRegion) {
+      try {
+        const { isGunsuFactQuery, buildGunsuFactBlock } = await import("../kg/facts");
+        if (isGunsuFactQuery(query)) {
+          const { getGunsuLineage } = await import("../kg/repository");
+          const { items, source } = await getGunsuLineage(c.env.ARCHIVE_DB);
+          const block = buildGunsuFactBlock(items, source);
+          if (block) parts.push(block);
+        }
+      } catch { /* KG 실패는 무시(기존 RAG로 폴백) */ }
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend && !hasMyShop) {
       const rows = await retrieveArchive(c.env, query);
