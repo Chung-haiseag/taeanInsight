@@ -1,0 +1,65 @@
+// 지식그래프(KG) 관리자 API 클라이언트 — backend/src/kg/admin_router.ts 매핑
+// v1 지식그래프 + 군수 계보 Fact 레이어(Task 7 백엔드) 대응.
+
+import { apiFetch } from "./client";
+
+export interface KgNode {
+  id: string;
+  type: string;
+  name: string;
+  source: string | null;
+  verified: number; // 0 | 1
+}
+
+export interface KgRelationSpec {
+  name: string;
+  src: string;
+  dst: string;
+  attrs: string[];
+}
+
+export interface KgOntology {
+  types: string[];
+  relations: KgRelationSpec[];
+}
+
+export function listKgNodes(type?: string): Promise<{ nodes: KgNode[] }> {
+  const p = type ? `?${new URLSearchParams({ type })}` : "";
+  return apiFetch(`/api/admin/kg/nodes${p}`);
+}
+
+export function getKgOntology(): Promise<KgOntology> {
+  return apiFetch("/api/admin/kg/ontology");
+}
+
+export interface UpsertKgNodeInput {
+  id: string;
+  type: string;
+  name: string;
+  aliases?: string;
+  attrs?: unknown;
+  source?: string;
+  verified?: boolean;
+}
+
+export function upsertKgNode(input: UpsertKgNodeInput): Promise<{ ok: boolean }> {
+  return apiFetch("/api/admin/kg/nodes", { method: "POST", body: JSON.stringify(input) });
+}
+
+export interface UpsertKgEdgeInput {
+  id: string;
+  src_id: string;
+  rel: string;
+  dst_id: string;
+  attrs?: unknown;
+  source?: string;
+  verified?: boolean;
+}
+
+export function upsertKgEdge(input: UpsertKgEdgeInput): Promise<{ ok: boolean }> {
+  return apiFetch("/api/admin/kg/edges", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function verifyKg(table: "kg_nodes" | "kg_edges", id: string, verified: boolean): Promise<{ ok: boolean }> {
+  return apiFetch("/api/admin/kg/verify", { method: "POST", body: JSON.stringify({ table, id, verified }) });
+}
