@@ -55,6 +55,9 @@ eval/verification/verification_log.json
 # 백필 스크랩 산출물
 tools/backfill/out/
 
+# KG 인물 추출 산출물(JSONL·체크포인트·배치 SQL) — 로컬 실행 결과, 재생성 가능
+tools/kg/out/
+
 # e-book OCR 컴파일 바이너리(소스 ocr_vision.swift로 재빌드)
 tools/ebook/ocr_vision
 # TS 빌드 캐시
