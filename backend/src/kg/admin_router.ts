@@ -19,9 +19,9 @@ router.get("/nodes", async (c) => {
 
 router.post("/nodes", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
-  const b = await c.req.json<{ id: string; type: string; name: string; aliases?: string; attrs?: unknown; source?: string; verified?: boolean }>();
-  const o = await loadOntology(c.env.ARCHIVE_DB);
+  const b = await c.req.json<{ id: string; type: string; name: string; aliases?: string; attrs?: unknown; source?: string; verified?: boolean }>().catch(() => ({} as { id: string; type: string; name: string; aliases?: string; attrs?: unknown; source?: string; verified?: boolean }));
   if (!b.id || !b.type || !b.name) return c.json({ error: "id/type/name 필수" }, 400);
+  const o = await loadOntology(c.env.ARCHIVE_DB);
   if (!isKnownType(o, b.type)) return c.json({ error: `미등록 타입: ${b.type}` }, 400);
   const verified: 0 | 1 = b.verified ? 1 : 0;
   if (verified === 1) { try { assertVerifiable(b, `node:${b.id}`); } catch (e) { return c.json({ error: (e as Error).message }, 400); } }
@@ -31,9 +31,9 @@ router.post("/nodes", async (c) => {
 
 router.post("/edges", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
-  const b = await c.req.json<{ id: string; src_id: string; rel: string; dst_id: string; attrs?: unknown; source?: string; verified?: boolean }>();
-  const o = await loadOntology(c.env.ARCHIVE_DB);
+  const b = await c.req.json<{ id: string; src_id: string; rel: string; dst_id: string; attrs?: unknown; source?: string; verified?: boolean }>().catch(() => ({} as { id: string; src_id: string; rel: string; dst_id: string; attrs?: unknown; source?: string; verified?: boolean }));
   if (!b.id || !b.src_id || !b.rel || !b.dst_id) return c.json({ error: "id/src_id/rel/dst_id 필수" }, 400);
+  const o = await loadOntology(c.env.ARCHIVE_DB);
   const srcType = await getNodeType(c.env.ARCHIVE_DB, b.src_id);
   const dstType = await getNodeType(c.env.ARCHIVE_DB, b.dst_id);
   if (!srcType || !dstType) return c.json({ error: "양끝 노드 없음(먼저 노드 등록)" }, 400);
@@ -46,7 +46,8 @@ router.post("/edges", async (c) => {
 
 router.post("/verify", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
-  const b = await c.req.json<{ table: "kg_nodes" | "kg_edges"; id: string; verified: boolean }>();
+  const b = await c.req.json<{ table: "kg_nodes" | "kg_edges"; id: string; verified: boolean }>().catch(() => ({} as { table: "kg_nodes" | "kg_edges"; id: string; verified: boolean }));
+  if (!b.id) return c.json({ error: "id 필수" }, 400);
   if (b.table !== "kg_nodes" && b.table !== "kg_edges") return c.json({ error: "table 오류" }, 400);
   await setVerified(c.env.ARCHIVE_DB, b.table, b.id, b.verified ? 1 : 0);
   return c.json({ ok: true });
