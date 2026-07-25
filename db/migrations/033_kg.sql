@@ -45,3 +45,7 @@ INSERT OR IGNORE INTO kg_ontology(kind,name,label,spec_json,schema_ver,updated_a
  ('type','person','인물',NULL,1,'2026-07-25T00:00:00Z'),
  ('type','office','직위',NULL,1,'2026-07-25T00:00:00Z'),
  ('relation','held','역임','{"src":"person","dst":"office","attrs":["start","end","ordinal"]}',1,'2026-07-25T00:00:00Z');
+
+-- 직위 노드 시드(멱등) — 군수 계보의 대상 직위. 인물·역임은 관리자 폼으로 검증 입력.
+INSERT OR IGNORE INTO kg_nodes(id,type,name,attrs_json,aliases,source,verified,schema_ver,created_at,updated_at) VALUES
+ ('office:taean-gunsu','office','태안군수',NULL,NULL,'태안군청 연혁',1,1,'2026-07-25T00:00:00Z','2026-07-25T00:00:00Z');

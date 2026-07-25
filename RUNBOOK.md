@@ -59,6 +59,8 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - **검증 원칙**: verified=1은 source 필수. 답변엔 verified=1만 노출. 지어낸 값 금지.
 - **파괴적 변경(이름변경·병합·삭제)**: 마이그레이션 + 사용자 승인 + 백업.
 - **원격 마이그레이션**: `npx wrangler d1 execute taean-archive --remote --file db/migrations/NNN.sql` (승인 후).
+- **군수 계보 대상 직위 `office:taean-gunsu` 노드**: 마이그레이션 033에서 자동 시드됨. 인물·역임은 `/admin/kg` 폼으로 검증 입력.
+- **역임(held) 엣지 ID 규칙 및 수정**: 엣지 id는 `held:office:taean-gunsu:<대수(ordinal)>`로 결정. 대수를 잘못 입력했으면 (1) 올바른 대수로 다시 등록하고 (2) 잘못된 엣지를 미검증 처리: `POST /api/admin/kg/verify {"table":"kg_edges","id":"held:office:taean-gunsu:<잘못된대수>","verified":false}` (미검증 엣지는 답변에 노출되지 않음).
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
