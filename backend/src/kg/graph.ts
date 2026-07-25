@@ -57,7 +57,7 @@ export async function personEgo(db: D1Database, id: string, limit = 12): Promise
   const ph = nodeIds.map(() => "?").join(",");
   const nrows = await db.prepare(
     `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions ` +
-    `FROM kg_nodes n WHERE n.id IN (${ph})`,
+    `FROM kg_nodes n WHERE n.type='person' AND n.id IN (${ph})`,
   ).bind(...nodeIds).all<GraphNode>();
   return { center: { id: center.id, name: center.name }, nodes: nrows.results ?? [], edges: edges.filter((e) => keep.has(e.a) && keep.has(e.b)) };
 }
