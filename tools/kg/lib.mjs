@@ -12,15 +12,17 @@ export function normalizeName(raw) {
 }
 
 // 본문에 실제로 있는 이름만(2글자+, 중복 제거) — 지어내기 방지.
+// 한국어 이름은 토큰의 시작(뒤에 조사·직함 허용)이므로 토큰 prefix로 매칭 → 교차어·중간조각 배제.
 export function faithfulFilter(names, body) {
-  const nb = normForMatch(body);
+  const tokens = String(body ?? "").split(/\s+/).map(normForMatch).filter(Boolean);
   const seen = new Set();
   const out = [];
   for (const raw of names ?? []) {
     const n = normalizeName(raw);
     if (n.length < 2) continue;
     if (seen.has(n)) continue;
-    if (!nb.includes(normForMatch(n))) continue;
+    const nm = normForMatch(n);
+    if (!tokens.some((t) => t.startsWith(nm))) continue;
     seen.add(n);
     out.push(n);
   }

@@ -18,6 +18,14 @@ describe("faithfulFilter", () => {
     const body = "이완섭 군수는 남기정 대표와 만났다.";
     expect(faithfulFilter(["이완섭", "남기정", "가상인물", "이완섭", "김"], body)).toEqual(["이완섭", "남기정"]);
   });
+  it("인접 단어에 걸친 조각·토큰 중간 조각은 버림(교차어 방지)", () => {
+    const body = "김철수 위원장과 박영희 의원이 참석했다.";
+    expect(faithfulFilter(["수위", "장과"], body)).toEqual([]);
+    expect(faithfulFilter(["김철수", "박영희"], body)).toEqual(["김철수", "박영희"]);
+  });
+  it("조사가 붙은 이름도 인정(토큰 시작 매칭)", () => {
+    expect(faithfulFilter(["이완섭"], "이완섭이 말했다")).toEqual(["이완섭"]);
+  });
 });
 
 describe("personNodeId", () => {
