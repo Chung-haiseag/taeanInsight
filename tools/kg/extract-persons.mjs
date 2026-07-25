@@ -23,8 +23,8 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 
 function arg(n, d) { const i = process.argv.indexOf(n); return i !== -1 ? process.argv[i + 1] : d; }
 const YEARS = process.argv.slice(2).filter((a) => /^\d{4}$/.test(a));
-const CONC = Number(arg("--conc", "4"));
-const LIMIT = Number(arg("--limit", "0"));
+const CONC = Math.max(1, Number(arg("--conc", "4")) || 4);
+const LIMIT = Math.max(0, Number(arg("--limit", "0")) || 0);
 
 if (!GEMINI_KEY) { console.error("GEMINI_API_KEY 필요"); process.exit(1); }
 if (!YEARS.length) { console.error("연도 인자 필요 (예: node extract-persons.mjs 2015 2016)"); process.exit(1); }

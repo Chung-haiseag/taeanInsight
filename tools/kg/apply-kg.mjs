@@ -104,6 +104,7 @@ async function main() {
       continue;
     }
     for (const raw of names) {
+      if (typeof raw !== "string") continue; // 오염된 names 항목(person:null류 정크 노드 방지)
       const id = personNodeId(raw); // lib.mjs 재사용 — 여기서 재구현하지 않음
       const name = id.slice("person:".length);
       if (!name) { skippedNames++; continue; } // 정규화 후 빈 이름 방어

@@ -9,4 +9,4 @@ CREATE TABLE IF NOT EXISTS kg_mentions (
 CREATE INDEX IF NOT EXISTS idx_kg_mentions_article ON kg_mentions(article_idxno);
 
 INSERT OR IGNORE INTO kg_ontology(kind,name,label,spec_json,schema_ver,updated_at) VALUES
- ('relation','coappears','공동등장','{"src":"person","dst":"person","attrs":["weight"]}',1,'2026-07-25T00:00:00Z');
+ ('relation','coappears','공동등장','{"src":"person","dst":"person","attrs":["weight","articles"]}',1,'2026-07-25T00:00:00Z');

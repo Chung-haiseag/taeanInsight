@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // tools/kg/derive-coappears.mjs — KG 3단계: kg_mentions(D1) → 공동등장(coappears) 엣지 파생.
 //   같은 기사에 등장한 인물 쌍을 집계해 kg_edges(rel=coappears, verified=0)로 적재.
-//   INSERT OR REPLACE라 멱등 — 재실행하면 최신 집계로 갱신(node --check로 문법만 검증, 실행은 사용자가).
+//   ON CONFLICT DO UPDATE(verified=0인 행만)라 멱등 — 재실행하면 최신 집계로 갱신하되, 4단계에서
+//   verified=1로 검증된 엣지는 절대 덮어쓰지 않는다(node --check로 문법만 검증, 실행은 사용자가).
 // 사용: node derive-coappears.mjs [--dry]   (--dry: SQL만 생성, 원격 적용 생략)
 import { writeFile, mkdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
@@ -71,12 +72,15 @@ function sqlEscape(s) { return String(s).replace(/'/g, "''"); }
 
 // verified는 항상 0(자동추출/미검증) — AI 질의 경로는 verified=1만 주입하므로 이 데이터는
 // 답변에 절대 섞이지 않는다. 이 값을 1로 바꾸지 말 것.
+// ON CONFLICT: 재실행 시 verified=0인 행만 attrs_json/updated_at을 갱신하고, 4단계에서
+// verified=1로 검증된 엣지는 created_at까지 포함해 그대로 보존한다(INSERT OR REPLACE 금지).
 function edgeInsertSQL(edge) {
   const repArticles = edge.articles.slice(0, ARTICLES_CAP); // 대표 기사만 저장(용량) — weight는 전체 공유수
   const attrsJson = JSON.stringify({ weight: edge.weight, articles: repArticles });
   return (
-    `INSERT OR REPLACE INTO kg_edges(id,src_id,rel,dst_id,attrs_json,source,verified,schema_ver,created_at,updated_at) ` +
-    `VALUES ('${sqlEscape(edge.id)}','${sqlEscape(edge.a)}','coappears','${sqlEscape(edge.b)}','${sqlEscape(attrsJson)}','아카이브 추출',0,1,'${NOW}','${NOW}');`
+    `INSERT INTO kg_edges(id,src_id,rel,dst_id,attrs_json,source,verified,schema_ver,created_at,updated_at) ` +
+    `VALUES ('${sqlEscape(edge.id)}','${sqlEscape(edge.a)}','coappears','${sqlEscape(edge.b)}','${sqlEscape(attrsJson)}','아카이브 추출',0,1,'${NOW}','${NOW}') ` +
+    `ON CONFLICT(id) DO UPDATE SET attrs_json=excluded.attrs_json, updated_at=excluded.updated_at WHERE kg_edges.verified=0;`
   );
 }
 
