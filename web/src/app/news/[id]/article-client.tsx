@@ -23,6 +23,7 @@ import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
 import { Icon } from "@/components/icon";
 import { CorrectionRequest } from "./correction-request";
+import ArticleGraph from "./article-graph";
 
 interface Reader {
   title: string;
@@ -183,6 +184,8 @@ export default function ArticleClient() {
           )}
         </>
       )}
+
+      <ArticleGraph idxno={Number(params.id)} />
 
       <RelatedArticles idxno={Number(params.id)} />
 
