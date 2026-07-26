@@ -4,6 +4,7 @@ import { loadOntology, isKnownType, isValidEdge } from "./ontology";
 import { upsertNode, upsertEdge, setVerified, listNodes, getNodeType } from "./repository";
 import { assertVerifiable } from "./import";
 import { articlePersonGraph, personEgo } from "./graph";
+import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus } from "./merge";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -65,6 +66,37 @@ router.get("/person/:id/ego", async (c) => {
   const id = c.req.param("id");
   const limit = Math.max(1, Math.min(50, Number(c.req.query("limit")) || 12));
   return c.json(await personEgo(c.env.ARCHIVE_DB, id, limit));
+});
+
+router.get("/merge/candidates", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const limit = Math.max(1, Math.min(200, Number(c.req.query("limit")) || 50));
+  return c.json({ candidates: await listCandidates(c.env.ARCHIVE_DB, limit) });
+});
+router.post("/merge", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ merged_id: string; canonical_id: string; a_id?: string; b_id?: string }>().catch(() => ({} as any));
+  if (!b.merged_id || !b.canonical_id) return c.json({ error: "merged_id/canonical_id 필수" }, 400);
+  if (b.merged_id === b.canonical_id) return c.json({ error: "자기참조 병합 불가" }, 400);
+  await setCanonical(c.env.ARCHIVE_DB, b.merged_id, b.canonical_id);
+  await logMerge(c.env.ARCHIVE_DB, { merged_id: b.merged_id, canonical_id: b.canonical_id, action: "merge" });
+  if (b.a_id && b.b_id) await setCandidateStatus(c.env.ARCHIVE_DB, b.a_id, b.b_id, "merged");
+  return c.json({ ok: true });
+});
+router.post("/merge/keep", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ a_id: string; b_id: string }>().catch(() => ({} as any));
+  if (!b.a_id || !b.b_id) return c.json({ error: "a_id/b_id 필수" }, 400);
+  await setCandidateStatus(c.env.ARCHIVE_DB, b.a_id, b.b_id, "kept");
+  return c.json({ ok: true });
+});
+router.post("/merge/unmerge", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ merged_id: string }>().catch(() => ({} as any));
+  if (!b.merged_id) return c.json({ error: "merged_id 필수" }, 400);
+  await clearCanonical(c.env.ARCHIVE_DB, b.merged_id);
+  await logMerge(c.env.ARCHIVE_DB, { merged_id: b.merged_id, canonical_id: null, action: "unmerge" });
+  return c.json({ ok: true });
 });
 
 export default router;
