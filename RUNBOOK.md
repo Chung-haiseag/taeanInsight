@@ -62,6 +62,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - **군수 계보 대상 직위 `office:taean-gunsu` 노드**: 마이그레이션 033에서 자동 시드됨. 인물·역임은 `/admin/kg` 폼으로 검증 입력.
 - **역임(held) 엣지 ID 규칙 및 수정**: 엣지 id는 `held:office:taean-gunsu:<대수(ordinal)>`로 결정. 대수를 잘못 입력했으면 (1) 올바른 대수로 다시 등록하고 (2) 잘못된 엣지를 미검증 처리: `POST /api/admin/kg/verify {"table":"kg_edges","id":"held:office:taean-gunsu:<잘못된대수>","verified":false}` (미검증 엣지는 답변에 노출되지 않음).
 - **동명이인 병합(soft canonical_id)**: 동명이인 여러 person 노드를 soft_canonical_id로 묶음. 후보 탐지: `node tools/kg/merge-candidates.mjs` → `/admin/kg` 검수 탭에서 병합(canonical 지정·기타 노드 병합). soft_canonical_id 그룹은 관계도·RAG에서 단일 대표로 검색·답변.
+- **엣지 라벨 생성(Gemini 관계유형)**: `export GEMINI_API_KEY=...` → `node tools/kg/label-relations.mjs [--limit N]` (~3,880 엣지, ~$0.4). weight≥10 coappears에 reltype 자동 추출.
 
 ### KG 인물 추출 실행(3단계)
 - 전제: `export GEMINI_API_KEY=...`(터미널), 034 원격 마이그레이션 적용.
@@ -134,6 +135,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-25 · KG 인물 추출·공동등장 그래프(kg_mentions/coappears, tools/kg/*, verified=0 미주입) · db/034
 - 2026-07-25 · 기사 인물 관계도 UI(관리자 베타, /api/admin/kg/article·person/ego, 자체 캔버스) · web/src/components/kg-graph.tsx
 - 2026-07-26 · 동명이인 병합 검수 콘솔(soft canonical_id, /api/admin/kg/merge*, tools/kg/merge-candidates) · web/admin/kg 검수탭
+- 2026-07-27 · 관계 라벨링(weight≥10 coappears에 reltype, Gemini, tools/kg/label-relations) · graph.ts·kg-graph 엣지 라벨
 
 ## 6. 재사용 패턴 (다른 프로젝트로)
 - **디지털화 파이프라인**: `tools/ebook/PLAYBOOK.md` (PDF→Vision OCR→Gemini 기사분리→D1/R2).
