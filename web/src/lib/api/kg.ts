@@ -77,3 +77,35 @@ export async function getArticleGraph(idxno: number): Promise<KgGraphResp> {
 export async function getPersonEgo(id: string, limit = 12): Promise<KgEgoResp> {
   return apiFetch(`/api/admin/kg/person/${encodeURIComponent(id)}/ego?limit=${limit}`);
 }
+
+// KG 병합 관리 (Task 7: 동명이인 병합 검수 콘솔)
+export interface MergeCandidate {
+  a_id: string;
+  b_id: string;
+  reason: string;
+  a_men: number;
+  b_men: number;
+  a_name: string;
+  b_name: string;
+}
+
+export async function getMergeCandidates(limit = 50): Promise<{ candidates: MergeCandidate[] }> {
+  return apiFetch(`/api/admin/kg/merge/candidates?limit=${limit}`);
+}
+
+export async function mergeNodes(body: {
+  merged_id: string;
+  canonical_id: string;
+  a_id: string;
+  b_id: string;
+}): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/merge`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function keepCandidate(a_id: string, b_id: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/merge/keep`, { method: "POST", body: JSON.stringify({ a_id, b_id }) });
+}
+
+export async function unmergeNode(merged_id: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/merge/unmerge`, { method: "POST", body: JSON.stringify({ merged_id }) });
+}
