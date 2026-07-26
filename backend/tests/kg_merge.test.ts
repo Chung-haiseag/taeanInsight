@@ -72,4 +72,19 @@ describe("resolveCanonical", () => {
     expect(c.name).toBe("김동이");
     expect(c.mentions).toBe(105);
   });
+  it("병합 시 엣지 reltype 보존(먼저 나온 비어있지 않은 값)", () => {
+    const map = { "person:김동위": "person:김동이" };
+    const nodes = [
+      { id: "person:김동이", name: "김동이", mentions: 100 },
+      { id: "person:가세로", name: "가세로", mentions: 50 },
+    ];
+    const edges = [
+      { a: "person:김동이", b: "person:가세로", weight: 3, reltype: "협력·동료" },
+      { a: "person:김동위", b: "person:가세로", weight: 2 },
+    ];
+    const r = resolveCanonical(nodes, edges, map);
+    const e = r.edges.find((e) => e.a === "person:가세로" || e.b === "person:가세로")!;
+    expect(e.weight).toBe(5);
+    expect(e.reltype).toBe("협력·동료");
+  });
 });

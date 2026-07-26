@@ -20,8 +20,8 @@ export function resolveCanonical(nodes: GraphNode[], edges: Edge[], map: Record<
     const [lo, hi] = a < b ? [a, b] : [b, a];
     const key = lo + "|" + hi;
     const ex = emap.get(key);
-    if (ex) ex.weight += e.weight;
-    else emap.set(key, { a: lo, b: hi, weight: e.weight });
+    if (ex) { ex.weight += e.weight; if (!ex.reltype && e.reltype) ex.reltype = e.reltype; }
+    else emap.set(key, { a: lo, b: hi, weight: e.weight, reltype: e.reltype });
   }
   return { nodes: [...nmap.values()], edges: [...emap.values()] };
 }
