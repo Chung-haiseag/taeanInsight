@@ -2,7 +2,7 @@
 
 import { resolveCanonical, loadCanonicalMap, getMembers } from "./merge";
 
-export interface Edge { a: string; b: string; weight: number }
+export interface Edge { a: string; b: string; weight: number; reltype?: string }
 export interface Neighbor { id: string; weight: number }
 export interface GraphNode { id: string; name: string; mentions: number }
 
@@ -27,6 +27,10 @@ function parseWeight(attrs: string | null): number {
   try { return Number(JSON.parse(attrs ?? "{}").weight) || 1; } catch { return 1; }
 }
 
+function parseReltype(attrs: string | null): string | undefined {
+  try { const r = JSON.parse(attrs ?? "{}").reltype; return typeof r === "string" && r ? r : undefined; } catch { return undefined; }
+}
+
 // 얇은 D1: 기사에 등장한 person 노드 + 그 집합 내부 coappears 엣지.
 export async function articlePersonGraph(db: D1Database, idxno: number): Promise<{ nodes: GraphNode[]; edges: Edge[] }> {
   const m = await db.prepare("SELECT node_id FROM kg_mentions WHERE article_idxno=?").bind(idxno).all<{ node_id: string }>();
@@ -41,7 +45,7 @@ export async function articlePersonGraph(db: D1Database, idxno: number): Promise
     `SELECT src_id, dst_id, attrs_json FROM kg_edges WHERE rel='coappears' AND src_id IN (${ph}) AND dst_id IN (${ph})`,
   ).bind(...ids, ...ids).all<{ src_id: string; dst_id: string; attrs_json: string | null }>();
   const nodes = nrows.results ?? [];
-  const edges = (erows.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json) }));
+  const edges = (erows.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json), reltype: parseReltype(e.attrs_json) }));
   const map = await loadCanonicalMap(db);
   return resolveCanonical(nodes, edges, map);
 }
@@ -57,7 +61,7 @@ export async function personEgo(db: D1Database, id: string, limit = 12): Promise
   const inc = await db.prepare(
     `SELECT src_id, dst_id, attrs_json FROM kg_edges WHERE rel='coappears' AND (src_id IN (${gph}) OR dst_id IN (${gph}))`,
   ).bind(...group, ...group).all<{ src_id: string; dst_id: string; attrs_json: string | null }>();
-  const rawEdges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json) }));
+  const rawEdges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json), reltype: parseReltype(e.attrs_json) }));
   const nodeIds = [...new Set(rawEdges.flatMap((e) => [e.a, e.b]).concat(group))];
   const iph = nodeIds.map(() => "?").join(",");
   const nrows = await db.prepare(
