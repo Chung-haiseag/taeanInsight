@@ -15,6 +15,7 @@ import {
   verifyKg,
   type KgNode,
 } from "@/lib/api/kg";
+import MergeConsole from "./merge-console";
 
 // 서버가 { error } 400을 주면 그 메시지를, 아니면 일반 Error 메시지를 표시
 function errMsg(e: unknown, fallback: string): string {
@@ -68,6 +69,7 @@ function KgLogin({ onOk }: { onOk: () => void }) {
 
 export default function KgAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [tab, setTab] = useState<"nodes" | "merge">("nodes");
 
   useEffect(() => {
     (async () => {
@@ -111,7 +113,28 @@ export default function KgAdminPage() {
         </div>
       </header>
 
-      <KgConsole />
+      <div className="flex gap-2 border-b border-brand/15">
+        <button
+          type="button"
+          onClick={() => setTab("nodes")}
+          className={`px-3 py-2 text-sm font-semibold ${
+            tab === "nodes" ? "border-b-2 border-brand text-brand" : "text-foreground-muted hover:text-brand"
+          }`}
+        >
+          📋 노드 목록
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("merge")}
+          className={`px-3 py-2 text-sm font-semibold ${
+            tab === "merge" ? "border-b-2 border-brand text-brand" : "text-foreground-muted hover:text-brand"
+          }`}
+        >
+          🔀 검수
+        </button>
+      </div>
+
+      {tab === "nodes" ? <KgConsole /> : <MergeConsole />}
     </div>
   );
 }
