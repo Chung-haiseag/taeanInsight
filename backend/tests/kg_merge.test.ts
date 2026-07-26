@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { withinEdit, blockKey, genCandidates } from "../../tools/kg/merge-lib.mjs";
+import { withinEdit, blockKey, genCandidates, contextOverlap } from "../../tools/kg/merge-lib.mjs";
 
 describe("withinEdit", () => {
   it("동일·1글자차는 true, 2글자+차·길이차>1은 false", () => {
@@ -23,6 +23,20 @@ describe("genCandidates", () => {
     expect(c).toHaveLength(1);
     expect(c[0].a_id < c[0].b_id).toBe(true);
     expect(new Set([c[0].a_id, c[0].b_id])).toEqual(new Set(["person:김동이", "person:김동위"]));
+  });
+});
+
+describe("contextOverlap", () => {
+  it("공유 이웃 수와 containment(작은 쪽 기준)", () => {
+    const r = contextOverlap(["x", "y", "z"], ["y", "z", "w"]);
+    expect(r.shared).toBe(2);
+    expect(r.containment).toBeCloseTo(2 / 3);
+  });
+  it("한쪽이 다른쪽의 부분집합이면 containment 1", () => {
+    expect(contextOverlap(["a", "b"], ["a", "b", "c", "d", "e"]).containment).toBe(1);
+  });
+  it("빈 집합이면 0", () => {
+    expect(contextOverlap([], ["a"])).toEqual({ shared: 0, containment: 0 });
   });
 });
 

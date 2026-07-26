@@ -19,6 +19,18 @@ export function withinEdit(a, b, max = 1) {
   return true;
 }
 export function blockKey(name) { const n = norm(name); return n.length + ":" + (n[0] ?? ""); }
+
+// 두 인물의 공동등장(coappears) 이웃 집합 겹침 — 동명이인 판별용 맥락 필터.
+// containment = shared / min(|A|,|B|) — 한쪽이 다른쪽의 부분집합에 가까우면 1에 근접.
+export function contextOverlap(neighborsA, neighborsB) {
+  const a = neighborsA instanceof Set ? neighborsA : new Set(neighborsA ?? []);
+  const b = neighborsB instanceof Set ? neighborsB : new Set(neighborsB ?? []);
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  let shared = 0;
+  for (const x of small) if (large.has(x)) shared++;
+  const minSize = Math.min(a.size, b.size);
+  return { shared, containment: minSize ? shared / minSize : 0 };
+}
 export function genCandidates(nodes) {
   const blocks = new Map();
   for (const nd of nodes ?? []) {

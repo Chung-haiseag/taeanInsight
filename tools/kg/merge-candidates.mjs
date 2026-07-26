@@ -1,14 +1,17 @@
 #!/usr/bin/env node
-// tools/kg/merge-candidates.mjs — KG 병합 후보 탐지: kg_nodes(person, 미병합) → genCandidates → kg_merge_candidates 적재.
-//   순수 로직(블로킹+편집거리≤1)은 ./merge-lib.mjs 재사용(재구현 금지). D1 읽기/쓰기 패턴은
+// tools/kg/merge-candidates.mjs — KG 병합 후보 탐지: kg_nodes(person, 미병합) → genCandidates → 맥락(이웃 겹침) 필터 → kg_merge_candidates 적재.
+//   순수 로직(블로킹+편집거리≤1, 맥락겹침)은 ./merge-lib.mjs 재사용(재구현 금지). D1 읽기/쓰기 패턴은
 //   extract-persons.mjs(읽기, --json)/apply-kg.mjs(d1file 재시도 쓰기)와 동일.
+//   이름 편집거리만으로는 34,510명 규모에서 596,039개 후보(대부분 오탐: 김철수/김철호처럼 실제로는
+//   다른 사람)가 나와, 같은 기사에 공동등장(coappears)한 이웃 노드 집합이 많이 겹치는 쌍만 남긴다
+//   (OCR/표기변형으로 같은 인물이면 이웃도 대부분 같음).
 // 사용: node merge-candidates.mjs [--dry]   (--dry: SQL만 생성, 원격 적용 생략)
 import { writeFile, mkdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { genCandidates } from "./merge-lib.mjs";
+import { genCandidates, contextOverlap } from "./merge-lib.mjs";
 
 const exec = promisify(execFile);
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -19,6 +22,9 @@ const FAILLOG = join(OUT_DIR, "merge_cand_failures.txt");
 const DRY = process.argv.includes("--dry");
 const BATCH_ROWS = 500; // 배치당 대략 이 정도 INSERT 문 수
 const NOW = new Date().toISOString(); // 이번 실행의 단일 타임스탬프(created_at/updated_at)
+// 맥락(이웃 겹침) 필터 임계값 — 튜닝 포인트. 공유 이웃 수 & containment(작은 쪽 기준) 둘 다 만족해야 통과.
+const MIN_SHARED = 2;
+const MIN_CONTAINMENT = 0.3;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 일시오류 판정 — apply-kg.mjs/extract-persons.mjs와 동일 정규식.
@@ -34,6 +40,27 @@ async function d1(sql, tries = 5) {
         { maxBuffer: 64 * 1024 * 1024 }
       );
       // wrangler가 JSON 앞에 진행 메시지를 찍는 경우가 있어 JSON 시작점부터 파싱.
+      const i = stdout.indexOf("[");
+      if (i === -1) throw new Error("wrangler 응답에 JSON 없음: " + stdout.slice(0, 200));
+      return JSON.parse(stdout.slice(i));
+    } catch (e) {
+      const msg = String(e.stdout || e.stderr || e.message || "");
+      if (t < tries && TRANSIENT.test(msg)) { await sleep(1500 * t * t); continue; }
+      throw e;
+    }
+  }
+}
+
+// coappears 엣지 전체 조회 전용 — kg_edges(rel='coappears')는 약 127만 행(~90MB JSON)이라
+// 기본 d1()의 maxBuffer(64MB)로는 부족. 파싱 방식(첫 '['부터)과 재시도 로직은 d1()과 동일.
+async function d1Big(sql, tries = 5) {
+  for (let t = 1; t <= tries; t++) {
+    try {
+      const { stdout } = await exec(
+        "npx",
+        ["wrangler", "d1", "execute", "taean-archive", "--remote", "--command", sql, "--json"],
+        { maxBuffer: 300 * 1024 * 1024 }
+      );
       const i = stdout.indexOf("[");
       if (i === -1) throw new Error("wrangler 응답에 JSON 없음: " + stdout.slice(0, 200));
       return JSON.parse(stdout.slice(i));
@@ -97,9 +124,35 @@ async function main() {
   console.log(`${rows.length}건 조회`);
   if (!rows.length) { console.log("대상 노드가 없습니다."); return; }
 
-  const candidates = genCandidates(rows); // 순수 로직 재사용 — 여기서 재구현하지 않음
-  console.log(`${candidates.length}개 병합 후보 생성`);
-  if (!candidates.length) { console.log("생성된 후보가 없습니다."); return; }
+  const nameCands = genCandidates(rows); // 순수 로직 재사용 — 여기서 재구현하지 않음
+  console.log(`${nameCands.length}개 이름 후보 생성`);
+  if (!nameCands.length) { console.log("생성된 후보가 없습니다."); return; }
+
+  // 맥락(이웃 겹침) 필터 — 공동등장(coappears) 엣지로 인접 집합을 만들어, 실제로 같은 문맥에서
+  // 함께 언급된 쌍만 남긴다(이름만 비슷한 다른 사람 배제).
+  console.log("kg_edges(coappears) 조회 중...");
+  const edgeResult = await d1Big("SELECT src_id, dst_id FROM kg_edges WHERE rel='coappears'");
+  const edgeRows = edgeResult?.[0]?.results ?? [];
+  console.log(`${edgeRows.length}개 coappears 엣지 조회`);
+
+  const adj = new Map();
+  function link(x, y) {
+    if (x === y) return; // self-loop 제외
+    let s = adj.get(x);
+    if (!s) { s = new Set(); adj.set(x, s); }
+    s.add(y);
+  }
+  for (const e of edgeRows) {
+    link(e.src_id, e.dst_id);
+    link(e.dst_id, e.src_id);
+  }
+
+  const candidates = nameCands.filter((c) => {
+    const o = contextOverlap(adj.get(c.a_id), adj.get(c.b_id));
+    return o.shared >= MIN_SHARED && o.containment >= MIN_CONTAINMENT;
+  });
+  console.log(`이름 후보 ${nameCands.length} → 맥락 필터 후 ${candidates.length}`);
+  if (!candidates.length) { console.log("맥락 필터 통과 후보가 없습니다."); return; }
 
   // 배치 SQL 생성
   const files = [];
