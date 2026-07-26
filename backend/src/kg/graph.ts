@@ -61,7 +61,7 @@ export async function personEgo(db: D1Database, id: string, limit = 12): Promise
   const nodeIds = [...new Set(rawEdges.flatMap((e) => [e.a, e.b]).concat(group))];
   const iph = nodeIds.map(() => "?").join(",");
   const nrows = await db.prepare(
-    `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions FROM kg_nodes n WHERE n.id IN (${iph})`,
+    `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions FROM kg_nodes n WHERE n.type='person' AND n.id IN (${iph})`,
   ).bind(...nodeIds).all<GraphNode>();
   const resolved = resolveCanonical(nrows.results ?? [], rawEdges, map);
   const top = rankNeighbors(resolved.edges, center, limit);

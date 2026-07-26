@@ -58,3 +58,11 @@ export async function listCandidates(db: D1Database, limit = 50): Promise<Array<
 export async function setCandidateStatus(db: D1Database, aId: string, bId: string, status: string): Promise<void> {
   await db.prepare("UPDATE kg_merge_candidates SET status=?, updated_at=? WHERE a_id=? AND b_id=?").bind(status, now(), aId, bId).run();
 }
+export async function getCanonicalId(db: D1Database, id: string): Promise<string | null> {
+  const r = await db.prepare("SELECT canonical_id FROM kg_nodes WHERE id=?").bind(id).first<{ canonical_id: string | null }>();
+  return r?.canonical_id ?? null;
+}
+export async function findCandidateByNode(db: D1Database, id: string, status = "merged"): Promise<{ a_id: string; b_id: string } | null> {
+  const r = await db.prepare("SELECT a_id, b_id FROM kg_merge_candidates WHERE (a_id=? OR b_id=?) AND status=? LIMIT 1").bind(id, id, status).first<{ a_id: string; b_id: string }>();
+  return r ?? null;
+}

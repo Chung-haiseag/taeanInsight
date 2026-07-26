@@ -4,7 +4,7 @@ import { loadOntology, isKnownType, isValidEdge } from "./ontology";
 import { upsertNode, upsertEdge, setVerified, listNodes, getNodeType } from "./repository";
 import { assertVerifiable } from "./import";
 import { articlePersonGraph, personEgo } from "./graph";
-import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus } from "./merge";
+import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus, getCanonicalId, findCandidateByNode } from "./merge";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -78,6 +78,7 @@ router.post("/merge", async (c) => {
   const b = await c.req.json<{ merged_id: string; canonical_id: string; a_id?: string; b_id?: string }>().catch(() => ({} as any));
   if (!b.merged_id || !b.canonical_id) return c.json({ error: "merged_id/canonical_id 필수" }, 400);
   if (b.merged_id === b.canonical_id) return c.json({ error: "자기참조 병합 불가" }, 400);
+  if ((await getCanonicalId(c.env.ARCHIVE_DB, b.canonical_id)) != null) return c.json({ error: "대표 노드가 이미 병합됨 — 최종 대표로 병합하세요" }, 400);
   await setCanonical(c.env.ARCHIVE_DB, b.merged_id, b.canonical_id);
   await logMerge(c.env.ARCHIVE_DB, { merged_id: b.merged_id, canonical_id: b.canonical_id, action: "merge" });
   if (b.a_id && b.b_id) await setCandidateStatus(c.env.ARCHIVE_DB, b.a_id, b.b_id, "merged");
@@ -92,10 +93,12 @@ router.post("/merge/keep", async (c) => {
 });
 router.post("/merge/unmerge", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
-  const b = await c.req.json<{ merged_id: string }>().catch(() => ({} as any));
+  const b = await c.req.json<{ merged_id: string; a_id?: string; b_id?: string }>().catch(() => ({} as { merged_id?: string; a_id?: string; b_id?: string }));
   if (!b.merged_id) return c.json({ error: "merged_id 필수" }, 400);
   await clearCanonical(c.env.ARCHIVE_DB, b.merged_id);
   await logMerge(c.env.ARCHIVE_DB, { merged_id: b.merged_id, canonical_id: null, action: "unmerge" });
+  const pair = b.a_id && b.b_id ? { a_id: b.a_id, b_id: b.b_id } : await findCandidateByNode(c.env.ARCHIVE_DB, b.merged_id, "merged");
+  if (pair) await setCandidateStatus(c.env.ARCHIVE_DB, pair.a_id, pair.b_id, "pending");
   return c.json({ ok: true });
 });
 

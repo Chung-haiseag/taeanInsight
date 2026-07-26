@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/api/client";
-import { getMergeCandidates, keepCandidate, mergeNodes, type MergeCandidate } from "@/lib/api/kg";
+import { getMergeCandidates, keepCandidate, mergeNodes, unmergeNode, type MergeCandidate } from "@/lib/api/kg";
 
 // KgConsole과 동일 규약: 서버가 { error } 400을 주면 그 메시지를, 아니면 일반 Error 메시지를 표시
 function errMsg(e: unknown, fallback: string): string {
@@ -27,6 +27,9 @@ export default function MergeConsole() {
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [cardErr, setCardErr] = useState<Record<string, string>>({});
+  const [merged, setMerged] = useState<Array<{ merged_id: string; canonical_id: string; a_id: string; b_id: string; label: string }>>([]);
+  const [unmergeBusyKey, setUnmergeBusyKey] = useState<string | null>(null);
+  const [unmergeErr, setUnmergeErr] = useState<Record<string, string>>({});
 
   async function load() {
     try {
@@ -69,8 +72,11 @@ export default function MergeConsole() {
       const aWins = c.a_men >= c.b_men;
       const canonical_id = aWins ? c.a_id : c.b_id;
       const merged_id = aWins ? c.b_id : c.a_id;
+      const mergedName = aWins ? c.b_name : c.a_name;
+      const canonName = aWins ? c.a_name : c.b_name;
       await mergeNodes({ merged_id, canonical_id, a_id: c.a_id, b_id: c.b_id });
       remove(key);
+      setMerged((m) => [{ merged_id, canonical_id, a_id: c.a_id, b_id: c.b_id, label: `${mergedName} → ${canonName}` }, ...m]);
     } catch (e) {
       setCardErr((cur) => ({ ...cur, [key]: errMsg(e, "병합 실패") }));
     } finally {
@@ -95,6 +101,25 @@ export default function MergeConsole() {
   function handleSkip(c: MergeCandidate) {
     // 보류: 서버 호출 없이 이번 화면에서만 제거(새로고침/재로드 시 다시 나타남)
     remove(keyOf(c));
+  }
+
+  async function handleUnmerge(m: { merged_id: string; a_id: string; b_id: string }) {
+    const key = m.merged_id;
+    setUnmergeBusyKey(key);
+    setUnmergeErr((cur) => {
+      if (!(key in cur)) return cur;
+      const next = { ...cur };
+      delete next[key];
+      return next;
+    });
+    try {
+      await unmergeNode(m.merged_id, m.a_id, m.b_id);
+      setMerged((cur) => cur.filter((x) => x.merged_id !== m.merged_id));
+    } catch (e) {
+      setUnmergeErr((cur) => ({ ...cur, [key]: errMsg(e, "되돌리기 실패") }));
+    } finally {
+      setUnmergeBusyKey(null);
+    }
   }
 
   return (
@@ -158,6 +183,34 @@ export default function MergeConsole() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {merged.length > 0 && (
+        <div className="space-y-2 border-t border-brand/10 pt-4">
+          <h3 className="text-sm font-semibold text-brand">최근 병합 (되돌리기 가능)</h3>
+          <div className="space-y-2">
+            {merged.map((m) => {
+              const busy = unmergeBusyKey === m.merged_id;
+              const err = unmergeErr[m.merged_id];
+              return (
+                <div key={m.merged_id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-brand/10 p-3 text-sm">
+                  <div className="space-y-1">
+                    <span>병합: {m.label}</span>
+                    {err && <p className="text-sm text-red-600 border border-red-200 rounded p-2 bg-red-50">⚠️ {err}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleUnmerge(m)}
+                    disabled={busy}
+                    className="rounded border border-brand/20 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60"
+                  >
+                    {busy ? "처리 중…" : "되돌리기"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </section>

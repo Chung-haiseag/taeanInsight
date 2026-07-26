@@ -106,6 +106,6 @@ export async function keepCandidate(a_id: string, b_id: string): Promise<{ ok: b
   return apiFetch(`/api/admin/kg/merge/keep`, { method: "POST", body: JSON.stringify({ a_id, b_id }) });
 }
 
-export async function unmergeNode(merged_id: string): Promise<{ ok: boolean }> {
-  return apiFetch(`/api/admin/kg/merge/unmerge`, { method: "POST", body: JSON.stringify({ merged_id }) });
+export async function unmergeNode(merged_id: string, a_id?: string, b_id?: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/merge/unmerge`, { method: "POST", body: JSON.stringify({ merged_id, a_id, b_id }) });
 }
