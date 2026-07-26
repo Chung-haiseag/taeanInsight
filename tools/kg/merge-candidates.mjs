@@ -25,6 +25,7 @@ const NOW = new Date().toISOString(); // 이번 실행의 단일 타임스탬프
 // 맥락(이웃 겹침) 필터 임계값 — 튜닝 포인트. 공유 이웃 수 & containment(작은 쪽 기준) 둘 다 만족해야 통과.
 const MIN_SHARED = 2;
 const MIN_CONTAINMENT = 0.5;
+const HUB_DEG = 300; // 이웃이 이보다 많은 인물=초허브(기자/편집인 등) — 변별력 없어 겹침 계산에서 제외
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 일시오류 판정 — apply-kg.mjs/extract-persons.mjs와 동일 정규식.
@@ -147,8 +148,22 @@ async function main() {
     link(e.dst_id, e.src_id);
   }
 
+  // 초허브(이웃 과다 인물) 식별 → 겹침 계산에서 제외해 변별력 확보.
+  // (초허브는 거의 모두와 공동등장하므로 "함께 등장했다"가 같은 사람 증거가 못 됨)
+  const hubs = new Set();
+  for (const [id, s] of adj) if (s.size > HUB_DEG) hubs.add(id);
+  console.log(`초허브 ${hubs.size}명(이웃>${HUB_DEG}) — 겹침 계산에서 제외`);
+  const adjNoHub = new Map();
+  for (const [id, s] of adj) {
+    const out = new Set();
+    for (const x of s) if (!hubs.has(x)) out.add(x);
+    adjNoHub.set(id, out);
+  }
+
   const candidates = nameCands.filter((c) => {
-    const o = contextOverlap(adj.get(c.a_id), adj.get(c.b_id));
+    // 초허브가 한쪽이면 (그가 거의 모두와 공동등장하므로) 겹침으로 같은 사람 판별이 불가 → v1 큐에서 제외.
+    if (hubs.has(c.a_id) || hubs.has(c.b_id)) return false;
+    const o = contextOverlap(adjNoHub.get(c.a_id), adjNoHub.get(c.b_id));
     return o.shared >= MIN_SHARED && o.containment >= MIN_CONTAINMENT;
   });
   console.log(`이름 후보 ${nameCands.length} → 맥락 필터 후 ${candidates.length}`);
