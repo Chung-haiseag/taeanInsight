@@ -41,10 +41,21 @@ describe("resolveCanonical", () => {
       { a: "person:김동이", b: "person:김동위", weight: 9 }, // 병합 후 self → 제거
     ];
     const r = resolveCanonical(nodes, edges, map);
-    expect(r.nodes.find((n) => n.id === "person:김동이").mentions).toBe(105);
+    expect(r.nodes.find((n) => n.id === "person:김동이")!.mentions).toBe(105);
     expect(r.nodes.some((n) => n.id === "person:김동위")).toBe(false);
-    const e = r.edges.find((e) => (e.a === "person:가세로" || e.b === "person:가세로"));
+    const e = r.edges.find((e) => (e.a === "person:가세로" || e.b === "person:가세로"))!;
     expect(e.weight).toBe(5);
     expect(r.edges.some((e) => e.a === e.b)).toBe(false);
+  });
+  it("병합 노드가 배열에서 먼저 와도 대표 이름이 우선", () => {
+    const map = { "person:김동위": "person:김동이" };
+    const nodes = [
+      { id: "person:김동위", name: "김동위", mentions: 5 },
+      { id: "person:김동이", name: "김동이", mentions: 100 },
+    ];
+    const r = resolveCanonical(nodes, [], map);
+    const c = r.nodes.find((n) => n.id === "person:김동이")!;
+    expect(c.name).toBe("김동이");
+    expect(c.mentions).toBe(105);
   });
 });

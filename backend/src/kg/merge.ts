@@ -6,8 +6,12 @@ export function resolveCanonical(nodes: GraphNode[], edges: Edge[], map: Record<
   for (const n of nodes) {
     const id = canon(n.id);
     const ex = nmap.get(id);
-    if (ex) ex.mentions = (ex.mentions ?? 0) + (n.mentions ?? 0);
-    else nmap.set(id, { id, name: n.name, mentions: n.mentions ?? 0 });
+    if (ex) {
+      ex.mentions = (ex.mentions ?? 0) + (n.mentions ?? 0);
+      if (n.id === id) ex.name = n.name; // 대표 노드 자신의 이름이 우선
+    } else {
+      nmap.set(id, { id, name: n.name, mentions: n.mentions ?? 0 });
+    }
   }
   const emap = new Map<string, Edge>();
   for (const e of edges) {
