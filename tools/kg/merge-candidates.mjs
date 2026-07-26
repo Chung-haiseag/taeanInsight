@@ -24,7 +24,7 @@ const BATCH_ROWS = 500; // 배치당 대략 이 정도 INSERT 문 수
 const NOW = new Date().toISOString(); // 이번 실행의 단일 타임스탬프(created_at/updated_at)
 // 맥락(이웃 겹침) 필터 임계값 — 튜닝 포인트. 공유 이웃 수 & containment(작은 쪽 기준) 둘 다 만족해야 통과.
 const MIN_SHARED = 2;
-const MIN_CONTAINMENT = 0.3;
+const MIN_CONTAINMENT = 0.5;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 일시오류 판정 — apply-kg.mjs/extract-persons.mjs와 동일 정규식.
