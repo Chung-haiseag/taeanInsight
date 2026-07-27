@@ -109,3 +109,21 @@ export async function keepCandidate(a_id: string, b_id: string): Promise<{ ok: b
 export async function unmergeNode(merged_id: string, a_id?: string, b_id?: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/merge/unmerge`, { method: "POST", body: JSON.stringify({ merged_id, a_id, b_id }) });
 }
+
+// 인물 탐색(취재 지원) — backend people.ts
+export interface PersonSearchResult { id: string; name: string; mentions: number }
+export function searchPersons(q: string): Promise<{ results: PersonSearchResult[] }> {
+  return apiFetch(`/api/admin/kg/persons/search?q=${encodeURIComponent(q)}`);
+}
+
+export interface PersonProfile {
+  person: { id: string; name: string; mentions: number; isHub: boolean } | null;
+  graph: { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] };
+  coappear: { id: string; name: string; count: number }[];
+  articles: { idxno: number; title: string; published_at: string }[];
+  offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
+  timeline: { year: number; count: number }[];
+}
+export function getPersonProfile(id: string): Promise<PersonProfile> {
+  return apiFetch(`/api/admin/kg/person/${encodeURIComponent(id)}/profile`);
+}

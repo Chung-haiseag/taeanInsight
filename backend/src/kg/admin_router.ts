@@ -5,6 +5,7 @@ import { upsertNode, upsertEdge, setVerified, listNodes, getNodeType } from "./r
 import { assertVerifiable } from "./import";
 import { articlePersonGraph, personEgo } from "./graph";
 import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus, getCanonicalId, findCandidateByNode } from "./merge";
+import { searchPersons, buildPersonProfile } from "./people";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -66,6 +67,21 @@ router.get("/person/:id/ego", async (c) => {
   const id = c.req.param("id");
   const limit = Math.max(1, Math.min(50, Number(c.req.query("limit")) || 12));
   return c.json(await personEgo(c.env.ARCHIVE_DB, id, limit));
+});
+router.get("/persons/search", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const q = (c.req.query("q") || "").trim();
+  if (!q) return c.json({ results: [] });
+  const limit = Math.max(1, Math.min(50, Number(c.req.query("limit")) || 20));
+  return c.json({ results: await searchPersons(c.env.ARCHIVE_DB, q, limit) });
+});
+router.get("/person/:id/profile", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const id = c.req.param("id");
+  const limit = Math.max(1, Math.min(30, Number(c.req.query("limit")) || 12));
+  const prof = await buildPersonProfile(c.env.ARCHIVE_DB, id, limit);
+  if (!prof) return c.json({ error: "person_not_found" }, 404);
+  return c.json(prof);
 });
 
 router.get("/merge/candidates", async (c) => {

@@ -51,7 +51,7 @@ export async function articlePersonGraph(db: D1Database, idxno: number): Promise
 }
 
 // 얇은 D1: 인물 ego — 중심을 대표로 해소 후 병합 멤버 엣지까지 합쳐 상위 limit 이웃 + 엣지.
-export async function personEgo(db: D1Database, id: string, limit = 12): Promise<{ center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] }> {
+export async function personEgo(db: D1Database, id: string, limit = 12, excludeHubs?: Set<string>): Promise<{ center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] }> {
   const map = await loadCanonicalMap(db);
   const center = map[id] ?? id;
   const centerNode = await db.prepare("SELECT id, name FROM kg_nodes WHERE id=? AND type='person'").bind(center).first<{ id: string; name: string }>();
@@ -66,8 +66,11 @@ export async function personEgo(db: D1Database, id: string, limit = 12): Promise
   const rawEdges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: Number(e.weight) || 1, reltype: e.reltype ? e.reltype : undefined }));
   // 이웃 노드 전량 조회는 D1 바인딩 파라미터(쿼리당 100개) 한도를 넘긴다(가세로=이웃 4,070명). 엣지만 canonical
   // 병합·랭킹한 뒤, 최종 유지 노드(중심 + 상위 limit, 소수)만 이름·언급수를 조회한다. limit은 100 미만으로 클램프.
+  const edgesForRank = excludeHubs && excludeHubs.size
+    ? rawEdges.filter((e) => !excludeHubs.has(e.a) && !excludeHubs.has(e.b))
+    : rawEdges;
   const lim = Math.min(Math.max(0, Math.floor(limit)), 60);
-  const { edges } = resolveCanonical([], rawEdges, map);
+  const { edges } = resolveCanonical([], edgesForRank, map);
   const top = rankNeighbors(edges, center, lim);
   const keepIds = [...new Set([center, ...top.map((n) => n.id)])];
   const keep = new Set(keepIds);
