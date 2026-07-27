@@ -1,6 +1,6 @@
 "use client";
 
-// 주간 AI 팟캐스트 — 진행자 2인 대담. 큰 WAV라 blob 대신 직접 스트리밍(사용자 제스처 유지→자동재생 차단 회피).
+// 주간 AI 팟캐스트 — 진행자 2인 대담. Gemini 낭독(.wav)만 서빙, 없으면 503→'준비 중'. 큰 WAV라 직접 스트리밍(제스처 유지).
 
 import { useRef, useState } from "react";
 import { Icon } from "@/components/icon";
@@ -10,13 +10,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-
 
 export function PodcastAudio() {
   const ref = useRef<HTMLAudioElement | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "playing" | "error" | "unavailable">("idle");
 
   function play() {
     const el = ref.current; if (!el) return;
-    if (!el.src) el.src = `${API_BASE}/api/audio/podcast?t=${Date.now()}`; // 스트리밍(제스처 내 즉시 play)
+    if (!el.src) el.src = `${API_BASE}/api/audio/podcast?t=${Date.now()}`; // 스트리밍(제스처 내 즉시 play). Gemini 낭독 없으면 503.
     setState("loading");
     el.play().then(() => { trackEvent("audio_play", "podcast"); setState("playing"); }).catch(() => setState("error"));
+  }
+
+  // 503(no_audio) = 이번 주 Gemini 팟캐스트 미생성 → '준비 중'으로 구분
+  async function onAudioError() {
+    try { const r = await fetch(`${API_BASE}/api/audio/podcast`); setState(r.status === 503 ? "unavailable" : "error"); }
+    catch { setState("error"); }
   }
 
   return (
@@ -35,7 +41,8 @@ export function PodcastAudio() {
       </div>
       <audio ref={ref} controls preload="none"
         className={state === "playing" || state === "loading" ? "mt-3 w-full" : "hidden"}
-        onError={() => setState("error")} onPlaying={() => setState("playing")} />
+        onError={onAudioError} onPlaying={() => setState("playing")} />
+      {state === "unavailable" && <p className="mt-2 text-xs text-foreground-muted">🎧 이번 주 팟캐스트는 준비 중입니다 — 생성되면 자동 제공됩니다.</p>}
       {state === "error" && <p className="mt-2 text-xs text-red-600">재생 실패 — 잠시 후 다시 시도하세요.</p>}
     </section>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-// 오디오 뉴스 — 서버 생성 음성을 직접 스트리밍(사용자 제스처 유지). 첫 재생 시 생성(수초), 이후 캐시.
+// 오디오 뉴스 — 서버 생성 음성을 직접 스트리밍(사용자 제스처 유지). Gemini 낭독(.wav)만 서빙, 없으면 503→'음성 준비 중'.
 
 import { useRef, useState } from "react";
 import { Icon } from "@/components/icon";
@@ -10,13 +10,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-
 
 export function NewsAudio({ idxno }: { idxno: number }) {
   const ref = useRef<HTMLAudioElement | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "playing" | "error" | "unavailable">("idle");
 
   function play() {
     const el = ref.current; if (!el) return;
-    if (!el.src) el.src = `${API_BASE}/api/audio/news/${idxno}?v=hd7`; // 백엔드 오디오 버전과 동기화(엔티티·특수문자·띄어쓰기 교정본). 오디오 파이프라인 변경 시 함께 올릴 것.
+    if (!el.src) el.src = `${API_BASE}/api/audio/news/${idxno}?v=hd7`; // 백엔드 오디오 버전과 동기화. Gemini 낭독 없으면 503.
     setState("loading");
     el.play().then(() => { trackEvent("audio_play", `news:${idxno}`); setState("playing"); }).catch(() => setState("error"));
+  }
+
+  // 503(no_audio) = 아직 Gemini 낭독 미생성 → '준비 중'으로 구분(실제 재생 오류와 분리)
+  async function onAudioError() {
+    try { const r = await fetch(`${API_BASE}/api/audio/news/${idxno}?v=hd7`); setState(r.status === 503 ? "unavailable" : "error"); }
+    catch { setState("error"); }
   }
 
   return (
@@ -29,7 +35,8 @@ export function NewsAudio({ idxno }: { idxno: number }) {
       )}
       <audio ref={ref} controls preload="none"
         className={state === "playing" || state === "loading" ? "h-9 w-full max-w-md align-middle" : "hidden"}
-        onError={() => setState("error")} onPlaying={() => setState("playing")} />
+        onError={onAudioError} onPlaying={() => setState("playing")} />
+      {state === "unavailable" && <span className="text-xs text-foreground-muted">🎧 음성 준비 중 — 곧 자동 생성됩니다</span>}
       {state === "error" && <span className="text-xs text-red-600">재생 실패</span>}
     </div>
   );

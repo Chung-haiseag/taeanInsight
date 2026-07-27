@@ -1,6 +1,7 @@
 // 주요 기사 Gemini 낭독 생성기(로컬·한국 IP) — 팟캐스트급 자연 음성, 무료.
 //   Worker는 Gemini 지역차단 → 한국 IP 맥에서 생성해 R2 업로드.
-//   무료 키 3개(victory·holyroad·taeannews) 로테이션 → 하루 ~45건 무료. 소진 시 중단(나머지는 Worker Chirp3-HD 폴백).
+//   무료 키 3개(victory·holyroad·taeannews) 로테이션 → 하루 ~45건 무료. 소진 시 중단(나머지는 음성 없음 —
+//   다음 실행에서 최신순으로 재시도. Chirp3-HD 폴백은 2026-07-27 제거, Gemini 낭독만 서빙).
 //
 //   키: tools/news-audio/.gemini_keys (한 줄에 하나, 무료 등급 키) — chmod 600
 //   사용: node tools/news-audio/gen-news-audio.mjs [--max=24] [--force]
@@ -148,13 +149,13 @@ async function main() {
   const rows = d1(`SELECT idxno, title, substr(COALESCE(body, excerpt, ''),1,1500) AS body
     FROM archive_articles WHERE idxno IN (${ids.join(",")})`).sort((a, b) => ord.get(String(a.idxno)) - ord.get(String(b.idxno)));
 
-  let done = 0, fail = 0;
+  let done = 0, fail = 0, exhaustedRun = false;
   for (const a of rows) {
     const key = `audio/news/${a.idxno}-gem2.wav`;
     const script = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     const r = await geminiTts(script);
-    if (r.exhausted) { console.log(`  ⚠ 무료 한도 소진 — 나머지는 Chirp3-HD 폴백. (생성 ${done})`); break; }
-    if (r.skip) { fail++; console.log(`  ⤼ ${a.idxno} 건너뜀(TTS 반복 오류) — Chirp3-HD 폴백`); continue; }
+    if (r.exhausted) { exhaustedRun = true; console.log(`  ⚠ 무료 한도 소진 — 나머지 ${picked.length - done - fail}건은 음성 없음(다음 실행 재시도). (생성 ${done})`); break; }
+    if (r.skip) { fail++; console.log(`  ⤼ ${a.idxno} 건너뜀(TTS 반복 오류) — 음성 없음`); continue; }
     const tmp = join(tmpdir(), `news-${a.idxno}.wav`);
     writeFileSync(tmp, r.audio);
     try { wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]); }
@@ -164,6 +165,6 @@ async function main() {
     await sleep(1500); // rate 여유
   }
   console.log(`완료 — 생성 ${done} · 건너뜀 ${fail} · 키사용 ${used.join("/")}`);
-  writeStatus({ news: { generated: done, failed: fail, target: picked.length, at: new Date().toISOString() } });
+  writeStatus({ news: { generated: done, failed: fail, target: picked.length, missing: picked.length - done - fail, exhausted: exhaustedRun, at: new Date().toISOString() } });
 }
 main().catch((e) => { console.error("실패:", e.message); process.exit(1); });
