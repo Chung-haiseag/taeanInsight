@@ -68,11 +68,39 @@ export default function RootLayout({
         <a href="#main" className="skip-link">
           본문으로 건너뛰기
         </a>
+        {/* 인쇄·PDF 저장 워터마크. position:fixed 요소는 인쇄 시 페이지마다 반복 렌더되므로
+            모든 쪽에 사선 문구가 들어간다. 화면에서는 globals.css 가 숨김 처리. */}
+        <div className="print-watermark" aria-hidden="true">
+          <span>태안인사이트</span>
+        </div>
         <AccessibilityProvider>
           <div className="min-h-dvh flex flex-col">
             <SiteHeader />
             <main id="main" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
-              {children}
+              {/* 인쇄 페이지 프레임: thead/tfoot은 인쇄 시 페이지마다 반복되므로
+                  2페이지 이후에도 상·하단 여백이 유지된다(인쇄 설정 '여백=없음'에서도).
+                  화면에서는 globals.css가 display:block + thead/tfoot 숨김 처리해 영향 없음. */}
+              <table className="print-frame" role="presentation">
+                <thead aria-hidden="true">
+                  <tr>
+                    <td>
+                      <div className="print-frame-space" />
+                    </td>
+                  </tr>
+                </thead>
+                <tfoot aria-hidden="true">
+                  <tr>
+                    <td>
+                      <div className="print-frame-space" />
+                    </td>
+                  </tr>
+                </tfoot>
+                <tbody>
+                  <tr>
+                    <td>{children}</td>
+                  </tr>
+                </tbody>
+              </table>
             </main>
             <SiteFooter />
           </div>
