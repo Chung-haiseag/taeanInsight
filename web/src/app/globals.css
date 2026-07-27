@@ -230,24 +230,26 @@ h2[id] {
     height: 10mm;
   }
 
-  /* 사선 워터마크 — position:fixed 라 인쇄 시 모든 페이지에 반복된다.
-     배경이 아니라 '텍스트'라서 인쇄 옵션의 '배경 그래픽' 체크 여부와 무관하게 항상 출력된다. */
+  /* 사선 타일 워터마크 — position:fixed 라 인쇄 시 모든 페이지에 반복된다.
+     배경이 아니라 '텍스트'라서 인쇄 옵션의 '배경 그래픽' 체크 여부와 무관하게 항상 출력된다.
+     2열 × 5행 = layout.tsx 의 span 10개와 맞춰져 있다(개수 바꾸면 열 수도 함께 조정). */
   .print-watermark {
-    display: flex !important;
+    display: grid !important;
     position: fixed;
     inset: 0;
-    align-items: center;
-    justify-content: center;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 1fr;
+    place-items: center;
     z-index: 9999;
     pointer-events: none;
   }
   .print-watermark span {
     transform: rotate(-45deg);
-    font-size: 64pt;
-    font-weight: 800;
-    letter-spacing: 0.2em;
+    font-size: 10pt;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     white-space: nowrap;
-    color: rgba(31, 42, 68, 0.09);
+    color: rgba(31, 42, 68, 0.04);
   }
   /* 본문 행은 아래 break-inside:avoid 대상에서 제외 — 본문 전체가 한 행이라 페이지마다 잘려야 한다.
      주의: thead/tfoot 에는 절대 break-inside:auto 를 주지 말 것.
