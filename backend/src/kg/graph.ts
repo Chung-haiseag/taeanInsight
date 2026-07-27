@@ -58,21 +58,28 @@ export async function personEgo(db: D1Database, id: string, limit = 12): Promise
   if (!centerNode) return { center: null, nodes: [], edges: [] };
   const group = [center, ...(await getMembers(db, center))];
   const gph = group.map(() => "?").join(",");
+  // 인접 엣지 — weight·reltype만 json_extract로 뽑아(articles 배열 제외) 고차수 인물의 응답 페이로드를 줄인다.
   const inc = await db.prepare(
-    `SELECT src_id, dst_id, attrs_json FROM kg_edges WHERE rel='coappears' AND (src_id IN (${gph}) OR dst_id IN (${gph}))`,
-  ).bind(...group, ...group).all<{ src_id: string; dst_id: string; attrs_json: string | null }>();
-  const rawEdges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: parseWeight(e.attrs_json), reltype: parseReltype(e.attrs_json) }));
-  const nodeIds = [...new Set(rawEdges.flatMap((e) => [e.a, e.b]).concat(group))];
-  const iph = nodeIds.map(() => "?").join(",");
+    `SELECT src_id, dst_id, CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS weight, json_extract(attrs_json,'$.reltype') AS reltype ` +
+    `FROM kg_edges WHERE rel='coappears' AND (src_id IN (${gph}) OR dst_id IN (${gph}))`,
+  ).bind(...group, ...group).all<{ src_id: string; dst_id: string; weight: number | null; reltype: string | null }>();
+  const rawEdges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: Number(e.weight) || 1, reltype: e.reltype ? e.reltype : undefined }));
+  // 이웃 노드 전량 조회는 D1 바인딩 파라미터(쿼리당 100개) 한도를 넘긴다(가세로=이웃 4,070명). 엣지만 canonical
+  // 병합·랭킹한 뒤, 최종 유지 노드(중심 + 상위 limit, 소수)만 이름·언급수를 조회한다. limit은 100 미만으로 클램프.
+  const lim = Math.min(Math.max(0, Math.floor(limit)), 60);
+  const { edges } = resolveCanonical([], rawEdges, map);
+  const top = rankNeighbors(edges, center, lim);
+  const keepIds = [...new Set([center, ...top.map((n) => n.id)])];
+  const keep = new Set(keepIds);
+  const kph = keepIds.map(() => "?").join(",");
   const nrows = await db.prepare(
-    `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions FROM kg_nodes n WHERE n.type='person' AND n.id IN (${iph})`,
-  ).bind(...nodeIds).all<GraphNode>();
-  const resolved = resolveCanonical(nrows.results ?? [], rawEdges, map);
-  const top = rankNeighbors(resolved.edges, center, limit);
-  const keep = new Set([center, ...top.map((n) => n.id)]);
+    `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions FROM kg_nodes n WHERE n.type='person' AND n.id IN (${kph})`,
+  ).bind(...keepIds).all<GraphNode>();
+  const nmap = new Map((nrows.results ?? []).map((n) => [n.id, n] as const));
+  const nodes: GraphNode[] = keepIds.map((kid) => nmap.get(kid) ?? { id: kid, name: kid === center ? centerNode.name : kid, mentions: 0 });
   return {
     center: { id: center, name: centerNode.name },
-    nodes: resolved.nodes.filter((n) => keep.has(n.id)),
-    edges: resolved.edges.filter((e) => keep.has(e.a) && keep.has(e.b)),
+    nodes,
+    edges: edges.filter((e) => keep.has(e.a) && keep.has(e.b)),
   };
 }
