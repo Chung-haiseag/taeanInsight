@@ -249,7 +249,9 @@ h2[id] {
     font-weight: 700;
     letter-spacing: 0.1em;
     white-space: nowrap;
-    color: rgba(31, 42, 68, 0.04);
+    /* 농도 기준(흰 바탕 대비 글자 밝기): .04→246 거의 안보임 · .12→228 화면에서 은은히 보임
+       · .16→219 종이 인쇄에도 남음. 10pt 작은 글자라 큰 글자보다 진하게 줘야 인지된다. */
+    color: rgba(31, 42, 68, 0.12);
   }
   /* 본문 행은 아래 break-inside:avoid 대상에서 제외 — 본문 전체가 한 행이라 페이지마다 잘려야 한다.
      주의: thead/tfoot 에는 절대 break-inside:auto 를 주지 말 것.
