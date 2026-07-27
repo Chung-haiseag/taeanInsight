@@ -12,6 +12,7 @@ import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
+import { wavToMp3 } from "../lib/wav-to-mp3.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
@@ -151,17 +152,18 @@ async function main() {
 
   let done = 0, fail = 0, exhaustedRun = false;
   for (const a of rows) {
-    const key = `audio/news/${a.idxno}-gem2.wav`;
+    const key = `audio/news/${a.idxno}-gem2.mp3`;
     const script = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     const r = await geminiTts(script);
     if (r.exhausted) { exhaustedRun = true; console.log(`  ⚠ 무료 한도 소진 — 나머지 ${picked.length - done - fail}건은 음성 없음(다음 실행 재시도). (생성 ${done})`); break; }
     if (r.skip) { fail++; console.log(`  ⤼ ${a.idxno} 건너뜀(TTS 반복 오류) — 음성 없음`); continue; }
-    const tmp = join(tmpdir(), `news-${a.idxno}.wav`);
-    writeFileSync(tmp, r.audio);
-    try { wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]); }
+    const mp3 = wavToMp3(r.audio);
+    const tmp = join(tmpdir(), `news-${a.idxno}.mp3`);
+    writeFileSync(tmp, mp3);
+    try { wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/mpeg", "--remote"]); }
     finally { rmSync(tmp, { force: true }); }
     done++;
-    console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(r.audio.length / 1024).toFixed(0)}KB)`);
+    console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(mp3.length / 1024).toFixed(0)}KB mp3)`);
     await sleep(1500); // rate 여유
   }
   console.log(`완료 — 생성 ${done} · 건너뜀 ${fail} · 키사용 ${used.join("/")}`);

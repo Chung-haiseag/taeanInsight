@@ -15,7 +15,9 @@ audioRouter.get("/podcast", async (c) => {
     .prepare("SELECT week_id FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1")
     .first<{ week_id: string }>();
   if (!rep) return c.json({ error: "no_report" }, 404);
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/podcast/${rep.week_id}-gem.wav`);
+  const mp3 = await c.env.ARCHIVE_PHOTOS.get(`audio/podcast/${rep.week_id}-gem.mp3`);
+  if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
+  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/podcast/${rep.week_id}-gem.wav`); // 전환기 폴백(구 WAV)
   if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=86400" } });
   return c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
@@ -25,7 +27,9 @@ audioRouter.get("/briefing", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
   const k = new Date(Date.now() + 9 * 3600 * 1000);
   const date = `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}-${String(k.getUTCDate()).padStart(2, "0")}`;
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.wav`);
+  const mp3 = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.mp3`);
+  if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=600, must-revalidate" } });
+  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.wav`); // 전환기 폴백(구 WAV)
   if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=600, must-revalidate" } });
   return c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
@@ -83,7 +87,9 @@ audioRouter.get("/manifest", async (c) => {
 audioRouter.get("/news/:idxno", async (c) => {
   const idxno = Number(c.req.param("idxno"));
   if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.wav`);
+  const mp3 = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.mp3`);
+  if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
+  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.wav`); // 전환기 폴백(구 WAV)
   if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=604800" } });
   return c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });

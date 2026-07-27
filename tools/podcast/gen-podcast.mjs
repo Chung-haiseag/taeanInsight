@@ -11,6 +11,7 @@ import { writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean } from "../lib/tts-normalize.mjs";
+import { wavToMp3 } from "../lib/wav-to-mp3.mjs";
 
 const KEY = process.env.GEMINI_API_KEY;
 if (!KEY) { console.error("GEMINI_API_KEY 필요 (export GEMINI_API_KEY=...)"); process.exit(1); }
@@ -113,7 +114,7 @@ function pcmToWav(pcm, rate) {
 
 async function main() {
   const rep = latestReport();
-  const key = `audio/podcast/${rep.week_id}-gem.wav`;
+  const key = `audio/podcast/${rep.week_id}-gem.mp3`;
   console.log(`▸ 주차 ${rep.week_id}`);
 
   if (!FORCE) {
@@ -136,13 +137,14 @@ async function main() {
 
   console.log("▸ 멀티스피커 음성 합성(Gemini)…");
   const wav = await synthesize(dialogue);
-  console.log(`  ${(wav.length / 1024).toFixed(0)}KB`);
+  const mp3 = wavToMp3(wav);
+  console.log(`  ${(mp3.length / 1024).toFixed(0)}KB mp3 (wav ${(wav.length / 1024).toFixed(0)}KB)`);
 
-  const tmp = join(tmpdir(), `podcast-${rep.week_id}.wav`);
-  writeFileSync(tmp, wav);
+  const tmp = join(tmpdir(), `podcast-${rep.week_id}.mp3`);
+  writeFileSync(tmp, mp3);
   try {
     console.log(`▸ R2 업로드 → ${key}`);
-    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]);
+    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/mpeg", "--remote"]);
     console.log("✅ 완료 — /reports 팟캐스트가 NotebookLM급으로 교체됩니다.");
     // 현황 기록(Worker /api/audio/status)
     try {
