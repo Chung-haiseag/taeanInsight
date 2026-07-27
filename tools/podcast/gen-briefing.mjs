@@ -9,6 +9,7 @@ import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean } from "../lib/tts-normalize.mjs";
+import { wavToMp3 } from "../lib/wav-to-mp3.mjs";
 
 // 키: .gemini_keys(뉴스낭독과 공유) 첫 줄 우선, 없으면 GEMINI_API_KEY env
 function loadKey() {
@@ -107,7 +108,7 @@ function pcmToWav(pcm, rate) {
 
 async function main() {
   const date = kstDate();
-  const key = `audio/briefing/${date}-gem.wav`;
+  const key = `audio/briefing/${date}-gem.mp3`;
   console.log(`▸ 저녁 브리핑 ${date}`);
 
   if (!FORCE) {
@@ -161,13 +162,14 @@ async function main() {
 
   console.log("▸ 멀티스피커 음성 합성(Gemini)…");
   const wav = await synthesize(dialogue);
-  console.log(`  ${(wav.length / 1024).toFixed(0)}KB`);
+  const mp3 = wavToMp3(wav);
+  console.log(`  ${(mp3.length / 1024).toFixed(0)}KB mp3 (wav ${(wav.length / 1024).toFixed(0)}KB)`);
 
-  const tmp = join(tmpdir(), `briefing-${date}.wav`);
-  writeFileSync(tmp, wav);
+  const tmp = join(tmpdir(), `briefing-${date}.mp3`);
+  writeFileSync(tmp, mp3);
   try {
     console.log(`▸ R2 업로드 → ${key}`);
-    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]);
+    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/mpeg", "--remote"]);
     console.log("✅ 완료 — 저녁 브리핑이 NotebookLM급으로 교체됩니다.");
     // 오늘 다룬 항목 저장 → 내일 중복 회피(최근 2일 롤링 유지)
     try {

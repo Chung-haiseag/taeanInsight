@@ -4,8 +4,8 @@
 //   other: 그 외(status.json 등)
 
 export function classifyAudioKey(key: string): string {
-  if (key.endsWith("-gem2.wav")) return "gem2";
-  if (key.endsWith("-gem.wav")) return "gem";
+  if (key.endsWith("-gem2.wav") || key.endsWith("-gem2.mp3")) return "gem2";
+  if (key.endsWith("-gem.wav") || key.endsWith("-gem.mp3")) return "gem";
   const hd = key.match(/-hd(\d+)\.mp3$/);
   if (hd) return `hd${hd[1]}`;
   return "other";
