@@ -8,6 +8,31 @@ import { aggregateManifest } from "./manifest";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
+// R2 오디오 서빙 — Range 요청 지원(<audio> 스트리밍·seek에 필수). 파일 없으면 null(다음 후보로).
+//   Range 없으면 전체 + content-length + accept-ranges. Range 있으면 206 부분 응답.
+async function serveAudio(
+  bucket: R2Bucket, key: string, contentType: string, cacheControl: string, rangeHeader: string | null | undefined,
+): Promise<Response | null> {
+  const m = rangeHeader ? /^bytes=(\d+)-(\d*)$/.exec(rangeHeader.trim()) : null;
+  if (m) {
+    const head = await bucket.head(key);
+    if (!head) return null;
+    const size = head.size;
+    const start = parseInt(m[1], 10);
+    const end = m[2] ? Math.min(parseInt(m[2], 10), size - 1) : size - 1;
+    if (start <= end && start < size) {
+      const obj = await bucket.get(key, { range: { offset: start, length: end - start + 1 } });
+      if (obj) return new Response(obj.body, { status: 206, headers: {
+        "content-type": contentType, "content-range": `bytes ${start}-${end}/${size}`,
+        "content-length": String(end - start + 1), "accept-ranges": "bytes", "cache-control": cacheControl } });
+    }
+  }
+  const obj = await bucket.get(key);
+  if (!obj) return null;
+  return new Response(obj.body, { headers: {
+    "content-type": contentType, "content-length": String(obj.size), "accept-ranges": "bytes", "cache-control": cacheControl } });
+}
+
 // GET /api/audio/podcast — 최신 발행 주간 리포트의 Gemini 멀티스피커 낭독(-gem.wav)만 서빙. 없으면 503.
 audioRouter.get("/podcast", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS || !c.env.ARCHIVE_DB) return c.json({ error: "bad_request" }, 400);
@@ -15,11 +40,10 @@ audioRouter.get("/podcast", async (c) => {
     .prepare("SELECT week_id FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 1")
     .first<{ week_id: string }>();
   if (!rep) return c.json({ error: "no_report" }, 404);
-  const mp3 = await c.env.ARCHIVE_PHOTOS.get(`audio/podcast/${rep.week_id}-gem.mp3`);
-  if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" } });
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/podcast/${rep.week_id}-gem.wav`); // 전환기 폴백(구 WAV)
-  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=86400" } });
-  return c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
+  const cc = "private, max-age=86400", rh = c.req.header("range");
+  const r = (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/podcast/${rep.week_id}-gem.mp3`, "audio/mpeg", cc, rh))
+    ?? (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/podcast/${rep.week_id}-gem.wav`, "audio/wav", cc, rh));
+  return r ?? c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
 
 // GET /api/audio/briefing — 당일(KST) Gemini 브리핑(-gem.wav)만 서빙. 없으면 503.
@@ -27,11 +51,10 @@ audioRouter.get("/briefing", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
   const k = new Date(Date.now() + 9 * 3600 * 1000);
   const date = `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}-${String(k.getUTCDate()).padStart(2, "0")}`;
-  const mp3 = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.mp3`);
-  if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=600, must-revalidate" } });
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/briefing/${date}-gem.wav`); // 전환기 폴백(구 WAV)
-  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=600, must-revalidate" } });
-  return c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
+  const cc = "private, max-age=600, must-revalidate", rh = c.req.header("range");
+  const r = (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/briefing/${date}-gem.mp3`, "audio/mpeg", cc, rh))
+    ?? (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/briefing/${date}-gem.wav`, "audio/wav", cc, rh));
+  return r ?? c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
 
 // GET /api/audio/status — 오디오 자동생성 현황(로컬 잡이 기록한 status.json + 이번주 팟캐스트 존재)
@@ -87,9 +110,8 @@ audioRouter.get("/manifest", async (c) => {
 audioRouter.get("/news/:idxno", async (c) => {
   const idxno = Number(c.req.param("idxno"));
   if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
-  const mp3 = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.mp3`);
-  if (mp3) return new Response(mp3.body, { headers: { "content-type": "audio/mpeg", "cache-control": "private, max-age=604800" } });
-  const gem = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.wav`); // 전환기 폴백(구 WAV)
-  if (gem) return new Response(gem.body, { headers: { "content-type": "audio/wav", "cache-control": "private, max-age=604800" } });
-  return c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
+  const cc = "private, max-age=604800", rh = c.req.header("range");
+  const r = (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/news/${idxno}-gem2.mp3`, "audio/mpeg", cc, rh))
+    ?? (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/news/${idxno}-gem2.wav`, "audio/wav", cc, rh));
+  return r ?? c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
