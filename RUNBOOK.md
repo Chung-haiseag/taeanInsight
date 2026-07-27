@@ -356,3 +356,4 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-21 · 지역언론 수집(태안 필터): 충남일보·디트뉴스24·충청투데이 RSS를 12h cron으로 수집→'태안' 필터→regional_news(url dedup). 질의 시 키워드 매칭 상위 3건 근거 주입(원문 링크·요약, 저작권). '올해/최근' 질문에 현재 데이터 공급 · backend/news/regional, query/router, db/031
 - 2026-07-22 · 질의 fact table(큐레이션 검증사실): facts 테이블+matchFacts 키워드 매칭 주입(확인된 사실 우선)+관리자 upsert(/api/query/_fact). 열거·전수형 질문(섬 명단 등) 보완. 첫 사실 '태안 섬 현황'(114개 공식) seed. 재시도 순차→병렬로 지연 45→10초 · backend/query/facts, db/032
 - 2026-07-27 · 인물 탐색(취재 지원): /admin/kg 탭, 검색→관계망·함께등장·기사·직위·시기추이, 바이라인 5000건 제외 · backend/src/kg/people.ts·web people-explorer.tsx
+- 2026-07-27 · 인쇄·PDF 저장 품질(기사/주간리포트 공통): 모든 페이지 상하 여백(thead/tfoot 반복 프레임 — '여백=없음'에서도 유지), 사선 워터마크 '태안인사이트'(position:fixed 페이지 반복), 하단 중앙 페이지번호 n/N(@page @bottom-center + counter(page)). 주의: thead/tfoot에 break-inside:auto 금지(반복 대신 분할됨) · web/app/layout.tsx·globals.css
