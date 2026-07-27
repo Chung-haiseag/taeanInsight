@@ -68,10 +68,13 @@ export default function RootLayout({
         <a href="#main" className="skip-link">
           본문으로 건너뛰기
         </a>
-        {/* 인쇄·PDF 저장 워터마크. position:fixed 요소는 인쇄 시 페이지마다 반복 렌더되므로
-            모든 쪽에 사선 문구가 들어간다. 화면에서는 globals.css 가 숨김 처리. */}
+        {/* 인쇄·PDF 저장 워터마크(사선 타일). position:fixed 요소는 인쇄 시 페이지마다 반복
+            렌더되므로 모든 쪽에 깔린다. 배경 이미지가 아니라 '텍스트'라서 인쇄 옵션의
+            '배경 그래픽' 체크 여부와 무관하게 항상 출력된다. 화면에서는 globals.css 가 숨김. */}
         <div className="print-watermark" aria-hidden="true">
-          <span>태안인사이트</span>
+          {Array.from({ length: 10 }, (_, i) => (
+            <span key={i}>태안신문</span>
+          ))}
         </div>
         <AccessibilityProvider>
           <div className="min-h-dvh flex flex-col">
