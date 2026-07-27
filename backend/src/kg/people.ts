@@ -26,3 +26,100 @@ export function yearHistogram(rows: YearCountRow[]): { year: number; count: numb
     .map((r) => ({ year: Number(r.year), count: Number(r.count) || 0 }))
     .sort((a, b) => a.year - b.year);
 }
+
+import type { GraphNode, Edge } from "./graph";
+import { personEgo } from "./graph";
+
+// 바이라인 id 집합 — 등장 기사 수 >= HUB_MENTIONS 인 person(현재 김동이·신문웅). 소수라 매 요청 조회해도 저렴.
+export async function loadHubIds(db: D1Database): Promise<Set<string>> {
+  const r = await db.prepare(
+    "SELECT n.id AS id FROM kg_nodes n WHERE n.type='person' AND (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) >= ?",
+  ).bind(HUB_MENTIONS).all<{ id: string }>();
+  return new Set((r.results ?? []).map((x) => x.id));
+}
+
+function likeEscape(q: string): string { return String(q).replace(/[\\%_]/g, (ch) => "\\" + ch); }
+
+export interface PersonHit { id: string; name: string; mentions: number }
+export async function searchPersons(db: D1Database, q: string, limit: number): Promise<PersonHit[]> {
+  const term = "%" + likeEscape(q.trim()) + "%";
+  const lim = Math.min(Math.max(1, Math.floor(limit) || 20), 50);
+  const r = await db.prepare(
+    "SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+    "FROM kg_nodes n WHERE n.type='person' AND n.name LIKE ? ESCAPE '\\' ORDER BY mentions DESC LIMIT ?",
+  ).bind(term, lim).all<PersonHit>();
+  return r.results ?? [];
+}
+
+export interface PersonProfile {
+  person: { id: string; name: string; mentions: number; isHub: boolean } | null;
+  graph: { center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] };
+  coappear: { id: string; name: string; count: number }[];
+  articles: { idxno: number; title: string; published_at: string }[];
+  offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
+  timeline: { year: number; count: number }[];
+}
+
+export async function buildPersonProfile(db: D1Database, id: string, limit = 12): Promise<PersonProfile | null> {
+  const p = await db.prepare(
+    "SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+    "FROM kg_nodes n WHERE n.id=? AND n.type='person'",
+  ).bind(id).first<{ id: string; name: string; mentions: number }>();
+  if (!p) return null;
+
+  const hubIds = await loadHubIds(db);
+
+  // 관계망(바이라인 제외)
+  const graph = await personEgo(db, id, limit, hubIds);
+
+  // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회
+  const inc = await db.prepare(
+    "SELECT CASE WHEN src_id=? THEN dst_id ELSE src_id END AS otherId, " +
+    "CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS count " +
+    "FROM kg_edges WHERE rel='coappears' AND (src_id=? OR dst_id=?)",
+  ).bind(id, id, id).all<{ otherId: string; count: number }>();
+  const top = rankCoappears((inc.results ?? []).map((e) => ({ otherId: e.otherId, count: Number(e.count) || 0 })), hubIds, limit);
+  let coappear: { id: string; name: string; count: number }[] = [];
+  if (top.length) {
+    const ids = top.map((t) => t.otherId);
+    const ph = ids.map(() => "?").join(",");
+    const nm = await db.prepare(`SELECT id, name FROM kg_nodes WHERE id IN (${ph})`).bind(...ids).all<{ id: string; name: string }>();
+    const nmap = new Map((nm.results ?? []).map((x) => [x.id, x.name] as const));
+    coappear = top.map((t) => ({ id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count }));
+  }
+
+  // 나온 기사(최신순 30)
+  const arts = await db.prepare(
+    "SELECT a.idxno AS idxno, a.title AS title, a.published_at AS published_at " +
+    "FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno WHERE m.node_id=? " +
+    "ORDER BY a.published_at DESC LIMIT 30",
+  ).bind(id).all<{ idxno: number; title: string; published_at: string }>();
+
+  // 직위·소속(verified held만)
+  const off = await db.prepare(
+    "SELECT o.name AS office, e.attrs_json AS attrs_json FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id " +
+    "WHERE e.src_id=? AND e.rel='held' AND e.verified=1",
+  ).bind(id).all<{ office: string; attrs_json: string | null }>();
+  const offices = (off.results ?? []).map((x) => {
+    let a: { start?: string; end?: string; ordinal?: number } = {};
+    try { a = JSON.parse(x.attrs_json ?? "{}"); } catch { /* */ }
+    return { office: x.office, start: a.start ?? null, end: a.end ?? null, ordinal: a.ordinal ?? null };
+  });
+
+  // 시기별 추이(연도별 기사 수)
+  const tl = await db.prepare(
+    "SELECT CAST(strftime('%Y', a.published_at) AS INTEGER) AS year, COUNT(*) AS count " +
+    "FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno " +
+    "WHERE m.node_id=? AND a.published_at IS NOT NULL GROUP BY year ORDER BY year",
+  ).bind(id).all<{ year: number | null; count: number }>();
+  const timeline = yearHistogram(tl.results ?? []);
+
+  return {
+    person: { id: p.id, name: p.name, mentions: Number(p.mentions) || 0, isHub: isHub(Number(p.mentions) || 0) },
+    graph,
+    coappear,
+    articles: arts.results ?? [],
+    offices,
+    timeline,
+  };
+}
