@@ -72,7 +72,7 @@ export default function RootLayout({
             렌더되므로 모든 쪽에 깔린다. 배경 이미지가 아니라 '텍스트'라서 인쇄 옵션의
             '배경 그래픽' 체크 여부와 무관하게 항상 출력된다. 화면에서는 globals.css 가 숨김. */}
         <div className="print-watermark" aria-hidden="true">
-          {Array.from({ length: 10 }, (_, i) => (
+          {Array.from({ length: 12 }, (_, i) => (
             <span key={i}>태안신문</span>
           ))}
         </div>
