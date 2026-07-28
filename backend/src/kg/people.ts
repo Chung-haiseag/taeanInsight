@@ -66,13 +66,13 @@ export async function buildPersonBrief(db: D1Database, ai: unknown, id: string):
   if (!prof || !prof.person) return null;
   const titles = prof.articles.slice(0, 18).map((a) => `- ${a.title} (${String(a.published_at).slice(0, 7)})`).join("\n");
   if (!titles) return null;
-  const rels = prof.coappear.slice(0, 8).map((c) => `${c.name}${c.reltype ? `(${c.reltype})` : ""}·${c.count}건`).join(", ");
+  const rels = prof.coappear.slice(0, 8).map((c) => `${c.name}(${c.count}건)`).join(", ");
   const office = prof.offices.map((o) => `${o.office}${o.ordinal ? ` ${o.ordinal}대` : ""}`).join(", ");
   const peak = prof.timeline.length ? prof.timeline.reduce((a, b) => (b.count > a.count ? b : a)) : null;
   const src =
     `인물: ${prof.person.name}\n` +
     (office ? `직위(검증): ${office}\n` : "") +
-    (rels ? `자주 함께 등장(관계): ${rels}\n` : "") +
+    (rels ? `같은 기사에 자주 동반 등장한 인물(관계 성격은 불명): ${rels}\n` : "") +
     (peak ? `등장 피크: ${peak.year}년(${peak.count}건)\n` : "") +
     `최근 기사 제목:\n${titles}`;
   try {
@@ -82,9 +82,11 @@ export async function buildPersonBrief(db: D1Database, ai: unknown, id: string):
       channel: "realtime", maxTokens: 320, temperature: 0.2,
       messages: [
         { role: "system", content:
-          "너는 지역신문 기자를 돕는 인물 브리핑 도우미다. 아래 정보(직위·관계·기사 제목)만 근거로 이 인물을 3~4문장으로 요약하라.\n" +
-          "- 누구인지(직위·역할), 최근 어떤 이슈로 보도됐는지, 주요 인물 관계(협력·대립·소속 등)를 자연스러운 서술형으로.\n" +
-          "- 제목에 없는 사실을 지어내지 마라. 한국어만 사용(한자·외국문자 금지). 개조식 목록 말고 문장으로." },
+          "너는 지역신문 기자를 돕는 인물 브리핑 도우미다. 아래 정보로 이 인물을 3~4문장, 사실 위주로 요약하라.\n" +
+          "- 직책·역할은 '기사 제목'에 나온 표현에 근거해 구체적으로 파악하라(예: 제목에 '윤희신 군수'가 있으면 태안군수). 근거가 없으면 직책을 단정하지 마라('공무원' 같은 막연한 표현 금지).\n" +
+          "- '동반 등장한 인물'은 그냥 같은 기사에 자주 나왔다는 뜻일 뿐, 관계가 아니다. 협력·소속·동료·상하 같은 관계로 절대 단정하지 마라. 특히 '누구에게 소속되어 있다' 같은 표현은 쓰지 마라. 필요하면 '○○ 등과 함께 자주 보도됨' 정도로만.\n" +
+          "- '다양한 정책과 사업을 추진한다' 같은 공허한 일반론 금지. 기사 제목에 실제로 나온 구체적 사안(예: 발전공기업 유치, 인수위 활동, 특정 공약)을 근거로 들어라.\n" +
+          "- 제목에 없는 사실을 지어내지 마라. 한국어만(한자·외국문자 금지). 서술형 문장으로." },
         { role: "user", content: src },
       ],
     });
