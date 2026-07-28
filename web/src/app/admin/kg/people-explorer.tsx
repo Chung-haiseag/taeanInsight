@@ -104,8 +104,8 @@ export default function PeopleExplorer() {
               <h3 className="mb-2 font-semibold text-brand">시기별 등장 추이</h3>
               <div className="flex items-end gap-1 h-32">
                 {prof.timeline.map((t) => (
-                  <div key={t.year} className="flex flex-col items-center gap-1" title={`${t.year}: ${t.count}건`}>
-                    <div className="w-3 bg-brand/70" style={{ height: `${maxCount ? Math.round((t.count / maxCount) * 100) : 0}%` }} />
+                  <div key={t.year} className="flex h-full flex-col items-center justify-end gap-1" title={`${t.year}: ${t.count}건`}>
+                    <div className="w-3 rounded-t bg-brand/70" style={{ height: `${maxCount ? Math.max(3, Math.round((t.count / maxCount) * 100)) : 0}px` }} />
                     <span className="text-[9px] text-foreground-muted">{String(t.year).slice(2)}</span>
                   </div>
                 ))}
