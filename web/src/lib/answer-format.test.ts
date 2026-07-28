@@ -40,4 +40,21 @@ describe("parseAnswer", () => {
   it("빈 문자열은 빈 배열", () => {
     expect(parseAnswer("")).toEqual([]);
   });
+
+  it("줄바꿈 빈 줄로 여러 문단 분리", () => {
+    const b = parseAnswer("첫 문단입니다.\n\n둘째 문단입니다.");
+    expect(b).toEqual([{ type: "para", text: "첫 문단입니다." }, { type: "para", text: "둘째 문단입니다." }]);
+  });
+
+  it("'- ' 줄은 불릿 목록", () => {
+    const b = parseAnswer("핵심 항목은 다음과 같다.\n- 첫째 항목\n- 둘째 항목");
+    expect(b[0]).toEqual({ type: "para", text: "핵심 항목은 다음과 같다." });
+    expect(b[1]).toEqual({ type: "bullets", items: ["첫째 항목", "둘째 항목"] });
+  });
+
+  it("'# '은 소제목", () => {
+    const b = parseAnswer("## 개요\n내용 문단입니다.");
+    expect(b[0]).toEqual({ type: "heading", text: "개요" });
+    expect(b[1]).toEqual({ type: "para", text: "내용 문단입니다." });
+  });
 });

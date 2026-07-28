@@ -1,13 +1,27 @@
-// AI 답변 텍스트를 화면용 블록으로 파싱(순수) — 번호목록("1. …")을 구조화해 보기 좋게 렌더.
-// LLM이 목록을 줄바꿈 없이 한 문단으로 뱉는 경우가 많아, "N. " 경계로 나눠 목록 블록으로 만든다.
+// AI 답변 텍스트를 화면용 블록으로 파싱(순수) — 가독성 위해 문단·불릿·소제목·번호목록으로 구조화.
+//   줄바꿈이 있으면(LLM이 구조화해 답한 경우) 줄 단위로 문단/불릿/소제목 파싱.
+//   줄바꿈이 없으면 기존 로직: "1. .. 2. .." 번호목록을 감지해 목록으로, 아니면 단일 문단.
+//   인라인 **굵게** 는 렌더(answer-view)에서 처리.
 
 export type AnswerBlock =
   | { type: "para"; text: string }
+  | { type: "heading"; text: string }
+  | { type: "bullets"; items: string[] }
   | { type: "list"; items: AnswerItem[] };
 
 export interface AnswerItem {
   label?: string; // "조철행(1989)" 처럼 콜론 앞 머리말
   body: string;
+}
+
+function clean(text: string): string {
+  return (text ?? "")
+    .replace(/\r/g, "")
+    .replace(/[（(]\s*[）)]/g, "") // 외국문자 제거로 남은 빈 괄호 "()" 정리(예: 부자() → 부자)
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([,.)])/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // "N. …" 항목 하나를 label/body로 분리. 콜론이 앞쪽(≤40자)에 있으면 머리말로 본다.
@@ -18,21 +32,12 @@ function splitItem(raw: string): AnswerItem {
   return { body: body0 };
 }
 
-export function parseAnswer(text: string): AnswerBlock[] {
-  const t = (text ?? "")
-    .replace(/\r/g, "")
-    .replace(/[（(]\s*[）)]/g, "") // 외국문자 제거로 남은 빈 괄호 "()" 정리(예: 부자() → 부자)
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\s+([,.)])/g, "$1")
-    .trim();
-  if (!t) return [];
-
-  // 진짜 번호목록인지: "1. " 과 "2. " 이 모두 있어야(연도 "1989."는 \d{1,2}라 매칭 안 됨).
+// 줄바꿈 없는 답변(기존 동작): 번호목록 감지 → list, 아니면 단일 문단.
+function parseInline(t: string): AnswerBlock[] {
   const first = t.search(/(?:^|\s)1\.\s/);
   const hasSecond = /(?:^|\s)2\.\s/.test(t);
   if (first < 0 || !hasSecond) return [{ type: "para", text: t }];
 
-  // 매칭이 공백을 포함했으면 그 공백 다음이 항목 시작.
   const start = /\s/.test(t[first]) ? first + 1 : first;
   const intro = t.slice(0, start).trim();
   const listStr = t.slice(start).trim();
@@ -43,6 +48,32 @@ export function parseAnswer(text: string): AnswerBlock[] {
   const blocks: AnswerBlock[] = [];
   if (intro) blocks.push({ type: "para", text: intro });
   if (items.length) blocks.push({ type: "list", items });
-  else blocks.push({ type: "para", text: t }); // 방어: 항목화 실패 시 원문
+  else blocks.push({ type: "para", text: t });
   return blocks;
+}
+
+// 줄바꿈 있는 답변: 빈 줄로 문단 구분, "- "·"* "·"• "·"N. " 는 불릿, "# "은 소제목.
+function parseStructured(t: string): AnswerBlock[] {
+  const blocks: AnswerBlock[] = [];
+  let para: string[] = [];
+  let bul: string[] = [];
+  const flushPara = () => { if (para.length) { blocks.push({ type: "para", text: para.join(" ") }); para = []; } };
+  const flushBul = () => { if (bul.length) { blocks.push({ type: "bullets", items: bul.slice() }); bul = []; } };
+
+  for (const raw of t.split("\n")) {
+    const line = raw.trim();
+    if (!line) { flushBul(); flushPara(); continue; }
+    if (/^#{1,3}\s/.test(line)) { flushBul(); flushPara(); blocks.push({ type: "heading", text: line.replace(/^#{1,3}\s*/, "").replace(/[*#]+$/, "").trim() }); continue; }
+    if (/^[-*•]\s/.test(line)) { flushPara(); bul.push(line.replace(/^[-*•]\s+/, "")); continue; }
+    if (/^\d{1,2}\.\s/.test(line)) { flushPara(); bul.push(line.replace(/^\d{1,2}\.\s+/, "")); continue; }
+    flushBul(); para.push(line);
+  }
+  flushBul(); flushPara();
+  return blocks.length ? blocks : [{ type: "para", text: t.replace(/\n/g, " ") }];
+}
+
+export function parseAnswer(text: string): AnswerBlock[] {
+  const t = clean(text);
+  if (!t) return [];
+  return /\n/.test(t) ? parseStructured(t) : parseInline(t);
 }
