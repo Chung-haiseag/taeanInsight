@@ -54,10 +54,43 @@ export async function searchPersons(db: D1Database, q: string, limit: number): P
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
   graph: { center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] };
-  coappear: { id: string; name: string; count: number }[];
+  coappear: { id: string; name: string; count: number; reltype?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
   timeline: { year: number; count: number }[];
+}
+
+// AI 인물 브리핑 — 직위·나온 기사 제목·주요 관계를 Workers AI로 3~4문장 요약(무료, 제목 근거로만).
+export async function buildPersonBrief(db: D1Database, ai: unknown, id: string): Promise<string | null> {
+  const prof = await buildPersonProfile(db, id, 10);
+  if (!prof || !prof.person) return null;
+  const titles = prof.articles.slice(0, 18).map((a) => `- ${a.title} (${String(a.published_at).slice(0, 7)})`).join("\n");
+  if (!titles) return null;
+  const rels = prof.coappear.slice(0, 8).map((c) => `${c.name}${c.reltype ? `(${c.reltype})` : ""}·${c.count}건`).join(", ");
+  const office = prof.offices.map((o) => `${o.office}${o.ordinal ? ` ${o.ordinal}대` : ""}`).join(", ");
+  const peak = prof.timeline.length ? prof.timeline.reduce((a, b) => (b.count > a.count ? b : a)) : null;
+  const src =
+    `인물: ${prof.person.name}\n` +
+    (office ? `직위(검증): ${office}\n` : "") +
+    (rels ? `자주 함께 등장(관계): ${rels}\n` : "") +
+    (peak ? `등장 피크: ${peak.year}년(${peak.count}건)\n` : "") +
+    `최근 기사 제목:\n${titles}`;
+  try {
+    const { WorkersAiLlmClient } = await import("../llm/workers_ai");
+    const client = new WorkersAiLlmClient({ ai } as unknown as ConstructorParameters<typeof WorkersAiLlmClient>[0]);
+    const res = await client.complete({
+      channel: "realtime", maxTokens: 320, temperature: 0.2,
+      messages: [
+        { role: "system", content:
+          "너는 지역신문 기자를 돕는 인물 브리핑 도우미다. 아래 정보(직위·관계·기사 제목)만 근거로 이 인물을 3~4문장으로 요약하라.\n" +
+          "- 누구인지(직위·역할), 최근 어떤 이슈로 보도됐는지, 주요 인물 관계(협력·대립·소속 등)를 자연스러운 서술형으로.\n" +
+          "- 제목에 없는 사실을 지어내지 마라. 한국어만 사용(한자·외국문자 금지). 개조식 목록 말고 문장으로." },
+        { role: "user", content: src },
+      ],
+    });
+    const brief = (res.content ?? "").replace(/\s+/g, " ").trim();
+    return brief.length > 10 ? brief : null;
+  } catch { return null; }
 }
 
 export async function buildPersonProfile(db: D1Database, id: string, limit = 12): Promise<PersonProfile | null> {
@@ -75,17 +108,20 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회
   const inc = await db.prepare(
     "SELECT CASE WHEN src_id=? THEN dst_id ELSE src_id END AS otherId, " +
-    "CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS count " +
+    "CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS count, " +
+    "json_extract(attrs_json,'$.reltype') AS reltype " +
     "FROM kg_edges WHERE rel='coappears' AND (src_id=? OR dst_id=?)",
-  ).bind(id, id, id).all<{ otherId: string; count: number }>();
-  const top = rankCoappears((inc.results ?? []).map((e) => ({ otherId: e.otherId, count: Number(e.count) || 0 })), hubIds, limit);
-  let coappear: { id: string; name: string; count: number }[] = [];
+  ).bind(id, id, id).all<{ otherId: string; count: number; reltype: string | null }>();
+  const incRows = inc.results ?? [];
+  const rmap = new Map(incRows.map((e) => [e.otherId, e.reltype && e.reltype !== "기타" ? e.reltype : undefined] as const));
+  const top = rankCoappears(incRows.map((e) => ({ otherId: e.otherId, count: Number(e.count) || 0 })), hubIds, limit);
+  let coappear: { id: string; name: string; count: number; reltype?: string }[] = [];
   if (top.length) {
     const ids = top.map((t) => t.otherId);
     const ph = ids.map(() => "?").join(",");
     const nm = await db.prepare(`SELECT id, name FROM kg_nodes WHERE id IN (${ph})`).bind(...ids).all<{ id: string; name: string }>();
     const nmap = new Map((nm.results ?? []).map((x) => [x.id, x.name] as const));
-    coappear = top.map((t) => ({ id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count }));
+    coappear = top.map((t) => ({ id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count, reltype: rmap.get(t.otherId) }));
   }
 
   // 나온 기사(최신순 30)

@@ -5,7 +5,7 @@ import { upsertNode, upsertEdge, setVerified, listNodes, getNodeType } from "./r
 import { assertVerifiable } from "./import";
 import { articlePersonGraph, personEgo } from "./graph";
 import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus, getCanonicalId, findCandidateByNode } from "./merge";
-import { searchPersons, buildPersonProfile } from "./people";
+import { searchPersons, buildPersonProfile, buildPersonBrief } from "./people";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -82,6 +82,14 @@ router.get("/person/:id/profile", async (c) => {
   const prof = await buildPersonProfile(c.env.ARCHIVE_DB, id, limit);
   if (!prof) return c.json({ error: "person_not_found" }, 404);
   return c.json(prof);
+});
+// AI 인물 브리핑(Workers AI 요약) — 지연이 있어 프로필과 분리(프런트가 lazy 로드).
+router.get("/person/:id/brief", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  if (!c.env.AI) return c.json({ error: "ai_unavailable" }, 503);
+  const brief = await buildPersonBrief(c.env.ARCHIVE_DB, c.env.AI, c.req.param("id"));
+  if (!brief) return c.json({ error: "no_brief" }, 404);
+  return c.json({ brief });
 });
 
 router.get("/merge/candidates", async (c) => {
