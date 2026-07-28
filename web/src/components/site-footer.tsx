@@ -40,8 +40,8 @@ export function SiteFooter() {
       <div className="border-t border-background/10 py-3 text-center text-xs text-background/60">
         © 2026 태안신문 · 지역신문발전위원회 지원 사업
         <span className="mx-2 text-background/30">·</span>
-        <a href="/admin" className="text-background/50 hover:text-background/80 underline">
-          관리자
+        <a href="/admin" className="inline-flex items-center gap-1 rounded-full border border-background/40 px-3 py-1 font-semibold text-background/90 hover:bg-background/10">
+          🔧 관리자
         </a>
       </div>
     </footer>

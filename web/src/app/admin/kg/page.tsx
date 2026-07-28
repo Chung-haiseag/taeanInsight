@@ -27,7 +27,7 @@ function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
-// 관리자 로그인 게이트 — /admin 페이지와 동일 규약: 토큰 입력 → sessionStorage 저장 → 보호 엔드포인트로 검증
+// 관리자 로그인 게이트 — /admin 페이지와 동일 규약: 토큰 입력 → localStorage 저장 → 보호 엔드포인트로 검증
 function KgLogin({ onOk }: { onOk: () => void }) {
   const [token, setToken] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -37,12 +37,12 @@ function KgLogin({ onOk }: { onOk: () => void }) {
     setBusy(true);
     setErr(null);
     try {
-      sessionStorage.setItem("taean-admin-token", token.trim());
+      localStorage.setItem("taean-admin-token", token.trim());
       await getKgOntology(); // 통과하면 유효
       onOk();
     } catch {
-      sessionStorage.removeItem("taean-admin-token");
-      setErr("토큰이 올바르지 않거나 서버에 ADMIN_TOKEN이 설정되지 않았습니다.");
+      localStorage.removeItem("taean-admin-token");
+      setErr("비밀번호가 올바르지 않습니다.");
     } finally {
       setBusy(false);
     }
@@ -50,13 +50,13 @@ function KgLogin({ onOk }: { onOk: () => void }) {
   return (
     <div className="mx-auto max-w-sm space-y-4 py-16">
       <h1 className="text-2xl font-bold text-brand">🔒 관리자 로그인</h1>
-      <p className="text-sm text-foreground-muted">지식그래프(KG) 관리자 폼은 관리자 토큰이 필요합니다.</p>
+      <p className="text-sm text-foreground-muted">관리자 비밀번호를 입력하세요. (한 번 로그인하면 이 브라우저에서 유지됩니다)</p>
       <input
         type="password"
         value={token}
         onChange={(e) => setToken(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder="관리자 토큰"
+        placeholder="비밀번호"
         className="w-full rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm"
         autoFocus
       />
@@ -101,7 +101,7 @@ export default function KgAdminPage() {
             type="button"
             onClick={() => {
               try {
-                sessionStorage.removeItem("taean-admin-token");
+                localStorage.removeItem("taean-admin-token");
               } catch {
                 /* 무시 */
               }

@@ -59,7 +59,7 @@ import {
   type EbookIssue,
 } from "@/lib/api/ebook-review";
 
-// 관리자 로그인 게이트 — 토큰 입력 → sessionStorage 저장 → 보호 엔드포인트로 검증
+// 관리자 로그인 게이트 — 토큰 입력 → localStorage 저장 → 보호 엔드포인트로 검증
 function AdminLogin({ onOk }: { onOk: () => void }) {
   const [token, setToken] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -68,20 +68,20 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
     if (!token.trim()) return;
     setBusy(true); setErr(null);
     try {
-      sessionStorage.setItem("taean-admin-token", token.trim());
+      localStorage.setItem("taean-admin-token", token.trim());
       await getCostSummary(); // 통과하면 유효
       onOk();
     } catch {
-      sessionStorage.removeItem("taean-admin-token");
-      setErr("토큰이 올바르지 않거나 서버에 ADMIN_TOKEN이 설정되지 않았습니다.");
+      localStorage.removeItem("taean-admin-token");
+      setErr("비밀번호가 올바르지 않습니다.");
     } finally { setBusy(false); }
   }
   return (
     <div className="mx-auto max-w-sm space-y-4 py-16">
       <h1 className="text-2xl font-bold text-brand">🔒 관리자 로그인</h1>
-      <p className="text-sm text-foreground-muted">관리자 토큰을 입력하세요. (발행·검수·거버넌스·비용 접근)</p>
+      <p className="text-sm text-foreground-muted">관리자 비밀번호를 입력하세요. (발행·검수·거버넌스·비용 · 한 번 로그인하면 유지)</p>
       <input type="password" value={token} onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder="관리자 토큰" className="w-full rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" autoFocus />
+        placeholder="비밀번호" className="w-full rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" autoFocus />
       {err && <p className="text-sm text-red-600">{err}</p>}
       <button type="button" onClick={submit} disabled={busy} className="btn-accent w-full px-4 py-2 text-sm disabled:opacity-60">
         {busy ? "확인 중…" : "로그인"}
@@ -149,7 +149,7 @@ export default function AdminPage() {
         </p>
         <div className="flex items-center justify-between gap-3 bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
           <span>🔒 <strong className="text-brand">관리자 인증됨</strong> — 발행·검수·거버넌스는 관리자 토큰으로 보호됩니다.</span>
-          <button type="button" onClick={() => { try { sessionStorage.removeItem("taean-admin-token"); } catch {} location.reload(); }}
+          <button type="button" onClick={() => { try { localStorage.removeItem("taean-admin-token"); } catch {} location.reload(); }}
             className="text-xs underline hover:text-brand">로그아웃</button>
         </div>
       </header>

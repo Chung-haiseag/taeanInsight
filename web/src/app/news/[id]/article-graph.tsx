@@ -13,7 +13,7 @@ export default function ArticleGraph({ idxno }: { idxno: number }) {
   useEffect(() => {
     let live = true;
     let hasToken = false;
-    try { hasToken = !!sessionStorage.getItem("taean-admin-token"); } catch { /* */ }
+    try { hasToken = !!localStorage.getItem("taean-admin-token"); } catch { /* */ }
     if (!hasToken) return;
     getArticleGraph(idxno)
       .then((g) => { if (!live) return; if (g.nodes.length) { base.current = { nodes: g.nodes, edges: g.edges }; setNodes(g.nodes); setEdges(g.edges); setOk(true); } })
