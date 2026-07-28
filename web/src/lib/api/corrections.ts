@@ -36,7 +36,7 @@ export async function getMyCorrections(): Promise<{ items: MyCorrection[] }> {
   return apiFetch("/api/archive/corrections/mine");
 }
 
-// ── 관리자(apiFetch가 sessionStorage의 X-Admin-Token 자동 부착) ──
+// ── 관리자(apiFetch가 localStorage의 X-Admin-Token 자동 부착) ──
 
 export interface AdminCorrection extends MyCorrection {
   uid: string;

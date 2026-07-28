@@ -47,7 +47,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   // 관리자 토큰(있으면) — /admin 게이트에서 저장. 일반 요청엔 무해.
   try {
     if (typeof window !== "undefined") {
-      const at = sessionStorage.getItem("taean-admin-token");
+      const at = localStorage.getItem("taean-admin-token");
       if (at) headers.set("X-Admin-Token", at);
     }
   } catch { /* 무시 */ }
