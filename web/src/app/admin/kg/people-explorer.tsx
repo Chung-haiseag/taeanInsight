@@ -8,12 +8,21 @@ export default function PeopleExplorer() {
   const [hits, setHits] = useState<PersonSearchResult[]>([]);
   const [prof, setProf] = useState<PersonProfile | null>(null);
   const [busy, setBusy] = useState(false);
+  const [searched, setSearched] = useState(false);
 
   async function onSearch(e: FormEvent) {
     e.preventDefault();
-    if (!q.trim()) return;
+    const query = q.trim();
+    if (!query) return;
     setBusy(true);
-    try { setHits((await searchPersons(q)).results); } catch { setHits([]); } finally { setBusy(false); }
+    setProf(null);      // 새 검색이면 이전 인물 프로필을 지운다
+    setSearched(true);
+    try {
+      const res = (await searchPersons(query)).results;
+      setHits(res);
+      // 검색 결과가 한 명이면 클릭하지 않아도 바로 그 사람 프로필을 연다
+      if (res.length === 1) setProf(await getPersonProfile(res[0].id));
+    } catch { setHits([]); setProf(null); } finally { setBusy(false); }
   }
   async function openPerson(id: string) {
     setBusy(true);
@@ -43,6 +52,10 @@ export default function PeopleExplorer() {
             </button>
           ))}
         </div>
+      )}
+
+      {searched && !busy && hits.length === 0 && (
+        <p className="text-sm text-foreground-muted">검색 결과가 없습니다. 이름만 입력해 보세요(예: 가세로).</p>
       )}
 
       {prof && prof.person && (
