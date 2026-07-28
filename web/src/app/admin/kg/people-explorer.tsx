@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import KgGraph from "@/components/kg-graph";
-import { searchPersons, getPersonProfile, type PersonSearchResult, type PersonProfile } from "@/lib/api/kg";
+import { searchPersons, getPersonProfile, getPersonBrief, type PersonSearchResult, type PersonProfile } from "@/lib/api/kg";
 
 export default function PeopleExplorer() {
   const [q, setQ] = useState("");
@@ -9,24 +9,31 @@ export default function PeopleExplorer() {
   const [prof, setProf] = useState<PersonProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [brief, setBrief] = useState<string | null>(null);
+  const [briefBusy, setBriefBusy] = useState(false);
 
   async function onSearch(e: FormEvent) {
     e.preventDefault();
     const query = q.trim();
     if (!query) return;
     setBusy(true);
-    setProf(null);      // 새 검색이면 이전 인물 프로필을 지운다
+    setProf(null); setBrief(null);      // 새 검색이면 이전 프로필·브리핑을 지운다
     setSearched(true);
     try {
       const res = (await searchPersons(query)).results;
       setHits(res);
       // 검색 결과가 한 명이면 클릭하지 않아도 바로 그 사람 프로필을 연다
-      if (res.length === 1) setProf(await getPersonProfile(res[0].id));
+      if (res.length === 1) await openPerson(res[0].id);
     } catch { setHits([]); setProf(null); } finally { setBusy(false); }
   }
   async function openPerson(id: string) {
-    setBusy(true);
-    try { setProf(await getPersonProfile(id)); } catch { setProf(null); } finally { setBusy(false); }
+    setBusy(true); setBrief(null);
+    try {
+      setProf(await getPersonProfile(id));
+      setBriefBusy(true);
+      // AI 브리핑은 느려서 프로필 먼저 띄우고 백그라운드로 채운다
+      getPersonBrief(id).then((r) => setBrief(r.brief)).catch(() => setBrief(null)).finally(() => setBriefBusy(false));
+    } catch { setProf(null); } finally { setBusy(false); }
   }
 
   const maxCount = prof && prof.timeline.length ? Math.max(...prof.timeline.map((t) => t.count)) : 0;
@@ -66,6 +73,14 @@ export default function PeopleExplorer() {
             {prof.person.isHub && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">바이라인(기자/편집인)일 수 있음</span>}
           </h2>
 
+          {/* AI 인물 브리핑 */}
+          {(brief || briefBusy) && (
+            <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 text-sm leading-relaxed">
+              <p className="mb-1 text-xs font-semibold text-accent">🤖 AI 인물 브리핑 <span className="font-normal text-foreground-muted">— 검증된 사실 아님, 기사 제목 요약</span></p>
+              {brief ? <p>{brief}</p> : <p className="text-foreground-muted">브리핑 생성 중…</p>}
+            </div>
+          )}
+
           {/* 직위·소속 */}
           {prof.offices.length > 0 && (
             <div className="text-sm">
@@ -93,6 +108,7 @@ export default function PeopleExplorer() {
                   <li key={c.id}>
                     <button type="button" onClick={() => openPerson(c.id)} className="hover:text-brand hover:underline">{c.name}</button>
                     <span className="text-foreground-muted"> · {c.count}건</span>
+                    {c.reltype && <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">{c.reltype}</span>}
                   </li>
                 ))}
                 {!prof.coappear.length && <li className="text-foreground-muted">없음</li>}
@@ -102,6 +118,10 @@ export default function PeopleExplorer() {
             {/* 시기별 추이 */}
             <section>
               <h3 className="mb-2 font-semibold text-brand">시기별 등장 추이</h3>
+              {prof.timeline.length > 0 && (() => {
+                const pk = prof.timeline.reduce((a, b) => (b.count > a.count ? b : a));
+                return <p className="mb-2 text-xs text-foreground-muted">가장 화제였던 시기 <span className="font-semibold text-brand">{pk.year}년</span>({pk.count}건)</p>;
+              })()}
               <div className="flex items-end gap-1 h-32">
                 {prof.timeline.map((t) => (
                   <div key={t.year} className="flex h-full flex-col items-center justify-end gap-1" title={`${t.year}: ${t.count}건`}>
