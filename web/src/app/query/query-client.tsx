@@ -12,6 +12,7 @@ import { askQuery, type QueryResult } from "@/lib/api/query";
 import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
+import { decodeEntities } from "@/lib/decode-entities";
 import { SearchProgress } from "./search-progress";
 
 const SUGGESTED_QUESTIONS = [
@@ -179,8 +180,8 @@ export function QueryClient() {
               <ul className="mt-2 space-y-2">
                 {result.evidence.map((e) => (
                   <li key={e.n} className="rounded-lg border border-brand/10 bg-background p-3 text-xs">
-                    <p className="font-semibold text-brand">[{e.n}] {e.source}</p>
-                    <p className="mt-1 whitespace-pre-wrap text-foreground-muted">{e.text}</p>
+                    <p className="font-semibold text-brand">[{e.n}] {decodeEntities(e.source)}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-foreground-muted">{decodeEntities(e.text)}</p>
                   </li>
                 ))}
               </ul>
