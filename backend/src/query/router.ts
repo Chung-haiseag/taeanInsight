@@ -23,7 +23,7 @@ import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
 import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
-import { completeAvoidingGarble } from "./answer_quality";
+import { completeAvoidingGarble, polishAnswer } from "./answer_quality";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
@@ -493,7 +493,10 @@ queryRouter.post("/", async (c) => {
         ],
       });
       // 출처는 답변이 실제로 사용한 것만 노출(무관 기사 더미 방지).
-      const answer = res.content;
+      // 교열 패스 — 무료 모델이 빠뜨린 글자·조사 복원 + 문단·불릿 구조화(사실·출처 불변, 실패 시 원문).
+      const answer = await polishAnswer(client, res.content, (messages) => ({
+        channel: "realtime" as const, maxTokens: 1000, temperature: 0.1, messages,
+      }));
       const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
       const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
       const liveSrc = liveParts.map((p) => p.source);
