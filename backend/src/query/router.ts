@@ -23,7 +23,7 @@ import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
 import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
-import { completeAvoidingGarble, polishAnswer, tidyAnswer } from "./answer_quality";
+import { completeAvoidingGarble, tidyAnswer } from "./answer_quality";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
@@ -183,7 +183,19 @@ queryRouter.post("/", async (c) => {
   const { query, domain, location, userTier } = parsed.data;
 
   // ── ① RAG: 실시간 관측(날씨·대기질) + 태안뉴스·아카이브를 근거로 답변(출처 표기) ──
-  const client = new WorkersAiLlmClient({ ai: c.env.AI });
+  const baseClient = new WorkersAiLlmClient({ ai: c.env.AI });
+  // 진단용 LLM 호출 카운터/타이밍 — ?debug=1일 때만 응답에 노출.
+  let llmCalls = 0;
+  let llmMs = 0;
+  const client = {
+    model: baseClient.model,
+    complete: async (req: Parameters<typeof baseClient.complete>[0]) => {
+      llmCalls++;
+      const s = Date.now();
+      try { return await baseClient.complete(req); } finally { llmMs += Date.now() - s; }
+    },
+  } as typeof baseClient;
+  const tStart = Date.now();
   try {
     const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string; kind?: string } }> = [];
     const recommend = RECOMMEND_RE.test(query); // 추천 질문 → 오늘 날씨·바다·행사·수요 종합
@@ -465,6 +477,7 @@ queryRouter.post("/", async (c) => {
           return text ? { id: hit.id, name: hit.name, text } : null;
         } catch { return null; }
       })();
+      const tRetrieveDone = Date.now();
       // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
       const res = await completeAvoidingGarble(client, {
         channel: "realtime",
@@ -492,12 +505,11 @@ queryRouter.post("/", async (c) => {
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
       });
-      // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 교열/정리가 표현을 바꿔도 근거 선택이 안 흔들린다.
+      // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 정리가 표현을 바꿔도 근거 선택이 안 흔들린다.
       const rawAnswer = res.content;
-      // 교열 패스(빠진 글자·조사 복원) → 결정론적 정리(중복 출처꼬리 제거 + 문단 분리). 표시용 텍스트.
-      const answer = tidyAnswer(await polishAnswer(client, rawAnswer, (messages) => ({
-        channel: "realtime" as const, maxTokens: 1000, temperature: 0.1, messages,
-      })));
+      // 결정론적 정리만(LLM 0, 즉시): 중복 출처꼬리 제거 + 인라인 불릿 정규화 + 문단 분리.
+      // 과거의 LLM 교열 패스는 질의당 왕복을 2배로 만들어(70초) 제거함. 구조·굵게는 본답 프롬프트가 지시.
+      const answer = tidyAnswer(rawAnswer);
       const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(rawAnswer);
       const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
       const liveSrc = liveParts.map((p) => p.source);
@@ -519,13 +531,22 @@ queryRouter.post("/", async (c) => {
         intent: "archive_rag",
         confidence: 0.9,
         fromCache: false,
-        llmCalls: 1,
+        llmCalls,
         sources,
         model: client.model,
         ...(personBrief ? { personBrief } : {}),
         // RAG 투명성 — ?debug=1 또는 evidence=1이면 LLM에 넣은 근거 원문을 그대로 노출
         ...(c.req.query("debug") === "1" || c.req.query("evidence") === "1"
-          ? { evidence: parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })) }
+          ? {
+              evidence: parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })),
+              _timing: {
+                totalMs: Date.now() - tStart,
+                retrieveMs: tRetrieveDone - tStart, // 검색·근거수집(웹검색 포함)
+                llmMs,                               // LLM 생성 합계
+                llmCalls,                            // 실제 Workers AI 호출 횟수(붕괴 재시도 포함)
+                contextChars: context.length,
+              },
+            }
           : {}),
       });
     }
