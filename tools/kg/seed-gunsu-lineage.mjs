@@ -20,10 +20,20 @@ const OFFICE_ID = "office:taean-gunsu";
 const OFFICE_NAME = "태안군수";
 const OFFICE_SOURCE = "태안군·중앙선관위 공식 기록"; // 필요시 출처 문구 수정
 
-// ⬇⬇⬇ 여기에 '검증된' 역대 태안군수를 채워라(비어 있으면 no-op). 아래는 형식 예시(주석).
+// 역대 태안군수 — 태안신문 아카이브 근거로 작성한 초안(운영자 확정 2026-07). 11·12대 재보궐 등 일부
+// 시작/종료일은 근사치(민선 취임 표준 7.1). 정확일 확인되면 값만 고치고 재실행하면 upsert로 갱신된다.
 const LINEAGE = [
-  // { ordinal: 7, name: "홍길동", start: "2018-07-01", end: "2022-06-30", personId: "person:홍길동" },
-  // { ordinal: 8, name: "아무개", start: "2022-07-01", end: null },
+  { ordinal: 6,  name: "김경년", start: "1994-10-07", end: "1995-06-30", personId: "person:김경년" }, // 관선
+  { ordinal: 7,  name: "윤형상", start: "1995-07-01", end: "1998-06-30", personId: "person:윤형상" }, // 민선1기
+  { ordinal: 8,  name: "윤형상", start: "1998-07-01", end: "2002-06-30", personId: "person:윤형상" }, // 민선2기(재선)
+  { ordinal: 9,  name: "진태구", start: "2002-07-01", end: "2006-06-30", personId: "person:진태구" }, // 민선3기
+  { ordinal: 10, name: "진태구", start: "2006-07-01", end: "2010-06-30", personId: "person:진태구" }, // 민선4기
+  { ordinal: 11, name: "김세호", start: "2010-07-01", end: "2011-03-31", personId: "person:김세호" }, // 민선5기(군수직 상실)
+  { ordinal: 12, name: "진태구", start: "2011-05-01", end: "2014-06-30", personId: "person:진태구" }, // 민선5기(재보궐)
+  { ordinal: 13, name: "한상기", start: "2014-07-01", end: "2018-06-30", personId: "person:한상기" }, // 민선6기
+  { ordinal: 14, name: "가세로", start: "2018-07-01", end: "2022-06-30", personId: "person:가세로" }, // 민선7기
+  { ordinal: 15, name: "가세로", start: "2022-07-01", end: "2026-06-30", personId: "person:가세로" }, // 민선8기(재선)
+  { ordinal: 16, name: "윤희신", start: "2026-07-01", end: null,         personId: "person:윤희신" }, // 민선9기(현직)
 ];
 
 const DRY = process.argv.includes("--dry");
@@ -52,7 +62,7 @@ stmts.push(
 for (const row of LINEAGE) {
   const pid = row.personId || `person:gunsu:${row.ordinal}`;
   const attrs = JSON.stringify({ ordinal: row.ordinal, start: row.start ?? null, end: row.end ?? null });
-  const eid = `held:${pid}:${OFFICE_ID}`;
+  const eid = `held:${pid}:${OFFICE_ID}:${row.ordinal}`; // 재선(같은 인물 여러 대) 대비 대수 포함
   console.log(`  ${row.ordinal}대 ${row.name} (${row.start ?? "?"}~${row.end ?? "현재"}) → 인물 ${pid}`);
   // 인물 노드 upsert(검증 승격). 기존 노드면 이름은 유지(덮어쓰지 않음), verified만 1로.
   stmts.push(
