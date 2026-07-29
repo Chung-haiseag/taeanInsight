@@ -398,6 +398,22 @@ queryRouter.post("/", async (c) => {
       } catch { /* KG 실패는 무시(기존 RAG로 폴백) */ }
     }
 
+    // (a-6.6) KG 검증된 인물 관계(B3) — 관계형 질의 + 인물 감지 시 verified=1 관계만 주입.
+    //   자동추출(verified=0) 관계는 넣지 않으므로 검증분이 없으면 무동작(안전). 검수 승격 시 자동 반영.
+    if (c.env.ARCHIVE_DB && !offRegion) {
+      try {
+        const { isRelationQuery, getVerifiedRelations, buildRelationFactBlock } = await import("../kg/relations");
+        if (isRelationQuery(query)) {
+          const { detectPersonInQuery } = await import("../kg/people");
+          const hit = await detectPersonInQuery(c.env.ARCHIVE_DB, query);
+          if (hit) {
+            const block = buildRelationFactBlock(hit.name, await getVerifiedRelations(c.env.ARCHIVE_DB, hit.id));
+            if (block) parts.push(block);
+          }
+        }
+      } catch { /* 관계 게이트 실패는 무시 */ }
+    }
+
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
     if (c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend && !hasMyShop) {
       const rows = await retrieveArchive(c.env, query);
