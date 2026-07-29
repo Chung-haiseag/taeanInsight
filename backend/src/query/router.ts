@@ -23,7 +23,7 @@ import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
 import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
-import { completeAvoidingGarble, polishAnswer } from "./answer_quality";
+import { completeAvoidingGarble, polishAnswer, tidyAnswer } from "./answer_quality";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
@@ -492,15 +492,16 @@ queryRouter.post("/", async (c) => {
           { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
       });
-      // 출처는 답변이 실제로 사용한 것만 노출(무관 기사 더미 방지).
-      // 교열 패스 — 무료 모델이 빠뜨린 글자·조사 복원 + 문단·불릿 구조화(사실·출처 불변, 실패 시 원문).
-      const answer = await polishAnswer(client, res.content, (messages) => ({
+      // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 교열/정리가 표현을 바꿔도 근거 선택이 안 흔들린다.
+      const rawAnswer = res.content;
+      // 교열 패스(빠진 글자·조사 복원) → 결정론적 정리(중복 출처꼬리 제거 + 문단 분리). 표시용 텍스트.
+      const answer = tidyAnswer(await polishAnswer(client, rawAnswer, (messages) => ({
         channel: "realtime" as const, maxTokens: 1000, temperature: 0.1, messages,
-      }));
-      const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(answer);
+      })));
+      const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(rawAnswer);
       const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
       const liveSrc = liveParts.map((p) => p.source);
-      const cited = new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
+      const cited = new Set([...rawAnswer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
       let sources: typeof liveSrc;
       if (notFound) {
         sources = liveSrc; // 못 찾음 → 공식 근거만(무관 기사 제거)

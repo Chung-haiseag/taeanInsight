@@ -3,7 +3,36 @@
 
 import { describe, it, expect } from "vitest";
 
-import { isGarbledAnswer, completeAvoidingGarble, stripForeignLetters } from "../src/query/answer_quality";
+import { isGarbledAnswer, completeAvoidingGarble, stripForeignLetters, tidyAnswer } from "../src/query/answer_quality";
+
+describe("tidyAnswer", () => {
+  it("말미 중복 출처목록(참고자료:[N]) 제거", () => {
+    const r = tidyAnswer("안면도 개발은 1997년 시작됐다. 참고자료: [1], [3], [4]");
+    expect(r).toBe("안면도 개발은 1997년 시작됐다.");
+  });
+  it("말미 [N][N] 꼬리 제거", () => {
+    expect(tidyAnswer("역대 군수는 16명이다. [1][2]")).toBe("역대 군수는 16명이다.");
+  });
+  it("한 덩어리 4문장 이상이면 문단 분리(3문장 단위)", () => {
+    const one = "가는 갔다. 나는 왔다. 다는 봤다. 라는 썼다.";
+    const r = tidyAnswer(one);
+    expect(r.split(/\n\n/).length).toBe(2); // 3 + 1
+    expect(r).toContain("\n\n");
+  });
+  it("인라인 굵게 불릿을 줄바꿈 불릿으로", () => {
+    const r = tidyAnswer("지원 사업은 다음과 같다. - **특별법 제정** - **금융지원** - **세제경감**");
+    expect(r).toContain("\n- **특별법 제정**");
+    expect(r).toContain("\n- **금융지원**");
+    expect((r.match(/^- /gm) ?? []).length).toBe(3);
+  });
+  it("이미 줄바꿈 있으면 그대로", () => {
+    const s = "첫 문단.\n\n- 항목1\n- 항목2";
+    expect(tidyAnswer(s)).toBe(s);
+  });
+  it("3문장 이하는 분리 안 함", () => {
+    expect(tidyAnswer("가는 갔다. 나는 왔다.")).toBe("가는 갔다. 나는 왔다.");
+  });
+});
 
 // 라이브에서 실제로 잡힌 붕괴 출력(축약) — 한글 거의 없이 라틴 토큰이 반복됨.
 const GARBLED =

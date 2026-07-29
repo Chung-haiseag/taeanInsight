@@ -72,7 +72,6 @@ export async function polishAnswer<Req>(
 ): Promise<string> {
   const t = (raw ?? "").trim();
   if (t.length < 40) return raw; // 짧은 단답·"찾지 못했습니다"는 그대로
-  const citations = new Set([...t.matchAll(/\[(\d+)\]/g)].map((m) => m[1]));
   try {
     const res = await completeAvoidingGarble(
       client,
@@ -81,13 +80,30 @@ export async function polishAnswer<Req>(
     );
     const out = (res.content ?? "").trim();
     if (!out || isGarbledAnswer(out)) return raw;              // 교열본이 깨졌으면 원문
-    if (out.length < t.length * 0.5) return raw;               // 내용이 절반 이하로 줄면(손실) 원문
-    const outCites = new Set([...out.matchAll(/\[(\d+)\]/g)].map((m) => m[1]));
-    if (citations.size > 0 && [...citations].some((c) => !outCites.has(c))) return raw; // 출처번호 유실 시 원문
-    return out;
+    if (out.length < t.length * 0.45) return raw;              // 내용이 절반 이하로 줄면(손실) 원문
+    return out;                                                 // 출처는 원문 기준으로 계산하므로 인용 유실 걱정 없음
   } catch {
     return raw;
   }
+}
+
+// 결정론적 정리 — 말미 중복 출처목록('참고자료:[1]..') 제거 + 한 덩어리 답을 문단으로 분리(읽기 좋게 보장). 순수.
+export function tidyAnswer(text: string): string {
+  let t = (text ?? "").trim();
+  if (!t) return t;
+  // 1) 아래 '출처' 섹션과 중복되는 말미 인용목록 제거: "참고자료:/참고문헌:/출처: [1],[3]..." 또는 "[1][2]..."만의 꼬리
+  t = t.replace(/\s*(참고자료|참고문헌|출처|참고)\s*[:：][\s\S]*$/g, "").trim();
+  t = t.replace(/(?:\s*\[\d+\][\s,·]*)+$/g, "").trim();
+  // 2) 인라인 불릿 정규화 — 한 줄에 붙은 " - **항목**"들을 줄바꿈 불릿으로(목록 렌더). 굵게 불릿만 대상(오탐 최소).
+  if ((t.match(/\s-\s\*\*/g) ?? []).length >= 2) t = t.replace(/\s+-\s+(\*\*)/g, "\n- $1");
+  // 3) 이미 줄바꿈(문단/불릿)이 있으면 그대로 둔다
+  if (/\n/.test(t)) return t;
+  // 4) 한 덩어리면 문장 단위로 나눠 3문장씩 문단으로 묶는다(한국어 종결 '다./요./…' + 공백 기준)
+  const sentences = t.split(/(?<=[다요음함됨임죠까죠]\.|[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (sentences.length <= 3) return t;
+  const paras: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join(" "));
+  return paras.join("\n\n");
 }
 
 // 붕괴(salad·외국어 누수) 방지 — 순차 재시도(지연 곱절) 대신 여러 개를 병렬 생성해 정상을 고른다.
