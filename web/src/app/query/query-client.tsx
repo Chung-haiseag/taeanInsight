@@ -1,6 +1,6 @@
 "use client";
 
-// AI Query Agent — 자연어 질의 → 백엔드 LangGraph Lite(라우터→예측/생성) 실시간 연결
+// AI Query Agent — 자연어 질의 → 백엔드 RAG 실시간 스트리밍(토큰 단위 표시).
 // REQ-PRODUCT-002 / TaskMaster #23. LLM 경로: Workers AI 무료 모델(종량 0).
 
 import { useState } from "react";
@@ -8,11 +8,12 @@ import { useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
 import { ApiError } from "@/lib/api/client";
-import { askQuery, type QueryResult } from "@/lib/api/query";
+import { askQuery, askQueryStream, type AskQueryInput, type QueryResult } from "@/lib/api/query";
 import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
 import { decodeEntities } from "@/lib/decode-entities";
+import { paragraphize } from "@/lib/paragraphize";
 import { SearchProgress } from "./search-progress";
 
 const SUGGESTED_QUESTIONS = [
@@ -30,9 +31,21 @@ const INTENT_LABELS: Record<string, string> = {
   other: "일반",
 };
 
+function mapError(status?: number): string {
+  return status === 503
+    ? "AI 엔진이 일시적으로 연결되지 않았습니다. 잠시 후 다시 시도해주세요."
+    : status === 400
+    ? "질문은 2자 이상 500자 이하로 입력해주세요."
+    : status
+    ? `요청 실패 (${status})`
+    : "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+}
+
 export function QueryClient() {
   const [query, setQuery] = useState("");
+  const [asked, setAsked] = useState(""); // 실제로 던진 질문(인쇄 머리말용)
   const [loading, setLoading] = useState(false);
+  const [live, setLive] = useState(""); // 스트리밍 중 누적 텍스트
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,25 +55,32 @@ export function QueryClient() {
     setLoading(true);
     setError(null);
     setResult(null);
-    try {
-      trackEvent("ai_query", text.slice(0, 120));
-      const res = await askQuery({ query: text });
-      setResult(res);
-    } catch (e) {
-      if (e instanceof ApiError) {
-        setError(
-          e.status === 503
-            ? "AI 엔진이 일시적으로 연결되지 않았습니다. 잠시 후 다시 시도해주세요."
-            : e.status === 400
-            ? "질문은 2자 이상 500자 이하로 입력해주세요."
-            : `요청 실패 (${e.status})`,
-        );
-      } else {
-        setError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      }
-    } finally {
-      setLoading(false);
-    }
+    setLive("");
+    setAsked(text);
+    trackEvent("ai_query", text.slice(0, 120));
+
+    const input: AskQueryInput = { query: text };
+    let done = false;
+    await askQueryStream(input, {
+      onToken: (chunk) => setLive((prev) => prev + chunk),
+      onDone: (r) => {
+        done = true;
+        setResult(r);
+        setLoading(false);
+      },
+      onError: async (_msg, status) => {
+        if (done) return;
+        // 스트리밍 실패 → 비스트림 1회 폴백
+        try {
+          const r = await askQuery(input);
+          setResult(r);
+        } catch (e) {
+          setError(e instanceof ApiError ? mapError(e.status) : mapError());
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -73,9 +93,19 @@ export function QueryClient() {
     void run(q);
   }
 
+  // PDF 저장 — 근거를 모두 펼친 뒤 인쇄(레이아웃 반영 후). 워터마크·페이지여백은 전역 print CSS가 담당.
+  function savePdf() {
+    document
+      .querySelectorAll<HTMLDetailsElement>(".answer-print details")
+      .forEach((d) => { d.open = true; });
+    window.setTimeout(() => window.print(), 60);
+  }
+
+  const streaming = loading && !result;
+
   return (
     <div className="mx-auto max-w-4xl space-y-8">
-      <header className="space-y-2">
+      <header className="space-y-2 no-print">
         <div className="flex items-center gap-2">
           <AILabelBadge kind="ai_assisted" />
           <span className="text-sm text-foreground-muted">빠른 답변 · 출처 표기</span>
@@ -87,7 +117,7 @@ export function QueryClient() {
       </header>
 
       {/* 질의 입력창 */}
-      <section aria-labelledby="query-form-heading" className="border border-brand/15 rounded-lg p-6 bg-background">
+      <section aria-labelledby="query-form-heading" className="no-print border border-brand/15 rounded-lg p-6 bg-background">
         <h2 id="query-form-heading" className="sr-only">
           질의 입력
         </h2>
@@ -123,25 +153,55 @@ export function QueryClient() {
         </form>
       </section>
 
-      {/* 검색 진행 표시 */}
-      {loading && <SearchProgress />}
+      {/* 스트리밍 시작 전(첫 토큰 대기) 진행 표시 */}
+      {streaming && !live && <div className="no-print"><SearchProgress /></div>}
+
+      {/* 스트리밍 중 실시간 답변(토큰) */}
+      {streaming && live && (
+        <section className="no-print border border-accent/30 rounded-lg p-6 bg-accent/5">
+          <div className="flex items-center gap-2 mb-3">
+            <AILabelBadge kind="ai_assisted" />
+            <span className="text-xs text-foreground-muted">생성 중…</span>
+          </div>
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
+            {live}
+            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-accent align-middle" aria-hidden />
+          </p>
+        </section>
+      )}
 
       {/* 에러 */}
       {error && (
-        <div role="alert" className="border border-red-300 bg-red-50 text-red-800 rounded-lg p-4 text-sm">
+        <div role="alert" className="no-print border border-red-300 bg-red-50 text-red-800 rounded-lg p-4 text-sm">
           {error}
         </div>
       )}
 
-      {/* 답변 */}
+      {/* 최종 답변 (인쇄/PDF 대상) */}
       {result && (
-        <section aria-labelledby="answer-heading" className="border border-accent/30 rounded-lg p-6 bg-accent/5 space-y-4">
+        <section
+          aria-labelledby="answer-heading"
+          className="answer-print border border-accent/30 rounded-lg p-6 bg-accent/5 space-y-4"
+        >
+          {/* 인쇄 전용 머리말 — 화면에선 숨김 */}
+          <div className="hidden print:block mb-2">
+            <p className="text-xs text-foreground-muted">태안 인사이트 · AI 답변</p>
+            <h2 className="text-xl font-bold text-brand">{asked}</h2>
+          </div>
+
           <div className="flex items-center gap-2 flex-wrap">
             <AILabelBadge kind="ai_assisted" />
             <span className="text-xs text-foreground-muted">
               {INTENT_LABELS[result.intent] ?? result.intent}
               {result.fromCache ? " · 캐시" : ` · LLM ${result.llmCalls}회`}
             </span>
+            <button
+              type="button"
+              onClick={savePdf}
+              className="no-print ml-auto inline-flex items-center gap-1 rounded border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 transition-colors"
+            >
+              <Icon name="download" /> PDF로 저장
+            </button>
           </div>
           <h2 id="answer-heading" className="sr-only">
             답변
@@ -182,21 +242,28 @@ export function QueryClient() {
               </ul>
             </div>
           )}
+
           {result.evidence && result.evidence.length > 0 && (
-            <details className="pt-2 border-t border-accent/20">
+            <details className="pt-2 border-t border-accent/20" open>
               <summary className="cursor-pointer text-sm font-semibold text-brand">
-                <Icon name="search" /> 참고한 실시간 근거 {result.evidence.length}건
+                <Icon name="search" /> 참고한 근거 {result.evidence.length}건
               </summary>
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-3 space-y-3">
                 {result.evidence.map((e) => (
-                  <li key={e.n} className="rounded-lg border border-brand/10 bg-background p-3 text-xs">
-                    <p className="font-semibold text-brand">[{e.n}] {decodeEntities(e.source)}</p>
-                    <p className="mt-1 whitespace-pre-wrap text-foreground-muted">{decodeEntities(e.text)}</p>
+                  <li key={e.n} className="rounded-lg border border-brand/10 bg-background p-4 text-sm break-inside-avoid">
+                    <p className="font-semibold text-brand mb-1.5">
+                      [{e.n}] {decodeEntities(e.source)}
+                    </p>
+                    <div className="space-y-2 leading-relaxed text-foreground-muted">
+                      {paragraphize(decodeEntities(e.text)).map((para, k) => (
+                        <p key={k}>{para}</p>
+                      ))}
+                    </div>
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-[11px] text-foreground-muted">
-                AI는 위 실시간 데이터를 근거로만 답합니다(없으면 “찾지 못함”). 사실은 공공데이터, 문장은 AI.
+              <p className="mt-3 text-[11px] text-foreground-muted">
+                AI는 위 실시간·아카이브 근거를 바탕으로 답합니다(없으면 “찾지 못함”). 사실은 공공데이터·기록, 문장은 AI.
               </p>
             </details>
           )}
@@ -207,7 +274,7 @@ export function QueryClient() {
       )}
 
       {/* 추천 질의 */}
-      <section aria-labelledby="suggested-heading">
+      <section aria-labelledby="suggested-heading" className="no-print">
         <h2 id="suggested-heading" className="text-lg font-bold text-brand mb-3">
           추천 질문
         </h2>

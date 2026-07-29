@@ -33,9 +33,12 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export const API_BASE_URL = API_BASE;
+
+// 공용 요청 헤더 — JWT·익명 uid·관리자 토큰 부착. apiFetch와 스트리밍 fetch가 공유.
+export async function buildApiHeaders(init: HeadersInit = {}): Promise<Headers> {
   const token = getAccessToken();
-  const headers = new Headers(init.headers);
+  const headers = new Headers(init);
   headers.set("content-type", "application/json");
   if (token) headers.set("authorization", `Bearer ${token}`);
   // 비로그인이어도 익명 디바이스 uid로 식별(선호도 영속·개인화)
@@ -51,7 +54,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
       if (at) headers.set("X-Admin-Token", at);
     }
   } catch { /* 무시 */ }
+  return headers;
+}
 
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = await buildApiHeaders(init.headers);
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     let body: unknown;
