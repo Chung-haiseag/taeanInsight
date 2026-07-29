@@ -69,4 +69,21 @@ export class WorkersAiLlmClient implements LlmClient {
       throw new VendorError(this.vendor, 502, e instanceof Error ? e.message : String(e));
     }
   }
+
+  // 스트리밍 생성 — Workers AI SSE(ReadableStream)를 그대로 반환. 토큰 단위로 흘려보내 체감 지연↓.
+  // 파싱은 query/stream.ts drainSse에 위임. 사용량 집계는 스트림 경로에선 생략(무료 모델 0원).
+  async stream(request: LlmRequest): Promise<ReadableStream<Uint8Array>> {
+    try {
+      return (await this.ai.run(this.cfModel as never, {
+        messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
+        max_tokens: request.maxTokens ?? 512,
+        temperature: request.temperature ?? 0.2,
+        repetition_penalty: DEFAULT_REPETITION_PENALTY,
+        frequency_penalty: DEFAULT_FREQUENCY_PENALTY,
+        stream: true,
+      } as never)) as unknown as ReadableStream<Uint8Array>;
+    } catch (e) {
+      throw new VendorError(this.vendor, 502, e instanceof Error ? e.message : String(e));
+    }
+  }
 }

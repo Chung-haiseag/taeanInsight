@@ -29,6 +29,10 @@ describe("tidyAnswer", () => {
   it("말미 [N][N] 꼬리 제거", () => {
     expect(tidyAnswer("역대 군수는 16명이다. [1][2]")).toBe("역대 군수는 16명이다.");
   });
+  it("빈 대괄호(번호 없는 인용 잔재)와 섞인 꼬리 제거", () => {
+    expect(tidyAnswer("태안 음식은 다양합니다. [][][5][]")).toBe("태안 음식은 다양합니다.");
+    expect(tidyAnswer("답변입니다 [] 그리고 끝 [].")).toBe("답변입니다 그리고 끝.");
+  });
   it("한 덩어리 4문장 이상이면 문단 분리(3문장 단위)", () => {
     const one = "가는 갔다. 나는 왔다. 다는 봤다. 라는 썼다.";
     const r = tidyAnswer(one);

@@ -7,6 +7,8 @@
 // 캐시는 인메모리(아이솔레이트 수명) — 영속 캐시는 KV 도입 시 교체(아래 NOTE).
 
 import { Hono } from "hono";
+import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 
 import type { Env } from "../types";
@@ -23,7 +25,9 @@ import { forecastDemand } from "../tour/demand";
 import { loadMarine } from "../tour/marine";
 import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
-import { completeAvoidingGarble, tidyAnswer } from "./answer_quality";
+import { completeAvoidingGarble, tidyAnswer, isSalad, isGarbledAnswer, stripForeignLetters } from "./answer_quality";
+import { drainSse } from "./stream";
+import { selectSources, type SourcePart } from "./sources";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
@@ -170,6 +174,79 @@ const querySchema = z.object({
   location: z.string().max(40).optional(),
   userTier: z.enum(["anon", "b2c", "b2b", "b2g"]).optional(),
 });
+
+// SSE 스트리밍 응답 — 토큰을 event:token으로 흘려보내고, 완료 후 정리본·출처·브리핑을 event:done으로.
+// 클라이언트는 done.answer(tidy 완료본)로 스트림 텍스트를 교체한다. salad면 1회 비스트림 재생성으로 교체.
+async function streamAnswer(
+  c: Context<{ Bindings: Env }>,
+  client: WorkersAiLlmClient,
+  llmReq: Parameters<WorkersAiLlmClient["stream"]>[0],
+  parts: SourcePart[],
+  briefPromise: Promise<{ id: string; name: string; text: string } | null>,
+): Promise<Response> {
+  return streamSSE(c, async (stream) => {
+    let raw = "";
+    try {
+      const reader = (await client.stream(llmReq)).getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const d = drainSse(buf);
+        buf = d.rest;
+        for (const t of d.tokens) {
+          raw += t;
+          await stream.writeSSE({ event: "token", data: JSON.stringify(t) });
+        }
+        if (d.done) break;
+      }
+    } catch {
+      // 스트림 실패 → 비스트림 1회 폴백
+      try {
+        raw = (await client.complete(llmReq)).content;
+        await stream.writeSSE({ event: "token", data: JSON.stringify(raw) });
+      } catch {
+        await stream.writeSSE({ event: "error", data: JSON.stringify("답변 생성에 실패했습니다.") });
+        return;
+      }
+    }
+
+    // 완성본이 salad면(스트림 중 이미 전송됐어도) 1회 비스트림 재생성으로 교체
+    let finalRaw = raw;
+    if (isSalad(finalRaw)) {
+      try {
+        const r = await client.complete(llmReq);
+        if (!isSalad(r.content)) finalRaw = r.content;
+      } catch { /* 유지 */ }
+    }
+    // 외국문자 누수는 제거(토큰 salad엔 무영향)
+    let cleaned = finalRaw;
+    if (isGarbledAnswer(cleaned)) {
+      const stripped = stripForeignLetters(cleaned);
+      if (stripped && stripped !== cleaned && !isGarbledAnswer(stripped)) cleaned = stripped;
+    }
+    const answer = tidyAnswer(cleaned);
+    const sources = selectSources(parts, finalRaw); // 출처는 원문 [번호] 기준
+    const personBrief = await briefPromise;
+    const withEvidence = c.req.query("evidence") === "1" || c.req.query("debug") === "1";
+    await stream.writeSSE({
+      event: "done",
+      data: JSON.stringify({
+        answer,
+        intent: "archive_rag",
+        confidence: 0.9,
+        fromCache: false,
+        llmCalls: finalRaw === raw ? 1 : 2,
+        sources,
+        model: client.model,
+        ...(personBrief ? { personBrief } : {}),
+        ...(withEvidence ? { evidence: parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })) } : {}),
+      }),
+    });
+  });
+}
 
 queryRouter.post("/", async (c) => {
   if (!c.env.AI) {
@@ -478,14 +555,14 @@ queryRouter.post("/", async (c) => {
         } catch { return null; }
       })();
       const tRetrieveDone = Date.now();
-      // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
-      const res = await completeAvoidingGarble(client, {
-        channel: "realtime",
+      // 본답 LLM 요청 — 스트림/JSON 경로 공용.
+      const llmReq = {
+        channel: "realtime" as const,
         maxTokens: 800,
         temperature: 0.1,
         messages: [
           {
-            role: "system",
+            role: "system" as const,
             content:
               "너는 태안 지역정보 도우미다. 아래 [근거](실시간 관측값·국토부 실거래·관광 수요·축제·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n" +
               "- 답변은 오직 한글·아라비아 숫자·필요한 영문 약어만 사용하라. 한자·중국어·일본어 등 외국 문자를 절대 쓰지 마라(예: '施设'가 아니라 '시설', '国内'가 아니라 '국내').\n" +
@@ -502,29 +579,23 @@ queryRouter.post("/", async (c) => {
               "- '오늘 뭐하지/추천' 류 질문이면 오늘의 날씨·바다(물때·일출몰)·진행 중 축제·행사를 종합해 구체적인 활동을 추천하라(예: 맑고 낮 간조면 갯벌체험, 비 예보면 실내). 과거 기사로 답하지 마라.\n" +
               "- '[내 가게 맞춤 분석]' 근거가 있으면 그 사장님 본인 가게 데이터다. '우리 가게/모텔/식당' 질문엔 그 수치(가동률·예상 손님·권장가·매출·출항 가부 등)로 사장님에게 말하듯 구체적으로 답하고, 실행 조치도 1~2개 제안하라.",
           },
-          { role: "user", content: `[근거]\n${context}\n\n[질문] ${query}` },
+          { role: "user" as const, content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
-      });
+      };
+
+      // 스트리밍 경로(?stream=1) — 토큰을 흘려보내 체감 지연↓. 완료 후 정리본·출처·브리핑을 done 이벤트로.
+      if (c.req.query("stream") === "1") {
+        return streamAnswer(c, baseClient, llmReq, parts, briefPromise);
+      }
+
+      // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
+      const res = await completeAvoidingGarble(client, llmReq);
       // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 정리가 표현을 바꿔도 근거 선택이 안 흔들린다.
       const rawAnswer = res.content;
       // 결정론적 정리만(LLM 0, 즉시): 중복 출처꼬리 제거 + 인라인 불릿 정규화 + 문단 분리.
       // 과거의 LLM 교열 패스는 질의당 왕복을 2배로 만들어(70초) 제거함. 구조·굵게는 본답 프롬프트가 지시.
       const answer = tidyAnswer(rawAnswer);
-      const notFound = /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지 않/.test(rawAnswer);
-      const liveParts = parts.filter((p) => p.source.url === null); // 주입한 공식 실시간·집계 근거
-      const liveSrc = liveParts.map((p) => p.source);
-      const cited = new Set([...rawAnswer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
-      let sources: typeof liveSrc;
-      if (notFound) {
-        sources = liveSrc; // 못 찾음 → 공식 근거만(무관 기사 제거)
-      } else if (liveParts.length) {
-        // 주입한 공식 근거는 항상 표시(모델 인용 누락 대비) + 인용된 아카이브 기사만 추가
-        const citedArchive = parts.filter((p, i) => cited.has(i + 1) && p.source.url).map((p) => p.source);
-        sources = [...liveSrc, ...citedArchive];
-      } else {
-        // 순수 아카이브 질문 — 인용분만, 없으면 전체
-        sources = cited.size ? parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source) : parts.map((p) => p.source);
-      }
+      const sources = selectSources(parts, rawAnswer);
       const personBrief = await briefPromise;
       return c.json({
         answer,
