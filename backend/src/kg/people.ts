@@ -70,7 +70,7 @@ export async function detectPersonInQuery(db: D1Database, query: string): Promis
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
   graph: { center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] };
-  coappear: { id: string; name: string; count: number; reltype?: string }[];
+  coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
   timeline: { year: number; count: number }[];
@@ -151,23 +151,29 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   // 관계망(바이라인 제외)
   const graph = await personEgo(db, id, limit, hubIds);
 
-  // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회
+  // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회.
+  // 관계 검수(B3 활성화)를 위해 엣지 id·verified·relreason도 함께 실어 준다.
   const inc = await db.prepare(
-    "SELECT CASE WHEN src_id=? THEN dst_id ELSE src_id END AS otherId, " +
+    "SELECT id AS edgeId, verified, CASE WHEN src_id=? THEN dst_id ELSE src_id END AS otherId, " +
     "CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS count, " +
-    "json_extract(attrs_json,'$.reltype') AS reltype " +
+    "json_extract(attrs_json,'$.reltype') AS reltype, " +
+    "json_extract(attrs_json,'$.relreason') AS reason " +
     "FROM kg_edges WHERE rel='coappears' AND (src_id=? OR dst_id=?)",
-  ).bind(id, id, id).all<{ otherId: string; count: number; reltype: string | null }>();
+  ).bind(id, id, id).all<{ edgeId: string; verified: number; otherId: string; count: number; reltype: string | null; reason: string | null }>();
   const incRows = inc.results ?? [];
   const rmap = new Map(incRows.map((e) => [e.otherId, e.reltype && e.reltype !== "기타" ? e.reltype : undefined] as const));
+  const emap = new Map(incRows.map((e) => [e.otherId, { edgeId: e.edgeId, verified: Number(e.verified) || 0, reason: e.reason ?? undefined }] as const));
   const top = rankCoappears(incRows.map((e) => ({ otherId: e.otherId, count: Number(e.count) || 0 })), hubIds, limit);
-  let coappear: { id: string; name: string; count: number; reltype?: string }[] = [];
+  let coappear: PersonProfile["coappear"] = [];
   if (top.length) {
     const ids = top.map((t) => t.otherId);
     const ph = ids.map(() => "?").join(",");
     const nm = await db.prepare(`SELECT id, name FROM kg_nodes WHERE id IN (${ph})`).bind(...ids).all<{ id: string; name: string }>();
     const nmap = new Map((nm.results ?? []).map((x) => [x.id, x.name] as const));
-    coappear = top.map((t) => ({ id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count, reltype: rmap.get(t.otherId) }));
+    coappear = top.map((t) => {
+      const meta = emap.get(t.otherId);
+      return { id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count, reltype: rmap.get(t.otherId), edgeId: meta?.edgeId, verified: meta?.verified, reason: meta?.reason };
+    });
   }
 
   // 나온 기사(최신순 30)
