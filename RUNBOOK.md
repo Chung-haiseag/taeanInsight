@@ -367,4 +367,6 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-07-29 · AI 인물 브리핑을 공개 질의(/query)에 첨부(A2): 질의에 등장 많은 KG 인물명 감지 시(바이라인·저빈도 제외) 답변과 병렬로 brief 생성→personBrief 반환, '검증 아님' 카드 노출 · backend/kg/people(detectPersonInQuery)·query/router, web query-client·api/query
 - 2026-07-29 · 인물 대표 사안 키워드(B4): 프로필에 topics 추가 — 기사 제목 최대 300건에서 자주 나오는 키워드(제목 문서빈도>=2, 본인이름·지역명 제외)를 칩으로. 순수함수 topTopics+테스트 · backend/kg/people, web people-explorer
 - 2026-07-29 · 관리자 메뉴 앵커 절대경로화(D7): 헤더 섹션 링크 #앵커→/admin#앵커 (지식그래프 등 다른 관리자 페이지에서도 이동+스크롤) · web/components/admin-header
+- 2026-07-29 · 관계 라벨링 --min-weight 파라미터화(C6): weight>=10 하드코딩→--min-weight(기본 10). w5-9 등 확장 라벨링 가능(GEMINI_API_KEY 사용자 터미널 배치, reltype IS NULL 자동 스킵) · tools/kg/label-relations
+- 2026-07-29 · 검증된 인물 관계를 질의에 주입(B3, 검증-only): 관계형 질의(대립·협력·측근 등)+인물 감지 시 verified=1 coappears 관계만 근거블록으로. 자동추출은 공개답변에 단정 안 함(무동작), 검수 승격 시 자동 반영 · backend/kg/relations, query/router
 - 2026-07-27 · 인쇄·PDF 저장 품질(기사/주간리포트 공통): 모든 페이지 상하 여백(thead/tfoot 반복 프레임 — '여백=없음'에서도 유지), 사선 타일 워터마크 '태안신문' 10개(position:fixed 페이지 반복, 텍스트라 '배경 그래픽' 무관), 하단 중앙 페이지번호 n/N(@page @bottom-center + counter(page)). 주의: thead/tfoot에 break-inside:auto 금지(반복 대신 분할됨) · web/app/layout.tsx·globals.css
