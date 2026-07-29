@@ -6,6 +6,7 @@ import { assertVerifiable } from "./import";
 import { articlePersonGraph, personEgo } from "./graph";
 import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus, getCanonicalId, findCandidateByNode } from "./merge";
 import { searchPersons, buildPersonProfile, buildPersonBrief } from "./people";
+import { listPendingRelations, setRelation, isReltype } from "./relations";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -90,6 +91,22 @@ router.get("/person/:id/brief", async (c) => {
   const brief = await buildPersonBrief(c.env.ARCHIVE_DB, c.env.AI, c.req.param("id"));
   if (!brief) return c.json({ error: "no_brief" }, 404);
   return c.json({ brief });
+});
+
+// 관계 검수: 라벨된 관계 대기 목록(weight 내림차순, 바이라인 제외)
+router.get("/relations/pending", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const limit = Math.max(1, Math.min(300, Number(c.req.query("limit")) || 100));
+  return c.json({ relations: await listPendingRelations(c.env.ARCHIVE_DB, limit) });
+});
+// 관계 라벨 수정(relabel) + 검증 설정. { id, reltype?, verified? }
+router.post("/relation/set", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ id: string; reltype?: string; verified?: boolean }>().catch(() => ({} as { id: string; reltype?: string; verified?: boolean }));
+  if (!b.id) return c.json({ error: "id 필수" }, 400);
+  if (b.reltype !== undefined && !isReltype(b.reltype)) return c.json({ error: "reltype 오류" }, 400);
+  await setRelation(c.env.ARCHIVE_DB, b.id, { reltype: b.reltype, verified: b.verified });
+  return c.json({ ok: true });
 });
 
 router.get("/merge/candidates", async (c) => {

@@ -131,3 +131,13 @@ export function getPersonProfile(id: string): Promise<PersonProfile> {
 export function getPersonBrief(id: string): Promise<{ brief: string }> {
   return apiFetch(`/api/admin/kg/person/${encodeURIComponent(id)}/brief`);
 }
+
+// 관계 검수 — 라벨 수정(relabel) + 검증 승격
+export const RELTYPES = ["협력·동료", "대립·갈등", "소속·상하", "전임·후임", "가족·인척", "기타"] as const;
+export interface PendingRelation { edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason?: string }
+export function getPendingRelations(limit = 100): Promise<{ relations: PendingRelation[] }> {
+  return apiFetch(`/api/admin/kg/relations/pending?limit=${limit}`);
+}
+export function setRelation(id: string, body: { reltype?: string; verified?: boolean }): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/relation/set`, { method: "POST", body: JSON.stringify({ id, ...body }) });
+}
