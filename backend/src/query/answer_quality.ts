@@ -2,30 +2,32 @@
 // Workers AI 무료 모델(fp8)이 간헐적으로 뱉는 깨진 출력을 걸러 1회 재시도하기 위함.
 // 한국어 답변이 기대되는 맥락이므로, 한글 비율이 비정상적으로 낮거나 같은 토큰이 폭주하면 붕괴로 본다.
 
-export function isGarbledAnswer(text: string): boolean {
-  const t = (text ?? "").trim();
-  // 짧은 답변(사실형 단답·"찾지 못했습니다")은 정상으로 취급 — 오탐 방지.
-  if (t.length < 24) return false;
+// 한글·라틴 외의 '글자'(한자·가나·데바나가리·키릴 등)가 하나라도 있는가.
+//   한국어 답변엔 이런 글자가 사실상 항상 누수(施设·国内·更加 등 2자 조각 포함).
+//   누수는 stripForeignLetters로 무손실 제거 가능 → '재시도'가 아니라 '제거' 대상이다.
+function hasForeignScript(t: string): boolean {
+  const foreign = (t.match(/\p{L}/gu) ?? []).filter((c) => !/[\p{Script=Hangul}\p{Script=Latin}]/u.test(c));
+  return foreign.length >= 1;
+}
 
-  // (1) 한글 비율 — 한국어 답변은 대부분 한글이어야 한다. 라틴 토큰 salad는 한글이 거의 없다.
+// '재시도할 가치가 있는' 심각한 붕괴 — 재생성하면 나아질 수 있는 것만. 순수.
+// 외국문자 누수(hasForeignScript)는 제외: 재생성해도 또 샐 수 있고 제거로 충분하므로 재시도는 지연 낭비다.
+export function isSalad(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (t.length < 24) return false; // 짧은 단답은 정상 취급 — 오탐 방지
+
+  // (1) 한글 비율 — 라틴 토큰 salad는 한글이 거의 없다.
   const hangul = (t.match(/[가-힣]/g) ?? []).length;
   const latin = (t.match(/[A-Za-z]/g) ?? []).length;
   const letters = hangul + latin;
   if (letters >= 30 && hangul / letters < 0.2) return true;
 
-  // (1-2) 외국어 스크립트 누수 — 한글·라틴 외의 글자(한자·가나·데바나가리·키릴·태국어 등).
-  //   한국어 답변엔 이런 글자가 사실상 항상 누수(施设·国内·更加 등 2자 조각 포함). 하나라도 있으면 붕괴.
-  const foreign = (t.match(/\p{L}/gu) ?? []).filter((c) => !/[\p{Script=Hangul}\p{Script=Latin}]/u.test(c));
-  if (foreign.length >= 1) return true;
-
-  // (1-3) 영어 단어가 한글에 직접 붙은 누수(예: "existed하며", "completed되었다").
-  //   소문자 4자+ 단어(단어 시작, 영문자에 안 이어짐)가 한글과 공백 없이 접하면 번역 잔재로 본다.
-  //   대문자 포함 약어·고유명사(AI·TourAPI·Co-Pilot)는 소문자 조건·단어경계로 걸러 오탐 방지.
+  // (2) 영어 단어가 한글에 직접 붙은 융합(예: "existed하며") — 라틴이라 제거로 못 고침 → 재생성 대상.
   if (/(?<![A-Za-z])[a-z]{4,}[가-힣]/.test(t)) return true;
 
   const words = t.split(/\s+/).filter(Boolean);
 
-  // (2) 같은 단어가 길게 연속 반복(예: "soap soap soap soap soap").
+  // (3) 같은 단어가 길게 연속 반복(예: "soap soap soap soap soap").
   let run = 1;
   for (let i = 1; i < words.length; i++) {
     if (words[i] === words[i - 1]) {
@@ -36,7 +38,7 @@ export function isGarbledAnswer(text: string): boolean {
     }
   }
 
-  // (3) 한 토큰이 전체 출력을 지배(반복 폭주) — 길이 20토큰 이상에서 한 단어가 25% 초과.
+  // (4) 한 토큰이 전체 출력을 지배(반복 폭주) — 20토큰 이상에서 한 단어가 25% 초과.
   if (words.length >= 20) {
     const freq = new Map<string, number>();
     for (const w of words) if (w.length >= 2) freq.set(w, (freq.get(w) ?? 0) + 1);
@@ -46,6 +48,13 @@ export function isGarbledAnswer(text: string): boolean {
   }
 
   return false;
+}
+
+// 표시 부적합한 출력 — salad(재시도 대상) + 외국문자 누수(제거 대상)를 모두 포함. 순수.
+export function isGarbledAnswer(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (t.length < 24) return false;
+  return isSalad(t) || hasForeignScript(t);
 }
 
 // 한글·라틴 외의 '글자'(한자·가나·데바나가리 등)만 제거. 숫자·문장부호·공백은 보존. 순수.
@@ -106,22 +115,24 @@ export function tidyAnswer(text: string): string {
   return paras.join("\n\n");
 }
 
-// 붕괴(salad·외국어 누수) 방지 — 순차 재시도(지연 곱절) 대신 여러 개를 병렬 생성해 정상을 고른다.
-// 지연은 생성 1회분으로 고정, 시도는 attempts번(누수 방어 유지). 무료 모델이라 비용 0.
+// 붕괴(salad·외국어 누수) 방지 — 조기 종료 순차 재시도.
+// Workers AI는 계정 동시성 한도로 '병렬' 호출을 줄 세워 실행하므로, N개 병렬은 사실상 N회 직렬 지연이 된다.
+// 붕괴는 드물다 → 1번 생성해 정상이면 즉시 반환(흔한 경우 LLM 왕복 1회). 깨졌을 때만 attempts까지 재시도.
 export async function completeAvoidingGarble<Req, Res extends { content: string }>(
   client: { complete: (req: Req) => Promise<Res> },
   request: Req,
-  attempts = 3, // 병렬이라 지연은 생성 1회분 고정. 3개면 모두 누수할 확률 ↓(슬립률 대폭 감소).
+  attempts = 2, // 정상이면 1회로 끝. 붕괴 시에만 1회 더(총 2회). 지연을 최소화.
 ): Promise<Res> {
   const n = Math.max(1, attempts);
-  const results = await Promise.all(Array.from({ length: n }, () => client.complete(request)));
-  const best = results.find((r) => !isGarbledAnswer(r.content)) ?? results[0];
-  // 최후 방어: 모든 시도가 붕괴여도, 외국문자 누수뿐이면 그 글자만 떼어 정상화(토큰 salad엔 무영향).
-  if (isGarbledAnswer(best.content)) {
-    const cleaned = stripForeignLetters(best.content);
-    if (cleaned && cleaned !== best.content && !isGarbledAnswer(cleaned)) {
-      return { ...best, content: cleaned };
-    }
+  let last!: Res;
+  for (let i = 0; i < n; i++) {
+    last = await client.complete(request);
+    if (!isSalad(last.content)) break; // salad만 재시도. 정상·경미한 누수면 즉시 종료(지연↓)
   }
-  return best;
+  // 외국문자 누수는 그 글자만 떼어 정상화(토큰 salad엔 무영향). 정상이면 그대로 반환.
+  const cleaned = stripForeignLetters(last.content);
+  if (cleaned && cleaned !== last.content && !isGarbledAnswer(cleaned)) {
+    return { ...last, content: cleaned };
+  }
+  return last;
 }
