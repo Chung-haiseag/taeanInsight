@@ -148,6 +148,16 @@ export function QueryClient() {
           </h2>
           <AnswerView text={result.answer} />
 
+          {result.personBrief && (
+            <div className="rounded-lg border border-brand/20 bg-background p-4 text-sm leading-relaxed">
+              <p className="mb-1 text-xs font-semibold text-brand">
+                👤 {result.personBrief.name} — AI 인물 브리핑
+                <span className="ml-1 font-normal text-foreground-muted">· 아카이브 기사 요약(검증된 사실 아님)</span>
+              </p>
+              <p className="whitespace-pre-wrap">{decodeEntities(result.personBrief.text)}</p>
+            </div>
+          )}
+
           {result.sources.length > 0 && (
             <div className="pt-2 border-t border-accent/20">
               <h3 className="text-sm font-semibold text-brand mb-2">출처</h3>
