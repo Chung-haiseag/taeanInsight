@@ -25,6 +25,46 @@ export function buildRelationFactBlock(
   };
 }
 
+// 허용 관계 어휘(라벨 수정 검증용). label-lib.mjs의 RELTYPES와 동일 순서.
+export const RELTYPES = ["협력·동료", "대립·갈등", "소속·상하", "전임·후임", "가족·인척", "기타"] as const;
+export function isReltype(v: string): boolean { return (RELTYPES as readonly string[]).includes(v); }
+
+// 얇은 D1: 관계 검수 대기 목록 — 라벨됨(reltype 있음, '기타' 제외)·미검증(verified=0)·바이라인 제외, weight 내림차순.
+export interface PendingRelation { edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason?: string }
+export async function listPendingRelations(db: D1Database, limit = 100): Promise<PendingRelation[]> {
+  const { loadHubIds } = await import("./people");
+  const lim = Math.min(Math.max(1, Math.floor(limit) || 100), 300);
+  const r = await db.prepare(
+    "SELECT e.id AS edgeId, e.src_id AS aId, na.name AS a, e.dst_id AS bId, nb.name AS b, " +
+    "json_extract(e.attrs_json,'$.reltype') AS reltype, " +
+    "CAST(json_extract(e.attrs_json,'$.weight') AS INTEGER) AS weight, " +
+    "json_extract(e.attrs_json,'$.relreason') AS reason " +
+    "FROM kg_edges e JOIN kg_nodes na ON na.id=e.src_id JOIN kg_nodes nb ON nb.id=e.dst_id " +
+    "WHERE e.rel='coappears' AND e.verified=0 " +
+    "AND json_extract(e.attrs_json,'$.reltype') IS NOT NULL AND json_extract(e.attrs_json,'$.reltype')<>'기타' " +
+    "ORDER BY weight DESC LIMIT ?",
+  ).bind(lim * 2).all<{ edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason: string | null }>();
+  const hubs = await loadHubIds(db);
+  return (r.results ?? [])
+    .filter((x) => !hubs.has(x.aId) && !hubs.has(x.bId)) // 바이라인(기자/편집인) 쌍 제외
+    .slice(0, lim)
+    .map((x) => ({ edgeId: x.edgeId, aId: x.aId, a: x.a, bId: x.bId, b: x.b, reltype: x.reltype, weight: Number(x.weight) || 0, reason: x.reason ?? undefined }));
+}
+
+// 얇은 D1: coappears 엣지의 라벨(reltype) 수정 + 검증(verified) 설정. reltype 미지정이면 verified만 변경.
+export async function setRelation(db: D1Database, id: string, opts: { reltype?: string; verified?: boolean }): Promise<void> {
+  const now = new Date().toISOString();
+  if (opts.reltype !== undefined) {
+    await db.prepare(
+      "UPDATE kg_edges SET attrs_json=json_set(COALESCE(attrs_json,'{}'), '$.reltype', ?1), verified=?2, updated_at=?3 WHERE id=?4 AND rel='coappears'",
+    ).bind(opts.reltype, opts.verified ? 1 : 0, now, id).run();
+  } else {
+    await db.prepare(
+      "UPDATE kg_edges SET verified=?1, updated_at=?2 WHERE id=?3 AND rel='coappears'",
+    ).bind(opts.verified ? 1 : 0, now, id).run();
+  }
+}
+
 // 얇은 D1: 특정 인물의 '검증된' coappears 관계(reltype 있음, '기타' 제외)를 weight 내림차순으로.
 export async function getVerifiedRelations(db: D1Database, personId: string, limit = 12): Promise<RelationItem[]> {
   const r = await db.prepare(

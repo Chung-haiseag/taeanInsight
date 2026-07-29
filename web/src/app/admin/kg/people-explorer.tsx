@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import KgGraph from "@/components/kg-graph";
-import { searchPersons, getPersonProfile, getPersonBrief, verifyKg, type PersonSearchResult, type PersonProfile } from "@/lib/api/kg";
+import { searchPersons, getPersonProfile, getPersonBrief, setRelation, RELTYPES, type PersonSearchResult, type PersonProfile } from "@/lib/api/kg";
 
 export default function PeopleExplorer() {
   const [q, setQ] = useState("");
@@ -40,9 +40,19 @@ export default function PeopleExplorer() {
   async function verifyRel(edgeId: string, otherId: string, next: boolean) {
     setProf((p) => (p ? { ...p, coappear: p.coappear.map((c) => (c.id === otherId ? { ...c, verified: next ? 1 : 0 } : c)) } : p));
     try {
-      await verifyKg("kg_edges", edgeId, next);
+      await setRelation(edgeId, { verified: next });
     } catch {
       setProf((p) => (p ? { ...p, coappear: p.coappear.map((c) => (c.id === otherId ? { ...c, verified: next ? 0 : 1 } : c)) } : p));
+    }
+  }
+  // 라벨 수정(relabel): 틀린 관계 종류를 고친다. 검증 상태는 그대로 유지.
+  async function relabelRel(edgeId: string, otherId: string, reltype: string, verified: boolean) {
+    const prev = prof?.coappear.find((c) => c.id === otherId)?.reltype;
+    setProf((p) => (p ? { ...p, coappear: p.coappear.map((c) => (c.id === otherId ? { ...c, reltype } : c)) } : p));
+    try {
+      await setRelation(edgeId, { reltype, verified });
+    } catch {
+      setProf((p) => (p ? { ...p, coappear: p.coappear.map((c) => (c.id === otherId ? { ...c, reltype: prev } : c)) } : p));
     }
   }
 
@@ -132,14 +142,20 @@ export default function PeopleExplorer() {
                   <li key={c.id}>
                     <button type="button" onClick={() => openPerson(c.id)} className="hover:text-brand hover:underline">{c.name}</button>
                     <span className="text-foreground-muted"> · {c.count}건</span>
-                    {c.reltype && <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">{c.reltype}</span>}
-                    {c.reltype && c.edgeId && (
-                      c.verified
-                        ? <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, false)} title={(c.reason ? c.reason + " · " : "") + "검증 취소"}
-                            className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-200">✓ 검증됨</button>
-                        : <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, true)} title={(c.reason ? c.reason + " · " : "") + "이 관계를 검증하면 공개 답변에 반영됩니다"}
-                            className="ml-1 rounded border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand hover:bg-brand/5">검증</button>
-                    )}
+                    {c.reltype && c.edgeId ? (
+                      <>
+                        <select value={c.reltype} onChange={(e) => relabelRel(c.edgeId!, c.id, e.target.value, !!c.verified)}
+                          title={c.reason || "관계 종류(틀리면 수정)"}
+                          className="ml-1.5 rounded border border-accent/30 bg-accent/10 px-1 py-0.5 text-[10px] font-medium text-accent">
+                          {RELTYPES.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
+                        </select>
+                        {c.verified
+                          ? <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, false)} title="검증 취소"
+                              className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-200">✓ 검증됨</button>
+                          : <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, true)} title="이 관계를 검증하면 공개 답변에 반영됩니다"
+                              className="ml-1 rounded border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand hover:bg-brand/5">검증</button>}
+                      </>
+                    ) : c.reltype && <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">{c.reltype}</span>}
                   </li>
                 ))}
                 {!prof.coappear.length && <li className="text-foreground-muted">없음</li>}

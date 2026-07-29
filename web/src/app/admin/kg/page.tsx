@@ -17,6 +17,7 @@ import {
 } from "@/lib/api/kg";
 import MergeConsole from "./merge-console";
 import PeopleExplorer from "./people-explorer";
+import RelationsReview from "./relations-review";
 
 // 서버가 { error } 400을 주면 그 메시지를, 아니면 일반 Error 메시지를 표시
 function errMsg(e: unknown, fallback: string): string {
@@ -70,7 +71,7 @@ function KgLogin({ onOk }: { onOk: () => void }) {
 
 export default function KgAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"nodes" | "merge" | "people">("nodes");
+  const [tab, setTab] = useState<"nodes" | "merge" | "people" | "relations">("nodes");
 
   useEffect(() => {
     (async () => {
@@ -142,9 +143,18 @@ export default function KgAdminPage() {
         >
           🧭 인물 탐색
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("relations")}
+          className={`px-3 py-2 text-sm font-semibold ${
+            tab === "relations" ? "border-b-2 border-brand text-brand" : "text-foreground-muted hover:text-brand"
+          }`}
+        >
+          🔗 관계 검수
+        </button>
       </div>
 
-      {tab === "nodes" ? <KgConsole /> : tab === "merge" ? <MergeConsole /> : <PeopleExplorer />}
+      {tab === "nodes" ? <KgConsole /> : tab === "merge" ? <MergeConsole /> : tab === "people" ? <PeopleExplorer /> : <RelationsReview />}
     </div>
   );
 }
