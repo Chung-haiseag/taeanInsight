@@ -123,6 +123,7 @@ export interface PersonProfile {
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
   timeline: { year: number; count: number }[];
+  topics: { term: string; count: number }[];
 }
 export function getPersonProfile(id: string): Promise<PersonProfile> {
   return apiFetch(`/api/admin/kg/person/${encodeURIComponent(id)}/profile`);

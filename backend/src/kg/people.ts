@@ -29,6 +29,7 @@ export function yearHistogram(rows: YearCountRow[]): { year: number; count: numb
 
 import type { GraphNode, Edge } from "./graph";
 import { personEgo } from "./graph";
+import { extractKeywords, UBIQUITOUS } from "../query/keywords";
 
 // 바이라인 id 집합 — 등장 기사 수 >= HUB_MENTIONS 인 person(현재 김동이·신문웅). 소수라 매 요청 조회해도 저렴.
 export async function loadHubIds(db: D1Database): Promise<Set<string>> {
@@ -73,6 +74,24 @@ export interface PersonProfile {
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
   timeline: { year: number; count: number }[];
+  topics: { term: string; count: number }[];
+}
+
+// 인물의 대표 사안 — 기사 제목들에서 자주 등장하는 키워드(제목 개수 기준). 본인 이름·지역명은 제외.
+export function topTopics(titles: string[], personName: string, limit = 10): { term: string; count: number }[] {
+  const nameParts = new Set(extractKeywords(personName));
+  const df = new Map<string, number>();
+  for (const t of titles) {
+    for (const kw of extractKeywords(t || "")) {
+      if (kw.length < 2 || UBIQUITOUS.has(kw) || nameParts.has(kw)) continue;
+      df.set(kw, (df.get(kw) ?? 0) + 1); // extractKeywords는 제목 내 중복 제거 → 제목 문서빈도
+    }
+  }
+  return [...df.entries()]
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .slice(0, limit)
+    .map(([term, count]) => ({ term, count }));
 }
 
 // AI 인물 브리핑 — 직위·나온 기사 제목·주요 관계를 Workers AI로 3~4문장 요약(무료, 제목 근거로만).
@@ -177,6 +196,13 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   ).bind(id).all<{ year: number | null; count: number }>();
   const timeline = yearHistogram(tl.results ?? []);
 
+  // 대표 사안 — 제목 최대 300건에서 자주 나오는 키워드
+  const tt = await db.prepare(
+    "SELECT a.title AS title FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno " +
+    "WHERE m.node_id=? AND a.title IS NOT NULL ORDER BY a.published_at DESC LIMIT 300",
+  ).bind(id).all<{ title: string }>();
+  const topics = topTopics((tt.results ?? []).map((x) => x.title), p.name);
+
   return {
     person: { id: p.id, name: p.name, mentions: Number(p.mentions) || 0, isHub: isHub(Number(p.mentions) || 0) },
     graph,
@@ -184,5 +210,6 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     articles: arts.results ?? [],
     offices,
     timeline,
+    topics,
   };
 }
