@@ -5,12 +5,13 @@
 
 import Link from "next/link";
 
+// 절대경로(/admin#앵커)로 둬야 /admin/kg 등 다른 관리자 페이지에서도 이동+스크롤이 된다.
 const ADMIN_SECTIONS = [
-  { href: "#cost-heading", label: "비용" },
-  { href: "#review-heading", label: "AI 검수" },
-  { href: "#citizen-heading", label: "시민기자" },
-  { href: "#governance-heading", label: "민감규칙" },
-  { href: "#ebook-heading", label: "전자북 검수" },
+  { href: "/admin#cost-heading", label: "비용" },
+  { href: "/admin#review-heading", label: "AI 검수" },
+  { href: "/admin#citizen-heading", label: "시민기자" },
+  { href: "/admin#governance-heading", label: "민감규칙" },
+  { href: "/admin#ebook-heading", label: "전자북 검수" },
   { href: "/admin/kg", label: "🕸️ 지식그래프" },
 ];
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isHub, rankCoappears, yearHistogram, HUB_MENTIONS } from "../src/kg/people";
+import { isHub, rankCoappears, yearHistogram, topTopics, HUB_MENTIONS } from "../src/kg/people";
 
 describe("isHub", () => {
   it("임계 경계(>=5000)", () => {
@@ -40,4 +40,22 @@ describe("yearHistogram", () => {
     expect(r).toEqual([{ year: 1999, count: 2 }, { year: 2003, count: 4 }]);
   });
   it("빈 배열", () => { expect(yearHistogram([])).toEqual([]); });
+});
+
+describe("topTopics", () => {
+  const titles = [
+    "가세로 군수 해양신도시 착공",
+    "해양신도시 예산 확보",
+    "해양신도시 주민설명회",
+    "가세로 태안군 방문",   // '태안군'은 UBIQUITOUS 제외, '가세로'는 본인 이름 제외
+    "관광 활성화 대책",
+  ];
+  it("제목 2회 이상 키워드를 빈도순으로, 본인이름·지역명 제외", () => {
+    const r = topTopics(titles, "가세로");
+    expect(r[0]).toEqual({ term: "해양신도시", count: 3 });
+    expect(r.some((t) => t.term === "가세로")).toBe(false);   // 본인 이름 제외
+    expect(r.some((t) => t.term === "태안군")).toBe(false);   // 지역명 제외
+    expect(r.some((t) => t.term === "관광")).toBe(false);     // 1회는 제외(count>=2)
+  });
+  it("빈 입력 안전", () => { expect(topTopics([], "홍길동")).toEqual([]); });
 });

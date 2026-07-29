@@ -81,6 +81,20 @@ export default function PeopleExplorer() {
             </div>
           )}
 
+          {/* 대표 사안 — 기사 제목에서 자주 등장한 키워드 */}
+          {prof.topics.length > 0 && (
+            <div>
+              <span className="mr-2 text-sm font-semibold text-brand">대표 사안:</span>
+              <span className="inline-flex flex-wrap gap-1.5 align-middle">
+                {prof.topics.map((t) => (
+                  <span key={t.term} className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs text-brand">
+                    {t.term}<span className="ml-1 text-foreground-muted">{t.count}</span>
+                  </span>
+                ))}
+              </span>
+            </div>
+          )}
+
           {/* 직위·소속 */}
           {prof.offices.length > 0 && (
             <div className="text-sm">
