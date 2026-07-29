@@ -6,7 +6,9 @@
 //   weight/articles/verified 등 기존 값 보존). 대상 쿼리가 reltype IS NULL만 골라 이미 라벨된 엣지는
 //   재실행 시 자동 스킵 — 체크포인트 파일 없이도 중단 후 이어하기 안전.
 // 사용: export GEMINI_API_KEY=...
-//       node label-relations.mjs [--limit N] [--conc 4] [--dry]
+//       node label-relations.mjs [--limit N] [--conc 4] [--min-weight 10] [--dry]
+//   --min-weight: 라벨 대상 최소 동반등장 횟수(기본 10). 예) --min-weight 5 로 낮추면 w5-9 층(약 2만개)까지
+//                 확장 라벨링. 이미 라벨된 엣지는 reltype IS NULL 조건으로 자동 스킵되어 중복 없음.
 //   --dry: Gemini 분류만 수행하고 결과를 로그로만 남김(UPDATE 생략).
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -20,6 +22,7 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 function arg(n, d) { const i = process.argv.indexOf(n); return i !== -1 ? process.argv[i + 1] : d; }
 const LIMIT = Math.max(0, Number(arg("--limit", "0")) || 0);
 const CONC = Math.max(1, Number(arg("--conc", "4")) || 4);
+const MIN_W = Math.max(1, Number(arg("--min-weight", "10")) || 10);
 const DRY = process.argv.includes("--dry");
 
 if (!GEMINI_KEY) { console.error("GEMINI_API_KEY 필요"); process.exit(1); }
@@ -127,13 +130,13 @@ async function batchedIn(items, chunkSize, buildSql, onRow) {
 }
 
 async function main() {
-  console.log(`대상 조회 중... (모델 ${GEMINI_MODEL} · 동시 ${CONC}${DRY ? " · --dry" : ""})`);
+  console.log(`대상 조회 중... (모델 ${GEMINI_MODEL} · 동시 ${CONC} · weight>=${MIN_W}${DRY ? " · --dry" : ""})`);
 
   // 대상: rel='coappears' · weight>=10 · reltype 미설정만 — 이미 라벨된 엣지는 여기서 제외되므로
   // 재실행해도 중복 작업 없이 이어서 진행된다(별도 체크포인트 파일 불필요).
   let sql =
     "SELECT id, src_id, dst_id, attrs_json FROM kg_edges WHERE rel='coappears' " +
-    "AND CAST(json_extract(attrs_json,'$.weight') AS INT)>=10 " +
+    `AND CAST(json_extract(attrs_json,'$.weight') AS INT)>=${MIN_W} ` +
     "AND json_extract(attrs_json,'$.reltype') IS NULL";
   if (LIMIT) sql += ` LIMIT ${LIMIT}`;
   const result = await d1(sql);
