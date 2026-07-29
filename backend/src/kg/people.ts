@@ -51,6 +51,21 @@ export async function searchPersons(db: D1Database, q: string, limit: number): P
   return r.results ?? [];
 }
 
+// 질의 문장에 '등장 많은 KG 인물명'이 통째로 포함되면 그 인물을 반환(브리핑 첨부용). 바이라인·저빈도·짧은 이름은 제외.
+export async function detectPersonInQuery(db: D1Database, query: string): Promise<{ id: string; name: string } | null> {
+  const q = String(query || "").trim();
+  if (q.length < 2) return null;
+  // 질의에 이름이 부분문자열로 들어가는 person 노드를 등장순으로. instr는 대소문자·공백 그대로 비교.
+  const r = await db.prepare(
+    "SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+    "FROM kg_nodes n WHERE n.type='person' AND length(n.name) >= 2 AND instr(?, n.name) > 0 " +
+    "ORDER BY mentions DESC LIMIT 5",
+  ).bind(q).all<{ id: string; name: string; mentions: number }>();
+  const hubs = await loadHubIds(db);
+  const cand = (r.results ?? []).filter((x) => !hubs.has(x.id) && x.mentions >= 20);
+  return cand.length ? { id: cand[0].id, name: cand[0].name } : null;
+}
+
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
   graph: { center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] };

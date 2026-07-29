@@ -438,6 +438,17 @@ queryRouter.post("/", async (c) => {
 
     if (parts.length) {
       const context = parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
+      // (A2) 질의가 인물 중심이면 인물 브리핑을 답변 생성과 '병렬'로 만들어 카드로 첨부(공개, 검증 아님 표기).
+      const briefPromise: Promise<{ id: string; name: string; text: string } | null> = (async () => {
+        try {
+          if (!c.env.ARCHIVE_DB || !c.env.AI || offRegion) return null;
+          const { detectPersonInQuery, buildPersonBrief } = await import("../kg/people");
+          const hit = await detectPersonInQuery(c.env.ARCHIVE_DB, query);
+          if (!hit) return null;
+          const text = await buildPersonBrief(c.env.ARCHIVE_DB, c.env.AI, hit.id);
+          return text ? { id: hit.id, name: hit.name, text } : null;
+        } catch { return null; }
+      })();
       // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
       const res = await completeAvoidingGarble(client, {
         channel: "realtime",
@@ -482,6 +493,7 @@ queryRouter.post("/", async (c) => {
         // 순수 아카이브 질문 — 인용분만, 없으면 전체
         sources = cited.size ? parts.filter((_, i) => cited.has(i + 1)).map((p) => p.source) : parts.map((p) => p.source);
       }
+      const personBrief = await briefPromise;
       return c.json({
         answer,
         intent: "archive_rag",
@@ -490,6 +502,7 @@ queryRouter.post("/", async (c) => {
         llmCalls: 1,
         sources,
         model: client.model,
+        ...(personBrief ? { personBrief } : {}),
         // RAG 투명성 — ?debug=1 또는 evidence=1이면 LLM에 넣은 근거 원문을 그대로 노출
         ...(c.req.query("debug") === "1" || c.req.query("evidence") === "1"
           ? { evidence: parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })) }
