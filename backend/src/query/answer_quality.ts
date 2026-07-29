@@ -57,6 +57,55 @@ export function stripForeignLetters(text: string): string {
     .trim();
 }
 
+// 교열(polish) 프롬프트 — 무료 fp8 모델이 빠뜨린 글자·조사를 복원하고 읽기 좋게 구조화. 사실·출처는 불변.
+const EDITOR_PROMPT =
+  "너는 한국어 교열자다. 아래 초안의 '뜻·사실·숫자·날짜·출처번호([1] 같은 대괄호 숫자)'는 절대 바꾸지 마라. 할 일은 두 가지뿐이다.\n" +
+  "1) 빠진 글자·조사·띄어쓰기를 문맥에 맞게 자연스럽게 복원하라. 예: '많은를'→'많은 과제를', '성공적으로되어야'→'성공적으로 발전되어야', '또한,의 진행'→'또한, 사업의 진행', '안면도가한'→'안면도가 훌륭한'.\n" +
+  "2) 읽기 좋게 2~4개의 짧은 문단으로 나눠라(문단 사이 빈 줄). 여러 항목을 나열하면 각 줄 앞에 '- '를 붙이고, 핵심 이름·숫자·날짜는 **굵게** 강조하라.\n" +
+  "새로운 사실·설명을 추가하지 말고, 없는 내용을 지어내지 마라. 출처번호는 원래 위치에 그대로 두라. 오직 한글·아라비아 숫자·필요한 영문 약어만 쓰고, 한자·일본어 등 외국 문자는 절대 쓰지 마라. 교정한 본문만 출력하라(설명·머리말 금지).";
+
+// 생성된 답변을 무료 AI로 1회 교열 — 빠진 글자 복원 + 문단·불릿 구조화. 사실/출처 훼손이 의심되면 원문을 그대로 반환.
+export async function polishAnswer<Req>(
+  client: { complete: (req: Req) => Promise<{ content: string }> },
+  raw: string,
+  makeRequest: (messages: { role: "system" | "user"; content: string }[]) => Req,
+): Promise<string> {
+  const t = (raw ?? "").trim();
+  if (t.length < 40) return raw; // 짧은 단답·"찾지 못했습니다"는 그대로
+  try {
+    const res = await completeAvoidingGarble(
+      client,
+      makeRequest([{ role: "system", content: EDITOR_PROMPT }, { role: "user", content: t }]),
+      2,
+    );
+    const out = (res.content ?? "").trim();
+    if (!out || isGarbledAnswer(out)) return raw;              // 교열본이 깨졌으면 원문
+    if (out.length < t.length * 0.45) return raw;              // 내용이 절반 이하로 줄면(손실) 원문
+    return out;                                                 // 출처는 원문 기준으로 계산하므로 인용 유실 걱정 없음
+  } catch {
+    return raw;
+  }
+}
+
+// 결정론적 정리 — 말미 중복 출처목록('참고자료:[1]..') 제거 + 한 덩어리 답을 문단으로 분리(읽기 좋게 보장). 순수.
+export function tidyAnswer(text: string): string {
+  let t = (text ?? "").trim();
+  if (!t) return t;
+  // 1) 아래 '출처' 섹션과 중복되는 말미 인용목록 제거: "참고자료:/참고문헌:/출처: [1],[3]..." 또는 "[1][2]..."만의 꼬리
+  t = t.replace(/\s*(참고자료|참고문헌|출처|참고)\s*[:：][\s\S]*$/g, "").trim();
+  t = t.replace(/(?:\s*\[\d+\][\s,·]*)+$/g, "").trim();
+  // 2) 인라인 불릿 정규화 — 한 줄에 붙은 " - **항목**"들을 줄바꿈 불릿으로(목록 렌더). 굵게 불릿만 대상(오탐 최소).
+  if ((t.match(/\s-\s\*\*/g) ?? []).length >= 2) t = t.replace(/\s+-\s+(\*\*)/g, "\n- $1");
+  // 3) 이미 줄바꿈(문단/불릿)이 있으면 그대로 둔다
+  if (/\n/.test(t)) return t;
+  // 4) 한 덩어리면 문장 단위로 나눠 3문장씩 문단으로 묶는다(한국어 종결 '다./요./…' + 공백 기준)
+  const sentences = t.split(/(?<=[다요음함됨임죠까죠]\.|[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (sentences.length <= 3) return t;
+  const paras: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join(" "));
+  return paras.join("\n\n");
+}
+
 // 붕괴(salad·외국어 누수) 방지 — 순차 재시도(지연 곱절) 대신 여러 개를 병렬 생성해 정상을 고른다.
 // 지연은 생성 1회분으로 고정, 시도는 attempts번(누수 방어 유지). 무료 모델이라 비용 0.
 export async function completeAvoidingGarble<Req, Res extends { content: string }>(
