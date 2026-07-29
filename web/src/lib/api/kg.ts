@@ -119,7 +119,7 @@ export function searchPersons(q: string): Promise<{ results: PersonSearchResult[
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
   graph: { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] };
-  coappear: { id: string; name: string; count: number; reltype?: string }[];
+  coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
   timeline: { year: number; count: number }[];

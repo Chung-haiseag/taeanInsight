@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import KgGraph from "@/components/kg-graph";
-import { searchPersons, getPersonProfile, getPersonBrief, type PersonSearchResult, type PersonProfile } from "@/lib/api/kg";
+import { searchPersons, getPersonProfile, getPersonBrief, verifyKg, type PersonSearchResult, type PersonProfile } from "@/lib/api/kg";
 
 export default function PeopleExplorer() {
   const [q, setQ] = useState("");
@@ -34,6 +34,16 @@ export default function PeopleExplorer() {
       // AI 브리핑은 느려서 프로필 먼저 띄우고 백그라운드로 채운다
       getPersonBrief(id).then((r) => setBrief(r.brief)).catch(() => setBrief(null)).finally(() => setBriefBusy(false));
     } catch { setProf(null); } finally { setBusy(false); }
+  }
+
+  // 관계 검수: 라벨된 coappears 엣지를 verified=1로 승격/취소(공개 답변 B3에 반영). 낙관적 업데이트+실패 롤백.
+  async function verifyRel(edgeId: string, otherId: string, next: boolean) {
+    setProf((p) => (p ? { ...p, coappear: p.coappear.map((c) => (c.id === otherId ? { ...c, verified: next ? 1 : 0 } : c)) } : p));
+    try {
+      await verifyKg("kg_edges", edgeId, next);
+    } catch {
+      setProf((p) => (p ? { ...p, coappear: p.coappear.map((c) => (c.id === otherId ? { ...c, verified: next ? 0 : 1 } : c)) } : p));
+    }
   }
 
   const maxCount = prof && prof.timeline.length ? Math.max(...prof.timeline.map((t) => t.count)) : 0;
@@ -123,6 +133,13 @@ export default function PeopleExplorer() {
                     <button type="button" onClick={() => openPerson(c.id)} className="hover:text-brand hover:underline">{c.name}</button>
                     <span className="text-foreground-muted"> · {c.count}건</span>
                     {c.reltype && <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">{c.reltype}</span>}
+                    {c.reltype && c.edgeId && (
+                      c.verified
+                        ? <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, false)} title={(c.reason ? c.reason + " · " : "") + "검증 취소"}
+                            className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-200">✓ 검증됨</button>
+                        : <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, true)} title={(c.reason ? c.reason + " · " : "") + "이 관계를 검증하면 공개 답변에 반영됩니다"}
+                            className="ml-1 rounded border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand hover:bg-brand/5">검증</button>
+                    )}
                   </li>
                 ))}
                 {!prof.coappear.length && <li className="text-foreground-muted">없음</li>}
