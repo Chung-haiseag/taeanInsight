@@ -103,16 +103,6 @@ html {
   }
 }
 
-/* 진행 상태 바(인디터미닛) — 답변 생성 대기 동안 '작업 중'임을 계속 보여준다.
-   폭 40%짜리 막대가 트랙을 좌→우로 반복 통과. prefers-reduced-motion에선 위 규칙이 정지시킴. */
-@keyframes progress-indeterminate {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(250%); }
-}
-.progress-bar-indeterminate > span {
-  animation: progress-indeterminate 1.3s ease-in-out infinite;
-}
-
 html {
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
