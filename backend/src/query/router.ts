@@ -737,7 +737,27 @@ queryRouter.post("/graph", async (c) => {
   const weather = WEATHER_RE.test(query) || RECOMMEND_RE.test(query);
   const offRegion = OTHER_REGION_RE.test(query) && !AREA_RE.test(query);
 
-  interface GState { parts: SourcePart[]; context: string; raw: string; answer: string; sources: QuerySource[] }
+  interface GState {
+    parts: SourcePart[]; context: string; raw: string; answer: string; sources: QuerySource[];
+    webDone?: boolean;  // 웹 검색을 이미 돌렸나
+    needMore?: boolean; // 첫 답이 '못 찾음/약함' → 보강 필요
+    gotMore?: boolean;  // 보강 검색이 실제로 근거를 더 찾았나
+  }
+  // 근거로 답 생성(compose·recompose 공용)
+  const composeAnswer = async (parts: SourcePart[]): Promise<{ context: string; raw: string }> => {
+    const context = parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
+    const res = await completeAvoidingGarble(client, {
+      channel: "realtime" as const,
+      maxTokens: 800,
+      temperature: 0.1,
+      messages: [
+        { role: "system" as const, content: answerSystemPrompt(todayKst) },
+        { role: "user" as const, content: `[근거]\n${context}\n\n[질문] ${query}` },
+      ],
+    });
+    return { context, raw: res.content };
+  };
+  const isWeak = (raw: string) => /찾지 못했|찾을 수 없|정보가 없|정보를 찾지|확인되지|해당 정보를/.test(raw);
 
   const nodes: GraphNode<GState>[] = [
     { name: "understand", label: "질문 이해 중", run: () => {} },
@@ -774,24 +794,37 @@ queryRouter.post("/graph", async (c) => {
           const web = await searchWeb(c.env, query);
           const parts = [...s.parts];
           for (const w of web) parts.push({ text: `${w.title}${w.publishedAt ? ` (${w.publishedAt})` : ""}\n${w.text}`, source: { title: w.title, url: w.url, publishedAt: w.publishedAt, kind: "web" } });
-          return { parts };
-        } catch { return {}; }
+          return { parts, webDone: true };
+        } catch { return { webDone: true }; }
       },
     },
     {
       name: "compose", label: "답변 작성 중",
       run: async (s) => {
-        const context = s.parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
-        const res = await completeAvoidingGarble(client, {
-          channel: "realtime" as const,
-          maxTokens: 800,
-          temperature: 0.1,
-          messages: [
-            { role: "system" as const, content: answerSystemPrompt(todayKst) },
-            { role: "user" as const, content: `[근거]\n${context}\n\n[질문] ${query}` },
-          ],
-        });
-        return { context, raw: res.content };
+        const { context, raw } = await composeAnswer(s.parts);
+        // 첫 답이 '못 찾음'이고 아직 웹을 안 돌렸으면 보강 루프 진입
+        return { context, raw, needMore: isWeak(raw) && !s.webDone };
+      },
+    },
+    // ── ② 반복 RAG: 첫 답이 약하면 웹으로 근거 보강 → 재작성(최대 1회, 근거가 실제로 늘 때만) ──
+    {
+      name: "reweb", label: "근거 더 찾는 중",
+      when: (s) => !!s.needMore && !offRegion,
+      run: async (s) => {
+        try {
+          const web = await searchWeb(c.env, query);
+          const parts = [...s.parts];
+          for (const w of web) parts.push({ text: `${w.title}${w.publishedAt ? ` (${w.publishedAt})` : ""}\n${w.text}`, source: { title: w.title, url: w.url, publishedAt: w.publishedAt, kind: "web" } });
+          return { parts, webDone: true, gotMore: web.length > 0 };
+        } catch { return { webDone: true, gotMore: false }; }
+      },
+    },
+    {
+      name: "recompose", label: "답변 다시 작성 중",
+      when: (s) => !!s.gotMore,
+      run: async (s) => {
+        const { context, raw } = await composeAnswer(s.parts);
+        return { context, raw };
       },
     },
     { name: "refine", label: "근거 대조 교열 중", run: async (s) => ({ answer: await polishDraft(client, s.raw, s.context) }) },
