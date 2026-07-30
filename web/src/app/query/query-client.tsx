@@ -41,8 +41,7 @@ export function QueryClient() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [graphMode, setGraphMode] = useState(false); // [시제품] 경량 그래프 실시간 진행
-  const [live, setLive] = useState<{ pct: number; label: string } | null>(null);
+  const [live, setLive] = useState<{ pct: number; label: string } | null>(null); // 그래프 실시간 진행
   // 대기 중 홍보용 태안신문 최신 소식 — 진입 시 미리 받아둔다(로딩 즉시 표시). 실패는 무시.
   const [promo, setPromo] = useState<{ items: NewsItem[]; labels: Record<string, string> }>({ items: [], labels: {} });
   useEffect(() => {
@@ -61,37 +60,36 @@ export function QueryClient() {
     setAsked(text);
     trackEvent("ai_query", text.slice(0, 120));
 
-    if (graphMode) {
-      // [시제품] 경량 그래프 — 노드별 실제 진행을 상태 바에 반영
-      await askQueryGraph(
-        { query: text },
-        {
-          onProgress: (p) => setLive({ pct: p.pct, label: p.label }),
-          onDone: (r) => { setResult(r); setLoading(false); },
-          onError: (msg, status) => { setError(status ? `요청 실패 (${status})` : msg); setLoading(false); },
+    // 기본 경로: 경량 그래프(노드별 실제 진행 + 완성본). 실패 시 비스트림으로 자동 폴백.
+    let done = false;
+    await askQueryGraph(
+      { query: text },
+      {
+        onProgress: (p) => setLive({ pct: p.pct, label: p.label }),
+        onDone: (r) => { done = true; setResult(r); setLoading(false); },
+        onError: async () => {
+          if (done) return;
+          try {
+            const res = await askQuery({ query: text }); // 폴백: 기존 비스트림
+            setResult(res);
+          } catch (e) {
+            if (e instanceof ApiError) {
+              setError(
+                e.status === 503
+                  ? "AI 엔진이 일시적으로 연결되지 않았습니다. 잠시 후 다시 시도해주세요."
+                  : e.status === 400
+                  ? "질문은 2자 이상 500자 이하로 입력해주세요."
+                  : `요청 실패 (${e.status})`,
+              );
+            } else {
+              setError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+            }
+          } finally {
+            setLoading(false);
+          }
         },
-      );
-      return;
-    }
-
-    try {
-      const res = await askQuery({ query: text });
-      setResult(res);
-    } catch (e) {
-      if (e instanceof ApiError) {
-        setError(
-          e.status === 503
-            ? "AI 엔진이 일시적으로 연결되지 않았습니다. 잠시 후 다시 시도해주세요."
-            : e.status === 400
-            ? "질문은 2자 이상 500자 이하로 입력해주세요."
-            : `요청 실패 (${e.status})`,
-        );
-      } else {
-        setError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      }
-    } finally {
-      setLoading(false);
-    }
+      },
+    );
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -151,21 +149,9 @@ export function QueryClient() {
             aria-describedby="query-help"
             maxLength={500}
           />
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p id="query-help" className="text-xs text-foreground-muted">
-              <Icon name="idea" /> ⌘/Ctrl+Enter로 전송
-            </p>
-            <label className="inline-flex items-center gap-1.5 text-xs text-foreground-muted cursor-pointer select-none" title="경량 그래프 실행기로 노드별 실제 진행률을 표시(시제품). 답변 품질·비용은 동일.">
-              <input
-                type="checkbox"
-                checked={graphMode}
-                onChange={(e) => setGraphMode(e.target.checked)}
-                disabled={loading}
-                className="accent-accent"
-              />
-              실시간 진행(그래프 시제품)
-            </label>
-          </div>
+          <p id="query-help" className="text-xs text-foreground-muted">
+            <Icon name="idea" /> ⌘/Ctrl+Enter로 전송
+          </p>
           <button
             type="submit"
             disabled={loading || query.trim().length < 2}
@@ -179,7 +165,7 @@ export function QueryClient() {
       {/* 검색·생성 진행 표시 + 대기 중 태안신문 최신 소식 홍보 */}
       {loading && (
         <div className="no-print space-y-4">
-          <SearchProgress livePct={graphMode && live ? live.pct : undefined} liveLabel={live?.label} />
+          <SearchProgress livePct={live ? live.pct : undefined} liveLabel={live?.label} />
           <NewsPromo items={promo.items} labels={promo.labels} />
         </div>
       )}
