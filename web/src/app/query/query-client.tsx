@@ -8,7 +8,7 @@ import { useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
 import { ApiError } from "@/lib/api/client";
-import { askQuery, askQueryStream, type AskQueryInput, type QueryResult } from "@/lib/api/query";
+import { askQuery, askQueryStream, polishForPdf, type AskQueryInput, type QueryResult } from "@/lib/api/query";
 import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
@@ -48,6 +48,7 @@ export function QueryClient() {
   const [live, setLive] = useState(""); // 스트리밍 중 누적 텍스트
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [polishing, setPolishing] = useState(false); // PDF 저장 전 교열 중
 
   async function run(q: string) {
     const text = q.trim();
@@ -93,12 +94,25 @@ export function QueryClient() {
     void run(q);
   }
 
-  // PDF 저장 — 근거를 모두 펼친 뒤 인쇄(레이아웃 반영 후). 워터마크·페이지여백은 전역 print CSS가 담당.
-  function savePdf() {
-    document
-      .querySelectorAll<HTMLDetailsElement>(".answer-print details")
-      .forEach((d) => { d.open = true; });
-    window.setTimeout(() => window.print(), 60);
+  // PDF 저장 — 저장물은 정확해야 하므로 먼저 근거와 대조해 교열(빠진 숫자·글자 복원)한 뒤,
+  //   근거를 모두 펼치고 인쇄. 워터마크·페이지여백은 전역 print CSS가 담당. 교열 실패해도 인쇄는 진행.
+  async function savePdf() {
+    if (!result || polishing) return;
+    setPolishing(true);
+    try {
+      const { answer } = await polishForPdf({ draft: result.answer, evidence: result.evidence });
+      setResult((r) => (r ? { ...r, answer } : r));
+    } catch {
+      /* 교열 실패 → 원본으로 인쇄 */
+    }
+    setPolishing(false);
+    // 상태 반영(리렌더) 후 근거 펼치고 인쇄
+    window.setTimeout(() => {
+      document
+        .querySelectorAll<HTMLDetailsElement>(".answer-print details")
+        .forEach((d) => { d.open = true; });
+      window.print();
+    }, 150);
   }
 
   const streaming = loading && !result;
@@ -198,9 +212,10 @@ export function QueryClient() {
             <button
               type="button"
               onClick={savePdf}
-              className="no-print ml-auto inline-flex items-center gap-1 rounded border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 transition-colors"
+              disabled={polishing}
+              className="no-print ml-auto inline-flex items-center gap-1 rounded border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
-              <Icon name="download" /> PDF로 저장
+              <Icon name="download" /> {polishing ? "다듬는 중…" : "PDF로 저장"}
             </button>
           </div>
           <h2 id="answer-heading" className="sr-only">

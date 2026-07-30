@@ -40,6 +40,18 @@ export async function askQuery(input: AskQueryInput): Promise<QueryResult> {
   });
 }
 
+// 저장/공유용 교열 — 스트리밍 답(fp8 숫자 흘림 가능)을 근거와 대조해 빠진 숫자·글자 복원.
+// PDF 저장 시에만 호출. 실패 시 원본 draft를 그대로 돌려받는다(저장은 되게).
+export async function polishForPdf(input: {
+  draft: string;
+  evidence?: QueryEvidence[];
+}): Promise<{ answer: string }> {
+  return apiFetch<{ answer: string }>("/api/query/polish", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export interface StreamHandlers {
   onToken: (chunk: string) => void;             // 토큰 도착(체감 지연↓)
   onDone: (result: QueryResult) => void;        // 완료 — 정리본·출처·근거
