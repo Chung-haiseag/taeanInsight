@@ -264,6 +264,61 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
   return out;
 }
 
+// 큐레이션 사실(fact table) 근거 — 메인·그래프 공용.
+async function buildFactsEvidence(env: Env, query: string): Promise<SourcePart[]> {
+  if (!env.ARCHIVE_DB) return [];
+  try {
+    const { loadFacts, matchFacts } = await import("./facts");
+    return matchFacts(query, await loadFacts(env.ARCHIVE_DB), 2).map((f) => ({
+      text: `[확인된 사실] ${f.title}\n${f.content}`,
+      source: { title: f.source ? `${f.title} · ${f.source}` : f.title, url: null },
+    }));
+  } catch { return []; }
+}
+
+// KG 검증 군수 계보 근거 — 메인·그래프 공용.
+async function buildGunsuFactEvidence(env: Env, query: string): Promise<SourcePart[]> {
+  if (!env.ARCHIVE_DB || !isGunsuFactQuery(query)) return [];
+  try {
+    const { buildGunsuFactBlock } = await import("../kg/facts");
+    const { getGunsuLineage } = await import("../kg/repository");
+    const { items, source } = await getGunsuLineage(env.ARCHIVE_DB);
+    const block = buildGunsuFactBlock(items, source);
+    return block ? [block] : [];
+  } catch { return []; }
+}
+
+// KG 검증 인물관계(B3) 근거 — 메인·그래프 공용. 관계형 질의 + 인물 감지 시 verified=1만.
+async function buildRelationEvidence(env: Env, query: string): Promise<SourcePart[]> {
+  if (!env.ARCHIVE_DB || !isRelationQuery(query)) return [];
+  try {
+    const { getVerifiedRelations, buildRelationFactBlock } = await import("../kg/relations");
+    const { detectPersonInQuery } = await import("../kg/people");
+    const hit = await detectPersonInQuery(env.ARCHIVE_DB, query);
+    if (!hit) return [];
+    const block = buildRelationFactBlock(hit.name, await getVerifiedRelations(env.ARCHIVE_DB, hit.id));
+    return block ? [block] : [];
+  } catch { return []; }
+}
+
+// 지역언론(최신 태안 소식) 근거 — 질의 키워드 매칭 상위 3건(최신순). 메인·그래프 공용.
+async function buildRegionalNewsEvidence(env: Env, query: string): Promise<SourcePart[]> {
+  if (!env.ARCHIVE_DB) return [];
+  try {
+    const kw = extractKeywords(query).filter((t) => t.length >= 2 && !UBIQUITOUS.has(t)).sort((a, b) => b.length - a.length)[0];
+    if (!kw) return [];
+    const like = `%${kw}%`;
+    const r = await env.ARCHIVE_DB
+      .prepare("SELECT source, title, excerpt, published_at, url FROM regional_news WHERE title LIKE ?1 OR excerpt LIKE ?1 ORDER BY published_at DESC LIMIT 3")
+      .bind(like)
+      .all<{ source: string; title: string; excerpt: string | null; published_at: string | null; url: string }>();
+    return (r.results ?? []).map((n) => ({
+      text: `${n.title} (${String(n.published_at ?? "").slice(0, 10)})\n${n.excerpt ?? ""}`,
+      source: { title: `[${n.source}] ${n.title}`, url: n.url, publishedAt: n.published_at ?? undefined, kind: "web" },
+    }));
+  } catch { return []; }
+}
+
 // 부동산 실거래(국토부, 읍·면 필터 + ㎡당 단가·월별 추이·전체 대비) 근거 — 메인·그래프 공용. 게이트는 호출부.
 async function buildRealestateEvidence(env: Env, query: string, location?: string): Promise<SourcePart[]> {
   const re = await fetchRealEstateDeep(env);
@@ -543,43 +598,11 @@ queryRouter.post("/", async (c) => {
       parts.push(...(await buildEventsEvidence(c.env)));
     }
 
-    // (a-6) 큐레이션 사실(fact table) — 열거·전수형 질문(섬 명단·역대 군수·인구 등)에 검증된 사실 우선 주입.
+    // (a-6) 큐레이션 사실 / (a-6.5) 군수 계보 / (a-6.6) 검증 인물관계 — 공용 헬퍼
     if (c.env.ARCHIVE_DB && !offRegion) {
-      try {
-        const { loadFacts, matchFacts } = await import("./facts");
-        for (const f of matchFacts(query, await loadFacts(c.env.ARCHIVE_DB), 2)) {
-          parts.push({ text: `[확인된 사실] ${f.title}\n${f.content}`, source: { title: f.source ? `${f.title} · ${f.source}` : f.title, url: null } });
-        }
-      } catch { /* 사실 주입 실패는 무시 */ }
-    }
-
-    // (a-6.5) KG 구조 사실 — 군수 계보 등 검증된 지식그래프 사실을 결정론적으로 우선 주입.
-    if (c.env.ARCHIVE_DB && !offRegion) {
-      try {
-        const { isGunsuFactQuery, buildGunsuFactBlock } = await import("../kg/facts");
-        if (isGunsuFactQuery(query)) {
-          const { getGunsuLineage } = await import("../kg/repository");
-          const { items, source } = await getGunsuLineage(c.env.ARCHIVE_DB);
-          const block = buildGunsuFactBlock(items, source);
-          if (block) parts.push(block);
-        }
-      } catch { /* KG 실패는 무시(기존 RAG로 폴백) */ }
-    }
-
-    // (a-6.6) KG 검증된 인물 관계(B3) — 관계형 질의 + 인물 감지 시 verified=1 관계만 주입.
-    //   자동추출(verified=0) 관계는 넣지 않으므로 검증분이 없으면 무동작(안전). 검수 승격 시 자동 반영.
-    if (c.env.ARCHIVE_DB && !offRegion) {
-      try {
-        const { isRelationQuery, getVerifiedRelations, buildRelationFactBlock } = await import("../kg/relations");
-        if (isRelationQuery(query)) {
-          const { detectPersonInQuery } = await import("../kg/people");
-          const hit = await detectPersonInQuery(c.env.ARCHIVE_DB, query);
-          if (hit) {
-            const block = buildRelationFactBlock(hit.name, await getVerifiedRelations(c.env.ARCHIVE_DB, hit.id));
-            if (block) parts.push(block);
-          }
-        }
-      } catch { /* 관계 게이트 실패는 무시 */ }
+      parts.push(...(await buildFactsEvidence(c.env, query)));
+      parts.push(...(await buildGunsuFactEvidence(c.env, query)));
+      parts.push(...(await buildRelationEvidence(c.env, query)));
     }
 
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
@@ -590,21 +613,9 @@ queryRouter.post("/", async (c) => {
       }
     }
 
-    // (b-2) 지역언론(최신 태안 소식) — 질의 키워드 매칭 상위 3건(최신순). 원문 링크·요약만(저작권).
+    // (b-2) 지역언론(최신 태안 소식) — 공용 헬퍼
     if (c.env.ARCHIVE_DB && !isPureWeather(query) && !offRegion) {
-      try {
-        const kw = extractKeywords(query).filter((t) => t.length >= 2 && !UBIQUITOUS.has(t)).sort((a, b) => b.length - a.length)[0];
-        if (kw) {
-          const like = `%${kw}%`;
-          const r = await c.env.ARCHIVE_DB
-            .prepare("SELECT source, title, excerpt, published_at, url FROM regional_news WHERE title LIKE ?1 OR excerpt LIKE ?1 ORDER BY published_at DESC LIMIT 3")
-            .bind(like)
-            .all<{ source: string; title: string; excerpt: string | null; published_at: string | null; url: string }>();
-          for (const n of r.results ?? []) {
-            parts.push({ text: `${n.title} (${String(n.published_at ?? "").slice(0, 10)})\n${n.excerpt ?? ""}`, source: { title: `[${n.source}] ${n.title}`, url: n.url, publishedAt: n.published_at ?? undefined, kind: "web" } });
-          }
-        }
-      } catch { /* 지역언론 실패는 무시(로컬로) */ }
+      parts.push(...(await buildRegionalNewsEvidence(c.env, query)));
     }
 
     // (c) 로컬 근거가 약하거나 최신-상황 질문이면 화이트리스트 웹 검색으로 보강(게이트·캐시·fail-open)
@@ -785,33 +796,18 @@ queryRouter.post("/graph", async (c) => {
 
   const nodes: GraphNode<GState>[] = [
     { name: "understand", label: "질문 이해 중", run: () => {} },
-    // ── 특수 분기(KG Fact) — 해당 질의에서만 발동. 검증된 사실을 근거블록으로 주입 ──
+    // ── 특수 분기(KG Fact) — 큐레이션 사실·군수 계보·검증 인물관계(해당 질의에서만 내부 게이트로 발동) ──
     {
-      name: "gunsu", label: "역대 군수 확인 중",
-      when: () => !!c.env.ARCHIVE_DB && !offRegion && isGunsuFactQuery(query),
-      run: async (s) => {
-        try {
-          const { buildGunsuFactBlock } = await import("../kg/facts");
-          const { getGunsuLineage } = await import("../kg/repository");
-          const { items, source } = await getGunsuLineage(c.env.ARCHIVE_DB!);
-          const block = buildGunsuFactBlock(items, source);
-          return block ? { parts: [...s.parts, block] } : {};
-        } catch { return {}; }
-      },
-    },
-    {
-      name: "relations", label: "검증된 인물 관계 확인 중",
-      when: () => !!c.env.ARCHIVE_DB && !offRegion && isRelationQuery(query),
-      run: async (s) => {
-        try {
-          const { getVerifiedRelations, buildRelationFactBlock } = await import("../kg/relations");
-          const { detectPersonInQuery } = await import("../kg/people");
-          const hit = await detectPersonInQuery(c.env.ARCHIVE_DB!, query);
-          if (!hit) return {};
-          const block = buildRelationFactBlock(hit.name, await getVerifiedRelations(c.env.ARCHIVE_DB!, hit.id));
-          return block ? { parts: [...s.parts, block] } : {};
-        } catch { return {}; }
-      },
+      name: "facts", label: "확인된 사실·인물관계 확인 중",
+      when: () => !!c.env.ARCHIVE_DB && !offRegion,
+      run: async (s) => ({
+        parts: [
+          ...s.parts,
+          ...(await buildFactsEvidence(c.env, query)),
+          ...(await buildGunsuFactEvidence(c.env, query)),
+          ...(await buildRelationEvidence(c.env, query)),
+        ],
+      }),
     },
     {
       name: "archive", label: "아카이브 검색 중",
@@ -822,6 +818,11 @@ queryRouter.post("/graph", async (c) => {
         for (const r of rows) parts.push({ text: `${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`, source: { title: r.title, url: `/news/${r.idxno}`, publishedAt: r.published_at } });
         return { parts };
       },
+    },
+    {
+      name: "regional", label: "지역언론 최신 확인 중",
+      when: () => !!c.env.ARCHIVE_DB && !isPureWeather(query) && !offRegion,
+      run: async (s) => ({ parts: [...s.parts, ...(await buildRegionalNewsEvidence(c.env, query))] }),
     },
     {
       name: "realtime", label: "실시간 데이터 확인 중",
