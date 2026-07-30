@@ -264,6 +264,21 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
   return out;
 }
 
+// 내 가게 맞춤 분석 근거 — 로그인(익명 uid)에 가게 정보가 있고 사업/주말/추천 질문이면 본인 업종 보드. 메인·그래프 공용.
+async function buildMyShopEvidence(env: Env, uid: string | undefined, query: string, recommend: boolean): Promise<SourcePart[]> {
+  if (!uid || !env.ARCHIVE_DB || !(MYSHOP_RE.test(query) || recommend || /주말|예보|이번\s?주|다음\s?주/.test(query))) return [];
+  try {
+    const { D1PreferencesRepo } = await import("../preferences/repository_d1");
+    const prefs = await new D1PreferencesRepo(env.ARCHIVE_DB).get(uid);
+    if (prefs?.shopProfile) {
+      const { loadOwnerBrief } = await import("../owner/brief");
+      const text = buildShopEvidence(await loadOwnerBrief(env, prefs));
+      if (text) return [{ text, source: { title: "내 가게 맞춤 분석(태안 수요·날씨 기반)", url: null } }];
+    }
+  } catch { /* 가게 분석 실패는 무시 */ }
+  return [];
+}
+
 // 큐레이션 사실(fact table) 근거 — 메인·그래프 공용.
 async function buildFactsEvidence(env: Env, query: string): Promise<SourcePart[]> {
   if (!env.ARCHIVE_DB) return [];
@@ -558,20 +573,11 @@ queryRouter.post("/", async (c) => {
       parts.push({ text: "이 서비스는 충청남도 태안군 지역 정보만 제공합니다. 태안 외 지역의 날씨·시세·관광 데이터는 보유하지 않습니다.", source: { title: "안내 · 태안 전용 서비스", url: null } });
     }
 
-    // (a-0) 내 가게 맞춤 — 로그인(익명 uid)에 가게 정보가 있고 사업/주말/추천 질문이면 본인 업종 보드 주입
-    let hasMyShop = false;
+    // (a-0) 내 가게 맞춤 — 공용 헬퍼(그래프와 동일). hasMyShop은 아카이브 게이트에 사용.
     const uid = c.req.header("X-Taean-Uid");
-    if (uid && c.env.ARCHIVE_DB && (MYSHOP_RE.test(query) || recommend || /주말|예보|이번\s?주|다음\s?주/.test(query))) {
-      try {
-        const { D1PreferencesRepo } = await import("../preferences/repository_d1");
-        const prefs = await new D1PreferencesRepo(c.env.ARCHIVE_DB).get(uid);
-        if (prefs?.shopProfile) {
-          const { loadOwnerBrief } = await import("../owner/brief");
-          const text = buildShopEvidence(await loadOwnerBrief(c.env, prefs));
-          if (text) { parts.push({ text, source: { title: "내 가게 맞춤 분석(태안 수요·날씨 기반)", url: null } }); hasMyShop = true; }
-        }
-      } catch { /* 가게 분석 실패는 무시 */ }
-    }
+    const myShopParts = await buildMyShopEvidence(c.env, uid, query, recommend);
+    parts.push(...myShopParts);
+    const hasMyShop = myShopParts.length > 0;
 
     // (a) 날씨·대기질 질문이면 실시간 관측값(+예보) 근거 추가 — 공용 헬퍼(그래프와 동일 코드)
     if ((WEATHER_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY && !offRegion) {
@@ -771,12 +777,14 @@ queryRouter.post("/graph", async (c) => {
   const weather = WEATHER_RE.test(query) || RECOMMEND_RE.test(query);
   const recommend = RECOMMEND_RE.test(query);
   const offRegion = OTHER_REGION_RE.test(query) && !AREA_RE.test(query);
+  const uid = c.req.header("X-Taean-Uid");
 
   interface GState {
     parts: SourcePart[]; context: string; raw: string; answer: string; sources: QuerySource[];
     webDone?: boolean;  // 웹 검색을 이미 돌렸나
     needMore?: boolean; // 첫 답이 '못 찾음/약함' → 보강 필요
     gotMore?: boolean;  // 보강 검색이 실제로 근거를 더 찾았나
+    hasMyShop?: boolean; // 내 가게 근거 주입됨(아카이브 게이트에 사용)
   }
   // 근거로 답 생성(compose·recompose 공용)
   const composeAnswer = async (parts: SourcePart[]): Promise<{ context: string; raw: string }> => {
@@ -796,6 +804,14 @@ queryRouter.post("/graph", async (c) => {
 
   const nodes: GraphNode<GState>[] = [
     { name: "understand", label: "질문 이해 중", run: () => {} },
+    {
+      name: "myshop", label: "내 가게 데이터 확인 중",
+      when: () => !!uid && !!c.env.ARCHIVE_DB && (MYSHOP_RE.test(query) || recommend || /주말|예보|이번\s?주|다음\s?주/.test(query)),
+      run: async (s) => {
+        const p = await buildMyShopEvidence(c.env, uid, query, recommend);
+        return { parts: [...s.parts, ...p], hasMyShop: p.length > 0 };
+      },
+    },
     // ── 특수 분기(KG Fact) — 큐레이션 사실·군수 계보·검증 인물관계(해당 질의에서만 내부 게이트로 발동) ──
     {
       name: "facts", label: "확인된 사실·인물관계 확인 중",
@@ -811,7 +827,7 @@ queryRouter.post("/graph", async (c) => {
     },
     {
       name: "archive", label: "아카이브 검색 중",
-      when: () => !!c.env.ARCHIVE_DB && !offRegion,
+      when: (s) => !!c.env.ARCHIVE_DB && !isPureWeather(query) && !recommend && !offRegion && !s.hasMyShop,
       run: async (s) => {
         const rows = await retrieveArchive(c.env, query);
         const parts = [...s.parts];
