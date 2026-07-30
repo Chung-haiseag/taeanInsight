@@ -46,9 +46,10 @@ export class WorkersAiLlmClient implements LlmClient {
         temperature: request.temperature ?? 0.2,
         repetition_penalty: DEFAULT_REPETITION_PENALTY,
         frequency_penalty: DEFAULT_FREQUENCY_PENALTY,
-      } as never)) as { response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+      } as never)) as { response?: unknown; usage?: { prompt_tokens?: number; completion_tokens?: number } };
 
-      const content = (res.response ?? "").trim();
+      // response가 문자열이 아닐 수 있음(레이트리밋·에러 응답 등) → 방어적으로 처리해 크래시 방지.
+      const content = (typeof res.response === "string" ? res.response : "").trim();
       // usage가 오면 사용, 없으면 char/4 추정(mock과 동일 규칙)
       const inputTokens =
         res.usage?.prompt_tokens ??
