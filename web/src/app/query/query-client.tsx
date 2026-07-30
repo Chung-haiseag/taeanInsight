@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, API_BASE_URL } from "@/lib/api/client";
 import { askQuery, askQueryGraph, type QueryResult } from "@/lib/api/query";
 import { getNews, type NewsItem } from "@/lib/api/news";
 import { trackEvent } from "@/lib/api/reading";
@@ -216,11 +216,26 @@ export function QueryClient() {
 
           {result.personBrief && (
             <div className="rounded-lg border border-brand/20 bg-background p-4 text-sm leading-relaxed">
-              <p className="mb-1 text-xs font-semibold text-brand">
+              <p className="mb-2 text-xs font-semibold text-brand">
                 👤 {result.personBrief.name} — AI 인물 브리핑
                 <span className="ml-1 font-normal text-foreground-muted">· 아카이브 기사 요약(검증된 사실 아님)</span>
               </p>
-              <p className="whitespace-pre-wrap">{decodeEntities(result.personBrief.text)}</p>
+              <div className="flex gap-3">
+                {result.personBrief.photo && (
+                  <figure className="shrink-0 text-center break-inside-avoid">
+                    {/* 역대 군수 공식 사진(태안군청). 검증된 항목이므로 AI 요약과 시각적으로 구분 */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`${API_BASE_URL}${result.personBrief.photo}`}
+                      alt={`${result.personBrief.name} 태안군수 공식 사진`}
+                      className="w-24 rounded border border-brand/15 bg-foreground-muted/5"
+                      loading="lazy"
+                    />
+                    <figcaption className="mt-1 text-[10px] text-foreground-muted">태안군청 공식</figcaption>
+                  </figure>
+                )}
+                <p className="flex-1 whitespace-pre-wrap">{decodeEntities(result.personBrief.text)}</p>
+              </div>
             </div>
           )}
 

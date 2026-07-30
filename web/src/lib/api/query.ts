@@ -12,7 +12,7 @@ export interface QuerySource {
 }
 
 export interface QueryEvidence { n: number; source: string; text: string }
-export interface QueryPersonBrief { id: string; name: string; text: string }
+export interface QueryPersonBrief { id: string; name: string; text: string; photo?: string }
 export interface QueryResult {
   answer: string;
   intent: string;
