@@ -13,8 +13,10 @@ import { getNews, type NewsItem } from "@/lib/api/news";
 import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
+import { AnswerChart } from "./answer-chart";
 import { decodeEntities } from "@/lib/decode-entities";
 import { paragraphize } from "@/lib/paragraphize";
+import { extractChartData } from "@/lib/chart-extract";
 import { NewsPromo } from "./news-promo";
 import { SearchProgress } from "./search-progress";
 
@@ -191,6 +193,11 @@ export function QueryClient() {
             답변
           </h2>
           <AnswerView text={result.answer} />
+
+          {/* 답변 속 수치를 자동으로 막대 차트로(월별·연도별 등). 뽑을 게 없으면 표시 안 함 */}
+          {extractChartData(result.answer).map((spec, i) => (
+            <AnswerChart key={i} spec={spec} />
+          ))}
 
           {result.personBrief && (
             <div className="rounded-lg border border-brand/20 bg-background p-4 text-sm leading-relaxed">
