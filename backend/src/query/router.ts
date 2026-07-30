@@ -265,14 +265,18 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
 }
 
 // 인물 브리핑(A2) 카드 — 질의에 등장 많은 KG 인물 감지 시 AI 요약(검증 아님). 메인·그래프 공용.
-async function buildPersonBriefCard(env: Env, query: string, offRegion: boolean): Promise<{ id: string; name: string; text: string } | null> {
+async function buildPersonBriefCard(env: Env, query: string, offRegion: boolean): Promise<{ id: string; name: string; text: string; photo?: string } | null> {
   try {
     if (!env.ARCHIVE_DB || !env.AI || offRegion) return null;
     const { detectPersonInQuery, buildPersonBrief } = await import("../kg/people");
     const hit = await detectPersonInQuery(env.ARCHIVE_DB, query);
     if (!hit) return null;
     const text = await buildPersonBrief(env.ARCHIVE_DB, env.AI, hit.id);
-    return text ? { id: hit.id, name: hit.name, text } : null;
+    if (!text) return null;
+    // 감지 인물이 역대 군수면 태안군청 공식 사진을 덧붙인다.
+    const { mayorPhotoFor } = await import("../kg/mayors");
+    const photo = mayorPhotoFor(hit.name);
+    return { id: hit.id, name: hit.name, text, ...(photo ? { photo } : {}) };
   } catch { return null; }
 }
 
