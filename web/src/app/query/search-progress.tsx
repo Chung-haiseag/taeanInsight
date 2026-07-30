@@ -32,14 +32,17 @@ export function stageForPct(pct: number): number {
   return 4;
 }
 
-export function SearchProgress() {
+// livePct(그래프 시제품): 실제 노드 진행률(0~100). 주어지면 시간추정 대신 이 값을 쓴다(진짜 진행).
+export function SearchProgress({ livePct, liveLabel }: { livePct?: number; liveLabel?: string } = {}) {
   const [elapsed, setElapsed] = useState(0);
+  const live = livePct != null;
   useEffect(() => {
+    if (live) return; // 실시간 모드면 타이머 불필요
     const t = setInterval(() => setElapsed((v) => v + TICK), TICK);
     return () => clearInterval(t);
-  }, []);
+  }, [live]);
 
-  const pct = estimatePct(elapsed);
+  const pct = live ? Math.min(100, Math.max(0, Math.round(livePct))) : estimatePct(elapsed);
   const i = stageForPct(pct);
   const composing = i >= STAGES.length - 1;
 
@@ -58,7 +61,12 @@ export function SearchProgress() {
             />
           ))}
         </span>
-        {composing ? "답변 작성 중…" : "검색 중…"}
+        {live ? (liveLabel ? `${liveLabel}…` : "진행 중…") : composing ? "답변 작성 중…" : "검색 중…"}
+        {live && (
+          <span className="rounded bg-accent/12 px-1.5 py-0.5 text-[10px] font-semibold text-accent" title="경량 그래프 실행기의 실제 단계 진행">
+            실시간
+          </span>
+        )}
         <span className="ml-auto tabular-nums text-foreground-muted" aria-hidden>
           {pct}%
         </span>

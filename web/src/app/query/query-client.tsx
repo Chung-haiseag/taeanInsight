@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
 import { ApiError } from "@/lib/api/client";
-import { askQuery, type QueryResult } from "@/lib/api/query";
+import { askQuery, askQueryGraph, type QueryResult } from "@/lib/api/query";
 import { getNews, type NewsItem } from "@/lib/api/news";
 import { trackEvent } from "@/lib/api/reading";
 
@@ -41,6 +41,8 @@ export function QueryClient() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [graphMode, setGraphMode] = useState(false); // [시제품] 경량 그래프 실시간 진행
+  const [live, setLive] = useState<{ pct: number; label: string } | null>(null);
   // 대기 중 홍보용 태안신문 최신 소식 — 진입 시 미리 받아둔다(로딩 즉시 표시). 실패는 무시.
   const [promo, setPromo] = useState<{ items: NewsItem[]; labels: Record<string, string> }>({ items: [], labels: {} });
   useEffect(() => {
@@ -55,8 +57,23 @@ export function QueryClient() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setLive(null);
     setAsked(text);
     trackEvent("ai_query", text.slice(0, 120));
+
+    if (graphMode) {
+      // [시제품] 경량 그래프 — 노드별 실제 진행을 상태 바에 반영
+      await askQueryGraph(
+        { query: text },
+        {
+          onProgress: (p) => setLive({ pct: p.pct, label: p.label }),
+          onDone: (r) => { setResult(r); setLoading(false); },
+          onError: (msg, status) => { setError(status ? `요청 실패 (${status})` : msg); setLoading(false); },
+        },
+      );
+      return;
+    }
+
     try {
       const res = await askQuery({ query: text });
       setResult(res);
@@ -134,9 +151,21 @@ export function QueryClient() {
             aria-describedby="query-help"
             maxLength={500}
           />
-          <p id="query-help" className="text-xs text-foreground-muted">
-            <Icon name="idea" /> ⌘/Ctrl+Enter로 전송
-          </p>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p id="query-help" className="text-xs text-foreground-muted">
+              <Icon name="idea" /> ⌘/Ctrl+Enter로 전송
+            </p>
+            <label className="inline-flex items-center gap-1.5 text-xs text-foreground-muted cursor-pointer select-none" title="경량 그래프 실행기로 노드별 실제 진행률을 표시(시제품). 답변 품질·비용은 동일.">
+              <input
+                type="checkbox"
+                checked={graphMode}
+                onChange={(e) => setGraphMode(e.target.checked)}
+                disabled={loading}
+                className="accent-accent"
+              />
+              실시간 진행(그래프 시제품)
+            </label>
+          </div>
           <button
             type="submit"
             disabled={loading || query.trim().length < 2}
@@ -150,7 +179,7 @@ export function QueryClient() {
       {/* 검색·생성 진행 표시 + 대기 중 태안신문 최신 소식 홍보 */}
       {loading && (
         <div className="no-print space-y-4">
-          <SearchProgress />
+          <SearchProgress livePct={graphMode && live ? live.pct : undefined} liveLabel={live?.label} />
           <NewsPromo items={promo.items} labels={promo.labels} />
         </div>
       )}
