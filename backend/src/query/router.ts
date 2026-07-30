@@ -657,6 +657,43 @@ queryRouter.post("/", async (c) => {
   }
 });
 
+// POST /api/query/polish — 저장/공유용 교열. 스트리밍 답(fp8 숫자 흘림 가능)을 [근거]와 대조해
+//   빠진 숫자·글자를 복원한 깨끗한 버전 반환. PDF 저장 시에만 호출(읽기 속도는 스트리밍 유지).
+const polishSchema = z.object({
+  draft: z.string().min(1).max(8000),
+  evidence: z.array(z.object({ n: z.number(), source: z.string(), text: z.string().max(4000) })).max(20).optional(),
+});
+queryRouter.post("/polish", async (c) => {
+  if (!c.env.AI) return c.json({ error: "ai_unbound" }, 503);
+  const parsed = polishSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
+  const { draft, evidence } = parsed.data;
+  const client = new WorkersAiLlmClient({ ai: c.env.AI });
+  const context = (evidence ?? []).map((e) => `[${e.n}] ${e.source}\n${e.text}`).join("\n\n");
+  const sys =
+    "너는 한국어 교열자다. 아래 [근거]를 참고해 [초안]을 다듬어라. 할 일:\n" +
+    "1) 빠진 연도·수치·글자·조사를 [근거]에서 찾아 정확히 복원하라(예: '개발은년부터'→근거의 연도로 '개발은 1997년부터', '이후2년'→'이후 2012년').\n" +
+    "2) 근거에 없는 숫자·사실은 절대 지어내지 마라. 불확실하면 그 부분은 원문 그대로 두라.\n" +
+    "3) 문단·불릿(- )·**굵게** 구조와 [번호] 출처 표기는 그대로 유지하라. 뜻·사실을 바꾸지 마라.\n" +
+    "4) 오직 한글·아라비아 숫자·필요한 영문 약어만. 한자·일본어 등 외국 문자 금지. 교정한 본문만 출력(설명·머리말 금지).";
+  try {
+    const res = await completeAvoidingGarble(client, {
+      channel: "realtime" as const,
+      maxTokens: 1200,
+      temperature: 0.1,
+      messages: [
+        { role: "system" as const, content: sys },
+        { role: "user" as const, content: `[근거]\n${context}\n\n[초안]\n${draft}` },
+      ],
+    });
+    const out = tidyAnswer(res.content);
+    // 교열본이 비정상적으로 짧으면(손실) 원본 유지
+    return c.json({ answer: out.length >= draft.length * 0.5 ? out : draft });
+  } catch {
+    return c.json({ answer: draft }); // 실패 시 원본(저장은 되게)
+  }
+});
+
 // POST /api/query/_fact — 큐레이션 사실 upsert(관리자). {id,keywords,title,content,source}
 queryRouter.post("/_fact", async (c) => {
   const env = c.env as Env & { ADMIN_TOKEN?: string };
