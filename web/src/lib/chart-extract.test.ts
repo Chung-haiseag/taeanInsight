@@ -40,6 +40,25 @@ describe("extractChartData", () => {
     expect(r[0].points.map((p) => p.value)).toEqual([17750000, 17330000, 18090000]);
   });
 
+  it("'**라벨**: 값' 항목이 3개 이상이면 bar 차트(읍·면별 등)", () => {
+    const answer =
+      "2025년도 태안군 읍면별 인구추이.\n- **태안읍**: 2만 8828명으로 전체의 48%를 차지했다.\n" +
+      "- **안면읍**: 7903명\n- **근흥면**: 5320명\n- **이원면**: 2162명 이러한 추이는 태안읍이 49세로 평균연령이 낮다.";
+    const r = extractChartData(answer);
+    expect(r.length).toBe(1);
+    expect(r[0].type).toBe("bar");
+    expect(r[0].points).toEqual([
+      { label: "태안읍", value: 28828 },
+      { label: "안면읍", value: 7903 },
+      { label: "근흥면", value: 5320 },
+      { label: "이원면", value: 2162 },
+    ]);
+  });
+
+  it("굵게 라벨 항목이 2개 이하면 차트 없음", () => {
+    expect(extractChartData("- **태안읍**: 2만 8828명\n- **안면읍**: 7903명")).toEqual([]);
+  });
+
   it("수치가 없거나 한 개뿐이면 빈 배열", () => {
     expect(extractChartData("태안은 아름다운 관광지입니다.")).toEqual([]);
     expect(extractChartData("2025년 방문객은 1775만 명입니다.")).toEqual([]);
