@@ -264,6 +264,18 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
   return out;
 }
 
+// 인물 브리핑(A2) 카드 — 질의에 등장 많은 KG 인물 감지 시 AI 요약(검증 아님). 메인·그래프 공용.
+async function buildPersonBriefCard(env: Env, query: string, offRegion: boolean): Promise<{ id: string; name: string; text: string } | null> {
+  try {
+    if (!env.ARCHIVE_DB || !env.AI || offRegion) return null;
+    const { detectPersonInQuery, buildPersonBrief } = await import("../kg/people");
+    const hit = await detectPersonInQuery(env.ARCHIVE_DB, query);
+    if (!hit) return null;
+    const text = await buildPersonBrief(env.ARCHIVE_DB, env.AI, hit.id);
+    return text ? { id: hit.id, name: hit.name, text } : null;
+  } catch { return null; }
+}
+
 // 내 가게 맞춤 분석 근거 — 로그인(익명 uid)에 가게 정보가 있고 사업/주말/추천 질문이면 본인 업종 보드. 메인·그래프 공용.
 async function buildMyShopEvidence(env: Env, uid: string | undefined, query: string, recommend: boolean): Promise<SourcePart[]> {
   if (!uid || !env.ARCHIVE_DB || !(MYSHOP_RE.test(query) || recommend || /주말|예보|이번\s?주|다음\s?주/.test(query))) return [];
@@ -639,17 +651,8 @@ queryRouter.post("/", async (c) => {
 
     if (parts.length) {
       const context = parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
-      // (A2) 질의가 인물 중심이면 인물 브리핑을 답변 생성과 '병렬'로 만들어 카드로 첨부(공개, 검증 아님 표기).
-      const briefPromise: Promise<{ id: string; name: string; text: string } | null> = (async () => {
-        try {
-          if (!c.env.ARCHIVE_DB || !c.env.AI || offRegion) return null;
-          const { detectPersonInQuery, buildPersonBrief } = await import("../kg/people");
-          const hit = await detectPersonInQuery(c.env.ARCHIVE_DB, query);
-          if (!hit) return null;
-          const text = await buildPersonBrief(c.env.ARCHIVE_DB, c.env.AI, hit.id);
-          return text ? { id: hit.id, name: hit.name, text } : null;
-        } catch { return null; }
-      })();
+      // (A2) 질의가 인물 중심이면 인물 브리핑을 답변 생성과 '병렬'로 만들어 카드로 첨부(공개, 검증 아님 표기). 공용 헬퍼.
+      const briefPromise = buildPersonBriefCard(c.env, query, offRegion);
       const tRetrieveDone = Date.now();
       // 현재 날짜(KST) — 모델이 오늘을 몰라 과거 연도를 '미래처럼 예측'하는 모순 방지.
       const nowKst = new Date(Date.now() + 9 * 3600_000);
@@ -913,12 +916,19 @@ queryRouter.post("/graph", async (c) => {
     { name: "finalize", label: "정리 중", run: (s) => ({ sources: selectSources(s.parts, s.raw) }) },
   ];
 
+  // 인물 브리핑(A2)은 그래프와 '병렬'로(메인과 동일, 추가 지연 없음). offRegion 안내부는 초기 근거로 시드.
+  const briefPromise = buildPersonBriefCard(c.env, query, offRegion);
+  const initialParts: SourcePart[] = offRegion
+    ? [{ text: "이 서비스는 충청남도 태안군 지역 정보만 제공합니다. 태안 외 지역의 날씨·시세·관광 데이터는 보유하지 않습니다.", source: { title: "안내 · 태안 전용 서비스", url: null } }]
+    : [];
+
   return streamSSE(c, async (stream) => {
     try {
-      const final = await runGraph(nodes, { parts: [], context: "", raw: "", answer: "", sources: [] } as GState, async (e) => {
+      const final = await runGraph(nodes, { parts: initialParts, context: "", raw: "", answer: "", sources: [] } as GState, async (e) => {
         await stream.writeSSE({ event: "progress", data: JSON.stringify({ node: e.name, label: e.label, phase: e.phase, pct: e.pct }) });
       });
       const withEvidence = c.req.query("evidence") === "1";
+      const personBrief = await briefPromise;
       await stream.writeSSE({
         event: "done",
         data: JSON.stringify({
@@ -929,6 +939,7 @@ queryRouter.post("/graph", async (c) => {
           llmCalls,
           sources: final.sources,
           model: baseClient.model,
+          ...(personBrief ? { personBrief } : {}),
           ...(withEvidence ? { evidence: final.parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })) } : {}),
         }),
       });
