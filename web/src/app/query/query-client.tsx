@@ -48,7 +48,7 @@ export function QueryClient() {
   const [live, setLive] = useState(""); // 스트리밍 중 누적 텍스트
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [polishing, setPolishing] = useState(false); // PDF 저장 전 교열 중
+  const [refining, setRefining] = useState(false); // 완료 후 근거 대조 교열(숫자 복원) 중
 
   async function run(q: string) {
     const text = q.trim();
@@ -68,6 +68,7 @@ export function QueryClient() {
         done = true;
         setResult(r);
         setLoading(false);
+        void refine(r); // 화면 답도 근거 대조로 숫자·표기 자동 교열
       },
       onError: async (_msg, status) => {
         if (done) return;
@@ -75,6 +76,7 @@ export function QueryClient() {
         try {
           const r = await askQuery(input);
           setResult(r);
+          void refine(r);
         } catch (e) {
           setError(e instanceof ApiError ? mapError(e.status) : mapError());
         } finally {
@@ -82,6 +84,20 @@ export function QueryClient() {
         }
       },
     });
+  }
+
+  // 완료 후 근거와 대조해 빠진 숫자·글자를 복원한 교열본으로 화면 답을 교체(스트리밍·PDF 공통 정확도).
+  // 근거가 없으면(단답 등) 건너뜀. 실패해도 원본 유지. 답이 그새 바뀌었으면 덮어쓰지 않음.
+  async function refine(base: QueryResult) {
+    if (!base.evidence?.length) return; // 근거 없으면 교열 불필요
+    setRefining(true);
+    try {
+      const { answer } = await polishForPdf({ draft: base.answer, evidence: base.evidence });
+      setResult((r) => (r && r.answer === base.answer ? { ...r, answer } : r));
+    } catch {
+      /* 교열 실패 → 원본 유지 */
+    }
+    setRefining(false);
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -94,25 +110,14 @@ export function QueryClient() {
     void run(q);
   }
 
-  // PDF 저장 — 저장물은 정확해야 하므로 먼저 근거와 대조해 교열(빠진 숫자·글자 복원)한 뒤,
-  //   근거를 모두 펼치고 인쇄. 워터마크·페이지여백은 전역 print CSS가 담당. 교열 실패해도 인쇄는 진행.
-  async function savePdf() {
-    if (!result || polishing) return;
-    setPolishing(true);
-    try {
-      const { answer } = await polishForPdf({ draft: result.answer, evidence: result.evidence });
-      setResult((r) => (r ? { ...r, answer } : r));
-    } catch {
-      /* 교열 실패 → 원본으로 인쇄 */
-    }
-    setPolishing(false);
-    // 상태 반영(리렌더) 후 근거 펼치고 인쇄
-    window.setTimeout(() => {
-      document
-        .querySelectorAll<HTMLDetailsElement>(".answer-print details")
-        .forEach((d) => { d.open = true; });
-      window.print();
-    }, 150);
+  // PDF 저장 — 화면 답은 이미 교열본(완료 후 자동 교열)이므로 그대로 인쇄한다.
+  //   근거를 모두 펼치고 인쇄. 워터마크·페이지여백은 전역 print CSS가 담당.
+  function savePdf() {
+    if (!result || refining) return; // 교열 중이면 완료 후에
+    document
+      .querySelectorAll<HTMLDetailsElement>(".answer-print details")
+      .forEach((d) => { d.open = true; });
+    window.setTimeout(() => window.print(), 80);
   }
 
   const streaming = loading && !result;
@@ -209,13 +214,20 @@ export function QueryClient() {
               {INTENT_LABELS[result.intent] ?? result.intent}
               {result.fromCache ? " · 캐시" : ` · LLM ${result.llmCalls}회`}
             </span>
+            {refining && (
+              <span className="no-print inline-flex items-center gap-1 text-xs text-accent">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+                숫자·표기 다듬는 중…
+              </span>
+            )}
             <button
               type="button"
               onClick={savePdf}
-              disabled={polishing}
+              disabled={refining}
+              title={refining ? "교열이 끝나면 저장할 수 있습니다" : "근거를 펼쳐 PDF로 저장"}
               className="no-print ml-auto inline-flex items-center gap-1 rounded border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
-              <Icon name="download" /> {polishing ? "다듬는 중…" : "PDF로 저장"}
+              <Icon name="download" /> PDF로 저장
             </button>
           </div>
           <h2 id="answer-heading" className="sr-only">
