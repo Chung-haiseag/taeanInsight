@@ -52,6 +52,58 @@ export async function polishForPdf(input: {
   });
 }
 
+export interface QueryProgress { node: string; label: string; phase: "start" | "end"; pct: number }
+
+// [시제품] 경량 그래프 경로 — 노드별 실제 진행(progress)을 받고, 완료(done)에 결과.
+// 기존 askQuery와 동일한 결과 계약. 진행률은 '진짜'라 상태 바가 실제 단계를 반영.
+export async function askQueryGraph(
+  input: AskQueryInput,
+  h: { onProgress: (p: QueryProgress) => void; onDone: (r: QueryResult) => void; onError: (m: string, s?: number) => void },
+): Promise<void> {
+  let res: Response;
+  try {
+    const headers = await buildApiHeaders();
+    res = await fetch(`${API_BASE_URL}/api/query/graph?evidence=1`, { method: "POST", headers, body: JSON.stringify(input) });
+  } catch {
+    h.onError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    return;
+  }
+  if (!res.ok || !res.body) { h.onError(`요청 실패 (${res.status})`, res.status); return; }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const flush = () => {
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const block = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      let event = "message";
+      const dataLines: string[] = [];
+      for (const raw of block.split("\n")) {
+        const line = raw.replace(/\r$/, "");
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+      }
+      const data = dataLines.join("\n");
+      if (!data) continue;
+      try {
+        if (event === "progress") h.onProgress(JSON.parse(data) as QueryProgress);
+        else if (event === "done") h.onDone(JSON.parse(data) as QueryResult);
+        else if (event === "error") h.onError(JSON.parse(data) as string);
+      } catch { /* 무시 */ }
+    }
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    flush();
+  }
+  buf += decoder.decode();
+  flush();
+}
+
 export interface StreamHandlers {
   onToken: (chunk: string) => void;             // 토큰 도착(체감 지연↓)
   onDone: (result: QueryResult) => void;        // 완료 — 정리본·출처·근거

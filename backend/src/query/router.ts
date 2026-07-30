@@ -27,7 +27,8 @@ import { fetchMidForecast } from "../env/midforecast";
 import { REGION } from "../region";
 import { completeAvoidingGarble, tidyAnswer, isSalad, isGarbledAnswer, stripForeignLetters } from "./answer_quality";
 import { drainSse } from "./stream";
-import { selectSources, type SourcePart } from "./sources";
+import { selectSources, type SourcePart, type QuerySource } from "./sources";
+import { runGraph, type GraphNode } from "./graph_engine";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
@@ -206,6 +207,28 @@ async function polishDraft(
   } catch {
     return tidyAnswer(draft);
   }
+}
+
+// 본답 시스템 프롬프트 — 메인 핸들러·그래프 시제품 공용(품질 일관 유지).
+function answerSystemPrompt(todayKst: string): string {
+  return (
+    `너는 태안 지역정보 도우미다. 오늘은 ${todayKst}(한국 시간)이다. 아래 [근거](실시간 관측값·국토부 실거래·관광 수요·축제·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n` +
+    "- 오늘보다 이전의 연도·월·기간은 이미 '지난 일'이다. 과거에 대해 '예측·전망·~할 가능성' 같은 표현을 쓰지 말고 근거의 실제 수치로 '사실'로 서술하라. 과거 기간의 데이터가 근거에 없으면 '해당 기간의 실제 데이터를 찾지 못했습니다'라고 명확히 밝히고 지어내거나 추정·예측하지 마라. '예측·전망'은 오직 오늘 이후의 미래에 대해서만 하라.\n" +
+    "- 답변은 오직 한글·아라비아 숫자·필요한 영문 약어만 사용하라. 한자·중국어·일본어 등 외국 문자를 절대 쓰지 마라(예: '施设'가 아니라 '시설', '国内'가 아니라 '국내').\n" +
+    "- 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 한 줄로 끝내지 마라.\n" +
+    "- 표(마크다운 파이프 '|')나 아스키 차트를 본문에 직접 그리지 마라. 수치는 문장·불릿으로 자연스럽게 설명하라(차트 시각화는 화면이 담당한다).\n" +
+    "- 가독성을 위해 답을 2~4개의 짧은 문단으로 나누고(문단 사이 빈 줄 한 줄), 여러 항목을 나열할 때는 각 줄 앞에 '- '를 붙여 목록으로 제시하라. 핵심 수치·이름·날짜는 **굵게** 강조하라. 문장 하나하나를 줄바꿈으로 쪼개지 말고 의미 단위로 문단을 묶어라.\n" +
+    "- 부동산 질문이면 ㎡당 평균 단가·거래 건수·기간·월별 추이·태안군 전체 대비를 종합해 '시세 흐름'을 설명하라.\n" +
+    "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
+    "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
+    "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
+    "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
+    "- 웹 출처(공식 .go.kr·관광공사·지역언론)는 최신 정보다. 원문을 그대로 베끼지 말고 요약하며, 공식 출처를 우선하라.\n" +
+    "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
+    "- '이번 주/다음 주' 행사는 군청 주간행사계획·축제 일정을 우선 사용하고, 이미 끝난 과거 행사는 답에 넣지 마라.\n" +
+    "- '오늘 뭐하지/추천' 류 질문이면 오늘의 날씨·바다(물때·일출몰)·진행 중 축제·행사를 종합해 구체적인 활동을 추천하라(예: 맑고 낮 간조면 갯벌체험, 비 예보면 실내). 과거 기사로 답하지 마라.\n" +
+    "- '[내 가게 맞춤 분석]' 근거가 있으면 그 사장님 본인 가게 데이터다. '우리 가게/모텔/식당' 질문엔 그 수치(가동률·예상 손님·권장가·매출·출항 가부 등)로 사장님에게 말하듯 구체적으로 답하고, 실행 조치도 1~2개 제안하라."
+  );
 }
 
 // SSE 스트리밍 응답 — 토큰을 event:token으로 흘려보내고, 완료 후 정리본·출처·브리핑을 event:done으로.
@@ -597,26 +620,7 @@ queryRouter.post("/", async (c) => {
         maxTokens: 800,
         temperature: 0.1,
         messages: [
-          {
-            role: "system" as const,
-            content:
-              `너는 태안 지역정보 도우미다. 오늘은 ${todayKst}(한국 시간)이다. 아래 [근거](실시간 관측값·국토부 실거래·관광 수요·축제·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n` +
-              "- 오늘보다 이전의 연도·월·기간은 이미 '지난 일'이다. 과거에 대해 '예측·전망·~할 가능성' 같은 표현을 쓰지 말고 근거의 실제 수치로 '사실'로 서술하라. 과거 기간의 데이터가 근거에 없으면 '해당 기간의 실제 데이터를 찾지 못했습니다'라고 명확히 밝히고 지어내거나 추정·예측하지 마라. '예측·전망'은 오직 오늘 이후의 미래에 대해서만 하라.\n" +
-              "- 답변은 오직 한글·아라비아 숫자·필요한 영문 약어만 사용하라. 한자·중국어·일본어 등 외국 문자를 절대 쓰지 마라(예: '施设'가 아니라 '시설', '国内'가 아니라 '국내').\n" +
-              "- 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 한 줄로 끝내지 마라.\n" +
-              "- 표(마크다운 파이프 '|')나 아스키 차트를 본문에 직접 그리지 마라. 수치는 문장·불릿으로 자연스럽게 설명하라(차트 시각화는 화면이 담당한다).\n" +
-              "- 가독성을 위해 답을 2~4개의 짧은 문단으로 나누고(문단 사이 빈 줄 한 줄), 여러 항목을 나열할 때는 각 줄 앞에 '- '를 붙여 목록으로 제시하라. 핵심 수치·이름·날짜는 **굵게** 강조하라. 문장 하나하나를 줄바꿈으로 쪼개지 말고 의미 단위로 문단을 묶어라.\n" +
-              "- 부동산 질문이면 ㎡당 평균 단가·거래 건수·기간·월별 추이·태안군 전체 대비를 종합해 '시세 흐름'을 설명하라.\n" +
-              "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
-              "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
-              "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
-              "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
-              "- 웹 출처(공식 .go.kr·관광공사·지역언론)는 최신 정보다. 원문을 그대로 베끼지 말고 요약하며, 공식 출처를 우선하라.\n" +
-              "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
-              "- '이번 주/다음 주' 행사는 군청 주간행사계획·축제 일정을 우선 사용하고, 이미 끝난 과거 행사는 답에 넣지 마라.\n" +
-              "- '오늘 뭐하지/추천' 류 질문이면 오늘의 날씨·바다(물때·일출몰)·진행 중 축제·행사를 종합해 구체적인 활동을 추천하라(예: 맑고 낮 간조면 갯벌체험, 비 예보면 실내). 과거 기사로 답하지 마라.\n" +
-              "- '[내 가게 맞춤 분석]' 근거가 있으면 그 사장님 본인 가게 데이터다. '우리 가게/모텔/식당' 질문엔 그 수치(가동률·예상 손님·권장가·매출·출항 가부 등)로 사장님에게 말하듯 구체적으로 답하고, 실행 조치도 1~2개 제안하라.",
-          },
+          { role: "system" as const, content: answerSystemPrompt(todayKst) },
           { role: "user" as const, content: `[근거]\n${context}\n\n[질문] ${query}` },
         ],
       };
@@ -710,6 +714,113 @@ queryRouter.post("/polish", async (c) => {
   const context = (evidence ?? []).map((e) => `[${e.n}] ${e.source}\n${e.text}`).join("\n\n");
   const answer = await polishDraft(client, draft, context);
   return c.json({ answer });
+});
+
+// POST /api/query/graph — [시제품] 경량 그래프 실행기로 '진짜 단계 진행'을 SSE로 스트리밍.
+//   기존 검색·생성·교열 함수를 노드로 재사용(추가 LLM 비용 없음: 생성 1~2 + 교열 1, Workers AI 무료).
+//   event: progress {node,label,phase,pct} … 노드 완료마다 → event: done {answer,sources,...}.
+//   기존 /api/query와 '나란히' 도는 opt-in 경로(운영 기본 경로는 그대로).
+queryRouter.post("/graph", async (c) => {
+  if (!c.env.AI) return c.json({ error: "ai_unbound" }, 503);
+  const parsed = querySchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
+  const { query } = parsed.data;
+
+  const baseClient = new WorkersAiLlmClient({ ai: c.env.AI });
+  let llmCalls = 0;
+  const client = {
+    model: baseClient.model,
+    complete: async (r: Parameters<typeof baseClient.complete>[0]) => { llmCalls++; return baseClient.complete(r); },
+  } as typeof baseClient;
+  const nowKst = new Date(Date.now() + 9 * 3600_000);
+  const todayKst = `${nowKst.getUTCFullYear()}년 ${nowKst.getUTCMonth() + 1}월 ${nowKst.getUTCDate()}일`;
+  const weather = WEATHER_RE.test(query) || RECOMMEND_RE.test(query);
+  const offRegion = OTHER_REGION_RE.test(query) && !AREA_RE.test(query);
+
+  interface GState { parts: SourcePart[]; context: string; raw: string; answer: string; sources: QuerySource[] }
+
+  const nodes: GraphNode<GState>[] = [
+    { name: "understand", label: "질문 이해 중", run: () => {} },
+    {
+      name: "archive", label: "아카이브 검색 중",
+      when: () => !!c.env.ARCHIVE_DB && !offRegion,
+      run: async (s) => {
+        const rows = await retrieveArchive(c.env, query);
+        const parts = [...s.parts];
+        for (const r of rows) parts.push({ text: `${r.title} (${String(r.published_at).slice(0, 10)})\n${r.body}`, source: { title: r.title, url: `/news/${r.idxno}`, publishedAt: r.published_at } });
+        return { parts };
+      },
+    },
+    {
+      name: "realtime", label: "실시간 데이터 확인 중",
+      when: () => weather && !!c.env.DATA_GO_KR_KEY && !offRegion,
+      run: async (s) => {
+        try {
+          const cond = await fetchConditions(c.env);
+          if (cond.available && (cond.weather.temp != null || cond.air.pm10 != null || cond.air.grade)) {
+            const w = cond.weather, a = cond.air;
+            const text = `태안 실시간 관측(${String(cond.observedAt).slice(0, 16).replace("T", " ")} KST) — 기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, 강수 ${w.pty ?? "?"}; 미세먼지(PM10) ${a.pm10 ?? "?"}㎍/㎥, 초미세(PM2.5) ${a.pm25 ?? "?"}㎍/㎥, 통합대기 '${a.grade ?? "?"}'`;
+            return { parts: [...s.parts, { text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } }] };
+          }
+        } catch { /* 무시 */ }
+        return {};
+      },
+    },
+    {
+      name: "web", label: "공식 · 지역언론에서 최신 정보 찾는 중",
+      when: (s) => !offRegion && needsWeb(query, s.parts),
+      run: async (s) => {
+        try {
+          const web = await searchWeb(c.env, query);
+          const parts = [...s.parts];
+          for (const w of web) parts.push({ text: `${w.title}${w.publishedAt ? ` (${w.publishedAt})` : ""}\n${w.text}`, source: { title: w.title, url: w.url, publishedAt: w.publishedAt, kind: "web" } });
+          return { parts };
+        } catch { return {}; }
+      },
+    },
+    {
+      name: "compose", label: "답변 작성 중",
+      run: async (s) => {
+        const context = s.parts.map((p, i) => `[${i + 1}] ${p.text}`).join("\n\n");
+        const res = await completeAvoidingGarble(client, {
+          channel: "realtime" as const,
+          maxTokens: 800,
+          temperature: 0.1,
+          messages: [
+            { role: "system" as const, content: answerSystemPrompt(todayKst) },
+            { role: "user" as const, content: `[근거]\n${context}\n\n[질문] ${query}` },
+          ],
+        });
+        return { context, raw: res.content };
+      },
+    },
+    { name: "refine", label: "근거 대조 교열 중", run: async (s) => ({ answer: await polishDraft(client, s.raw, s.context) }) },
+    { name: "finalize", label: "정리 중", run: (s) => ({ sources: selectSources(s.parts, s.raw) }) },
+  ];
+
+  return streamSSE(c, async (stream) => {
+    try {
+      const final = await runGraph(nodes, { parts: [], context: "", raw: "", answer: "", sources: [] } as GState, async (e) => {
+        await stream.writeSSE({ event: "progress", data: JSON.stringify({ node: e.name, label: e.label, phase: e.phase, pct: e.pct }) });
+      });
+      const withEvidence = c.req.query("evidence") === "1";
+      await stream.writeSSE({
+        event: "done",
+        data: JSON.stringify({
+          answer: final.answer || tidyAnswer(final.raw),
+          intent: "archive_rag",
+          confidence: 0.9,
+          fromCache: false,
+          llmCalls,
+          sources: final.sources,
+          model: baseClient.model,
+          ...(withEvidence ? { evidence: final.parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })) } : {}),
+        }),
+      });
+    } catch {
+      await stream.writeSSE({ event: "error", data: JSON.stringify("답변 생성에 실패했습니다.") });
+    }
+  });
 });
 
 // POST /api/query/_fact — 큐레이션 사실 upsert(관리자). {id,keywords,title,content,source}
