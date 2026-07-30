@@ -72,5 +72,20 @@ export function extractChartData(text: string): ChartSpec[] {
     return [{ type: "line", title: "연도별 추이", points }];
   }
 
+  // 항목별 비교: "**라벨**: 값" (모델이 항목을 굵게+콜론으로 나열). 값은 굵게여도 허용. 3개 이상이면 bar.
+  const labeled = new Map<string, number>();
+  const lre = new RegExp(String.raw`\*\*\s*([^*\n:：]{1,12}?)\s*\*\*\s*[:：]\s*\*{0,2}\s*(` + NUM + String.raw`)\s*(?:명|가구|세대|원|개|건|톤|㏊|ha)?`, "g");
+  let l: RegExpExecArray | null;
+  while ((l = lre.exec(t))) {
+    const label = l[1].replace(/\s+/g, " ").trim();
+    const v = parseKNum(l[2]);
+    if (label && v != null && v >= 1 && !labeled.has(label) && labeled.size < 20) labeled.set(label, v);
+  }
+  if (labeled.size >= 3) {
+    const points = [...labeled.entries()].map(([label, value]) => ({ label, value }));
+    const allAdmin = points.every((p) => /[읍면동리]$/.test(p.label));
+    return [{ type: "bar", title: allAdmin ? "읍·면별 비교" : "항목별 비교", points }];
+  }
+
   return [];
 }
