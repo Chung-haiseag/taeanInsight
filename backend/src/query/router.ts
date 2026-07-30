@@ -264,6 +264,51 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
   return out;
 }
 
+// 부동산 실거래(국토부, 읍·면 필터 + ㎡당 단가·월별 추이·전체 대비) 근거 — 메인·그래프 공용. 게이트는 호출부.
+async function buildRealestateEvidence(env: Env, query: string, location?: string): Promise<SourcePart[]> {
+  const re = await fetchRealEstateDeep(env);
+  if (!re.available || (!re.apartments.length && !re.lands.length)) return [];
+  const EUPMYEON = ["태안읍", "안면읍", "고남면", "근흥면", "남면", "소원면", "원북면", "이원면"];
+  const hay = `${query} ${location ?? ""}`;
+  const eup = EUPMYEON.find((e) => hay.includes(e)) ?? (/안면도/.test(hay) ? "안면읍" : null);
+  const inEup = (d: string) => !eup || (d ?? "").includes(eup);
+  const scope = eup ?? "태안군";
+  type Item = { manwon: number; area: string; ymd: string };
+  const stat = (items: Item[]) => {
+    const v = items.filter((x) => x.manwon > 0 && Number(x.area) > 0);
+    if (!v.length) return null;
+    const unit = v.map((x) => x.manwon / Number(x.area));
+    const avgU = unit.reduce((s, u) => s + u, 0) / unit.length;
+    const ymds = v.map((x) => x.ymd).filter(Boolean).sort();
+    const byMon = new Map<string, number[]>();
+    for (const x of v) { const m = x.ymd.slice(0, 7); const a = byMon.get(m) ?? []; a.push(x.manwon / Number(x.area)); byMon.set(m, a); }
+    const monthly = [...byMon.entries()].sort().map(([m, us]) => `${m}: ㎡당 ${(us.reduce((s, u) => s + u, 0) / us.length).toFixed(1)}만원(${us.length}건)`).join(", ");
+    return { n: v.length, avgU: avgU.toFixed(1), minU: Math.min(...unit).toFixed(1), maxU: Math.max(...unit).toFixed(1), from: ymds[0], to: ymds[ymds.length - 1], monthly };
+  };
+  const landsLoc = re.lands.filter((x) => inEup(x.dong));
+  const aptsLoc = re.apartments.filter((x) => inEup(x.dong));
+  const landStat = stat(landsLoc), aptStat = stat(aptsLoc);
+  const countyLand = stat(re.lands), countyApt = stat(re.apartments);
+  const lines: string[] = [`[${scope} 부동산 실거래 분석 · 국토교통부 최근 6개월]`];
+  if (landStat) {
+    lines.push(`· 토지: ${landStat.n}건(${landStat.from}~${landStat.to}), ㎡당 평균 ${landStat.avgU}만원(범위 ${landStat.minU}~${landStat.maxU}). 월별 추이 — ${landStat.monthly}`);
+    lines.push(`  개별: ${landsLoc.slice(0, 8).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
+  }
+  if (aptStat) {
+    lines.push(`· 아파트: ${aptStat.n}건, ㎡당 평균 ${aptStat.avgU}만원. 월별 — ${aptStat.monthly}`);
+    lines.push(`  개별: ${aptsLoc.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
+  }
+  if (eup && !landStat && !aptStat) {
+    lines.push(`· ${eup}의 최근 6개월 실거래 기록이 없습니다.`);
+  }
+  if (eup && countyLand) {
+    const sparse = (landStat?.n ?? 0) < 3;
+    lines.push(`· (참고) 태안군 전체 토지 ㎡당 평균 ${countyLand.avgU}만원(${countyLand.n}건, ${countyLand.from}~${countyLand.to})${countyApt ? `, 아파트 ㎡당 평균 ${countyApt.avgU}만원` : ""}`);
+    if (sparse) lines.push(`  ${eup} 표본이 적어 추세 단정이 어렵습니다. 태안군 전체 토지 월별 추이 — ${countyLand.monthly}`);
+  }
+  return [{ text: lines.join("\n"), source: { title: `국토교통부 실거래가 · ${scope}(6개월)`, url: null } }];
+}
+
 // 관광 수요·축제 근거 — 메인·그래프 공용. 게이트는 호출부.
 async function buildTourEvidence(env: Env): Promise<SourcePart[]> {
   const lines: string[] = [];
@@ -478,57 +523,9 @@ queryRouter.post("/", async (c) => {
       parts.push(...(await buildRealtimeEvidence(c.env, query)));
     }
 
-    // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터 + ㎡당 단가·월별 추이·전체 대비)
+    // (a-2) 부동산·실거래 — 공용 헬퍼(그래프와 동일)
     if (REALESTATE_RE.test(query) && c.env.DATA_GO_KR_KEY && !offRegion) {
-      const re = await fetchRealEstateDeep(c.env);
-      if (re.available && (re.apartments.length || re.lands.length)) {
-        const EUPMYEON = ["태안읍", "안면읍", "고남면", "근흥면", "남면", "소원면", "원북면", "이원면"];
-        const hay = `${query} ${location ?? ""}`;
-        const eup = EUPMYEON.find((e) => hay.includes(e)) ?? (/안면도/.test(hay) ? "안면읍" : null);
-        const inEup = (d: string) => !eup || (d ?? "").includes(eup);
-        const scope = eup ?? "태안군";
-
-        // 토지/아파트 표본 통계 — ㎡당 단가(만원), 건수, 기간, 월별 추이
-        type Item = { manwon: number; area: string; ymd: string };
-        const stat = (items: Item[]) => {
-          const v = items.filter((x) => x.manwon > 0 && Number(x.area) > 0);
-          if (!v.length) return null;
-          const unit = v.map((x) => x.manwon / Number(x.area)); // 만원/㎡
-          const avgU = unit.reduce((s, u) => s + u, 0) / unit.length;
-          const ymds = v.map((x) => x.ymd).filter(Boolean).sort();
-          // 월별 평균 ㎡단가
-          const byMon = new Map<string, number[]>();
-          for (const x of v) { const m = x.ymd.slice(0, 7); const a = byMon.get(m) ?? []; a.push(x.manwon / Number(x.area)); byMon.set(m, a); }
-          const monthly = [...byMon.entries()].sort().map(([m, us]) => `${m}: ㎡당 ${(us.reduce((s, u) => s + u, 0) / us.length).toFixed(1)}만원(${us.length}건)`).join(", ");
-          return { n: v.length, avgU: avgU.toFixed(1), minU: Math.min(...unit).toFixed(1), maxU: Math.max(...unit).toFixed(1), from: ymds[0], to: ymds[ymds.length - 1], monthly };
-        };
-
-        const landsLoc = re.lands.filter((x) => inEup(x.dong));
-        const aptsLoc = re.apartments.filter((x) => inEup(x.dong));
-        const landStat = stat(landsLoc), aptStat = stat(aptsLoc);
-        const countyLand = stat(re.lands), countyApt = stat(re.apartments);
-
-        const lines: string[] = [`[${scope} 부동산 실거래 분석 · 국토교통부 최근 6개월]`];
-        if (landStat) {
-          lines.push(`· 토지: ${landStat.n}건(${landStat.from}~${landStat.to}), ㎡당 평균 ${landStat.avgU}만원(범위 ${landStat.minU}~${landStat.maxU}). 월별 추이 — ${landStat.monthly}`);
-          lines.push(`  개별: ${landsLoc.slice(0, 8).map((x) => `${x.dong} ${x.jimok} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
-        }
-        if (aptStat) {
-          lines.push(`· 아파트: ${aptStat.n}건, ㎡당 평균 ${aptStat.avgU}만원. 월별 — ${aptStat.monthly}`);
-          lines.push(`  개별: ${aptsLoc.slice(0, 6).map((x) => `${x.dong} ${x.name} ${x.area}㎡ ${x.amount}(${x.ymd})`).join("; ")}`);
-        }
-        if (eup && !landStat && !aptStat) {
-          lines.push(`· ${eup}의 최근 6개월 실거래 기록이 없습니다.`);
-        }
-        // 태안군 전체 대비(읍면 질문일 때 비교 기준). 읍·면 표본이 적으면 전체 월별 추이까지 제공.
-        if (eup && countyLand) {
-          const sparse = (landStat?.n ?? 0) < 3;
-          lines.push(`· (참고) 태안군 전체 토지 ㎡당 평균 ${countyLand.avgU}만원(${countyLand.n}건, ${countyLand.from}~${countyLand.to})${countyApt ? `, 아파트 ㎡당 평균 ${countyApt.avgU}만원` : ""}`);
-          if (sparse) lines.push(`  ${eup} 표본이 적어 추세 단정이 어렵습니다. 태안군 전체 토지 월별 추이 — ${countyLand.monthly}`);
-        }
-
-        parts.push({ text: lines.join("\n"), source: { title: `국토교통부 실거래가 · ${scope}(6개월)`, url: null } });
-      }
+      parts.push(...(await buildRealestateEvidence(c.env, query, location)));
     }
 
     // (a-3) 관광 수요·축제 — 공용 헬퍼(그래프와 동일)
@@ -750,7 +747,7 @@ queryRouter.post("/graph", async (c) => {
   if (!c.env.AI) return c.json({ error: "ai_unbound" }, 503);
   const parsed = querySchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
-  const { query } = parsed.data;
+  const { query, location } = parsed.data;
 
   const baseClient = new WorkersAiLlmClient({ ai: c.env.AI });
   let llmCalls = 0;
@@ -848,6 +845,11 @@ queryRouter.post("/graph", async (c) => {
       name: "events", label: "군정·주간행사 확인 중",
       when: () => (EVENT_RE.test(query) || recommend) && !!c.env.ARCHIVE_DB && !offRegion,
       run: async (s) => ({ parts: [...s.parts, ...(await buildEventsEvidence(c.env))] }),
+    },
+    {
+      name: "realestate", label: "부동산 실거래 확인 중",
+      when: () => REALESTATE_RE.test(query) && !!c.env.DATA_GO_KR_KEY && !offRegion,
+      run: async (s) => ({ parts: [...s.parts, ...(await buildRealestateEvidence(c.env, query, location))] }),
     },
     {
       name: "web", label: "공식 · 지역언론에서 최신 정보 찾는 중",
