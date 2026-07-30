@@ -14,7 +14,7 @@ const STAGES = [
   { key: "compose", label: "답변 작성 중", hint: "근거 대조 · 숫자·표기 교열" },
 ];
 
-const TAU = 15000; // 감속 상수(ms) — 클수록 천천히 참
+const TAU = 10000; // 감속 상수(ms) — 작을수록 %가 빨리 오른다(5s≈37% · 10s≈63% · 30s≈90%)
 const CAP = 95; // 실제 완료 전 최대 %(멈춘 듯 100% 방지)
 const TICK = 300; // ms
 
