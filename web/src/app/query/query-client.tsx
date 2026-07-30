@@ -3,17 +3,19 @@
 // AI Query Agent — 자연어 질의 → 백엔드 RAG. 완성본 표시(스트리밍 끔): 서버가 근거 대조 교열까지
 // 마친 정확본을 한 번에 반환하므로 눈앞에서 답이 바뀌지 않는다. REQ-PRODUCT-002 / TaskMaster #23.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
 import { ApiError } from "@/lib/api/client";
 import { askQuery, type QueryResult } from "@/lib/api/query";
+import { getNews, type NewsItem } from "@/lib/api/news";
 import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
 import { decodeEntities } from "@/lib/decode-entities";
 import { paragraphize } from "@/lib/paragraphize";
+import { NewsPromo } from "./news-promo";
 import { SearchProgress } from "./search-progress";
 
 const SUGGESTED_QUESTIONS = [
@@ -37,6 +39,13 @@ export function QueryClient() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 대기 중 홍보용 태안신문 최신 소식 — 진입 시 미리 받아둔다(로딩 즉시 표시). 실패는 무시.
+  const [promo, setPromo] = useState<{ items: NewsItem[]; labels: Record<string, string> }>({ items: [], labels: {} });
+  useEffect(() => {
+    getNews(undefined, 6)
+      .then((r) => setPromo({ items: r.items ?? [], labels: r.labels ?? {} }))
+      .catch(() => {});
+  }, []);
 
   async function run(q: string) {
     const text = q.trim();
@@ -136,8 +145,13 @@ export function QueryClient() {
         </form>
       </section>
 
-      {/* 검색·생성 진행 표시(완성될 때까지) */}
-      {loading && <div className="no-print"><SearchProgress /></div>}
+      {/* 검색·생성 진행 표시 + 대기 중 태안신문 최신 소식 홍보 */}
+      {loading && (
+        <div className="no-print space-y-4">
+          <SearchProgress />
+          <NewsPromo items={promo.items} labels={promo.labels} />
+        </div>
+      )}
 
       {/* 에러 */}
       {error && (
