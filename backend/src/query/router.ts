@@ -264,6 +264,71 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
   return out;
 }
 
+// 관광 수요·축제 근거 — 메인·그래프 공용. 게이트는 호출부.
+async function buildTourEvidence(env: Env): Promise<SourcePart[]> {
+  const lines: string[] = [];
+  try {
+    const t = await fetchTour(env);
+    const fests = (t.festivals ?? [])
+      .map((f) => ({ ...f, dday: ymd8Dday(f.start) }))
+      .filter((f) => f.dday >= -3)
+      .sort((a, b) => a.dday - b.dday)
+      .slice(0, 8);
+    if (fests.length) {
+      lines.push("축제·행사: " + fests.map((f) => `${f.title}(${f.start}~${f.end}${f.dday >= 0 && f.dday <= 60 ? `, D-${f.dday}` : ""}${f.addr ? `, ${f.addr}` : ""})`).join("; "));
+    }
+  } catch { /* 무시 */ }
+  if (env.DATA_GO_KR_KEY) {
+    try {
+      const dem = await forecastDemand(env);
+      if (dem?.available) {
+        const fac = (dem.factors ?? []).map((f) => `${f.label} ${f.effect > 0 ? "+" : ""}${f.effect}(${f.detail})`).join(", ");
+        lines.push(`주말 관광 수요지수: ${dem.index}점 '${dem.level}' (${dem.weekend.sat}~${dem.weekend.sun}). ${dem.headline}. 기여 요인 — ${fac}`);
+      }
+    } catch { /* 무시 */ }
+  }
+  return lines.length ? [{ text: `[태안 관광 수요·행사]\n${lines.join("\n")}`, source: { title: "관광 수요예측·축제(TourAPI·기상 기반)", url: null } }] : [];
+}
+
+// 바다·해변(일출몰·물때·수온·파고·서핑) 근거 — 메인·그래프 공용. 게이트는 호출부.
+async function buildMarineEvidence(env: Env): Promise<SourcePart[]> {
+  try {
+    const m = await loadMarine(env);
+    if (m.available) {
+      const seg: string[] = [];
+      if (m.sun) seg.push(`오늘 일출 ${m.sun.sunrise}, 일몰 ${m.sun.sunset} (태안 기준 천문계산)`);
+      if (m.tide?.events?.length) seg.push(`오늘 물때(${m.tide.station}): ${m.tide.events.map((e) => `${e.type === "고조" ? "만조" : "간조"} ${e.time}`).join(", ")}`);
+      if (m.beaches?.length) seg.push(`해변: ${m.beaches.map((b) => `${b.name} 수온 ${b.waterTemp ?? "?"}℃·파고 ${b.waveHeight ?? "?"}m${b.beachIndex ? `·해수욕지수 ${b.beachIndex}` : ""}`).join("; ")}`);
+      if (m.surf) seg.push(`서핑(${m.surf.spot}): 파고 ${m.surf.wave ?? "?"}m·수온 ${m.surf.waterTemp ?? "?"}℃`);
+      if (m.mudflat?.length) seg.push(`갯벌체험 적기: ${m.mudflat.join(", ")}`);
+      if (seg.length) return [{ text: `[태안 바다·해변 실시간]\n${seg.join("\n")}`, source: { title: "국립해양조사원·일출몰 천문계산(실시간)", url: null } }];
+    }
+  } catch { /* 무시 */ }
+  return [];
+}
+
+// 태안군청 군정소식·주간행사계획 근거 — 메인·그래프 공용. 게이트는 호출부(ARCHIVE_DB 없으면 빈 배열).
+async function buildEventsEvidence(env: Env): Promise<SourcePart[]> {
+  if (!env.ARCHIVE_DB) return [];
+  try {
+    const r = await env.ARCHIVE_DB
+      .prepare(
+        `SELECT board_name, title, dept, published_at, substr(body,1,2200) AS body FROM gov_notices
+         ORDER BY (board_name='주간행사계획') DESC, published_at DESC, ntt_id DESC LIMIT 10`,
+      )
+      .all<{ board_name: string; title: string; dept: string | null; published_at: string; body: string | null }>();
+    const rows = r.results ?? [];
+    if (rows.length) {
+      const text = "[태안군청 군정 소식·주간행사계획]\n" + rows.map((n) => {
+        const head = `· [${n.board_name}] ${n.title} (${String(n.published_at).slice(0, 10)}${n.dept ? `, ${n.dept}` : ""})`;
+        return n.board_name === "주간행사계획" && n.body ? `${head}\n  ${n.body.replace(/\s+/g, " ").trim()}` : head;
+      }).join("\n");
+      return [{ text, source: { title: "태안군청 군정 소식·주간행사계획", url: null } }];
+    }
+  } catch { /* 무시 */ }
+  return [];
+}
+
 // 본답 시스템 프롬프트 — 메인 핸들러·그래프 시제품 공용(품질 일관 유지).
 function answerSystemPrompt(todayKst: string): string {
   return (
@@ -466,67 +531,19 @@ queryRouter.post("/", async (c) => {
       }
     }
 
-    // (a-3) 관광 수요·축제 질문이면 수요예측 + 축제 일정을 근거에 추가
+    // (a-3) 관광 수요·축제 — 공용 헬퍼(그래프와 동일)
     if ((TOURISM_RE.test(query) || recommend) && !offRegion) {
-      const lines: string[] = [];
-      try {
-        const t = await fetchTour(c.env);
-        const fests = (t.festivals ?? [])
-          .map((f) => ({ ...f, dday: ymd8Dday(f.start) }))
-          .filter((f) => f.dday >= -3)
-          .sort((a, b) => a.dday - b.dday)
-          .slice(0, 8);
-        if (fests.length) {
-          lines.push("축제·행사: " + fests.map((f) => `${f.title}(${f.start}~${f.end}${f.dday >= 0 && f.dday <= 60 ? `, D-${f.dday}` : ""}${f.addr ? `, ${f.addr}` : ""})`).join("; "));
-        }
-      } catch { /* 무시 */ }
-      if (c.env.DATA_GO_KR_KEY) {
-        try {
-          const dem = await forecastDemand(c.env);
-          if (dem?.available) {
-            const fac = (dem.factors ?? []).map((f) => `${f.label} ${f.effect > 0 ? "+" : ""}${f.effect}(${f.detail})`).join(", ");
-            lines.push(`주말 관광 수요지수: ${dem.index}점 '${dem.level}' (${dem.weekend.sat}~${dem.weekend.sun}). ${dem.headline}. 기여 요인 — ${fac}`);
-          }
-        } catch { /* 무시 */ }
-      }
-      if (lines.length) parts.push({ text: `[태안 관광 수요·행사]\n${lines.join("\n")}`, source: { title: "관광 수요예측·축제(TourAPI·기상 기반)", url: null } });
+      parts.push(...(await buildTourEvidence(c.env)));
     }
 
-    // (a-4) 바다·해변 질문이면 일출몰·물때·수온·파고·서핑을 근거에 추가(실시간/천문계산)
+    // (a-4) 바다·해변(일출몰·물때·수온·파고·서핑) — 공용 헬퍼
     if ((MARINE_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY && !offRegion) {
-      try {
-        const m = await loadMarine(c.env);
-        if (m.available) {
-          const seg: string[] = [];
-          if (m.sun) seg.push(`오늘 일출 ${m.sun.sunrise}, 일몰 ${m.sun.sunset} (태안 기준 천문계산)`);
-          if (m.tide?.events?.length) seg.push(`오늘 물때(${m.tide.station}): ${m.tide.events.map((e) => `${e.type === "고조" ? "만조" : "간조"} ${e.time}`).join(", ")}`);
-          if (m.beaches?.length) seg.push(`해변: ${m.beaches.map((b) => `${b.name} 수온 ${b.waterTemp ?? "?"}℃·파고 ${b.waveHeight ?? "?"}m${b.beachIndex ? `·해수욕지수 ${b.beachIndex}` : ""}`).join("; ")}`);
-          if (m.surf) seg.push(`서핑(${m.surf.spot}): 파고 ${m.surf.wave ?? "?"}m·수온 ${m.surf.waterTemp ?? "?"}℃`);
-          if (m.mudflat?.length) seg.push(`갯벌체험 적기: ${m.mudflat.join(", ")}`);
-          if (seg.length) parts.push({ text: `[태안 바다·해변 실시간]\n${seg.join("\n")}`, source: { title: "국립해양조사원·일출몰 천문계산(실시간)", url: null } });
-        }
-      } catch { /* 무시 */ }
+      parts.push(...(await buildMarineEvidence(c.env)));
     }
 
-    // (a-5) 행사·일정·군정 질문이면 태안군청 군정소식·주간행사계획 주입(이번 주 행사의 정본)
+    // (a-5) 군정·주간행사계획 — 공용 헬퍼
     if ((EVENT_RE.test(query) || recommend) && c.env.ARCHIVE_DB && !offRegion) {
-      try {
-        const r = await c.env.ARCHIVE_DB
-          .prepare(
-            `SELECT board_name, title, dept, published_at, substr(body,1,2200) AS body FROM gov_notices
-             ORDER BY (board_name='주간행사계획') DESC, published_at DESC, ntt_id DESC LIMIT 10`,
-          )
-          .all<{ board_name: string; title: string; dept: string | null; published_at: string; body: string | null }>();
-        const rows = r.results ?? [];
-        if (rows.length) {
-          const text = "[태안군청 군정 소식·주간행사계획]\n" + rows.map((n) => {
-            const head = `· [${n.board_name}] ${n.title} (${String(n.published_at).slice(0, 10)}${n.dept ? `, ${n.dept}` : ""})`;
-            // 주간행사계획은 본문에 실제 일정이 있어 함께 제공
-            return n.board_name === "주간행사계획" && n.body ? `${head}\n  ${n.body.replace(/\s+/g, " ").trim()}` : head;
-          }).join("\n");
-          parts.push({ text, source: { title: "태안군청 군정 소식·주간행사계획", url: null } });
-        }
-      } catch { /* 무시 */ }
+      parts.push(...(await buildEventsEvidence(c.env)));
     }
 
     // (a-6) 큐레이션 사실(fact table) — 열거·전수형 질문(섬 명단·역대 군수·인구 등)에 검증된 사실 우선 주입.
@@ -744,6 +761,7 @@ queryRouter.post("/graph", async (c) => {
   const nowKst = new Date(Date.now() + 9 * 3600_000);
   const todayKst = `${nowKst.getUTCFullYear()}년 ${nowKst.getUTCMonth() + 1}월 ${nowKst.getUTCDate()}일`;
   const weather = WEATHER_RE.test(query) || RECOMMEND_RE.test(query);
+  const recommend = RECOMMEND_RE.test(query);
   const offRegion = OTHER_REGION_RE.test(query) && !AREA_RE.test(query);
 
   interface GState {
@@ -815,6 +833,21 @@ queryRouter.post("/graph", async (c) => {
         try { return { parts: [...s.parts, ...(await buildRealtimeEvidence(c.env, query))] }; }
         catch { return {}; }
       },
+    },
+    {
+      name: "tour", label: "관광 수요·축제 확인 중",
+      when: () => (TOURISM_RE.test(query) || recommend) && !offRegion,
+      run: async (s) => ({ parts: [...s.parts, ...(await buildTourEvidence(c.env))] }),
+    },
+    {
+      name: "marine", label: "바다·물때 확인 중",
+      when: () => (MARINE_RE.test(query) || recommend) && !!c.env.DATA_GO_KR_KEY && !offRegion,
+      run: async (s) => ({ parts: [...s.parts, ...(await buildMarineEvidence(c.env))] }),
+    },
+    {
+      name: "events", label: "군정·주간행사 확인 중",
+      when: () => (EVENT_RE.test(query) || recommend) && !!c.env.ARCHIVE_DB && !offRegion,
+      run: async (s) => ({ parts: [...s.parts, ...(await buildEventsEvidence(c.env))] }),
     },
     {
       name: "web", label: "공식 · 지역언론에서 최신 정보 찾는 중",
