@@ -175,6 +175,39 @@ const querySchema = z.object({
   userTier: z.enum(["anon", "b2c", "b2b", "b2g"]).optional(),
 });
 
+// 근거 대조 교열 프롬프트 — fp8이 흘린 숫자·글자를 [근거]에서 찾아 복원. 없는 숫자는 지어내지 않음.
+const POLISH_SYS =
+  "너는 한국어 교열자다. 아래 [근거]를 참고해 [초안]을 다듬어라. 할 일:\n" +
+  "1) 빠진 연도·수치·글자·조사를 [근거]에서 찾아 정확히 복원하라(예: '개발은년부터'→근거의 연도로 '개발은 1997년부터', '이후2년'→'이후 2012년').\n" +
+  "2) 근거에 없는 숫자·사실은 절대 지어내지 마라. 불확실하면 그 부분은 원문 그대로 두라.\n" +
+  "3) 문단·불릿(- )·**굵게** 구조와 [번호] 출처 표기는 그대로 유지하라. 뜻·사실을 바꾸지 마라.\n" +
+  "4) 오직 한글·아라비아 숫자·필요한 영문 약어만. 한자·일본어 등 외국 문자 금지. 교정한 본문만 출력(설명·머리말 금지).";
+
+// 근거 대조 교열 — 초안의 빠진 숫자·글자를 [근거]로 복원한 tidy 완성본 반환. 근거·초안이 없으면 정리만.
+// 스트리밍을 끄고 '완성본만 표시'하므로 서버가 이 정확본을 만들어 반환한다. 실패·과단축 시 원본 유지.
+async function polishDraft(
+  client: WorkersAiLlmClient,
+  draft: string,
+  context: string,
+): Promise<string> {
+  if (!context.trim() || draft.trim().length < 20) return tidyAnswer(draft);
+  try {
+    const res = await completeAvoidingGarble(client, {
+      channel: "realtime" as const,
+      maxTokens: 1200,
+      temperature: 0.1,
+      messages: [
+        { role: "system" as const, content: POLISH_SYS },
+        { role: "user" as const, content: `[근거]\n${context}\n\n[초안]\n${draft}` },
+      ],
+    });
+    const out = tidyAnswer(res.content);
+    return out.length >= draft.length * 0.5 ? out : tidyAnswer(draft);
+  } catch {
+    return tidyAnswer(draft);
+  }
+}
+
 // SSE 스트리밍 응답 — 토큰을 event:token으로 흘려보내고, 완료 후 정리본·출처·브리핑을 event:done으로.
 // 클라이언트는 done.answer(tidy 완료본)로 스트림 텍스트를 교체한다. salad면 1회 비스트림 재생성으로 교체.
 async function streamAnswer(
@@ -590,11 +623,11 @@ queryRouter.post("/", async (c) => {
 
       // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
       const res = await completeAvoidingGarble(client, llmReq);
-      // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 정리가 표현을 바꿔도 근거 선택이 안 흔들린다.
+      // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 교열이 표현을 바꿔도 근거 선택이 안 흔들린다.
       const rawAnswer = res.content;
-      // 결정론적 정리만(LLM 0, 즉시): 중복 출처꼬리 제거 + 인라인 불릿 정규화 + 문단 분리.
-      // 과거의 LLM 교열 패스는 질의당 왕복을 2배로 만들어(70초) 제거함. 구조·굵게는 본답 프롬프트가 지시.
-      const answer = tidyAnswer(rawAnswer);
+      // 완성본만 표시하므로(스트리밍 끔) 서버에서 근거 대조 교열까지 끝낸 '정확본'을 반환.
+      // fp8이 흘린 연도 숫자를 [근거]로 복원 → 화면·PDF 모두 처음부터 정확(눈앞 스왑 없음).
+      const answer = await polishDraft(client, rawAnswer, context);
       const sources = selectSources(parts, rawAnswer);
       const personBrief = await briefPromise;
       return c.json({
@@ -670,28 +703,8 @@ queryRouter.post("/polish", async (c) => {
   const { draft, evidence } = parsed.data;
   const client = new WorkersAiLlmClient({ ai: c.env.AI });
   const context = (evidence ?? []).map((e) => `[${e.n}] ${e.source}\n${e.text}`).join("\n\n");
-  const sys =
-    "너는 한국어 교열자다. 아래 [근거]를 참고해 [초안]을 다듬어라. 할 일:\n" +
-    "1) 빠진 연도·수치·글자·조사를 [근거]에서 찾아 정확히 복원하라(예: '개발은년부터'→근거의 연도로 '개발은 1997년부터', '이후2년'→'이후 2012년').\n" +
-    "2) 근거에 없는 숫자·사실은 절대 지어내지 마라. 불확실하면 그 부분은 원문 그대로 두라.\n" +
-    "3) 문단·불릿(- )·**굵게** 구조와 [번호] 출처 표기는 그대로 유지하라. 뜻·사실을 바꾸지 마라.\n" +
-    "4) 오직 한글·아라비아 숫자·필요한 영문 약어만. 한자·일본어 등 외국 문자 금지. 교정한 본문만 출력(설명·머리말 금지).";
-  try {
-    const res = await completeAvoidingGarble(client, {
-      channel: "realtime" as const,
-      maxTokens: 1200,
-      temperature: 0.1,
-      messages: [
-        { role: "system" as const, content: sys },
-        { role: "user" as const, content: `[근거]\n${context}\n\n[초안]\n${draft}` },
-      ],
-    });
-    const out = tidyAnswer(res.content);
-    // 교열본이 비정상적으로 짧으면(손실) 원본 유지
-    return c.json({ answer: out.length >= draft.length * 0.5 ? out : draft });
-  } catch {
-    return c.json({ answer: draft }); // 실패 시 원본(저장은 되게)
-  }
+  const answer = await polishDraft(client, draft, context);
+  return c.json({ answer });
 });
 
 // POST /api/query/_fact — 큐레이션 사실 upsert(관리자). {id,keywords,title,content,source}

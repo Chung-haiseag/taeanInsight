@@ -1,14 +1,14 @@
 "use client";
 
-// AI Query Agent — 자연어 질의 → 백엔드 RAG 실시간 스트리밍(토큰 단위 표시).
-// REQ-PRODUCT-002 / TaskMaster #23. LLM 경로: Workers AI 무료 모델(종량 0).
+// AI Query Agent — 자연어 질의 → 백엔드 RAG. 완성본 표시(스트리밍 끔): 서버가 근거 대조 교열까지
+// 마친 정확본을 한 번에 반환하므로 눈앞에서 답이 바뀌지 않는다. REQ-PRODUCT-002 / TaskMaster #23.
 
 import { useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
 import { ApiError } from "@/lib/api/client";
-import { askQuery, askQueryStream, polishForPdf, type AskQueryInput, type QueryResult } from "@/lib/api/query";
+import { askQuery, type QueryResult } from "@/lib/api/query";
 import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
@@ -31,24 +31,12 @@ const INTENT_LABELS: Record<string, string> = {
   other: "일반",
 };
 
-function mapError(status?: number): string {
-  return status === 503
-    ? "AI 엔진이 일시적으로 연결되지 않았습니다. 잠시 후 다시 시도해주세요."
-    : status === 400
-    ? "질문은 2자 이상 500자 이하로 입력해주세요."
-    : status
-    ? `요청 실패 (${status})`
-    : "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-}
-
 export function QueryClient() {
   const [query, setQuery] = useState("");
   const [asked, setAsked] = useState(""); // 실제로 던진 질문(인쇄 머리말용)
   const [loading, setLoading] = useState(false);
-  const [live, setLive] = useState(""); // 스트리밍 중 누적 텍스트
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [refining, setRefining] = useState(false); // 완료 후 근거 대조 교열(숫자 복원) 중
 
   async function run(q: string) {
     const text = q.trim();
@@ -56,48 +44,26 @@ export function QueryClient() {
     setLoading(true);
     setError(null);
     setResult(null);
-    setLive("");
     setAsked(text);
     trackEvent("ai_query", text.slice(0, 120));
-
-    const input: AskQueryInput = { query: text };
-    let done = false;
-    await askQueryStream(input, {
-      onToken: (chunk) => setLive((prev) => prev + chunk),
-      onDone: (r) => {
-        done = true;
-        setResult(r);
-        setLoading(false);
-        void refine(r); // 화면 답도 근거 대조로 숫자·표기 자동 교열
-      },
-      onError: async (_msg, status) => {
-        if (done) return;
-        // 스트리밍 실패 → 비스트림 1회 폴백
-        try {
-          const r = await askQuery(input);
-          setResult(r);
-          void refine(r);
-        } catch (e) {
-          setError(e instanceof ApiError ? mapError(e.status) : mapError());
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  }
-
-  // 완료 후 근거와 대조해 빠진 숫자·글자를 복원한 교열본으로 화면 답을 교체(스트리밍·PDF 공통 정확도).
-  // 근거가 없으면(단답 등) 건너뜀. 실패해도 원본 유지. 답이 그새 바뀌었으면 덮어쓰지 않음.
-  async function refine(base: QueryResult) {
-    if (!base.evidence?.length) return; // 근거 없으면 교열 불필요
-    setRefining(true);
     try {
-      const { answer } = await polishForPdf({ draft: base.answer, evidence: base.evidence });
-      setResult((r) => (r && r.answer === base.answer ? { ...r, answer } : r));
-    } catch {
-      /* 교열 실패 → 원본 유지 */
+      const res = await askQuery({ query: text });
+      setResult(res);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setError(
+          e.status === 503
+            ? "AI 엔진이 일시적으로 연결되지 않았습니다. 잠시 후 다시 시도해주세요."
+            : e.status === 400
+            ? "질문은 2자 이상 500자 이하로 입력해주세요."
+            : `요청 실패 (${e.status})`,
+        );
+      } else {
+        setError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } finally {
+      setLoading(false);
     }
-    setRefining(false);
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -110,24 +76,22 @@ export function QueryClient() {
     void run(q);
   }
 
-  // PDF 저장 — 화면 답은 이미 교열본(완료 후 자동 교열)이므로 그대로 인쇄한다.
+  // PDF 저장 — 답은 서버에서 이미 교열된 정확본이므로 그대로 인쇄한다.
   //   근거를 모두 펼치고 인쇄. 워터마크·페이지여백은 전역 print CSS가 담당.
   function savePdf() {
-    if (!result || refining) return; // 교열 중이면 완료 후에
+    if (!result) return;
     document
       .querySelectorAll<HTMLDetailsElement>(".answer-print details")
       .forEach((d) => { d.open = true; });
     window.setTimeout(() => window.print(), 80);
   }
 
-  const streaming = loading && !result;
-
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <header className="space-y-2 no-print">
         <div className="flex items-center gap-2">
           <AILabelBadge kind="ai_assisted" />
-          <span className="text-sm text-foreground-muted">빠른 답변 · 출처 표기</span>
+          <span className="text-sm text-foreground-muted">정확한 답변 · 출처 표기</span>
         </div>
         <h1 className="text-3xl font-bold text-brand">무엇이든 물어보세요</h1>
         <p className="text-foreground-muted">
@@ -172,22 +136,8 @@ export function QueryClient() {
         </form>
       </section>
 
-      {/* 스트리밍 시작 전(첫 토큰 대기) 진행 표시 */}
-      {streaming && !live && <div className="no-print"><SearchProgress /></div>}
-
-      {/* 스트리밍 중 실시간 답변(토큰) */}
-      {streaming && live && (
-        <section className="no-print border border-accent/30 rounded-lg p-6 bg-accent/5">
-          <div className="flex items-center gap-2 mb-3">
-            <AILabelBadge kind="ai_assisted" />
-            <span className="text-xs text-foreground-muted">생성 중…</span>
-          </div>
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
-            {live}
-            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-accent align-middle" aria-hidden />
-          </p>
-        </section>
-      )}
+      {/* 검색·생성 진행 표시(완성될 때까지) */}
+      {loading && <div className="no-print"><SearchProgress /></div>}
 
       {/* 에러 */}
       {error && (
@@ -196,7 +146,7 @@ export function QueryClient() {
         </div>
       )}
 
-      {/* 최종 답변 (인쇄/PDF 대상) */}
+      {/* 완성 답변 (인쇄/PDF 대상) */}
       {result && (
         <section
           aria-labelledby="answer-heading"
@@ -214,18 +164,11 @@ export function QueryClient() {
               {INTENT_LABELS[result.intent] ?? result.intent}
               {result.fromCache ? " · 캐시" : ` · LLM ${result.llmCalls}회`}
             </span>
-            {refining && (
-              <span className="no-print inline-flex items-center gap-1 text-xs text-accent">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-                숫자·표기 다듬는 중…
-              </span>
-            )}
             <button
               type="button"
               onClick={savePdf}
-              disabled={refining}
-              title={refining ? "교열이 끝나면 저장할 수 있습니다" : "근거를 펼쳐 PDF로 저장"}
-              className="no-print ml-auto inline-flex items-center gap-1 rounded border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              title="근거를 펼쳐 PDF로 저장"
+              className="no-print ml-auto inline-flex items-center gap-1 rounded border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5 transition-colors"
             >
               <Icon name="download" /> PDF로 저장
             </button>
