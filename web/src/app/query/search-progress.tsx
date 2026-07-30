@@ -1,8 +1,8 @@
 "use client";
 
-// 검색·생성 진행 표시 — 백엔드 /api/query는 단일 응답(스트리밍 아님)이라, 실제 파이프라인 단계를
-// 순서대로 타이머로 짚어 보여준다(이벤트 단위가 아닌 '지표'). 마지막 '답변 작성' 단계에서 응답을 기다리며,
-// 인디터미닛 상태 바로 '계속 작업 중'임을 보여준다(교열까지 포함해 웹종합 질의는 ~50초 걸릴 수 있음).
+// 검색·생성 진행 표시 — 백엔드 /api/query는 단일 응답(진행 이벤트 없음)이라, 경과 시간 기반으로
+// 진행률(%)을 '추정'해 보여준다. 초반 빠르게·후반 감속(지수 감쇠)하여 95%에서 대기(가짜 100% 방지).
+// 답이 도착하면 이 컴포넌트는 사라지고 답변이 표시된다(그게 실질적 100%).
 
 import { useEffect, useState } from "react";
 
@@ -14,13 +14,34 @@ const STAGES = [
   { key: "compose", label: "답변 작성 중", hint: "근거 대조 · 숫자·표기 교열" },
 ];
 
+const TAU = 15000; // 감속 상수(ms) — 클수록 천천히 참
+const CAP = 95; // 실제 완료 전 최대 %(멈춘 듯 100% 방지)
+const TICK = 300; // ms
+
+// 경과 시간 → 추정 % (지수 감쇠: 초반 빠르게, 후반 완만하게 95%로 수렴)
+export function estimatePct(elapsedMs: number): number {
+  return Math.min(CAP, Math.round(CAP * (1 - Math.exp(-Math.max(0, elapsedMs) / TAU))));
+}
+
+// 추정 %에 맞춰 활성 단계 인덱스(검색 단계는 초반에 빠르게 지나가고 '답변 작성'이 대부분 차지)
+export function stageForPct(pct: number): number {
+  if (pct < 12) return 0;
+  if (pct < 25) return 1;
+  if (pct < 33) return 2;
+  if (pct < 45) return 3;
+  return 4;
+}
+
 export function SearchProgress() {
-  const [i, setI] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setI((v) => Math.min(v + 1, STAGES.length - 1)), 1300);
+    const t = setInterval(() => setElapsed((v) => v + TICK), TICK);
     return () => clearInterval(t);
   }, []);
-  const composing = i >= STAGES.length - 1; // 마지막(답변 작성) 단계 도달
+
+  const pct = estimatePct(elapsed);
+  const i = stageForPct(pct);
+  const composing = i >= STAGES.length - 1;
 
   return (
     <section
@@ -38,7 +59,26 @@ export function SearchProgress() {
           ))}
         </span>
         {composing ? "답변 작성 중…" : "검색 중…"}
+        <span className="ml-auto tabular-nums text-foreground-muted" aria-hidden>
+          {pct}%
+        </span>
       </div>
+
+      {/* 진행률 바(결정형) — 폭 = 추정 % */}
+      <div
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={composing ? "답변 작성 진행률" : "검색 진행률"}
+        className="h-1.5 w-full overflow-hidden rounded-full bg-brand/10"
+      >
+        <span
+          className="block h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
       <ol className="space-y-2.5">
         {STAGES.map((s, idx) => {
           const done = idx < i;
@@ -67,14 +107,6 @@ export function SearchProgress() {
         })}
       </ol>
 
-      {/* 인디터미닛 상태 바 — 응답 대기 내내 움직여 '작업 중'임을 표시 */}
-      <div
-        role="progressbar"
-        aria-label={composing ? "답변 작성 중" : "검색 중"}
-        className="progress-bar-indeterminate relative h-1.5 w-full overflow-hidden rounded-full bg-brand/10"
-      >
-        <span className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-accent" aria-hidden />
-      </div>
       {composing && (
         <p className="text-xs text-foreground-muted">
           근거와 대조해 숫자·표기까지 다듬는 중이라 잠시 걸립니다. 정확한 답변을 위해 기다려 주세요.
