@@ -29,6 +29,8 @@ import { completeAvoidingGarble, tidyAnswer, isSalad, isGarbledAnswer, stripFore
 import { drainSse } from "./stream";
 import { selectSources, type SourcePart, type QuerySource } from "./sources";
 import { runGraph, type GraphNode } from "./graph_engine";
+import { isGunsuFactQuery } from "../kg/facts";
+import { isRelationQuery } from "../kg/relations";
 import { extractKeywords, ftsRankTokens, QUERY_STOP, UBIQUITOUS } from "./keywords";
 import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
@@ -761,6 +763,34 @@ queryRouter.post("/graph", async (c) => {
 
   const nodes: GraphNode<GState>[] = [
     { name: "understand", label: "질문 이해 중", run: () => {} },
+    // ── 특수 분기(KG Fact) — 해당 질의에서만 발동. 검증된 사실을 근거블록으로 주입 ──
+    {
+      name: "gunsu", label: "역대 군수 확인 중",
+      when: () => !!c.env.ARCHIVE_DB && !offRegion && isGunsuFactQuery(query),
+      run: async (s) => {
+        try {
+          const { buildGunsuFactBlock } = await import("../kg/facts");
+          const { getGunsuLineage } = await import("../kg/repository");
+          const { items, source } = await getGunsuLineage(c.env.ARCHIVE_DB!);
+          const block = buildGunsuFactBlock(items, source);
+          return block ? { parts: [...s.parts, block] } : {};
+        } catch { return {}; }
+      },
+    },
+    {
+      name: "relations", label: "검증된 인물 관계 확인 중",
+      when: () => !!c.env.ARCHIVE_DB && !offRegion && isRelationQuery(query),
+      run: async (s) => {
+        try {
+          const { getVerifiedRelations, buildRelationFactBlock } = await import("../kg/relations");
+          const { detectPersonInQuery } = await import("../kg/people");
+          const hit = await detectPersonInQuery(c.env.ARCHIVE_DB!, query);
+          if (!hit) return {};
+          const block = buildRelationFactBlock(hit.name, await getVerifiedRelations(c.env.ARCHIVE_DB!, hit.id));
+          return block ? { parts: [...s.parts, block] } : {};
+        } catch { return {}; }
+      },
+    },
     {
       name: "archive", label: "아카이브 검색 중",
       when: () => !!c.env.ARCHIVE_DB && !offRegion,
