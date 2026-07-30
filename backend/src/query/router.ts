@@ -211,6 +211,59 @@ async function polishDraft(
   }
 }
 
+// 날씨·대기질 실시간 관측 + (예보/주말 질의면) 주말 기상예보 근거 — 메인·그래프 공용. 게이트는 호출부.
+async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePart[]> {
+  const out: SourcePart[] = [];
+  const cond = await fetchConditions(env);
+  if (cond.available && (cond.weather.temp != null || cond.air.pm10 != null || cond.air.grade)) {
+    const w = cond.weather, a = cond.air;
+    const text =
+      `태안 실시간 관측(${String(cond.observedAt).slice(0, 16).replace("T", " ")} KST) — ` +
+      `기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, 강수 ${w.pty ?? "?"}; ` +
+      `미세먼지(PM10) ${a.pm10 ?? "?"}㎍/㎥, 초미세(PM2.5) ${a.pm25 ?? "?"}㎍/㎥, 오존 ${a.o3 ?? "?"}ppm, ` +
+      `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
+    out.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
+  }
+  // 예보·주말·내일 질문이면 주말/다가오는 날 예보 — 단기(±3일) 우선, 범위 밖이면 중기(3~10일)
+  if (/예보|주말|다음\s?주|내일|모레|이번\s?주/.test(query)) {
+    try {
+      const [dem, mid] = await Promise.all([forecastDemand(env), fetchMidForecast(env)]);
+      const shortFc = (w: { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
+        if (!w) return null;
+        const p: string[] = [];
+        if (w.tmax != null) p.push(`최고 ${w.tmax}℃`);
+        if (w.pop != null) p.push(`강수확률 ${w.pop}%`);
+        if (w.sky) p.push(`하늘 ${w.sky}`);
+        if (w.pty && w.pty !== "없음") p.push(w.pty);
+        return p.length ? `${p.join(", ")} (단기예보)` : null;
+      };
+      const midFc = (date: string) => {
+        const m = mid.available ? mid.days[date] : null;
+        if (!m) return null;
+        const p: string[] = [];
+        if (m.tmax != null) p.push(`최고 ${m.tmax}℃`);
+        if (m.tmin != null) p.push(`최저 ${m.tmin}℃`);
+        if (m.pop != null) p.push(`강수확률 ${m.pop}%`);
+        if (m.sky) p.push(m.sky);
+        return p.length ? `${p.join(", ")} (중기예보)` : null;
+      };
+      const wk = dem?.weekend;
+      type SW = { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null | undefined;
+      const dayLine = (label: string, date: string | undefined, sw: SW) => {
+        if (!date) return null;
+        const s = shortFc(sw ?? null) ?? midFc(date);
+        return s ? `${label}(${date.slice(5)}) ${s}` : null;
+      };
+      const sat = dayLine("토", wk?.sat, dem?.weather?.sat);
+      const sun = dayLine("일", wk?.sun, dem?.weather?.sun);
+      if (sat || sun) {
+        out.push({ text: `태안 주말 기상예보 — ${[sat, sun].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기·중기예보", url: null } });
+      }
+    } catch { /* 무시 */ }
+  }
+  return out;
+}
+
 // 본답 시스템 프롬프트 — 메인 핸들러·그래프 시제품 공용(품질 일관 유지).
 function answerSystemPrompt(todayKst: string): string {
   return (
@@ -355,55 +408,9 @@ queryRouter.post("/", async (c) => {
       } catch { /* 가게 분석 실패는 무시 */ }
     }
 
-    // (a) 날씨·대기질 질문이면 실시간 관측값을 근거에 추가
+    // (a) 날씨·대기질 질문이면 실시간 관측값(+예보) 근거 추가 — 공용 헬퍼(그래프와 동일 코드)
     if ((WEATHER_RE.test(query) || recommend) && c.env.DATA_GO_KR_KEY && !offRegion) {
-      const cond = await fetchConditions(c.env);
-      if (cond.available && (cond.weather.temp != null || cond.air.pm10 != null || cond.air.grade)) {
-        const w = cond.weather, a = cond.air;
-        const text =
-          `태안 실시간 관측(${String(cond.observedAt).slice(0, 16).replace("T", " ")} KST) — ` +
-          `기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, 강수 ${w.pty ?? "?"}; ` +
-          `미세먼지(PM10) ${a.pm10 ?? "?"}㎍/㎥, 초미세(PM2.5) ${a.pm25 ?? "?"}㎍/㎥, 오존 ${a.o3 ?? "?"}ppm, ` +
-          `통합대기 '${a.grade ?? "?"}' (측정소 ${a.station ?? "?"})`;
-        parts.push({ text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } });
-      }
-      // 예보·주말·내일 질문이면 주말/다가오는 날 예보 — 단기(±3일) 우선, 범위 밖이면 중기(3~10일)
-      if (/예보|주말|다음\s?주|내일|모레|이번\s?주/.test(query)) {
-        try {
-          const [dem, mid] = await Promise.all([forecastDemand(c.env), fetchMidForecast(c.env)]);
-          const shortFc = (w: { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null) => {
-            if (!w) return null;
-            const p: string[] = [];
-            if (w.tmax != null) p.push(`최고 ${w.tmax}℃`);
-            if (w.pop != null) p.push(`강수확률 ${w.pop}%`);
-            if (w.sky) p.push(`하늘 ${w.sky}`);
-            if (w.pty && w.pty !== "없음") p.push(w.pty);
-            return p.length ? `${p.join(", ")} (단기예보)` : null;
-          };
-          const midFc = (date: string) => {
-            const m = mid.available ? mid.days[date] : null;
-            if (!m) return null;
-            const p: string[] = [];
-            if (m.tmax != null) p.push(`최고 ${m.tmax}℃`);
-            if (m.tmin != null) p.push(`최저 ${m.tmin}℃`);
-            if (m.pop != null) p.push(`강수확률 ${m.pop}%`);
-            if (m.sky) p.push(m.sky);
-            return p.length ? `${p.join(", ")} (중기예보)` : null;
-          };
-          const wk = dem?.weekend;
-          type SW = { tmax: number | null; pop: number | null; sky: string | null; pty: string | null } | null | undefined;
-          const dayLine = (label: string, date: string | undefined, sw: SW) => {
-            if (!date) return null;
-            const s = shortFc(sw ?? null) ?? midFc(date);
-            return s ? `${label}(${date.slice(5)}) ${s}` : null;
-          };
-          const sat = dayLine("토", wk?.sat, dem?.weather?.sat);
-          const sun = dayLine("일", wk?.sun, dem?.weather?.sun);
-          if (sat || sun) {
-            parts.push({ text: `태안 주말 기상예보 — ${[sat, sun].filter(Boolean).join(" / ")}`, source: { title: "기상청 단기·중기예보", url: null } });
-          }
-        } catch { /* 무시 */ }
-      }
+      parts.push(...(await buildRealtimeEvidence(c.env, query)));
     }
 
     // (a-2) 부동산·실거래 질문이면 국토부 실거래가를 근거에 추가(읍·면 필터 + ㎡당 단가·월별 추이·전체 대비)
@@ -805,15 +812,8 @@ queryRouter.post("/graph", async (c) => {
       name: "realtime", label: "실시간 데이터 확인 중",
       when: () => weather && !!c.env.DATA_GO_KR_KEY && !offRegion,
       run: async (s) => {
-        try {
-          const cond = await fetchConditions(c.env);
-          if (cond.available && (cond.weather.temp != null || cond.air.pm10 != null || cond.air.grade)) {
-            const w = cond.weather, a = cond.air;
-            const text = `태안 실시간 관측(${String(cond.observedAt).slice(0, 16).replace("T", " ")} KST) — 기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, 강수 ${w.pty ?? "?"}; 미세먼지(PM10) ${a.pm10 ?? "?"}㎍/㎥, 초미세(PM2.5) ${a.pm25 ?? "?"}㎍/㎥, 통합대기 '${a.grade ?? "?"}'`;
-            return { parts: [...s.parts, { text, source: { title: "실시간 관측 · 기상청 단기예보 / 에어코리아", url: null, publishedAt: cond.observedAt ?? undefined } }] };
-          }
-        } catch { /* 무시 */ }
-        return {};
+        try { return { parts: [...s.parts, ...(await buildRealtimeEvidence(c.env, query))] }; }
+        catch { return {}; }
       },
     },
     {
