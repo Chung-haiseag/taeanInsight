@@ -10,7 +10,11 @@ import { hasRole, type Role } from "@/lib/roles";
 type Gate = "checking" | "ok" | "denied";
 
 // 등급 가드(UX). 비로그인→/login?redirect=, 등급부족→안내, 충족→children.
-export function RequireRole({ minRole, children }: { minRole: Role; children: React.ReactNode }) {
+export function RequireRole({ minRole, deniedHint, children }: {
+  minRole: Role;
+  deniedHint?: { text: string; href: string; label: string };
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [gate, setGate] = useState<Gate>("checking");
@@ -37,8 +41,8 @@ export function RequireRole({ minRole, children }: { minRole: Role; children: Re
     return (
       <div className="mx-auto max-w-md space-y-3 py-16 text-center">
         <h1 className="text-xl font-bold text-brand">접근 권한이 없습니다</h1>
-        <p className="text-sm text-foreground-muted">이 메뉴는 상위 등급 회원 전용입니다.</p>
-        <Link href="/membership" className="inline-flex rounded-full border border-brand/20 px-4 py-2 text-sm font-semibold text-brand hover:bg-brand/5">멤버십 안내</Link>
+        <p className="text-sm text-foreground-muted">{deniedHint?.text ?? "이 메뉴는 상위 등급 회원 전용입니다."}</p>
+        <Link href={deniedHint?.href ?? "/membership"} className="inline-flex rounded-full border border-brand/20 px-4 py-2 text-sm font-semibold text-brand hover:bg-brand/5">{deniedHint?.label ?? "멤버십 안내"}</Link>
       </div>
     );
   return <>{children}</>;
