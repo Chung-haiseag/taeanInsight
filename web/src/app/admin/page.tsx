@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
+import { getSession, logout, type Account } from "@/lib/api/auth";
+import { hasRole } from "@/lib/roles";
 import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser } from "@/lib/api/admin";
 import {
   decideReview,
@@ -59,7 +61,8 @@ import {
   type EbookIssue,
 } from "@/lib/api/ebook-review";
 
-// 관리자 로그인 게이트 — 토큰 입력 → localStorage 저장 → 보호 엔드포인트로 검증
+// 관리자 로그인 게이트(비상용) — 토큰 입력 → localStorage 저장 → 보호 엔드포인트로 검증
+// 평상시엔 세션 role(admin/superadmin)로 인증되므로, 이 폼은 접힌 "고급" 영역에만 노출.
 function AdminLogin({ onOk }: { onOk: () => void }) {
   const [token, setToken] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -77,15 +80,36 @@ function AdminLogin({ onOk }: { onOk: () => void }) {
     } finally { setBusy(false); }
   }
   return (
-    <div className="mx-auto max-w-sm space-y-4 py-16">
-      <h1 className="text-2xl font-bold text-brand">🔒 관리자 로그인</h1>
-      <p className="text-sm text-foreground-muted">관리자 비밀번호를 입력하세요. (발행·검수·거버넌스·비용 · 한 번 로그인하면 유지)</p>
+    <div className="space-y-3">
       <input type="password" value={token} onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder="비밀번호" className="w-full rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" autoFocus />
+        placeholder="관리자 비밀번호" className="w-full rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm" />
       {err && <p className="text-sm text-red-600">{err}</p>}
       <button type="button" onClick={submit} disabled={busy} className="btn-accent w-full px-4 py-2 text-sm disabled:opacity-60">
-        {busy ? "확인 중…" : "로그인"}
+        {busy ? "확인 중…" : "토큰으로 로그인"}
       </button>
+    </div>
+  );
+}
+
+// 미인증 화면 — 세션 상태에 따라 안내 문구를 바꾸고, 토큰 입력은 접힌 "고급(비상용)"으로 제공
+function AdminGate({ account, onOk }: { account: Account | null; onOk: () => void }) {
+  return (
+    <div className="mx-auto max-w-sm space-y-6 py-16">
+      <h1 className="text-2xl font-bold text-brand">🔒 관리자 콘솔</h1>
+      {account ? (
+        <p className="text-sm text-red-600">이 계정은 관리자 권한이 없습니다. ({account.email})</p>
+      ) : (
+        <p className="text-sm text-foreground-muted">
+          관리자 콘솔은 로그인이 필요합니다.{" "}
+          <a href="/login?redirect=/admin" className="font-semibold text-brand underline">로그인하러 가기</a>
+        </p>
+      )}
+      <details className="rounded-lg border border-brand/15 p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-foreground-muted">고급(비상용) — 관리자 토큰 직접 입력</summary>
+        <div className="mt-3">
+          <AdminLogin onOk={onOk} />
+        </div>
+      </details>
     </div>
   );
 }
@@ -108,10 +132,14 @@ const ADMIN_TABS: { key: AdminTab; label: string }[] = [
 export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>("cost");
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
 
-  // 관리자 인증 — 저장된 토큰으로 보호된 엔드포인트 호출해 검증
+  // 관리자 인증 — 세션 role(admin/superadmin) 우선, 없으면 저장된 관리자 토큰으로 폴백 검증(비상용)
   useEffect(() => {
     (async () => {
+      const acct = await getSession().catch(() => null);
+      setAccount(acct);
+      if (acct && hasRole(acct.role, "admin")) { setAuthed(true); return; }
       try {
         await getCostSummary();
         setAuthed(true);
@@ -138,7 +166,7 @@ export default function AdminPage() {
   };
 
   if (authed === null) return <p className="p-6 text-sm text-foreground-muted">확인 중…</p>;
-  if (!authed) return <AdminLogin onOk={() => setAuthed(true)} />;
+  if (!authed) return <AdminGate account={account} onOk={() => setAuthed(true)} />;
 
   return (
     <div className="space-y-6">
@@ -148,8 +176,8 @@ export default function AdminPage() {
           비용 감시 · AI 콘텐츠 검수 · 시민기자 운영 · 민감주제 규칙 · 전자북 검수. 메뉴별로 전환됩니다.
         </p>
         <div className="flex items-center justify-between gap-3 bg-accent-subtle/40 border border-accent rounded-lg p-3 text-sm text-foreground-muted">
-          <span>🔒 <strong className="text-brand">관리자 인증됨</strong> — 발행·검수·거버넌스는 관리자 토큰으로 보호됩니다.</span>
-          <button type="button" onClick={() => { try { localStorage.removeItem("taean-admin-token"); } catch {} location.reload(); }}
+          <span>🔒 <strong className="text-brand">관리자 인증됨</strong>{account ? ` — ${account.email}` : ""} — 발행·검수·거버넌스는 보호됩니다.</span>
+          <button type="button" onClick={() => { void logout().finally(() => { try { localStorage.removeItem("taean-admin-token"); } catch {} location.reload(); }); }}
             className="text-xs underline hover:text-brand">로그아웃</button>
         </div>
       </header>
