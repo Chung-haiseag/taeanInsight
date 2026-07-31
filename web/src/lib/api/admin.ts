@@ -70,3 +70,10 @@ export async function getUsers(): Promise<{ users: AdminUser[] }> {
 export async function setUserAccess(id: number, patch: { role?: string; plan?: string }): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/api/admin/users/set", { method: "POST", body: JSON.stringify({ id, ...patch }) });
 }
+
+// 시민기자 신청 대기열 — backend /api/admin/citizen-applications
+export interface CitizenApp { id: number; user_id: number; status: string; reason: string | null; applied_at: string; email: string; role: string }
+export const getCitizenApplications = (status?: string) =>
+  apiFetch<{ applications: CitizenApp[] }>(`/api/admin/citizen-applications${status ? `?status=${status}` : ""}`);
+export const decideCitizenApplication = (id: number, decision: "approve" | "reject", reason?: string) =>
+  apiFetch<{ ok: boolean }>(`/api/admin/citizen-applications/${id}`, { method: "POST", body: JSON.stringify({ decision, reason }) });
