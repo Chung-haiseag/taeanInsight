@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { ReportReader } from "@/components/reports/report-reader";
 import { fetchLatestReport, fetchWeeklyNews, fetchGovNotices, fetchCardNews, fetchReportMetrics } from "@/lib/api/reports";
+import { RequireRole } from "@/components/require-role";
 
 // 공유 미리보기(카톡·SNS) — 최신 발행분의 그 주 요약을 동적 description으로
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,5 +37,9 @@ export default async function ReportsPage({
   const [news, govNotices, cardNews, metrics] = report
     ? await Promise.all([fetchWeeklyNews(report.weekId), fetchGovNotices(14), fetchCardNews(6), fetchReportMetrics()])
     : [[], [], [], null];
-  return <ReportReader initialReport={report} metrics={metrics} news={news} govNotices={govNotices} cardNews={cardNews} />;
+  return (
+    <RequireRole minRole="user">
+      <ReportReader initialReport={report} metrics={metrics} news={news} govNotices={govNotices} cardNews={cardNews} />
+    </RequireRole>
+  );
 }
