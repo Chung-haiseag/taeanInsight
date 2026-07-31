@@ -99,6 +99,19 @@ export function CopilotEditor() {
           }
         }
       } catch { /* 무시 */ }
+      // 기자 취재알림 핸드오프(/reporter → /reporter/write → /write 리다이렉트) — sessionStorage로 보존
+      try {
+        const handoff = sessionStorage.getItem("reporter-article-draft");
+        if (handoff) {
+          const d = JSON.parse(handoff) as { title?: string; body?: string; sources?: { title: string }[] };
+          setTitle((t) => t || (d.title ?? ""));
+          setBody((b) => b || (d.body ?? ""));
+          setAiLabel("ai_assisted");
+          setSource((s) => s || (d.sources?.[0]?.title ?? ""));
+          sessionStorage.removeItem("reporter-article-draft");
+          setRestored(true);
+        }
+      } catch { /* 무시 */ }
       loaded.current = true;
     })();
   }, [editId]);
