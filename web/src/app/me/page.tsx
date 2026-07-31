@@ -17,8 +17,17 @@ const FULL_WIDTH = new Set(["my_news", "personalized_report", "team_workspace", 
 import { canToggleTone, preferredTone, REGION_OPTIONS, SEGMENT_LIMITS, type MeResponse } from "@/lib/types";
 import { getMe } from "@/lib/api/me";
 import { PageHeader } from "@/components/page-header";
+import { RequireRole } from "@/components/require-role";
 
 export default function MePage() {
+  return (
+    <RequireRole minRole="user">
+      <MePageContent />
+    </RequireRole>
+  );
+}
+
+function MePageContent() {
   const [data, setData] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

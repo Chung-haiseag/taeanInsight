@@ -6,33 +6,20 @@ import { usePathname } from "next/navigation";
 import { useAccessibility } from "./accessibility-provider";
 import { AdminHeader } from "./admin-header";
 import { AccountNav } from "./account-nav";
-
-const NAV_ITEMS = [
-  { href: "/live", label: "지금 태안" },
-  { href: "/news", label: "뉴스아카이브" },
-  { href: "/reports", label: "주간 리포트" },
-  { href: "/query", label: "질의응답" },
-  { href: "/citizen", label: "시민기자" },
-  { href: "/reporter", label: "취재 알림", reporterOnly: true },
-  { href: "/membership", label: "멤버십" },
-  { href: "/me", label: "내 페이지" },
-] as { href: string; label: string; reporterOnly?: boolean }[];
-
-// 기자 전용 메뉴 노출 — 계정 role(reporter/admin) 또는 이 기기에서 기자 등록 이력
-function canSeeReporter(): boolean {
-  try {
-    const role = localStorage.getItem("taean-role");
-    return role === "reporter" || role === "admin" || localStorage.getItem("taean-reporter") === "1";
-  } catch { return false; }
-}
+import { visibleNav } from "@/lib/nav";
+import { cachedRole, getSession } from "@/lib/api/auth";
 
 export function SiteHeader() {
   const { fontSize, setFontSize, theme, setTheme } = useAccessibility();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [showReporter, setShowReporter] = useState(false);
-  useEffect(() => { setShowReporter(canSeeReporter()); }, [pathname]);
-  const navItems = NAV_ITEMS.filter((i) => !i.reporterOnly || showReporter);
+  const [role, setRole] = useState<string | null>(null);
+  // 캐시 role로 즉시 렌더 후, 세션으로 최신화(로그인/등급 변경 반영)
+  useEffect(() => {
+    setRole(cachedRole());
+    getSession().then((a) => setRole(a?.role ?? null)).catch(() => {});
+  }, [pathname]);
+  const navItems = visibleNav(role);
 
   // 경로 바뀌면 모바일 메뉴 닫기
   useEffect(() => { setOpen(false); }, [pathname]);

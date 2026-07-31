@@ -5,7 +5,8 @@
 // env 누락 시에도 동작하도록. 운영 도메인 연결 후 교체.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
-const TOKEN_KEY = "taean-insight-access-token";
+// 로그인 세션 토큰 키 — auth.ts(AUTH_KEY="taean-auth-token")와 동일해야 apiFetch가 세션 Bearer를 보낸다.
+const TOKEN_KEY = "taean-auth-token";
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;

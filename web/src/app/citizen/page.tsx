@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
+import { RequireRole } from "@/components/require-role";
 
 export const metadata: Metadata = {
   title: "AI 증강 시민기자단",
@@ -17,6 +18,7 @@ const TIMELINE = [
 
 export default function CitizenPage() {
   return (
+    <RequireRole minRole="user">
     <div className="mx-auto max-w-4xl space-y-8">
       <header className="space-y-2">
         <div className="flex items-center gap-2">
@@ -102,5 +104,6 @@ export default function CitizenPage() {
         </p>
       </section>
     </div>
+    </RequireRole>
   );
 }
