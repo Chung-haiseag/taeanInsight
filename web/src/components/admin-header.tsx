@@ -13,6 +13,7 @@ const ADMIN_SECTIONS = [
   { href: "/admin#governance-heading", label: "민감규칙" },
   { href: "/admin#ebook-heading", label: "전자북 검수" },
   { href: "/admin/kg", label: "🕸️ 지식그래프" },
+  { href: "/admin/report", label: "📄 보고서" },
 ];
 
 export function AdminHeader() {
