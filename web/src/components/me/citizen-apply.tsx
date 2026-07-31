@@ -10,17 +10,28 @@ export function CitizenApply() {
   const [app, setApp] = useState<MyCitizenApp | null>(null);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    getSession().then((a) => setRole(a?.role ?? null)).catch(() => {});
-    getMyApplication().then((r) => setApp(r.application)).catch(() => {});
+    (async () => {
+      const a = await getSession().catch(() => null);
+      const r = a?.role ?? null;
+      setRole(r);
+      if (r === "user") {
+        await getMyApplication().then((res) => setApp(res.application)).catch(() => {});
+      }
+    })();
   }, []);
   if (role === null) return null; // 비로그인/로딩
   if (role !== "user") return null; // 이미 시민기자 이상이면 숨김
 
   async function submit() {
-    setBusy(true);
-    try { await applyCitizen(reason.trim() || undefined); setApp({ id: 0, status: "pending", reason: reason.trim() || null, applied_at: "" }); }
-    finally { setBusy(false); }
+    setBusy(true); setErr(null);
+    try {
+      await applyCitizen(reason.trim() || undefined);
+      setApp({ id: 0, status: "pending", reason: reason.trim() || null, applied_at: "" });
+    } catch {
+      setErr("신청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally { setBusy(false); }
   }
 
   return (
@@ -33,6 +44,7 @@ export function CitizenApply() {
           {app?.status === "rejected" && <p className="text-xs text-red-600">이전 신청이 반려되었습니다{app.reason ? `: ${app.reason}` : ""}. 다시 신청할 수 있습니다.</p>}
           <p className="text-foreground-muted">태안 소식을 직접 취재·투고하고 싶으신가요? 신청하면 관리자 승인 후 글쓰기가 열립니다.</p>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={500} placeholder="신청 사유(선택)" className="w-full rounded border border-brand/20 bg-background px-2 py-1 text-xs" />
+          {err && <p className="text-xs text-red-600">{err}</p>}
           <button type="button" onClick={submit} disabled={busy} className="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-background disabled:opacity-60">{busy ? "신청 중…" : "시민기자 신청"}</button>
         </div>
       )}
