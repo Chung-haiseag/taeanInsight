@@ -6,7 +6,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import type { Env } from "./types";
-import { sessionUser, bearerToken, adminGuardDecision } from "./auth/session_guard";
+import { adminGuard } from "./auth/session_guard";
 import { costRouter } from "./cost/router";
 import { meRouter } from "./preferences/router";
 import { addonsRouter } from "./payments/addons_router";
@@ -52,24 +52,7 @@ app.use(
   }),
 );
 
-// 관리자 보호 — 세션 role이 admin 이상이거나 X-Admin-Token 일치면 통과.
-//   ADMIN_TOKEN은 스크립트·크론·비상용 폴백으로 유지(미설정이면 503 잠금).
-const adminGuard = async (
-  c: {
-    req: { method: string; header: (k: string) => string | undefined };
-    env: Env;
-    json: (b: unknown, s?: number) => Response;
-  },
-  next: () => Promise<void>,
-) => {
-  if (c.req.method === "OPTIONS") return next();
-  const su = await sessionUser(c.env.ARCHIVE_DB, bearerToken(c));
-  const decision = adminGuardDecision(su, c.req.header("X-Admin-Token"), c.env.ADMIN_TOKEN);
-  if (decision === "pass") return next();
-  if (decision === "not_configured")
-    return c.json({ error: "admin_not_configured", hint: "Set ADMIN_TOKEN secret" }, 503);
-  return c.json({ error: "unauthorized" }, 401);
-};
+// 관리자 보호 — /api/admin/*·/api/cost/* 마운트. 판정 로직은 ./auth/session_guard의 adminGuard.
 app.use("/api/admin/*", adminGuard);
 app.use("/api/cost/*", adminGuard);
 

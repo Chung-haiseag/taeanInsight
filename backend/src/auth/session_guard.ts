@@ -3,6 +3,7 @@
 
 import type { MiddlewareHandler } from "hono";
 
+import type { Env } from "../types";
 import { hasRole, type Role } from "./roles";
 
 export interface SessionUser {
@@ -46,6 +47,25 @@ export function deriveRequesterRole(su: SessionUser | null, tokenOk: boolean): s
   if (su) return su.role;
   return tokenOk ? "superadmin" : "user";
 }
+
+// 관리자 보호 — 세션 role이 admin 이상이거나 X-Admin-Token 일치면 통과.
+//   ADMIN_TOKEN은 스크립트·크론·비상용 폴백으로 유지(미설정이면 503 잠금).
+export const adminGuard = async (
+  c: {
+    req: { method: string; header: (k: string) => string | undefined };
+    env: Env;
+    json: (b: unknown, s?: number) => Response;
+  },
+  next: () => Promise<void>,
+) => {
+  if (c.req.method === "OPTIONS") return next();
+  const su = await sessionUser(c.env.ARCHIVE_DB, bearerToken(c));
+  const decision = adminGuardDecision(su, c.req.header("X-Admin-Token"), c.env.ADMIN_TOKEN);
+  if (decision === "pass") return next();
+  if (decision === "not_configured")
+    return c.json({ error: "admin_not_configured", hint: "Set ADMIN_TOKEN secret" }, 503);
+  return c.json({ error: "unauthorized" }, 401);
+};
 
 // 세션 minRole 이상 가드(웹 회원용 미들웨어). 통과 시 c.set("sessionUser", …).
 export function requireSessionRole(
