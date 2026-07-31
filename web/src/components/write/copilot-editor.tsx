@@ -58,27 +58,10 @@ export function CopilotEditor() {
   const loaded = useRef(false);
   const sp = useSearchParams();
   const editId = sp.get("id");
-  const fromAlert = sp.get("from") === "alert";
 
-  // 로드: 취재알림 핸드오프(AI 초안) > ?id= 서버 기사 > localStorage 임시저장
+  // 로드: ?id= 서버 기사 > localStorage 임시저장 > 기자 취재알림 핸드오프(진행 중 초안 없을 때만)
   useEffect(() => {
     (async () => {
-      // 취재 알림 → AI 기사 초안 핸드오프(sessionStorage)
-      if (fromAlert) {
-        try {
-          const raw = sessionStorage.getItem("reporter-article-draft");
-          if (raw) {
-            const d = JSON.parse(raw) as { title?: string; body?: string; sources?: { title: string }[] };
-            setTitle(d.title ?? ""); setBody(d.body ?? "");
-            setAiLabel("ai_assisted");
-            setSource(d.sources?.[0]?.title ?? "");
-            sessionStorage.removeItem("reporter-article-draft");
-            setRestored(true);
-          }
-        } catch { /* 무시 */ }
-        loaded.current = true;
-        return;
-      }
       if (editId) {
         try {
           const a = await getMyArticle(editId);
@@ -88,6 +71,7 @@ export function CopilotEditor() {
         loaded.current = true;
         return;
       }
+      let hasDraft = false;
       try {
         const raw = localStorage.getItem(DRAFT_KEY);
         if (raw) {
@@ -96,22 +80,27 @@ export function CopilotEditor() {
             setTitle(d.title ?? ""); setBody(d.body ?? "");
             setAiLabel(d.aiLabel ?? "human"); setSource(d.source ?? "");
             setSavedAt(d.at ?? null); setRestored(true);
+            hasDraft = true;
           }
         }
       } catch { /* 무시 */ }
-      // 기자 취재알림 핸드오프(/reporter → /reporter/write → /write 리다이렉트) — sessionStorage로 보존
-      try {
-        const handoff = sessionStorage.getItem("reporter-article-draft");
-        if (handoff) {
-          const d = JSON.parse(handoff) as { title?: string; body?: string; sources?: { title: string }[] };
-          setTitle((t) => t || (d.title ?? ""));
-          setBody((b) => b || (d.body ?? ""));
-          setAiLabel("ai_assisted");
-          setSource((s) => s || (d.sources?.[0]?.title ?? ""));
-          sessionStorage.removeItem("reporter-article-draft");
-          setRestored(true);
-        }
-      } catch { /* 무시 */ }
+      // 기자 취재알림 핸드오프(/reporter → /reporter/write → /write 리다이렉트, sessionStorage로 보존)
+      // 진행 중인(로컬 임시저장) 초안이 없을 때만 흡수 — 사람이 쓰던 human 라벨 글의 AI 라벨을 오염시키지 않기 위함
+      if (!hasDraft) {
+        try {
+          const raw = sessionStorage.getItem("reporter-article-draft");
+          if (raw) {
+            const d = JSON.parse(raw) as { title?: string; body?: string; sources?: { title: string }[] };
+            if (d.title || d.body) {
+              setTitle(d.title ?? ""); setBody(d.body ?? "");
+              setAiLabel("ai_assisted");
+              setSource(d.sources?.[0]?.title ?? "");
+              setRestored(true);
+            }
+            sessionStorage.removeItem("reporter-article-draft");
+          }
+        } catch { /* 무시 */ }
+      }
       loaded.current = true;
     })();
   }, [editId]);
