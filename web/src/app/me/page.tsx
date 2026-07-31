@@ -9,6 +9,7 @@ import { PushOptInButton } from "@/components/me/push_opt_in";
 import { MeHeroStrip } from "@/components/me/hero-strip";
 import { MeOwnerBoard } from "@/components/me/owner-board";
 import { MyCorrections } from "@/components/me/my-corrections";
+import { CitizenApply } from "@/components/me/citizen-apply";
 import { ReaderPicks } from "@/components/me/reader-picks";
 import { BriefingAudio } from "@/components/briefing-audio";
 
@@ -98,6 +99,9 @@ function MeDashboard({ data }: { data: MeResponse }) {
         </div>
         <p className="mt-3 text-sm text-foreground-muted">발행 콘텐츠는 모두 편집부 검토(HITL)를 거칩니다.</p>
       </header>
+
+      {/* 시민기자 신청 — 일반 회원에게만 노출 */}
+      <CitizenApply />
 
       {/* 오늘 한눈에 — 히어로 요약 */}
       <MeHeroStrip preferences={preferences} />

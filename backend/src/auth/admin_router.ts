@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../types";
-import { canAssignRole } from "./roles";
+import { canAssignRole, canModifyUser } from "./roles";
 import { sessionUser, bearerToken, deriveRequesterRole } from "./session_guard";
 
 export const adminUsersRouter = new Hono<{ Bindings: Env }>();
@@ -31,6 +31,13 @@ adminUsersRouter.post("/set", async (c) => {
   const su = await sessionUser(db, bearerToken(c));
   const tokenOk = !!env.ADMIN_TOKEN && c.req.header("X-Admin-Token") === env.ADMIN_TOKEN;
   const requesterRole = deriveRequesterRole(su, tokenOk);
+
+  // 대상의 현재 등급을 조회해 강등 보호(요청자보다 상위 대상 변경 금지).
+  const target = await db.prepare("SELECT role FROM users WHERE id=?").bind(p.data.id).first<{ role: string }>();
+  if (!target) return c.json({ error: "not_found" }, 404);
+  if (!canModifyUser(requesterRole, target.role)) {
+    return c.json({ error: "insufficient_privilege", hint: "상위 등급 회원은 변경할 수 없음" }, 403);
+  }
 
   if (p.data.role && !canAssignRole(requesterRole, p.data.role)) {
     return c.json({ error: "insufficient_privilege", hint: "reporter·admin 임명은 superadmin만" }, 403);

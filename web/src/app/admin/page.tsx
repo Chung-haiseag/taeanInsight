@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { getSession, logout, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser, type CitizenApp } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -218,11 +218,17 @@ function UsersSection() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
+  const [apps, setApps] = useState<CitizenApp[]>([]);
   const load = () => getUsers().then((r) => setUsers(r.users)).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
-  useEffect(() => { void load(); }, []);
+  const loadApps = () => getCitizenApplications("pending").then((r) => setApps(r.applications)).catch(() => {});
+  useEffect(() => { void load(); loadApps(); }, []);
   async function patch(id: number, p: { role?: string; plan?: string }) {
     setSaving(id);
-    try { await setUserAccess(id, p); await load(); } finally { setSaving(null); }
+    try { await setUserAccess(id, p); await load(); } catch (e) { alert(e instanceof Error ? e.message : "변경 실패"); } finally { setSaving(null); }
+  }
+  async function decide(id: number, decision: "approve" | "reject") {
+    const reason = decision === "reject" ? (window.prompt("반려 사유(선택):") ?? undefined) : undefined;
+    try { await decideCitizenApplication(id, decision, reason); await loadApps(); await load(); } catch (e) { alert(e instanceof Error ? e.message : "처리 실패"); }
   }
   if (err) return <p className="text-sm text-red-600">{err}</p>;
   if (!users) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
@@ -230,6 +236,20 @@ function UsersSection() {
     <section className="space-y-3">
       <h2 className="text-xl font-bold text-brand">👥 회원 관리</h2>
       <p className="text-xs text-foreground-muted">역할(기자·관리자)과 플랜(유료)을 부여합니다. 결제 연동 전에는 입금 확인 후 여기서 수동 전환하세요.</p>
+      <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+        <p className="mb-2 text-sm font-semibold text-brand">🖊 시민기자 신청 대기 {apps.length}건</p>
+        {apps.length === 0 ? <p className="text-xs text-foreground-muted">대기 중인 신청이 없습니다.</p> : (
+          <ul className="space-y-1 text-sm">
+            {apps.map((a) => (
+              <li key={a.id} className="flex items-center gap-2">
+                <span className="flex-1">{a.email}{a.reason ? ` — ${a.reason}` : ""}</span>
+                <button type="button" onClick={() => void decide(a.id, "approve")} className="rounded bg-brand px-2 py-0.5 text-xs text-background">승인</button>
+                <button type="button" onClick={() => void decide(a.id, "reject")} className="rounded border border-brand/20 px-2 py-0.5 text-xs">반려</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {users.length === 0 ? <p className="text-sm text-foreground-muted">가입 회원이 없습니다.</p> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -245,7 +265,7 @@ function UsersSection() {
                   <td className="py-2 pr-3">
                     <select value={u.role} disabled={saving === u.id} onChange={(e) => void patch(u.id, { role: e.target.value })}
                       className="rounded border border-brand/20 bg-background px-2 py-1 text-xs">
-                      <option value="user">일반</option><option value="reporter">기자</option><option value="admin">관리자</option>
+                      <option value="user">일반</option><option value="citizen">시민기자</option><option value="reporter">기자</option><option value="admin">관리자</option>
                     </select>
                   </td>
                   <td className="py-2">

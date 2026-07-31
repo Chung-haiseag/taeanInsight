@@ -4,6 +4,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../types";
+import { sessionUser, bearerToken } from "./session_guard";
+import { applyForCitizen, myApplication } from "../citizen/applications";
 
 export const authRouter = new Hono<{ Bindings: Env }>();
 
@@ -243,4 +245,24 @@ authRouter.post("/logout", async (c) => {
   const token = bearer(c);
   if (db && token) await db.prepare("DELETE FROM sessions WHERE token=?").bind(token).run();
   return c.json({ ok: true });
+});
+
+// 시민기자 신청(회원 세션 필요). {reason?}
+authRouter.post("/citizen-apply", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const u = await sessionUser(db, bearerToken(c));
+  if (!u) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { reason?: string };
+  await applyForCitizen(db, u.id, (body.reason ?? "").slice(0, 500) || null, new Date().toISOString());
+  return c.json({ ok: true, status: "pending" });
+});
+
+// 내 신청 상태
+authRouter.get("/citizen-apply", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const u = await sessionUser(db, bearerToken(c));
+  if (!u) return c.json({ error: "unauthorized" }, 401);
+  return c.json({ application: await myApplication(db, u.id) });
 });
