@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { hasRole, canAssignRole, ROLE_VALUES, ROLE_RANK } from "../src/auth/roles";
+import { canModifyUser } from "../src/auth/roles";
 
 describe("hasRole — 역할 순위 게이트", () => {
   it("동급/상위면 통과, 하위면 실패", () => {
@@ -31,5 +32,16 @@ describe("canAssignRole — 임명 권한", () => {
   it("그 외는 불가", () => {
     expect(canAssignRole("reporter", "citizen")).toBe(false);
     expect(canAssignRole("user", "user")).toBe(false);
+  });
+});
+
+describe("canModifyUser — 강등 보호", () => {
+  it("동급 이하만 변경 가능, 상위는 불가", () => {
+    expect(canModifyUser("superadmin", "admin")).toBe(true);
+    expect(canModifyUser("admin", "citizen")).toBe(true);
+    expect(canModifyUser("admin", "reporter")).toBe(true);
+    expect(canModifyUser("admin", "superadmin")).toBe(false); // 상위 강등 차단
+    expect(canModifyUser("admin", "admin")).toBe(true);       // 동급 허용
+    expect(canModifyUser("user", "user")).toBe(true);
   });
 });

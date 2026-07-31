@@ -25,3 +25,11 @@ export function canAssignRole(requesterRole: string, targetRole: Role): boolean 
   if (requesterRole === "admin") return targetRole === "user" || targetRole === "citizen";
   return false;
 }
+
+// 요청자가 대상(현재 등급)을 변경할 수 있는가 — 대상이 요청자보다 상위면 불가(강등 보호).
+export function canModifyUser(requesterRole: string, targetRole: string): boolean {
+  const req = ROLE_RANK[requesterRole as Role];
+  const tgt = ROLE_RANK[targetRole as Role];
+  if (req === undefined) return false;
+  return tgt === undefined || req >= tgt;
+}
