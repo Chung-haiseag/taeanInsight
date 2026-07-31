@@ -10,9 +10,10 @@ import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
 import { getUsers, type AdminUser } from "@/lib/api/admin";
 
-type ReportTab = "overview" | "ops";
+type ReportTab = "overview" | "tech" | "ops";
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "overview", label: "프로젝트 개요" },
+  { key: "tech", label: "🧠 AI·기술" },
   { key: "ops", label: "운영 정보" },
   // 이후 확장: { key: "cost", label: "비용·성과" }, { key: "changelog", label: "변경 이력" } 등
 ];
@@ -69,7 +70,7 @@ export default function AdminReportPage() {
         ))}
       </div>
 
-      {tab === "overview" ? <ProjectOverview /> : <OperationsInfo />}
+      {tab === "overview" ? <ProjectOverview /> : tab === "tech" ? <TechOverview /> : <OperationsInfo />}
     </div>
   );
 }
@@ -140,6 +141,57 @@ function ProjectOverview() {
           <li>· 지면 디지털화 1990~2001 전량 라이브.</li>
           <li>· 최종관리자 부트스트랩 완료(소유자 1인).</li>
           <li>· 검토 중: 도메인 이전(tamemory.com, 보류).</li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+// ── 🧠 AI·기술 ─────────────────────────────────────────────────
+function TechOverview() {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-foreground-muted">
+        답변은 <strong className="text-brand">근거 기반 생성(Grounded RAG)</strong>이 원칙 — 검색으로 근거를 모으고, 그 근거만으로 답하며 출처를 표기한다. 아래는 실제로 쓰는 기술을 간단히 정리한 것.
+      </p>
+
+      <Card title="① 하이브리드 검색 RAG">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>키워드</strong>: D1 {code("archive_fts")} FTS5 트라이그램 검색</li>
+          <li>· <strong>의미</strong>: Vectorize {code("bge-m3")} 1024차원 임베딩(아카이브 ~59k건 백필)</li>
+          <li>· 둘을 <strong>RRF(Reciprocal Rank Fusion)</strong>로 융합(cosine 하한 0.5) → 키워드·의미 양쪽 강점 결합</li>
+        </ul>
+      </Card>
+
+      <Card title="② 지식그래프 증강 (GraphRAG 접근)">
+        <ul className="space-y-1.5 text-sm">
+          <li>· 기사에서 인물 추출→<strong>공동등장 그래프</strong>(kg_nodes/edges), 관계 라벨링(협력·대립·전임후임·소속 등)</li>
+          <li>· 질의에 인물이 감지되면 <strong>그래프 기반 인물 브리핑</strong>과 <strong>관계 근거</strong>를 답변에 주입</li>
+          <li>· 그래프 자체는 관리자 <code className="text-xs">/admin/kg</code>에서 탐색·검수(자동추출분은 미검증 표시)</li>
+        </ul>
+      </Card>
+
+      <Card title="③ 근거 결합 & 지어내기 방지">
+        <ul className="space-y-1.5 text-sm">
+          <li>· 근거 소스: 아카이브 + <strong>실시간</strong>(날씨·대기질·관광·해상) + <strong>큐레이션 팩트</strong>(역대 군수·군의원) + <strong>웹 보강</strong>(네이버/Tavily)</li>
+          <li>· 답변이 <code className="text-xs">[번호]</code>로 <strong>인용한 근거만 출처 노출</strong></li>
+          <li>· verified 팩트만 신뢰, 근거 없으면 "찾지 못함" — 없는 사실을 만들지 않음</li>
+        </ul>
+      </Card>
+
+      <Card title="④ 품질 게이트(생성 후처리)">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>붕괴·외국문자 방지</strong>: 반복·비한글 응답 감지 시 재생성, 최후엔 잔여 이물 제거</li>
+          <li>· <strong>근거 대조 교열</strong>: fp8 모델이 흘린 숫자·글자를 근거와 대조해 복원</li>
+          <li>· <strong>현재 날짜 주입</strong>: 지난 일을 "예측"으로 답하는 모순 제거</li>
+        </ul>
+      </Card>
+
+      <Card title="⑤ 오케스트레이션 & 비용">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>경량 그래프 엔진</strong>(runGraph): 이해→검색→작성→교정 노드, 실시간 진행률 표시</li>
+          <li>· <strong>모델</strong>: Workers AI {code("llama-3.3-70b")}(질의·copilot, 종량 0) · Gemini Flash-Lite(디지털화, thinking off)</li>
+          <li>· 운영 Worker는 <strong>Claude API 미사용</strong> — 무료·저가 우선 방침</li>
         </ul>
       </Card>
     </div>
