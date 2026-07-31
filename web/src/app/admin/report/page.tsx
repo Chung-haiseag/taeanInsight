@@ -129,6 +129,25 @@ function ProjectOverview() {
         </p>
       </Card>
 
+      <Card title="배경 & 목적">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>문제</strong>: 지역 신문이 수십 년 쌓은 기록·데이터가 검색·활용되지 못하고, 지역 저널리즘은 지속가능성 압박을 받는다.</li>
+          <li>· <strong>해법</strong>: 옛 지면까지 디지털화해 <strong>검색·질의 가능한 지역 지식베이스</strong>로 만들고, 공공데이터·실시간 정보와 결합해 주민에게 실용 답을 준다.</li>
+          <li>· <strong>지향</strong>: AI가 <strong>출처를 밝히고 근거로만</strong> 답해 신뢰를 지키며, 시민이 직접 취재·투고하는 <strong>참여형 지역 미디어</strong>로 확장.</li>
+        </ul>
+      </Card>
+
+      <Card title="대상 & 차별점">
+        <KV
+          rows={[
+            ["주 대상", <>태안 주민·관광객 · 기자/시민기자 · 지역 기관</>],
+            ["차별점", <>전국 범용 AI가 아닌 <strong>태안 특화 근거</strong>(아카이브+공공데이터)에 출처 표기·지어내기 방지</>],
+            ["비용 구조", <>Cloudflare 종량(무료 티어 중심)·Workers AI로 <strong>저비용 운영</strong>, 고가 API 지양</>],
+            ["운영 주체", <>주간태안신문</>],
+          ]}
+        />
+      </Card>
+
       <Card title="기술 스택">
         <KV
           rows={[
@@ -317,6 +336,34 @@ function OperationsInfo() {
         />
       </Card>
 
+      <Card title="데이터 흐름">
+        <div className="mb-2"><Flow steps={["수집", "저장", "처리", "서빙"]} /></div>
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>수집</strong>: 자사 RSS·기사목록(회원 세션 전문) · 지역언론 RSS · 공공데이터 API · 관공서 크롤 · 지면 PDF (크론·수동)</li>
+          <li>· <strong>저장</strong>: D1(기사·회원·KG·팩트) · R2(지면·사진·오디오) · Vectorize(임베딩)</li>
+          <li>· <strong>처리</strong>: 임베딩 백필 · 인물/관계 추출 · OCR→기사화 · 주간 리포트·오디오 생성</li>
+          <li>· <strong>서빙</strong>: AI 질의(RAG) · 아카이브 검색 · 리포트 · Web Push 알림</li>
+        </ul>
+      </Card>
+
+      <Card title="권한 · 보안 모델">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>6계층 role</strong>: 비로그인 · user · citizen · reporter · admin · superadmin (누적 권한)</li>
+          <li>· <strong>인증</strong>: 이메일+비번(PBKDF2)·카카오 SSO → 불투명 세션 토큰. 관리자 API는 세션 role(admin+) 또는 비상 토큰</li>
+          <li>· <strong>이중 방어</strong>: 메뉴·라우트는 클라이언트 가드(UX), 민감 데이터는 서버가 강제(adminGuard·역할 검증)</li>
+          <li>· <strong>시크릿</strong>: Worker 시크릿으로만 보관·평문 미노출. 임명은 최종관리자, 강등 보호로 상위 계정 안전</li>
+        </ul>
+      </Card>
+
+      <Card title="외부 연동(데이터 소스)">
+        <ul className="space-y-1 text-sm text-foreground-muted">
+          <li>· <strong>기상청</strong> 동네예보 · <strong>에어코리아</strong> 대기질 · <strong>data.go.kr</strong> 관광·부동산(실거래)</li>
+          <li>· <strong>KHOA</strong> 바다누리 해상 · <strong>오피넷</strong> 유가 · <strong>ITS</strong> 도로 CCTV</li>
+          <li>· <strong>네이버/Tavily</strong> 웹 검색 · <strong>카카오</strong> 로그인 · <strong>태안신문</strong>(자사 RSS·전문)</li>
+          <li className="text-xs">실시간 연결 상태는 🩺 시스템 상태 탭 참고.</li>
+        </ul>
+      </Card>
+
       <Card title="서버 구성(바인딩)">
         <KV
           rows={[
@@ -427,6 +474,8 @@ function Roadmap() {
           <RoadItem s="done">시민기자 신청·승인 + <code className="text-xs">/write</code> 통합 투고 에디터</RoadItem>
           <RoadItem s="done">지면 디지털화 1990~2001 전량</RoadItem>
           <RoadItem s="done">지식그래프(인물·관계) 구축·검수 콘솔</RoadItem>
+          <RoadItem s="done">하이브리드 검색(FTS5+Vectorize RRF)·임베딩 백필</RoadItem>
+          <RoadItem s="done">주간 리포트·오디오 나레이션 · 취재 알림(Web Push)</RoadItem>
           <RoadItem s="done">관리자 보고서 허브(이 화면)</RoadItem>
         </ul>
       </Card>
@@ -487,6 +536,34 @@ function Runbook() {
           <li>· 크론: {code("0 15 * * *")}(자정 KST 뉴스·환경·비용) 외 6개 — {code("backend/src/index.ts")} scheduled()</li>
         </ul>
       </Card>
+
+      <Card title="테스트 · 로컬 개발">
+        <KV
+          rows={[
+            ["백엔드 테스트", code("cd backend && npx vitest run")],
+            ["프론트 빌드·테스트", code("cd web && npm run build && npx vitest run")],
+            ["로컬 개발", <>{code("wrangler dev")}(백) · {code("npm run dev")}(프론트)</>],
+          ]}
+        />
+      </Card>
+
+      <Card title="장애 대응 · 롤백">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>롤백</strong>: 배포는 버전이 남으므로 Cloudflare 대시보드/{code("wrangler rollback")}로 직전 버전 복귀</li>
+          <li>· <strong>설계상 완충</strong>: 외부 API·웹검색은 fail-open(실패해도 답변 지속), 대량 작업은 체크포인트·지수 백오프 재시도</li>
+          <li>· <strong>관리자 비상 접근</strong>: 세션 문제 시 {code("ADMIN_TOKEN")}으로 콘솔 진입(고급 접기)</li>
+          <li>· <strong>신규 라우트 404</strong>: 배포 직후 ~20초 edge 전파 지연일 수 있음(재확인)</li>
+        </ul>
+      </Card>
+
+      <Card title="자주 하는 작업">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>팩트 시드</strong>(군수·의원 등): {code("tools/kg/*.mjs")} 생성 → {code("wrangler d1 execute … --file")} 적용</li>
+          <li>· <strong>회원 등급 변경</strong>: <code className="text-xs">/admin</code> 👥회원 탭(권한 차등 자동 적용)</li>
+          <li>· <strong>시민기자 승인</strong>: 👥회원 탭 신청 대기열에서 승인/반려</li>
+          <li>· <strong>디지털화</strong>: {code("sh tools/ebook/page.sh <연도>")} → {code("publish.mjs")} → {code("restructure-gemini.mjs")}</li>
+        </ul>
+      </Card>
     </div>
   );
 }
@@ -510,6 +587,7 @@ function DataSnapshot() {
             ["전체 기사", nn(c.articles)],
             ["전자북(디지털화)", <>{nn(c.ebook)} <span className="text-xs text-foreground-muted">(1990~2001)</span></>],
             ["지역언론", nn(c.regionalNews)],
+            ["군청 공지·카드", nn(c.govNotices)],
             ["최신 기사", s.freshness.latestArticle?.slice(0, 10) ?? "—"],
           ]}
         />
@@ -518,7 +596,24 @@ function DataSnapshot() {
         <KV rows={[["인물 노드", nn(c.kgNodes)], ["관계 엣지", nn(c.kgEdges)], ["큐레이션 팩트", nn(c.facts)]]} />
       </Card>
       <Card title="회원·참여">
-        <KV rows={[["회원", nn(c.users)], ["시민기자 신청 대기", nn(c.pendingApplications)], ["푸시 구독", nn(c.pushSubs)]]} />
+        <KV
+          rows={[
+            ["회원", nn(c.users)],
+            ["시민기자 신청 대기", nn(c.pendingApplications)],
+            ["시민기자 기사", nn(c.citizenArticles)],
+            ["등록 기자", nn(c.reporters)],
+            ["푸시 구독", nn(c.pushSubs)],
+          ]}
+        />
+      </Card>
+      <Card title="자동 생성물">
+        <KV
+          rows={[
+            ["주간 리포트", nn(c.weeklyReports)],
+            ["환경 스냅샷(일수)", nn(c.envDays)],
+            ["최신 환경 스냅샷", s.freshness.latestEnv?.slice(0, 10) ?? "—"],
+          ]}
+        />
       </Card>
       <p className="text-xs text-foreground-muted">기준 {s.generatedAt.slice(0, 16).replace("T", " ")} · 라이브 집계</p>
     </div>
@@ -527,12 +622,16 @@ function DataSnapshot() {
 
 // ── 🧾 변경 이력 ──────────────────────────────────────────────
 const CHANGELOG: [string, string][] = [
-  ["2026-07-31", "관리자 보고서 허브(/admin/report) — 개요·AI기술·운영·로드맵·절차·데이터·이력·상태"],
+  ["2026-07-31", "관리자 보고서 허브(/admin/report) — 개요·AI기술·운영·로드맵·절차·데이터·이력·상태 8탭"],
   ["2026-07-31", "회원 등급 시스템 Plan 1~4 완결 — 접근제어·프런트 계층·회원관리·시민기자 신청·/write 통합 에디터"],
-  ["2026-07-30", "역대 군수 공식본+사진, 현직 군의원 프로필(선거구·연락처)"],
-  ["2026-07-30", "경량 그래프 오케스트레이션(runGraph) 기본 승격, 답변 자동 차트"],
-  ["2026-07-27", "지식그래프 인물 탐색·관계 라벨링, 동명이인 병합 콘솔"],
-  ["2026-06", "지면 디지털화 1990~2001 완료(Gemini 멀티모달)"],
+  ["2026-07-30", "역대 군수 공식본+사진(인물카드), 현직 군의원 프로필(선거구·연락처)"],
+  ["2026-07-30", "경량 그래프 오케스트레이션(runGraph) 기본 승격, 답변 자동 차트·근거 단락화·PDF"],
+  ["2026-07-27", "지식그래프 인물 탐색·관계 라벨링(6종), 동명이인 병합 검수 콘솔"],
+  ["2026-07-26", "전 코퍼스 인물·공동등장 그래프 추출(인물 3.4만·엣지 127만)"],
+  ["2026-07-22", "웹 보강 RAG 네이버 검색, 붕괴·외국문자 방지 게이트"],
+  ["2026-07", "하이브리드 검색(FTS5+Vectorize RRF)·아카이브 임베딩 백필 ~59k"],
+  ["2026-07-02", "카카오 로그인(OAuth), 회원 계정·세션 체계"],
+  ["2026-06", "지면 디지털화 1990~2001 완료(Google Vision + Gemini 멀티모달)"],
 ];
 function Changelog() {
   return (
@@ -574,9 +673,36 @@ function Health() {
           rows={[
             ["최신 자사 기사", s?.freshness.latestArticle?.slice(0, 10) ?? "—"],
             ["최신 지역언론", s?.freshness.latestRegional?.slice(0, 10) ?? "—"],
+            ["최신 환경 스냅샷", s?.freshness.latestEnv?.slice(0, 10) ?? "—"],
           ]}
         />
       </Card>
+
+      <Card title="외부 연동 설정 상태">
+        <p className="mb-2 text-xs text-foreground-muted">시크릿 <strong>설정 여부만</strong> 표시(값은 노출하지 않음).</p>
+        {s ? (
+          <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-2">
+            {([
+              ["태안신문 로그인", s.config.taeanLogin],
+              ["공공데이터(data.go.kr)", s.config.dataGoKr],
+              ["네이버 검색", s.config.naver],
+              ["웹검색 폴백(Tavily)", s.config.webSearch],
+              ["카카오 로그인", s.config.kakao],
+              ["유가(오피넷)", s.config.opinet],
+              ["Web Push(VAPID)", s.config.push],
+              ["Slack 알림", s.config.slack],
+              ["관리자 토큰", s.config.adminToken],
+            ] as [string, boolean][]).map(([label, on]) => (
+              <span key={label} className="flex items-center gap-2">
+                <Dot up={on} /> {label} <span className="text-xs text-foreground-muted">{on ? "설정됨" : "미설정"}</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-foreground-muted">확인 중…</p>
+        )}
+      </Card>
+
       <Card title="자동화(크론)">
         <ul className="space-y-1 text-sm text-foreground-muted">
           <li>· 자정 KST — 뉴스 수집·환경 스냅샷·비용 집계</li>
