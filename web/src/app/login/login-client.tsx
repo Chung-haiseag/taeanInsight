@@ -17,7 +17,9 @@ const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 export function LoginClient() {
   const router = useRouter();
   const params = useSearchParams();
-  const redirectTo = params.get("redirect") || "/me";
+  const rawRedirect = params.get("redirect") || "/me";
+  // 오픈 리다이렉트 방지: 내부 절대경로("/…")만 허용, 프로토콜상대("//…")·외부 URL은 /me로.
+  const redirectTo = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/me";
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
