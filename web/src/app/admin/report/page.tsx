@@ -9,14 +9,32 @@ import Link from "next/link";
 import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
 import { getUsers, type AdminUser } from "@/lib/api/admin";
+import { getReportSummary, type ReportSummary } from "@/lib/api/report";
 
-type ReportTab = "overview" | "tech" | "ops";
+type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "changelog" | "health";
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "overview", label: "프로젝트 개요" },
   { key: "tech", label: "🧠 AI·기술" },
   { key: "ops", label: "운영 정보" },
-  // 이후 확장: { key: "cost", label: "비용·성과" }, { key: "changelog", label: "변경 이력" } 등
+  { key: "roadmap", label: "🗺 로드맵" },
+  { key: "runbook", label: "🚀 운영 절차" },
+  { key: "data", label: "📦 데이터 현황" },
+  { key: "changelog", label: "🧾 변경 이력" },
+  { key: "health", label: "🩺 시스템 상태" },
 ];
+
+function renderTab(tab: ReportTab) {
+  switch (tab) {
+    case "overview": return <ProjectOverview />;
+    case "tech": return <TechOverview />;
+    case "ops": return <OperationsInfo />;
+    case "roadmap": return <Roadmap />;
+    case "runbook": return <Runbook />;
+    case "data": return <DataSnapshot />;
+    case "changelog": return <Changelog />;
+    case "health": return <Health />;
+  }
+}
 
 export default function AdminReportPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -70,7 +88,7 @@ export default function AdminReportPage() {
         ))}
       </div>
 
-      {tab === "overview" ? <ProjectOverview /> : tab === "tech" ? <TechOverview /> : <OperationsInfo />}
+      {renderTab(tab)}
     </div>
   );
 }
@@ -392,4 +410,180 @@ function countBy(list: AdminUser[] | null, key: (u: AdminUser) => string): Recor
   const out: Record<string, number> = {};
   for (const u of list ?? []) { const k = key(u); out[k] = (out[k] ?? 0) + 1; }
   return out;
+}
+
+// ── 🗺 로드맵 ──────────────────────────────────────────────────
+function RoadItem({ s, children }: { s: "done" | "wip" | "wait"; children: React.ReactNode }) {
+  const m = { done: ["✅", "text-foreground"], wip: ["🔨", "text-amber-600"], wait: ["⏳", "text-foreground-muted"] } as const;
+  const [icon, cls] = m[s];
+  return <li className="flex gap-2 text-sm"><span aria-hidden="true">{icon}</span><span className={cls}>{children}</span></li>;
+}
+function Roadmap() {
+  return (
+    <div className="space-y-4">
+      <Card title="완료">
+        <ul className="space-y-1.5">
+          <RoadItem s="done">회원 등급·접근 계층 시스템(비로그인~최종관리자 6계층) — Plan 1~4 라이브</RoadItem>
+          <RoadItem s="done">시민기자 신청·승인 + <code className="text-xs">/write</code> 통합 투고 에디터</RoadItem>
+          <RoadItem s="done">지면 디지털화 1990~2001 전량</RoadItem>
+          <RoadItem s="done">지식그래프(인물·관계) 구축·검수 콘솔</RoadItem>
+          <RoadItem s="done">관리자 보고서 허브(이 화면)</RoadItem>
+        </ul>
+      </Card>
+      <Card title="진행/검토">
+        <ul className="space-y-1.5">
+          <RoadItem s="wip">보고서 탭 확장(현재 문서)</RoadItem>
+          <RoadItem s="wait">도메인 tamemory.com 이전 — 보류(Cloudflare 커스텀도메인·Kakao 콜백 갱신 필요)</RoadItem>
+        </ul>
+      </Card>
+      <Card title="대기 (사용자 액션 필요)">
+        <ul className="space-y-1.5">
+          <RoadItem s="wait">인구 추이 — data.go.kr 15108065 활용신청</RoadItem>
+          <RoadItem s="wait">해상 데이터(밀물·수온·파고) — KHOA 바다누리 전용키</RoadItem>
+          <RoadItem s="wait">오디오 나레이션 커버리지 — Gemini 무료키 추가</RoadItem>
+          <RoadItem s="wait">태안신문 기존 회원 연동 — 회원 DB 접근 방식 결정</RoadItem>
+        </ul>
+      </Card>
+      <Card title="후속 정리(minor)">
+        <ul className="space-y-1 text-sm text-foreground-muted">
+          <li>· 시민기자 반려 후 role=citizen 잔존(멱등성) — admin 회수 가능</li>
+          <li>· 현직 의원 사진·회의록/조례 검색 연동</li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+// ── 🚀 운영 절차 ──────────────────────────────────────────────
+function Runbook() {
+  return (
+    <div className="space-y-4">
+      <Card title="배포">
+        <KV
+          rows={[
+            ["백엔드", code("cd backend && npx wrangler deploy")],
+            ["프론트", code("cd web && npm run deploy:cf")],
+            ["주의", <span className="text-foreground-muted">반드시 절대경로 cwd. 신규 라우트는 배포 후 ~20초 edge 전파.</span>],
+          ]}
+        />
+      </Card>
+      <Card title="D1 마이그레이션">
+        <KV
+          rows={[
+            ["적용", code("cd backend && wrangler d1 execute taean-archive --remote --file ../db/migrations/NNN.sql")],
+            ["현재 최신", <>036 (citizen_applications)</>],
+          ]}
+        />
+      </Card>
+      <Card title="회원 등급 부여">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>최종관리자 부트스트랩</strong>(1회): {code("UPDATE users SET role='superadmin',plan='org' WHERE email='…'")} (해당 이메일 /login 가입 선행)</li>
+          <li>· 이후 <strong>기자·관리자 임명</strong>=최종관리자만, <strong>시민기자 승인</strong>=관리자 이상 — <code className="text-xs">/admin</code> 👥회원 탭</li>
+        </ul>
+      </Card>
+      <Card title="시크릿·크론">
+        <ul className="space-y-1.5 text-sm">
+          <li>· 시크릿 갱신: {code("cd backend && npx wrangler secret put <이름>")} — 평문 노출 금지</li>
+          <li>· 크론: {code("0 15 * * *")}(자정 KST 뉴스·환경·비용) 외 6개 — {code("backend/src/index.ts")} scheduled()</li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+// ── 📦 데이터 현황(라이브) ─────────────────────────────────────
+const nn = (v: number | null) => (v === null ? "—" : v.toLocaleString());
+function DataSnapshot() {
+  const [s, setS] = useState<ReportSummary | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    getReportSummary().then(setS).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
+  }, []);
+  if (err) return <Card title="데이터 현황"><p className="text-sm text-red-600">{err}</p></Card>;
+  if (!s) return <Card title="데이터 현황"><p className="text-sm text-foreground-muted">불러오는 중…</p></Card>;
+  const c = s.counts;
+  return (
+    <div className="space-y-4">
+      <Card title="아카이브·콘텐츠">
+        <KV
+          rows={[
+            ["전체 기사", nn(c.articles)],
+            ["전자북(디지털화)", <>{nn(c.ebook)} <span className="text-xs text-foreground-muted">(1990~2001)</span></>],
+            ["지역언론", nn(c.regionalNews)],
+            ["최신 기사", s.freshness.latestArticle?.slice(0, 10) ?? "—"],
+          ]}
+        />
+      </Card>
+      <Card title="지식그래프">
+        <KV rows={[["인물 노드", nn(c.kgNodes)], ["관계 엣지", nn(c.kgEdges)], ["큐레이션 팩트", nn(c.facts)]]} />
+      </Card>
+      <Card title="회원·참여">
+        <KV rows={[["회원", nn(c.users)], ["시민기자 신청 대기", nn(c.pendingApplications)], ["푸시 구독", nn(c.pushSubs)]]} />
+      </Card>
+      <p className="text-xs text-foreground-muted">기준 {s.generatedAt.slice(0, 16).replace("T", " ")} · 라이브 집계</p>
+    </div>
+  );
+}
+
+// ── 🧾 변경 이력 ──────────────────────────────────────────────
+const CHANGELOG: [string, string][] = [
+  ["2026-07-31", "관리자 보고서 허브(/admin/report) — 개요·AI기술·운영·로드맵·절차·데이터·이력·상태"],
+  ["2026-07-31", "회원 등급 시스템 Plan 1~4 완결 — 접근제어·프런트 계층·회원관리·시민기자 신청·/write 통합 에디터"],
+  ["2026-07-30", "역대 군수 공식본+사진, 현직 군의원 프로필(선거구·연락처)"],
+  ["2026-07-30", "경량 그래프 오케스트레이션(runGraph) 기본 승격, 답변 자동 차트"],
+  ["2026-07-27", "지식그래프 인물 탐색·관계 라벨링, 동명이인 병합 콘솔"],
+  ["2026-06", "지면 디지털화 1990~2001 완료(Gemini 멀티모달)"],
+];
+function Changelog() {
+  return (
+    <Card title="최근 변경 이력">
+      <ol className="space-y-2 text-sm">
+        {CHANGELOG.map(([d, t], i) => (
+          <li key={i} className="flex gap-3">
+            <span className="shrink-0 font-mono text-xs text-foreground-muted">{d}</span>
+            <span>{t}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-xs text-foreground-muted">전체 기능 로그는 RUNBOOK.md §5.</p>
+    </Card>
+  );
+}
+
+// ── 🩺 시스템 상태(라이브) ─────────────────────────────────────
+function Dot({ up }: { up: boolean }) {
+  return <span className={`inline-block h-2 w-2 rounded-full ${up ? "bg-green-500" : "bg-red-500"}`} aria-hidden="true" />;
+}
+function Health() {
+  const [s, setS] = useState<ReportSummary | null>(null);
+  const [ok, setOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    getReportSummary().then((r) => { setS(r); setOk(true); }).catch(() => setOk(false));
+  }, []);
+  return (
+    <div className="space-y-4">
+      <Card title="서비스 상태">
+        <ul className="space-y-1.5 text-sm">
+          <li className="flex items-center gap-2"><Dot up={ok !== false} /> 백엔드 API — {ok === null ? "확인 중…" : ok ? "정상" : "응답 없음"}</li>
+          <li className="flex items-center gap-2"><Dot up={true} /> 프론트(현재 화면) — 정상</li>
+          <li className="flex items-center gap-2"><Dot up={!!s?.counts.articles} /> D1 아카이브 — {s?.counts.articles ? "연결됨" : ok === null ? "확인 중…" : "확인 필요"}</li>
+        </ul>
+      </Card>
+      <Card title="데이터 신선도">
+        <KV
+          rows={[
+            ["최신 자사 기사", s?.freshness.latestArticle?.slice(0, 10) ?? "—"],
+            ["최신 지역언론", s?.freshness.latestRegional?.slice(0, 10) ?? "—"],
+          ]}
+        />
+      </Card>
+      <Card title="자동화(크론)">
+        <ul className="space-y-1 text-sm text-foreground-muted">
+          <li>· 자정 KST — 뉴스 수집·환경 스냅샷·비용 집계</li>
+          <li>· 그 외 6개 스케줄(지역언론·오디오·리포트 등)</li>
+          <li className="text-xs">상세 실행 로그는 <code className="text-[11px]">/admin</code> ⚙️자동화·📊분석 탭에서.</li>
+        </ul>
+      </Card>
+    </div>
+  );
 }
