@@ -148,51 +148,105 @@ function ProjectOverview() {
 }
 
 // ── 🧠 AI·기술 ─────────────────────────────────────────────────
+const PIPELINE = ["질의", "의도 이해", "하이브리드 검색", "＋ 지식그래프", "＋ 실시간 근거", "근거 결합 생성", "교열·차트", "출처 표기"];
+const GLOSSARY: [string, string][] = [
+  ["RAG", "검색증강생성 — 외부 근거를 찾아 그 근거로만 답하게 하는 방식. 환각을 줄이고 출처를 붙일 수 있다."],
+  ["FTS5 트라이그램", "SQLite 전문검색. 세 글자 단위 색인이라 한국어 형태소 분석 없이도 부분일치가 잘 된다."],
+  ["임베딩 / bge-m3", "문장을 1024차원 벡터로 바꿔 '의미가 가까운' 글을 찾게 하는 다국어 모델."],
+  ["RRF", "Reciprocal Rank Fusion — 키워드 순위와 의미 순위를 순위 기반으로 합치는 융합법."],
+  ["GraphRAG", "지식그래프(인물·관계)를 RAG에 얹어, 검색만으로 안 잡히는 '관계·맥락' 근거까지 답변에 넣는 접근."],
+  ["verified", "사람이 검수해 사실로 확정한 데이터. 답변에는 verified만 신뢰해 주입한다."],
+];
+
+function Flow({ steps }: { steps: string[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto text-xs">
+      {steps.map((s, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          <span className="whitespace-nowrap rounded-full border border-accent/40 bg-accent/5 px-2.5 py-1 font-medium text-brand">{s}</span>
+          {i < steps.length - 1 && <span className="text-foreground-muted" aria-hidden="true">→</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TechOverview() {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-foreground-muted">
-        답변은 <strong className="text-brand">근거 기반 생성(Grounded RAG)</strong>이 원칙 — 검색으로 근거를 모으고, 그 근거만으로 답하며 출처를 표기한다. 아래는 실제로 쓰는 기술을 간단히 정리한 것.
-      </p>
+      <Card title="설계 철학">
+        <p className="text-sm leading-relaxed">
+          답변은 <strong className="text-brand">근거 기반 생성(Grounded RAG)</strong>이 원칙이다. 모델이 아는 것을 바로 말하게 두지 않고, 먼저 <strong>검색으로 근거를 모아</strong> 그 근거만으로 답하게 하며, 문장이 인용한 근거를 <strong>출처로 표기</strong>한다. 지역 뉴스·공공데이터라는 사실성이 중요한 도메인에서 <strong>환각(없는 사실 지어내기)</strong>을 억제하고 신뢰를 확보하기 위한 선택이다.
+        </p>
+        <div className="mt-3">
+          <p className="mb-1.5 text-xs font-semibold text-foreground-muted">질의 처리 흐름</p>
+          <Flow steps={PIPELINE} />
+        </div>
+      </Card>
 
-      <Card title="① 하이브리드 검색 RAG">
+      <Card title="① 검색(Retrieval) — 하이브리드">
         <ul className="space-y-1.5 text-sm">
-          <li>· <strong>키워드</strong>: D1 {code("archive_fts")} FTS5 트라이그램 검색</li>
-          <li>· <strong>의미</strong>: Vectorize {code("bge-m3")} 1024차원 임베딩(아카이브 ~59k건 백필)</li>
-          <li>· 둘을 <strong>RRF(Reciprocal Rank Fusion)</strong>로 융합(cosine 하한 0.5) → 키워드·의미 양쪽 강점 결합</li>
+          <li>· <strong>질의 정규화</strong>: 조사 제거·지역어(태안 등) 희석·대화체 메타어(요즘·최근·근황) 정리로 검색 신호를 또렷하게</li>
+          <li>· <strong>키워드 검색</strong>: D1 {code("archive_fts")} <strong>FTS5 트라이그램</strong> — 형태소 분석 없이도 부분일치·오탈자에 강함</li>
+          <li>· <strong>의미 검색</strong>: Vectorize {code("bge-m3")} 1024차원 임베딩(아카이브 본문충실 ~59k건 백필, cosine 유사도)</li>
+          <li>· <strong>RRF 융합</strong>: 키워드 순위 + 의미 순위를 Reciprocal Rank Fusion으로 결합(cosine 하한 0.5) → 정확 매칭과 맥락 매칭의 장점을 동시에</li>
         </ul>
       </Card>
 
       <Card title="② 지식그래프 증강 (GraphRAG 접근)">
         <ul className="space-y-1.5 text-sm">
-          <li>· 기사에서 인물 추출→<strong>공동등장 그래프</strong>(kg_nodes/edges), 관계 라벨링(협력·대립·전임후임·소속 등)</li>
-          <li>· 질의에 인물이 감지되면 <strong>그래프 기반 인물 브리핑</strong>과 <strong>관계 근거</strong>를 답변에 주입</li>
-          <li>· 그래프 자체는 관리자 <code className="text-xs">/admin/kg</code>에서 탐색·검수(자동추출분은 미검증 표시)</li>
+          <li>· <strong>구축</strong>: 전 코퍼스 기사에서 인물 NER(Gemini Flash-Lite)→본문충실 필터→{code("kg_nodes")}(인물 ~3.4만)·{code("kg_mentions")}, 공유쌍 집계로 <strong>공동등장 엣지 ~127만</strong></li>
+          <li>· <strong>관계 라벨</strong>: 협력·동료 / 대립·갈등 / 소속·상하 / 전임·후임 / 가족·인척 / 기타 6종(Gemini, 제목 근거 불명확은 보수적 기타)</li>
+          <li>· <strong>정제</strong>: 동명이인 병합(canonical·맥락 겹침 검수), 초허브(기자 바이라인) 제외로 노이즈 억제</li>
+          <li>· <strong>답변 주입</strong>: 질의에 인물이 감지되면 그래프 기반 <strong>인물 브리핑</strong> + <strong>관계 근거</strong>를 결합. 자동추출분은 미검증(verified=0)이라 관리자 <code className="text-xs">/admin/kg</code> 탐색·검수용으로 구분</li>
         </ul>
       </Card>
 
-      <Card title="③ 근거 결합 & 지어내기 방지">
+      <Card title="③ 근거 소스(Evidence) — 다중 결합">
         <ul className="space-y-1.5 text-sm">
-          <li>· 근거 소스: 아카이브 + <strong>실시간</strong>(날씨·대기질·관광·해상) + <strong>큐레이션 팩트</strong>(역대 군수·군의원) + <strong>웹 보강</strong>(네이버/Tavily)</li>
-          <li>· 답변이 <code className="text-xs">[번호]</code>로 <strong>인용한 근거만 출처 노출</strong></li>
-          <li>· verified 팩트만 신뢰, 근거 없으면 "찾지 못함" — 없는 사실을 만들지 않음</li>
+          <li>· <strong>아카이브</strong>(하이브리드 검색) + <strong>실시간</strong>(기상청 동네예보·에어코리아 대기질·관광·KHOA 해상·오피넷 유가)</li>
+          <li>· <strong>큐레이션 팩트</strong>: 역대 군수·역대/현직 군의원(선거구·연락처) 등 사람이 검증한 fact table</li>
+          <li>· <strong>지역언론</strong>(충남일보·디트뉴스24·충청투데이 RSS) + <strong>내 가게</strong> 맞춤 근거(로그인 업종 기반)</li>
+          <li>· <strong>웹 보강</strong>: 최신·상황 질문이거나 로컬 근거가 약할 때만(needsWeb 게이트) 네이버/Tavily 검색, 6h 캐시·fail-open</li>
+          <li>· 답변이 <code className="text-xs">[번호]</code>로 <strong>인용한 근거만</strong> 출처로 노출(토픽형은 웹 표시, 일반 질의는 공식 근거로)</li>
         </ul>
       </Card>
 
-      <Card title="④ 품질 게이트(생성 후처리)">
+      <Card title="④ 생성 & 지어내기 방지">
         <ul className="space-y-1.5 text-sm">
-          <li>· <strong>붕괴·외국문자 방지</strong>: 반복·비한글 응답 감지 시 재생성, 최후엔 잔여 이물 제거</li>
-          <li>· <strong>근거 대조 교열</strong>: fp8 모델이 흘린 숫자·글자를 근거와 대조해 복원</li>
-          <li>· <strong>현재 날짜 주입</strong>: 지난 일을 "예측"으로 답하는 모순 제거</li>
+          <li>· <strong>근거만 사용</strong>: verified 팩트만 신뢰, 근거 없으면 "찾지 못함" — 없는 사실을 만들지 않음</li>
+          <li>· <strong>현재 날짜 주입</strong>(KST): 지난 일을 "예측/가능성"으로 답하던 모순 제거 → 과거는 사실, 예측은 미래에만</li>
+          <li>· <strong>지역 이탈 안내</strong>: 태안과 무관한 질의는 범위를 벗어났음을 밝힘</li>
         </ul>
       </Card>
 
-      <Card title="⑤ 오케스트레이션 & 비용">
+      <Card title="⑤ 품질·후처리">
         <ul className="space-y-1.5 text-sm">
-          <li>· <strong>경량 그래프 엔진</strong>(runGraph): 이해→검색→작성→교정 노드, 실시간 진행률 표시</li>
-          <li>· <strong>모델</strong>: Workers AI {code("llama-3.3-70b")}(질의·copilot, 종량 0) · Gemini Flash-Lite(디지털화, thinking off)</li>
-          <li>· 운영 Worker는 <strong>Claude API 미사용</strong> — 무료·저가 우선 방침</li>
+          <li>· <strong>붕괴·외국문자 방지</strong>: 반복·비한글 누수 응답을 감지해 재생성(salad 게이트), 최후엔 잔여 한자·가나만 제거해 정상화</li>
+          <li>· <strong>근거 대조 교열</strong>: fp8 양자화 모델이 흘린 연도·숫자를 근거와 대조해 복원(예: '개발은년부터'→'1997년부터')</li>
+          <li>· <strong>결정론 정리</strong>: 문단·불릿 구조화, 빈 대괄호 제거 등 읽기 좋게 다듬기</li>
+          <li>· <strong>자동 시각화</strong>: 답변 속 수치를 결정론 파싱해 월별·연도별·읍면별 막대차트로(LLM 없이·무료·안정). 인쇄/PDF는 워터마크·페이지여백 재사용</li>
         </ul>
+      </Card>
+
+      <Card title="⑥ 오케스트레이션 & ⑦ 모델·비용">
+        <ul className="space-y-1.5 text-sm">
+          <li>· <strong>경량 그래프 엔진</strong>({code("runGraph")}): 이해→아카이브→실시간→웹→작성→교정→마무리 노드, {code("when")} 조건 분기, 노드별 <strong>실시간 진행률</strong> 표시(가짜 시간추정 대체)</li>
+          <li>· <strong>근거 파리티</strong>: 메인 경로와 그래프 경로가 같은 build*Evidence 헬퍼를 공유해 드리프트 0</li>
+          <li>· <strong>모델</strong>: Workers AI {code("llama-3.3-70b")}(질의·copilot, 종량 0) · Gemini Flash-Lite(디지털화·라벨링, thinking off) · 임베딩 bge-m3</li>
+          <li>· <strong>방침</strong>: 운영 Worker는 Claude API 미사용 — 무료·저가 우선. 대량 작업은 체크포인트·재시도(지수 백오프)로 안정화</li>
+        </ul>
+      </Card>
+
+      <Card title="용어">
+        <dl className="space-y-2 text-sm">
+          {GLOSSARY.map(([term, desc]) => (
+            <div key={term}>
+              <dt className="font-semibold text-brand">{term}</dt>
+              <dd className="text-foreground-muted">{desc}</dd>
+            </div>
+          ))}
+        </dl>
       </Card>
     </div>
   );
