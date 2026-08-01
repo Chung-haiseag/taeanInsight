@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-01 · 비로그인 첫 화면(GenericHome) 콘텐츠·디자인 강화(방문자 첫인상): 기존 얇은 홈을 실데이터 기반 5블록으로 재구성 — ①히어로(정체성+실수치 증거 10만4천건·1990–2026·100% 편집부검토, CTA 질의/아카이브/리포트) ②실시간 '지금 태안'(LiveSummaryStrip) ③대표 콘텐츠 쇼케이스 4카드(질의응답·아카이브 getArchiveStats 실count·옛신문 디지털화 1990–2001·인물 관계망, Phosphor 라인아이콘 칩) ④실제 최신 기사(PersonalizedNewsStrip) ⑤저널리즘·신뢰 네이비 블록(편집부검토·시민기자단·주간리포트). 사용자 선택 방향=대표콘텐츠+실시간+저널리즘+최신기사 전부. 기존 디자인시스템(brand navy·teal accent·eyebrow·hairline·card-lift) 유지, 숫자는 archive/stats 실데이터·배지 남발 금지. web/src/components/home/generic-home.tsx
 - 2026-06 · 옛신문 디지털화 1991~2001 (Vision OCR, ~14k건) · tools/ebook, PLAYBOOK.md
 - 2026-06 · 띄어쓰기 transferSpacing(글자보존 이식) · tools/ebook/fix-spacing.mjs
 - 2026-06 · 관리자 검수: 탭·본문교정·삭제·원본지면 전체화면 뷰어·저충실도 안내 · web/admin
