@@ -5,13 +5,10 @@
 
 import Link from "next/link";
 
-// 절대경로(/admin#앵커)로 둬야 /admin/kg 등 다른 관리자 페이지에서도 이동+스크롤이 된다.
+// 상단은 '페이지' 이동만(대시보드·지식그래프·보고서). 대시보드 내부 섹션 전환은 아래 탭바가 담당 —
+// 예전 #앵커 항목(비용·AI검수·시민기자·민감규칙·전자북)은 탭바와 중복이라 제거했다.
 const ADMIN_SECTIONS = [
-  { href: "/admin#cost-heading", label: "비용" },
-  { href: "/admin#review-heading", label: "AI 검수" },
-  { href: "/admin#citizen-heading", label: "시민기자" },
-  { href: "/admin#governance-heading", label: "민감규칙" },
-  { href: "/admin#ebook-heading", label: "전자북 검수" },
+  { href: "/admin", label: "대시보드" },
   { href: "/admin/kg", label: "🕸️ 지식그래프" },
   { href: "/admin/report", label: "📄 보고서" },
 ];
