@@ -14,6 +14,7 @@ import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
 import { RegionDataPanel } from "@/components/reports/region-data-panel";
 import { PodcastAudio } from "@/components/reports/podcast-audio";
+import { PodcastEpisodes } from "@/components/reports/podcast-episodes";
 import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -132,7 +133,10 @@ export function ReportReader({
         <ReportPushButton />
       </div>
 
-      <div className="mt-6"><PodcastAudio /></div>
+      <div className="mt-6 space-y-4">
+        <PodcastAudio />
+        <PodcastEpisodes excludeWeekId={report.weekId} />
+      </div>
 
       {report.personalized && report.interests?.length ? (
         <div className="no-print mt-6 flex items-center gap-2 rounded-xl bg-accent-subtle/30 px-4 py-2.5 text-sm">
