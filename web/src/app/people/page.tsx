@@ -4,12 +4,12 @@
 //   ⚠️ 미검증 데이터. 관계 '라벨'은 검수(verified)된 것만 노출, 나머지는 '함께 등장'만 표시.
 //   바이라인·초허브는 백엔드에서 제외됨. 관리자 도구(/admin/kg)와 분리된 공개 엔드포인트 사용.
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 
 import KgGraph from "@/components/kg-graph";
 import { PageHeader } from "@/components/page-header";
-import { searchPersonsPublic, getPersonProfilePublic } from "@/lib/api/kg-public";
+import { searchPersonsPublic, getPersonProfilePublic, getKgStatus } from "@/lib/api/kg-public";
 import type { PersonSearchResult, PersonProfile } from "@/lib/api/kg";
 
 export default function PeoplePage() {
@@ -18,6 +18,8 @@ export default function PeoplePage() {
   const [prof, setProf] = useState<PersonProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => { getKgStatus().then((s) => setEnabled(s.enabled)).catch(() => setEnabled(true)); }, []);
 
   async function search(e?: FormEvent) {
     e?.preventDefault();
@@ -51,6 +53,12 @@ export default function PeoplePage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader title="인물 탐색" description="아카이브 기사 속 인물과 함께 등장한 관계를 찾아봅니다." />
 
+      {enabled === false ? (
+        <div className="rounded-lg border border-brand/15 bg-background p-10 text-center text-sm text-foreground-muted">
+          인물 탐색은 현재 준비 중입니다.
+        </div>
+      ) : (
+        <>
       {/* 미검증 안내 — 크게 */}
       <div role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-semibold">⚠️ 실험 기능 · AI 자동 추출(미검증)</p>
@@ -169,6 +177,8 @@ export default function PeoplePage() {
             </section>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );

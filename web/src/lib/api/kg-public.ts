@@ -7,3 +7,6 @@ export const searchPersonsPublic = (q: string) =>
 
 export const getPersonProfilePublic = (id: string) =>
   apiFetch<PersonProfile>(`/api/kg/person/${encodeURIComponent(id)}/profile`);
+
+// 공개 여부(페이지·네비가 확인)
+export const getKgStatus = () => apiFetch<{ enabled: boolean }>("/api/kg/status");

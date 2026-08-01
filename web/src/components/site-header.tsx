@@ -8,18 +8,28 @@ import { AdminHeader } from "./admin-header";
 import { AccountNav } from "./account-nav";
 import { visibleNav } from "@/lib/nav";
 import { cachedRole, getSession } from "@/lib/api/auth";
+import { getKgStatus } from "@/lib/api/kg-public";
+
+// 인물 탐색 공개 여부(모듈 캐시 — 세션 내 1회 조회). 기본 노출(true).
+let _peopleOn: boolean | null = null;
 
 export function SiteHeader() {
   const { fontSize, setFontSize, theme, setTheme } = useAccessibility();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [peopleOn, setPeopleOn] = useState<boolean>(_peopleOn ?? true);
   // 캐시 role로 즉시 렌더 후, 세션으로 최신화(로그인/등급 변경 반영)
   useEffect(() => {
     setRole(cachedRole());
     getSession().then((a) => setRole(a?.role ?? null)).catch(() => {});
   }, [pathname]);
-  const navItems = visibleNav(role);
+  // 인물 탐색 공개 여부 — 세션 내 1회 조회(모듈 캐시). 비활성이면 nav에서 숨김.
+  useEffect(() => {
+    if (_peopleOn !== null) { setPeopleOn(_peopleOn); return; }
+    getKgStatus().then((s) => { _peopleOn = s.enabled; setPeopleOn(s.enabled); }).catch(() => {});
+  }, []);
+  const navItems = visibleNav(role).filter((i) => i.href !== "/people" || peopleOn);
 
   // 경로 바뀌면 모바일 메뉴 닫기
   useEffect(() => { setOpen(false); }, [pathname]);

@@ -33,3 +33,8 @@ export interface ReportSummary {
 }
 
 export const getReportSummary = () => apiFetch<ReportSummary>("/api/admin/report/summary");
+
+// 공개 기능 설정(관리자) — 조회는 관리자, 변경은 superadmin(백엔드 강제).
+export const getAdminSettings = () => apiFetch<{ publicPeople: boolean }>("/api/admin/settings");
+export const setAdminSettings = (patch: { publicPeople: boolean }) =>
+  apiFetch<{ ok: boolean; publicPeople: boolean }>("/api/admin/settings", { method: "POST", body: JSON.stringify(patch) });
