@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { getSession, logout, type Account } from "@/lib/api/auth";
 import { Icon } from "@/components/icon";
 
 export function AccountNav() {
   const [acct, setAcct] = useState<Account | null | undefined>(undefined); // undefined=로딩
-  useEffect(() => { getSession().then(setAcct).catch(() => setAcct(null)); }, []);
+  const pathname = usePathname();
+  // 헤더 layout은 라우트 이동 시 재마운트되지 않으므로 pathname마다 세션 재조회(로그인 직후 반영).
+  useEffect(() => { getSession().then(setAcct).catch(() => setAcct(null)); }, [pathname]);
 
   if (acct === undefined) return null;
 

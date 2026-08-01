@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login, signup, startKakaoLogin, consumeKakaoCallback } from "@/lib/api/auth";
 
@@ -15,7 +15,6 @@ const ERR: Record<string, string> = {
 const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
 export function LoginClient() {
-  const router = useRouter();
   const params = useSearchParams();
   const rawRedirect = params.get("redirect") || "/me";
   // 오픈 리다이렉트 방지: 내부 절대경로("/…")만 허용, 프로토콜상대("//…")·백슬래시 우회·외부 URL은 /me로.
@@ -32,17 +31,17 @@ export function LoginClient() {
 
   // 카카오 콜백 처리 — kakao_token 있으면 로그인 완료 → redirect 목적지
   useEffect(() => {
-    if (consumeKakaoCallback()) { router.replace(redirectTo); return; }
+    if (consumeKakaoCallback()) { window.location.assign(redirectTo); return; }
     const p = new URLSearchParams(window.location.search);
     if (p.get("error")?.startsWith("kakao")) setErr("카카오 로그인에 실패했습니다. 다시 시도해 주세요.");
-  }, [router, redirectTo]);
+  }, [redirectTo]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
       const r = mode === "login" ? await login(email, pw) : await signup(email, pw, name || undefined);
-      if (r.ok) router.replace(redirectTo);
+      if (r.ok) window.location.assign(redirectTo);
       else setErr(ERR[r.error ?? ""] ?? r.error ?? "실패했습니다.");
     } finally { setBusy(false); }
   }
