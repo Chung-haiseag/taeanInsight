@@ -8,10 +8,10 @@ import Link from "next/link";
 
 import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getUsers, type AdminUser } from "@/lib/api/admin";
+import { getUsers, getCostSummary, getRoi, type AdminUser, type MonthlyCostReport, type RoiData } from "@/lib/api/admin";
 import { getReportSummary, type ReportSummary } from "@/lib/api/report";
 
-type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "changelog" | "health";
+type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "cost" | "changelog" | "health";
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "overview", label: "프로젝트 개요" },
   { key: "tech", label: "🧠 AI·기술" },
@@ -19,6 +19,7 @@ const TABS: { key: ReportTab; label: string }[] = [
   { key: "roadmap", label: "🗺 로드맵" },
   { key: "runbook", label: "🚀 운영 절차" },
   { key: "data", label: "📦 데이터 현황" },
+  { key: "cost", label: "💰 비용·성과" },
   { key: "changelog", label: "🧾 변경 이력" },
   { key: "health", label: "🩺 시스템 상태" },
 ];
@@ -31,6 +32,7 @@ function renderTab(tab: ReportTab) {
     case "roadmap": return <Roadmap />;
     case "runbook": return <Runbook />;
     case "data": return <DataSnapshot />;
+    case "cost": return <CostPerf />;
     case "changelog": return <Changelog />;
     case "health": return <Health />;
   }
@@ -710,6 +712,78 @@ function Health() {
           <li className="text-xs">상세 실행 로그는 <code className="text-[11px]">/admin</code> ⚙️자동화·📊분석 탭에서.</li>
         </ul>
       </Card>
+    </div>
+  );
+}
+
+// ── 💰 비용·성과(라이브 요약) ──────────────────────────────────
+const won = (n: number) => n.toLocaleString() + "원";
+function CostPerf() {
+  const [cost, setCost] = useState<MonthlyCostReport | null>(null);
+  const [roi, setRoi] = useState<RoiData | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    getCostSummary().then(setCost).catch(() => {});
+    getRoi().then(setRoi).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
+  }, []);
+  return (
+    <div className="space-y-4">
+      <Card title={`이번 달 비용${cost ? ` (${cost.month})` : ""}`}>
+        {cost ? (
+          <>
+            <KV
+              rows={[
+                ["지출", won(cost.totalKrw)],
+                ["한도", won(cost.limitKrw)],
+                ["소진율", <span className={cost.ratio >= 0.9 ? "font-semibold text-red-600" : cost.ratio >= 0.7 ? "text-amber-600" : ""}>{Math.round(cost.ratio * 100)}%{cost.thresholdsCrossed.length > 0 ? " ⚠️" : ""}</span>],
+              ]}
+            />
+            {Object.keys(cost.byCategory).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                {Object.entries(cost.byCategory).map(([k, v]) => (
+                  <span key={k} className="rounded-full border border-brand/15 px-2 py-0.5 text-foreground-muted">{k} {won(v)}</span>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-foreground-muted">불러오는 중…</p>
+        )}
+      </Card>
+
+      <Card title="자산 & 자동화 창출가치">
+        {roi ? (
+          <KV
+            rows={[
+              ["아카이브 기사", roi.assets.totalArticles.toLocaleString()],
+              ["디지털화", <>{roi.assets.digitized.toLocaleString()} <span className="text-xs text-foreground-muted">({roi.assets.yearRange})</span></>],
+              ["자동화 창출가치(누적)", <strong className="text-brand">{won(roi.totalValueKrw)}</strong>],
+            ]}
+          />
+        ) : err ? (
+          <p className="text-sm text-red-600">{err}</p>
+        ) : (
+          <p className="text-sm text-foreground-muted">불러오는 중…</p>
+        )}
+      </Card>
+
+      {roi && (
+        <Card title="독자·이용">
+          <div className="flex flex-wrap gap-2 text-sm">
+            {([
+              ["열람", roi.audience.reads],
+              ["AI 질의", roi.audience.aiQueries],
+              ["오디오 재생", roi.audience.audioPlays],
+              ["가입", roi.audience.accounts],
+              ["푸시 구독", roi.audience.pushSubs],
+            ] as [string, number][]).map(([k, v]) => (
+              <span key={k} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{k} <strong className="text-brand">{v.toLocaleString()}</strong></span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <p className="text-xs text-foreground-muted">상세 대시보드는 <code className="text-[11px]">/admin</code> 💰비용·💎성과·📊분석 탭에서.</p>
     </div>
   );
 }
