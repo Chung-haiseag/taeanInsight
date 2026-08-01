@@ -32,6 +32,7 @@ export async function signup(email: string, password: string, displayName?: stri
   if (!ok) return { ok: false, error: String(data.error ?? "회원가입 실패") };
   setAuthToken(String(data.token));
   setUid(String(data.uid));
+  invalidateSession();
   return { ok: true, account: { email: String(data.email), uid: String(data.uid), displayName: (data.displayName as string) ?? null } };
 }
 
@@ -40,21 +41,34 @@ export async function login(email: string, password: string): Promise<{ ok: bool
   if (!ok) return { ok: false, error: String(data.error ?? "로그인 실패") };
   setAuthToken(String(data.token));
   setUid(String(data.uid)); // 정규 uid로 교체 → 기존 개인화 동기화
+  invalidateSession();
   return { ok: true, account: { email: String(data.email), uid: String(data.uid), displayName: (data.displayName as string) ?? null } };
 }
 
-export async function getSession(): Promise<Account | null> {
+async function fetchSession(): Promise<Account | null> {
   const token = getAuthToken();
   if (!token) { setRoleCache(null); return null; } // 로그아웃 상태 — 역할 캐시도 정리(메뉴 오노출 방지)
   try {
     const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null; // 서버 일시오류 — 토큰 유지(잘못된 로그아웃 방지)
     const data = await res.json();
     const u = data.user;
-    if (!u) { setAuthToken(null); setRoleCache(null); return null; } // 세션 만료 — 역할 캐시 정리
+    if (!u) { setAuthToken(null); setRoleCache(null); return null; } // 세션 무효 — 토큰·역할 정리
     setUid(String(u.uid)); // 다른 기기 로그인 상태 반영
     setRoleCache(u.role);
     return { email: u.email, uid: u.uid, displayName: u.displayName ?? null, role: u.role, plan: u.plan };
-  } catch { return null; }
+  } catch { return null; } // 네트워크 오류 — 토큰 유지
+}
+
+// 세션 조회 단일화(single-flight, 10초 캐시) — 여러 컴포넌트(헤더·계정·가드)가 동시에 불러도
+//   /api/auth/me 1회 호출·결과 일관. 로그인/로그아웃 시 invalidateSession으로 갱신.
+let _sessionPromise: Promise<Account | null> | null = null;
+let _sessionAt = 0;
+export function invalidateSession() { _sessionPromise = null; _sessionAt = 0; }
+export async function getSession(): Promise<Account | null> {
+  const now = Date.now();
+  if (!_sessionPromise || now - _sessionAt > 10_000) { _sessionAt = now; _sessionPromise = fetchSession(); }
+  return _sessionPromise;
 }
 
 // 카카오 로그인 시작 — 현재 익명 uid를 넘겨 계정에 귀속
@@ -70,6 +84,7 @@ export function consumeKakaoCallback(): boolean {
     const t = p.get("kakao_token");
     if (!t) return false;
     setAuthToken(t);
+    invalidateSession();
     const uid = p.get("uid");
     if (uid) setUid(uid);
     // URL 정리
@@ -103,5 +118,6 @@ export async function logout(): Promise<void> {
   try { if (token) await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }); } catch { /* 무시 */ }
   setAuthToken(null);
   setRoleCache(null);
+  invalidateSession();
   resetUid(); // 새 익명 uid(공유기기 대비)
 }

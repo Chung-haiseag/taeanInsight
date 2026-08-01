@@ -14,7 +14,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/query", label: "질의응답", minRole: "user" },
   { href: "/reports", label: "주간 리포트", minRole: "user" },
   { href: "/people", label: "인물 탐색", minRole: "user" },
-  { href: "/citizen", label: "시민기자", minRole: "user" },
+  { href: "/citizen", label: "시민기자", minRole: "citizen" }, // 시민기자 등급부터. 일반회원은 /me에서 신청
   { href: "/me", label: "내 페이지", minRole: "user" },
   { href: "/reporter", label: "취재 알림", minRole: "reporter" },
 ];
