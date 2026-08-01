@@ -31,6 +31,7 @@ import { membershipRouter } from "./membership/router";
 import { authRouter } from "./auth/router";
 import { adminUsersRouter } from "./auth/admin_router";
 import { reportRouter } from "./report/router";
+import { kgPublicRouter } from "./kg/public_router";
 import { envRouter } from "./env/router";
 import { reportsRouter, adminReportsRouter } from "./reports/router";
 import { pushRouter } from "./notifications/router";
@@ -94,6 +95,7 @@ app.route("/api/membership", membershipRouter);
 app.route("/api/auth", authRouter);
 app.route("/api/admin/users", adminUsersRouter);
 app.route("/api/admin/report", reportRouter);
+app.route("/api/kg", kgPublicRouter); // 공개 인물 탐색(읽기 전용)
 app.route("/api/conditions", envRouter);
 app.route("/api/reports", reportsRouter);
 app.route("/api/admin/reports", adminReportsRouter);
