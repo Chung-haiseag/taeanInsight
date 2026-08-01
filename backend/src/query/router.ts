@@ -273,9 +273,10 @@ async function buildPersonBriefCard(env: Env, query: string, offRegion: boolean)
     if (!hit) return null;
     const text = await buildPersonBrief(env.ARCHIVE_DB, env.AI, hit.id);
     if (!text) return null;
-    // 감지 인물이 역대 군수면 태안군청 공식 사진을 덧붙인다.
+    // 감지 인물이 역대 군수 또는 현직 군의원이면 공식 사진을 덧붙인다.
     const { mayorPhotoFor } = await import("../kg/mayors");
-    const photo = mayorPhotoFor(hit.name);
+    const { councilPhotoFor } = await import("../kg/council_members");
+    const photo = mayorPhotoFor(hit.name) ?? councilPhotoFor(hit.name);
     return { id: hit.id, name: hit.name, text, ...(photo ? { photo } : {}) };
   } catch { return null; }
 }
