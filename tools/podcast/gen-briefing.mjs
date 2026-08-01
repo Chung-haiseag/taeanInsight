@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean } from "../lib/tts-normalize.mjs";
 import { wavToMp3 } from "../lib/wav-to-mp3.mjs";
+import { mixIntroOutro } from "./mix-music.mjs";
 
 // 키: .gemini_keys(뉴스낭독과 공유) 첫 줄 우선, 없으면 GEMINI_API_KEY env
 function loadKey() {
@@ -167,9 +168,14 @@ async function main() {
 
   const tmp = join(tmpdir(), `briefing-${date}.mp3`);
   writeFileSync(tmp, mp3);
+  // 인트로·아웃트로 음악 합성(assets/intro·outro.mp3 있으면). 없거나 실패하면 원본 업로드.
+  const finalFile = join(tmpdir(), `briefing-${date}-final.mp3`);
+  let mixed = false;
+  try { mixed = mixIntroOutro(tmp, finalFile); } catch (e) { console.warn("  ⚠ 음악 합성 실패 — 원본 업로드:", e.message); }
+  if (mixed) console.log("  🎵 인트로·아웃트로 음악 합성 적용");
   try {
     console.log(`▸ R2 업로드 → ${key}`);
-    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/mpeg", "--remote"]);
+    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", mixed ? finalFile : tmp, "--content-type", "audio/mpeg", "--remote"]);
     console.log("✅ 완료 — 저녁 브리핑이 NotebookLM급으로 교체됩니다.");
     // 오늘 다룬 항목 저장 → 내일 중복 회피(최근 2일 롤링 유지)
     try {
