@@ -13,7 +13,7 @@ describe("bearerToken", () => {
 });
 
 describe("adminGuardDecision — adminGuard 순수 판정", () => {
-  const su = (role: string) => ({ id: 1, email: "a@b.c", role, plan: "org" });
+  const su = (role: string) => ({ id: 1, uid: "u1", email: "a@b.c", role, plan: "org" });
   it("세션 admin 이상이면 통과(토큰 무관)", () => {
     expect(adminGuardDecision(su("admin"), undefined, "SECRET")).toBe("pass");
     expect(adminGuardDecision(su("superadmin"), undefined, undefined)).toBe("pass");
@@ -33,7 +33,7 @@ describe("adminGuardDecision — adminGuard 순수 판정", () => {
 
 describe("deriveRequesterRole", () => {
   it("세션 있으면 세션 role", () => {
-    expect(deriveRequesterRole({ id: 1, email: "", role: "admin", plan: "" }, false)).toBe("admin");
+    expect(deriveRequesterRole({ id: 1, uid: "u1", email: "", role: "admin", plan: "" }, false)).toBe("admin");
   });
   it("세션 없고 토큰OK면 superadmin", () => {
     expect(deriveRequesterRole(null, true)).toBe("superadmin");

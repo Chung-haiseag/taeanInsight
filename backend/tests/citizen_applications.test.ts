@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decisionToStatus, shouldPromoteToCitizen, myApplication } from "../src/citizen/applications";
+import { decisionToStatus, shouldPromoteToCitizen, shouldDemoteToUser, myApplication } from "../src/citizen/applications";
 
 describe("시민기자 신청 순수 결정", () => {
   it("decisionToStatus", () => {
@@ -11,6 +11,12 @@ describe("시민기자 신청 순수 결정", () => {
     expect(shouldPromoteToCitizen("approve", "reporter")).toBe(false); // 상위는 안 건드림
     expect(shouldPromoteToCitizen("approve", "admin")).toBe(false);
     expect(shouldPromoteToCitizen("reject", "user")).toBe(false);
+  });
+  it("반려+현재 citizen이면 user로 회수, 상위는 보존", () => {
+    expect(shouldDemoteToUser("reject", "citizen")).toBe(true);
+    expect(shouldDemoteToUser("reject", "reporter")).toBe(false); // 상위 강등 안 함
+    expect(shouldDemoteToUser("reject", "user")).toBe(false);
+    expect(shouldDemoteToUser("approve", "citizen")).toBe(false);
   });
 });
 

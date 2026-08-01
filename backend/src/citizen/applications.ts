@@ -20,6 +20,11 @@ export function shouldPromoteToCitizen(decision: "approve" | "reject", currentRo
   return decision === "approve" && currentRole === "user";
 }
 
+// 반려이고 현재 citizen이면 user로 회수(승인으로 올린 등급 원복). reporter·admin 등 상위는 건드리지 않음.
+export function shouldDemoteToUser(decision: "approve" | "reject", currentRole: string): boolean {
+  return decision === "reject" && currentRole === "citizen";
+}
+
 // 신청(재신청 시 pending으로 갱신). UNIQUE(user_id) 충돌 시 갱신.
 export async function applyForCitizen(db: D1Database, userId: number, reason: string | null, nowIso: string): Promise<void> {
   await db

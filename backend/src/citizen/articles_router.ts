@@ -10,13 +10,22 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { Env } from "../types";
-import { identifyUser, type AuthVariables } from "../auth/middleware";
+import { type AuthVariables } from "../auth/middleware";
+import { sessionUser, bearerToken } from "../auth/session_guard";
+import { hasRole } from "../auth/roles";
 import { applyGovernance } from "../governance/middleware";
 import { AI_LABEL_TEXT, type AiLabel } from "../governance/ai_label";
 import { reviewService, nextReviewId, type ReviewItem } from "../governance/review_queue";
 
 export const citizenArticlesRouter = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
-citizenArticlesRouter.use("*", identifyUser((env) => (env as Env & { JWT_SECRET?: string }).JWT_SECRET ?? "dev-secret"));
+// 투고는 시민기자 이상만(세션 강제). auth.sub=사용자 uid로 세팅해 기존 소유자 스코프 코드 유지.
+citizenArticlesRouter.use("*", async (c, next) => {
+  const u = await sessionUser(c.env.ARCHIVE_DB, bearerToken(c));
+  if (!u) return c.json({ error: "unauthorized", reason: "no_session" }, 401);
+  if (!hasRole(u.role, "citizen")) return c.json({ error: "forbidden", required: "citizen" }, 403);
+  c.set("auth", { sub: u.uid, role: u.role, iat: 0, exp: 0, type: "access" });
+  await next();
+});
 
 const firstImage = (body: string): string | null => body.match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1] ?? null;
 

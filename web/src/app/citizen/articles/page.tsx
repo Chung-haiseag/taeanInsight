@@ -6,6 +6,17 @@ import Link from "next/link";
 
 import { listMyArticles, deleteArticle, STATUS_LABEL, type CitizenArticle } from "@/lib/api/citizen-articles";
 import { PageHeader } from "@/components/page-header";
+import { RequireRole } from "@/components/require-role";
+
+const CITIZEN_HINT = { text: "시민기자만 이용할 수 있습니다. 내 페이지에서 시민기자를 신청하세요.", href: "/me", label: "시민기자 신청하러 가기" };
+
+export default function MyArticlesPage() {
+  return (
+    <RequireRole minRole="citizen" deniedHint={CITIZEN_HINT}>
+      <MyArticlesContent />
+    </RequireRole>
+  );
+}
 
 const STATUS_STYLE: Record<CitizenArticle["status"], string> = {
   draft: "bg-brand/10 text-brand",
@@ -15,7 +26,7 @@ const STATUS_STYLE: Record<CitizenArticle["status"], string> = {
   rejected: "bg-red-100 text-red-700",
 };
 
-export default function MyArticlesPage() {
+function MyArticlesContent() {
   const [items, setItems] = useState<CitizenArticle[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
