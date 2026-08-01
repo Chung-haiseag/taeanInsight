@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { classifyAudioKey, aggregateManifest } from "../src/audio/manifest";
+import { classifyAudioKey, aggregateManifest, podcastWeekIds } from "../src/audio/manifest";
 
 describe("classifyAudioKey", () => {
   it("현행 Gemini(-gem2.wav)를 gem2로", () => {
@@ -44,5 +44,29 @@ describe("aggregateManifest", () => {
     const m = aggregateManifest([]);
     expect(m.total).toBe(0);
     expect(m.byFormat).toEqual({});
+  });
+});
+
+describe("podcastWeekIds — 다시듣기 회차 추출", () => {
+  it("gem 팟캐스트 키에서 week_id만 뽑는다", () => {
+    const s = podcastWeekIds([
+      "audio/podcast/2026-W31-gem.mp3",
+      "audio/podcast/2026-W30-gem.wav",
+      "audio/podcast/2026-W29-gem.mp3",
+    ]);
+    expect([...s].sort()).toEqual(["2026-W29", "2026-W30", "2026-W31"]);
+  });
+  it("mp3/wav 중복은 한 주차로 합친다", () => {
+    const s = podcastWeekIds(["audio/podcast/2026-W31-gem.mp3", "audio/podcast/2026-W31-gem.wav"]);
+    expect([...s]).toEqual(["2026-W31"]);
+  });
+  it("팟캐스트 아닌 키·구버전은 제외", () => {
+    const s = podcastWeekIds([
+      "audio/briefing/2026-07-06-gem.mp3",   // 브리핑
+      "audio/news/12345-gem2.mp3",           // 기사
+      "audio/podcast/status.json",
+      "audio/podcast/2026-W31-hd7.mp3",      // 구 Chirp
+    ]);
+    expect(s.size).toBe(0);
   });
 });
