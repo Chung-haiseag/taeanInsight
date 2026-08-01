@@ -23,13 +23,16 @@ describe("visibleNav — 등급별 메뉴", () => {
     expect(v).not.toContain("/me");
     expect(v).not.toContain("/reporter");
   });
-  it("일반회원은 AI질의·리포트·내페이지·시민기자 추가, 취재알림은 미노출", () => {
+  it("일반회원은 AI질의·리포트·내페이지 추가, 시민기자·취재알림은 미노출", () => {
     const v = hrefs("user");
     expect(v).toContain("/query");
     expect(v).toContain("/reports");
     expect(v).toContain("/me");
-    expect(v).toContain("/citizen");
+    expect(v).not.toContain("/citizen"); // 시민기자 등급부터
     expect(v).not.toContain("/reporter");
+  });
+  it("시민기자는 /citizen 노출", () => {
+    expect(hrefs("citizen")).toContain("/citizen");
   });
   it("기자는 취재알림까지 노출", () => {
     expect(hrefs("reporter")).toContain("/reporter");
