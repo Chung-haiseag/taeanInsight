@@ -22,10 +22,32 @@ export function AccountNav() {
     );
   }
   const label = acct.displayName || acct.email.split("@")[0];
+  const grade = acct.role ? ROLE_LABEL[acct.role] ?? acct.role : null;
   return (
     <div className="hidden md:flex items-center gap-2 text-xs">
       <Link href="/account" className="font-semibold text-brand hover:underline" title={acct.email}><Icon name="user" /> {label}</Link>
+      {grade && (
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${GRADE_STYLE[acct.role ?? ""] ?? "bg-brand/10 text-brand"}`}>
+          {grade}
+        </span>
+      )}
       <button type="button" onClick={async () => { await logout(); location.reload(); }} className="text-foreground-muted hover:text-brand">로그아웃</button>
     </div>
   );
 }
+
+// 등급 라벨·색상 — 상위 등급일수록 눈에 띄게.
+const ROLE_LABEL: Record<string, string> = {
+  user: "일반회원",
+  citizen: "시민기자",
+  reporter: "기자",
+  admin: "관리자",
+  superadmin: "최종관리자",
+};
+const GRADE_STYLE: Record<string, string> = {
+  user: "bg-foreground-muted/15 text-foreground-muted",
+  citizen: "bg-emerald-100 text-emerald-700",
+  reporter: "bg-blue-100 text-blue-700",
+  admin: "bg-amber-100 text-amber-800",
+  superadmin: "bg-red-100 text-red-700",
+};
