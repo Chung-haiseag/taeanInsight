@@ -70,7 +70,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-brand/10 bg-background/80 backdrop-blur-md">
       {/* 상단 황토 라인 */}
       <div className="h-1 bg-gradient-to-r from-accent via-accent/60 to-transparent" aria-hidden="true" />
-      <div className="container mx-auto px-4 max-w-7xl flex items-center justify-between h-16">
+      <div className="container mx-auto px-4 max-w-[1200px] flex items-center justify-between h-16">
         <Link href="/" className="flex items-center gap-2.5 text-brand" aria-label="태안 인사이트 홈">
           <span className="inline-block w-2 h-7 bg-accent rounded-sm" aria-hidden="true" />
           <span className="flex flex-col leading-none">
@@ -120,7 +120,7 @@ export function SiteHeader() {
       {/* 모바일 메뉴 패널 */}
       {open && (
         <div id="mobile-menu" className="md:hidden border-t border-brand/10 bg-background">
-          <nav aria-label="주요 메뉴(모바일)" className="container mx-auto max-w-7xl px-4 py-2">
+          <nav aria-label="주요 메뉴(모바일)" className="container mx-auto max-w-[1200px] px-4 py-2">
             <ul className="divide-y divide-brand/5">
               {navItems.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
