@@ -77,13 +77,14 @@ export default function KgGraph({
     function ego() { if (!selected) return null; const s2 = new Set([selected]); for (const e of es) { if (e.a === selected) s2.add(e.b); if (e.b === selected) s2.add(e.a); } return s2; }
     function draw() {
       const P = pal(), eg = ego(); ctx!.clearRect(0, 0, W, H); ctx!.fillStyle = P.bg; ctx!.fillRect(0, 0, W, H);
-      // 엣지
+      // 엣지 — 두께로 관계 강도(공동등장 빈도) 표현. 이 그래프 최대 가중치 대비 √정규화(빈도 편차가 커 √로 압축).
+      const maxW = es.reduce((m, e) => Math.max(m, e.weight), 1);
       for (const e of es) {
         const a = byId[e.a], b = byId[e.b], inc = selected && (e.a === selected || e.b === selected);
         const relC = e.reltype ? REL_COLOR[e.reltype] : undefined;
         ctx!.beginPath(); ctx!.moveTo(a.x, a.y); ctx!.lineTo(b.x, b.y);
         if (selected && !inc) { ctx!.strokeStyle = P.edgeDim; ctx!.lineWidth = 0.7; }
-        else { ctx!.strokeStyle = relC ?? P.edge; ctx!.lineWidth = (relC ? 2 : 0.8) + Math.min(e.weight, 8) * 0.18; }
+        else { ctx!.strokeStyle = relC ?? P.edge; ctx!.lineWidth = (relC ? 1.6 : 0.6) + Math.sqrt(e.weight / maxW) * 4.4; }
         ctx!.stroke();
       }
       // 관계 라벨(색 배경 pill) — 검수된 reltype만

@@ -9,7 +9,7 @@ import Link from "next/link";
 
 import KgGraph from "@/components/kg-graph";
 import { PageHeader } from "@/components/page-header";
-import { searchPersonsPublic, getPersonProfilePublic, getKgStatus } from "@/lib/api/kg-public";
+import { searchPersonsPublic, getPersonProfilePublic, getPersonBriefPublic, getKgStatus } from "@/lib/api/kg-public";
 import type { PersonSearchResult, PersonProfile } from "@/lib/api/kg";
 
 export default function PeoplePage() {
@@ -181,28 +181,62 @@ export default function PeoplePage() {
   );
 }
 
-// ── 인물 기본 소개(자동 요약, 미검증) ──────────────────────────
+// ── 인물 소개(기사 근거 AI 전기 + 확정 팩트 스트립) ─────────────
+const TOPIC_NOISE = new Set(["개최", "대상", "성황", "성료", "실시", "위한", "한다", "선정", "진행"]);
 function PersonIntro({ prof }: { prof: PersonProfile }) {
+  const pid = prof.graph.center?.id;
+  const [brief, setBrief] = useState<string | null | undefined>(undefined); // undefined=로딩, null=근거부족
+  useEffect(() => {
+    let alive = true;
+    setBrief(undefined);
+    if (!pid) { setBrief(null); return; }
+    getPersonBriefPublic(pid).then((r) => { if (alive) setBrief(r.brief); }).catch(() => { if (alive) setBrief(null); });
+    return () => { alive = false; };
+  }, [pid]);
+
   if (!prof.person) return null;
   const office = prof.offices[0];
   const years = prof.timeline.length ? `${prof.timeline[0].year}~${prof.timeline[prof.timeline.length - 1].year}` : null;
   const topCo = prof.coappear.slice(0, 3).map((c) => c.name);
-  const topics = prof.topics.slice(0, 6).map((t) => t.term);
-  const desc = office ? `${office.office}${office.ordinal ? `(${office.ordinal}대)` : ""}을 지낸 인물` : "태안 지역 아카이브 인물";
+  const desc = office ? `${office.office}${office.ordinal ? `(${office.ordinal}대)` : ""}` : null;
+  const topics = prof.topics.map((t) => t.term).filter((t) => !TOPIC_NOISE.has(t)).slice(0, 6);
+
   return (
     <section className="rounded-lg border border-brand/20 bg-accent/5 p-4">
-      <h3 className="mb-1.5 text-sm font-bold text-brand">인물 소개</h3>
-      <p className="text-sm leading-relaxed text-foreground">
-        <strong className="text-brand">{prof.person.name}</strong> — {desc}. 아카이브 기사 <strong>{prof.person.mentions.toLocaleString()}건</strong>에 등장{years ? ` (${years})` : ""}.
-        {topCo.length ? <> 기사에서 <strong>{topCo.join(" · ")}</strong> 등과 자주 함께 다뤄졌습니다.</> : null}
-      </p>
+      <div className="mb-2 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-brand">인물 소개</h3>
+        <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">AI 요약 · 기사 근거</span>
+      </div>
+      {/* AI 전기 — 지연 로드(기사 제목·본문 근거). 없으면 결정론 한 줄로 폴백 */}
+      {brief === undefined ? (
+        <div className="space-y-1.5" aria-hidden>
+          <div className="h-3 w-11/12 animate-pulse rounded bg-brand/10" />
+          <div className="h-3 w-full animate-pulse rounded bg-brand/10" />
+          <div className="h-3 w-10/12 animate-pulse rounded bg-brand/10" />
+          <p className="pt-1 text-[11px] text-foreground-muted">기사에서 인물 소개를 작성하는 중…</p>
+        </div>
+      ) : brief ? (
+        <p className="text-sm leading-relaxed text-foreground">{brief}</p>
+      ) : (
+        <p className="text-sm leading-relaxed text-foreground">
+          <strong className="text-brand">{prof.person.name}</strong> — {desc ? `${desc} · ` : ""}아카이브 기사 <strong>{prof.person.mentions.toLocaleString()}건</strong>에 등장{years ? ` (${years})` : ""}.
+          {topCo.length ? <> 기사에서 <strong>{topCo.join(" · ")}</strong> 등과 자주 함께 다뤄졌습니다.</> : null}
+        </p>
+      )}
+      {/* 확정 팩트 스트립 — AI 요약과 별개의 집계 수치(항상 표시) */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-brand/10 pt-2.5 text-[11px] text-foreground-muted">
+        <span>아카이브 <strong className="text-foreground">{prof.person.mentions.toLocaleString()}건</strong></span>
+        {years && <span>활동 <strong className="text-foreground">{years}</strong></span>}
+        {desc && <span>직위 <strong className="text-foreground">{desc}</strong></span>}
+        {topCo.length > 0 && <span>자주 동반 <strong className="text-foreground">{topCo.join(" · ")}</strong></span>}
+      </div>
       {topics.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-foreground-muted">주요 주제</span>
+          <span className="text-[11px] text-foreground-muted">주요 주제</span>
           {topics.map((t) => <span key={t} className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] text-brand">{t}</span>)}
         </div>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ AI가 기사에서 자동 추출한 요약입니다(검증된 사실 아님).</p>
+      <p className="mt-2 text-[11px] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>
     </section>
   );
 }

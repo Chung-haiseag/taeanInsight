@@ -80,9 +80,24 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
   ).bind(...keepIds).all<GraphNode>();
   const nmap = new Map((nrows.results ?? []).map((n) => [n.id, n] as const));
   const nodes: GraphNode[] = keepIds.map((kid) => nmap.get(kid) ?? { id: kid, name: kid === center ? centerNode.name : kid, mentions: 0 });
+  const outEdges = edges.filter((e) => keep.has(e.a) && keep.has(e.b));
+  // 이웃끼리(중심 제외)의 coappears도 실어 별(star)이 아닌 진짜 관계망으로 만든다. 위 outEdges가 중심 엣지를
+  // 이미 보유하므로 resolveCanonical의 weight 합산 중복을 피하려 이웃-이웃만 조회한다.
+  // D1 바인딩 100개 한도(양변 IN 2회) → 이웃 45명까지만 mesh, 초과 시 star 유지.
+  const neighborIds = keepIds.filter((k) => k !== center);
+  if (neighborIds.length > 1 && neighborIds.length <= 45) {
+    const nph = neighborIds.map(() => "?").join(",");
+    const mesh = await db.prepare(
+      `SELECT src_id, dst_id, CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS weight, json_extract(attrs_json,'$.reltype') AS reltype ` +
+      `FROM kg_edges WHERE rel='coappears' AND src_id IN (${nph}) AND dst_id IN (${nph})`,
+    ).bind(...neighborIds, ...neighborIds).all<{ src_id: string; dst_id: string; weight: number | null; reltype: string | null }>();
+    const meshRaw: Edge[] = (mesh.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: Number(e.weight) || 1, reltype: e.reltype ? e.reltype : undefined }));
+    const meshKept = resolveCanonical([], meshRaw, map).edges.filter((e) => keep.has(e.a) && keep.has(e.b) && e.a !== center && e.b !== center);
+    outEdges.push(...meshKept);
+  }
   return {
     center: { id: center, name: centerNode.name },
     nodes,
-    edges: edges.filter((e) => keep.has(e.a) && keep.has(e.b)),
+    edges: outEdges,
   };
 }
