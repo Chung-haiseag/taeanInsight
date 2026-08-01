@@ -111,6 +111,8 @@ export default function PeoplePage() {
             <button type="button" onClick={() => setProf(null)} className="text-sm text-accent underline">← 검색으로</button>
           </div>
 
+          <PersonIntro prof={prof} />
+
           {prof.offices.length > 0 && (
             <section className="rounded-lg border border-brand/15 bg-background p-4">
               <h3 className="mb-2 text-sm font-bold text-brand">직위·소속 <span className="font-normal text-foreground-muted">(검증됨)</span></h3>
@@ -122,12 +124,7 @@ export default function PeoplePage() {
             </section>
           )}
 
-          {prof.graph.nodes.length > 0 && (
-            <section className="rounded-lg border border-brand/15 bg-background p-2">
-              <p className="px-2 pt-1 text-xs text-foreground-muted">관계망 — 노드를 누르면 그 인물로 이동(바이라인 제외)</p>
-              <KgGraph nodes={prof.graph.nodes} edges={prof.graph.edges} onNodeClick={(id) => void open(id)} height={380} />
-            </section>
-          )}
+          {prof.graph.nodes.length > 0 && <RelationGraph prof={prof} onOpen={open} />}
 
           {prof.coappear.length > 0 && (
             <section className="rounded-lg border border-brand/15 bg-background p-4">
@@ -181,5 +178,67 @@ export default function PeoplePage() {
         </>
       )}
     </div>
+  );
+}
+
+// ── 인물 기본 소개(자동 요약, 미검증) ──────────────────────────
+function PersonIntro({ prof }: { prof: PersonProfile }) {
+  if (!prof.person) return null;
+  const office = prof.offices[0];
+  const years = prof.timeline.length ? `${prof.timeline[0].year}~${prof.timeline[prof.timeline.length - 1].year}` : null;
+  const topCo = prof.coappear.slice(0, 3).map((c) => c.name);
+  const topics = prof.topics.slice(0, 6).map((t) => t.term);
+  const desc = office ? `${office.office}${office.ordinal ? `(${office.ordinal}대)` : ""}을 지낸 인물` : "태안 지역 아카이브 인물";
+  return (
+    <section className="rounded-lg border border-brand/20 bg-accent/5 p-4">
+      <h3 className="mb-1.5 text-sm font-bold text-brand">인물 소개</h3>
+      <p className="text-sm leading-relaxed text-foreground">
+        <strong className="text-brand">{prof.person.name}</strong> — {desc}. 아카이브 기사 <strong>{prof.person.mentions.toLocaleString()}건</strong>에 등장{years ? ` (${years})` : ""}.
+        {topCo.length ? <> 기사에서 <strong>{topCo.join(" · ")}</strong> 등과 자주 함께 다뤄졌습니다.</> : null}
+      </p>
+      {topics.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-foreground-muted">주요 주제</span>
+          {topics.map((t) => <span key={t} className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] text-brand">{t}</span>)}
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-foreground-muted">※ AI가 기사에서 자동 추출한 요약입니다(검증된 사실 아님).</p>
+    </section>
+  );
+}
+
+// ── 관계망(중심 인물 강조 + 검수된 관계만 색 라벨) ─────────────
+const REL_LEGEND: Record<string, string> = {
+  "협력·동료": "#16a34a",
+  "대립·갈등": "#dc2626",
+  "전임·후임": "#7c3aed",
+  "소속·상하": "#2563eb",
+  "가족·인척": "#d97706",
+};
+function RelationGraph({ prof, onOpen }: { prof: PersonProfile; onOpen: (id: string) => void }) {
+  const centerId = prof.graph.center?.id;
+  // 관계 라벨은 검수(verified)된 것만 그래프에 실어 색·라벨로 표시.
+  const verifiedRel = new Map(prof.coappear.filter((c) => c.verified === 1 && c.reltype).map((c) => [c.id, c.reltype as string]));
+  const edges = prof.graph.edges.map((e) => {
+    const other = e.a === centerId ? e.b : e.b === centerId ? e.a : null;
+    return { ...e, reltype: other ? verifiedRel.get(other) : undefined };
+  });
+  const usedRels = [...new Set(edges.map((e) => e.reltype).filter(Boolean) as string[])];
+  return (
+    <section className="rounded-lg border border-brand/15 bg-background p-2">
+      <p className="px-2 pt-1 text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(원 클릭 시 이동). 바이라인 제외.</p>
+      <KgGraph nodes={prof.graph.nodes} edges={edges} centerId={centerId} onNodeClick={onOpen} height={440} />
+      {usedRels.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-2 pb-1 pt-1 text-[11px]">
+          {usedRels.map((r) => (
+            <span key={r} className="inline-flex items-center gap-1">
+              <span className="inline-block h-2.5 w-4 rounded-sm" style={{ background: REL_LEGEND[r] ?? "#888" }} />
+              {r}
+            </span>
+          ))}
+          <span className="text-foreground-muted">— 검수된 관계만 색으로 표시(나머지는 함께 등장)</span>
+        </div>
+      )}
+    </section>
   );
 }
