@@ -9,7 +9,7 @@ import Link from "next/link";
 import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
 import { getUsers, getCostSummary, getRoi, type AdminUser, type MonthlyCostReport, type RoiData } from "@/lib/api/admin";
-import { getReportSummary, type ReportSummary } from "@/lib/api/report";
+import { getReportSummary, getAdminSettings, setAdminSettings, type ReportSummary } from "@/lib/api/report";
 
 type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "cost" | "changelog" | "health";
 const TABS: { key: ReportTab; label: string }[] = [
@@ -327,6 +327,7 @@ function OperationsInfo() {
 
   return (
     <div className="space-y-4">
+      <PublicPeopleToggle />
       <Card title="접속 주소">
         <KV
           rows={[
@@ -449,6 +450,47 @@ function OperationsInfo() {
         )}
       </Card>
     </div>
+  );
+}
+
+// ── 공개 기능 토글(superadmin 전용) ───────────────────────────
+function PublicPeopleToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    getSession().then((a) => setRole(a?.role ?? null)).catch(() => {});
+    getAdminSettings().then((s) => setOn(s.publicPeople)).catch(() => {});
+  }, []);
+  if (role !== "superadmin") return null; // 최종관리자만 노출
+  async function toggle() {
+    if (on === null) return;
+    setBusy(true);
+    try { const r = await setAdminSettings({ publicPeople: !on }); setOn(r.publicPeople); }
+    catch { /* 권한/네트워크 오류 무시 */ } finally { setBusy(false); }
+  }
+  return (
+    <section className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-brand">공개 기능 — 인물 탐색(/people)</h2>
+          <p className="mt-0.5 text-xs text-foreground-muted">
+            독자에게 {on === null ? "…" : on ? <strong className="text-green-700">공개 중</strong> : <strong className="text-foreground">감춤</strong>}.
+            데이터는 유지되고 노출만 즉시 제어됩니다(배포 불필요, 네비 반영 ~30초).
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={busy || on === null}
+          className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+            on ? "bg-green-600 text-white hover:bg-green-700" : "bg-foreground-muted/20 text-foreground hover:bg-foreground-muted/30"
+          }`}
+        >
+          {busy ? "…" : on ? "끄기(감추기)" : "켜기(공개)"}
+        </button>
+      </div>
+    </section>
   );
 }
 
