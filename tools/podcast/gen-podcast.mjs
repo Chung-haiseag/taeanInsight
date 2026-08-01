@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean } from "../lib/tts-normalize.mjs";
 import { wavToMp3 } from "../lib/wav-to-mp3.mjs";
+import { mixIntroOutro } from "./mix-music.mjs";
 
 const KEY = process.env.GEMINI_API_KEY;
 if (!KEY) { console.error("GEMINI_API_KEY 필요 (export GEMINI_API_KEY=...)"); process.exit(1); }
@@ -142,9 +143,14 @@ async function main() {
 
   const tmp = join(tmpdir(), `podcast-${rep.week_id}.mp3`);
   writeFileSync(tmp, mp3);
+  // 인트로·아웃트로 음악 합성(assets/intro·outro.mp3 있으면). 없거나 실패하면 원본 업로드.
+  const finalFile = join(tmpdir(), `podcast-${rep.week_id}-final.mp3`);
+  let mixed = false;
+  try { mixed = mixIntroOutro(tmp, finalFile); } catch (e) { console.warn("  ⚠ 음악 합성 실패 — 원본 업로드:", e.message); }
+  if (mixed) console.log("  🎵 인트로·아웃트로 음악 합성 적용");
   try {
     console.log(`▸ R2 업로드 → ${key}`);
-    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", tmp, "--content-type", "audio/mpeg", "--remote"]);
+    wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", mixed ? finalFile : tmp, "--content-type", "audio/mpeg", "--remote"]);
     console.log("✅ 완료 — /reports 팟캐스트가 NotebookLM급으로 교체됩니다.");
     // 현황 기록(Worker /api/audio/status)
     try {
