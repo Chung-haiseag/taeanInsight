@@ -270,3 +270,20 @@ export async function listReports(): Promise<ReportListItem[]> {
     return [];
   }
 }
+
+// 주간 팟캐스트 다시듣기 — 팟캐스트(-gem)가 있는 발행 회차 목록.
+export interface PodcastEpisode {
+  weekId: string;
+  publishedAt: string;
+  summary: string;
+}
+export async function listPodcastEpisodes(): Promise<PodcastEpisode[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/audio/podcast/episodes`, { next: { revalidate: 300 } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { episodes: PodcastEpisode[] };
+    return data.episodes ?? [];
+  } catch {
+    return [];
+  }
+}

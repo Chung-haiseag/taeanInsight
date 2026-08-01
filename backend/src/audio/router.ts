@@ -4,7 +4,7 @@
 
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { aggregateManifest } from "./manifest";
+import { aggregateManifest, podcastWeekIds } from "./manifest";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
@@ -43,6 +43,39 @@ audioRouter.get("/podcast", async (c) => {
   const cc = "private, max-age=86400", rh = c.req.header("range");
   const r = (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/podcast/${rep.week_id}-gem.mp3`, "audio/mpeg", cc, rh))
     ?? (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/podcast/${rep.week_id}-gem.wav`, "audio/wav", cc, rh));
+  return r ?? c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
+});
+
+// GET /api/audio/podcast/episodes — 팟캐스트(-gem)가 있는 발행 주간 리포트 회차 목록(다시듣기).
+//   R2 audio/podcast/ 목록에서 주차 집합을 뽑아 발행 리포트와 교집합. (:weekId 라우트보다 먼저 등록)
+audioRouter.get("/podcast/episodes", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS || !c.env.ARCHIVE_DB) return c.json({ episodes: [] });
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < 10; i++) {
+    const res = await c.env.ARCHIVE_PHOTOS.list({ prefix: "audio/podcast/", cursor, limit: 1000 });
+    for (const o of res.objects) keys.push(o.key);
+    if (!res.truncated) break;
+    cursor = res.cursor;
+  }
+  const have = podcastWeekIds(keys);
+  const rows = await c.env.ARCHIVE_DB
+    .prepare("SELECT week_id, published_at, summary FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 40")
+    .all<{ week_id: string; published_at: string; summary: string }>();
+  const episodes = (rows.results ?? [])
+    .filter((r) => have.has(r.week_id))
+    .map((r) => ({ weekId: r.week_id, publishedAt: r.published_at, summary: r.summary ?? "" }));
+  c.header("Cache-Control", "public, max-age=300");
+  return c.json({ episodes });
+});
+
+// GET /api/audio/podcast/:weekId — 특정 주차 팟캐스트(-gem) 서빙(다시듣기). weekId는 ISO 주차 형식만.
+audioRouter.get("/podcast/:weekId{[0-9]{4}-W[0-9]{2}}", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
+  const weekId = c.req.param("weekId");
+  const cc = "private, max-age=86400", rh = c.req.header("range");
+  const r = (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/podcast/${weekId}-gem.mp3`, "audio/mpeg", cc, rh))
+    ?? (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/podcast/${weekId}-gem.wav`, "audio/wav", cc, rh));
   return r ?? c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
 

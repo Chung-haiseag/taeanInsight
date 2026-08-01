@@ -27,3 +27,14 @@ export function aggregateManifest(keys: string[]): AudioManifest {
   }
   return { total: keys.length, byFormat, keysByFormat };
 }
+
+// R2 키 목록에서 팟캐스트가 존재하는 주차(week_id) 집합 추출 — 다시듣기 회차 목록용(순수).
+//   키 형식: audio/podcast/<week_id>-gem.(mp3|wav)   예) audio/podcast/2026-W31-gem.mp3
+export function podcastWeekIds(keys: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const k of keys) {
+    const m = k.match(/(?:^|\/)(\d{4}-W\d{2})-gem\.(?:mp3|wav)$/);
+    if (m) out.add(m[1]);
+  }
+  return out;
+}

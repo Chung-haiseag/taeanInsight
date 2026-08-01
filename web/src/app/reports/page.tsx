@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ReportReader } from "@/components/reports/report-reader";
+import { PodcastEpisodes } from "@/components/reports/podcast-episodes";
 import { fetchLatestReport, fetchWeeklyNews, fetchGovNotices, fetchCardNews, fetchReportMetrics } from "@/lib/api/reports";
 import { RequireRole } from "@/components/require-role";
 
@@ -39,7 +40,10 @@ export default async function ReportsPage({
     : [[], [], [], null];
   return (
     <RequireRole minRole="user">
-      <ReportReader initialReport={report} metrics={metrics} news={news} govNotices={govNotices} cardNews={cardNews} />
+      <div className="space-y-6">
+        <ReportReader initialReport={report} metrics={metrics} news={news} govNotices={govNotices} cardNews={cardNews} />
+        <PodcastEpisodes />
+      </div>
     </RequireRole>
   );
 }
