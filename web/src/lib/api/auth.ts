@@ -45,12 +45,12 @@ export async function login(email: string, password: string): Promise<{ ok: bool
 
 export async function getSession(): Promise<Account | null> {
   const token = getAuthToken();
-  if (!token) return null;
+  if (!token) { setRoleCache(null); return null; } // 로그아웃 상태 — 역할 캐시도 정리(메뉴 오노출 방지)
   try {
     const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
     const u = data.user;
-    if (!u) { setAuthToken(null); return null; }
+    if (!u) { setAuthToken(null); setRoleCache(null); return null; } // 세션 만료 — 역할 캐시 정리
     setUid(String(u.uid)); // 다른 기기 로그인 상태 반영
     setRoleCache(u.role);
     return { email: u.email, uid: u.uid, displayName: u.displayName ?? null, role: u.role, plan: u.plan };
