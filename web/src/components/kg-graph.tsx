@@ -34,6 +34,8 @@ export default function KgGraph({
     });
     const es = edges.filter((e) => byId[e.a] && byId[e.b]);
     let W = 0, H = 0, dpr = 1, raf = 0, alpha = 1, selected: string | null = null, hovered: string | null = null, seeded = false;
+    // 표시 변환 — 물리는 자연 좌표에서 안정적으로 두고, 그릴 때만 캔버스에 꽉 차게 확대(축소 금지→겹침 없음).
+    let T = { cx: 0, cy: 0, sx: 1, sy: 1 };
     let s = 7; const rand = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     function theme() { const a = document.documentElement.getAttribute("data-theme"); if (a === "dark" || a === "light") return a; return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
     function pal() { const d = theme() === "dark"; return d ? { bg: "#141C28", edge: "rgba(231,235,237,.28)", edgeDim: "rgba(231,235,237,.06)", node: "#3E6B72", nodeC: "#57B2BC", ring: "#7FC9D2", label: "#E7EBED", halo: "#141C28" } : { bg: "#FBFCFC", edge: "rgba(27,36,54,.28)", edgeDim: "rgba(27,36,54,.05)", node: "#7FB0B5", nodeC: "#0E5860", ring: "#0E5860", label: "#1B2436", halo: "#FBFCFC" }; }
@@ -50,6 +52,16 @@ export default function KgGraph({
       if (!c) ns.forEach((n, i) => { const a = (i / Math.max(1, ns.length)) * Math.PI * 2; n.x = cx + Math.cos(a) * R; n.y = cy + Math.sin(a) * R; });
     }
     function clampAll() { ns.forEach((n) => { const p = n.r + 10; n.x = Math.max(p, Math.min(W - p, n.x)); n.y = Math.max(p, Math.min(H - p, n.y)); }); }
+    // 현재 노드 분포를 캔버스에 꽉 차게 맞추는 표시 배율 계산(중심 기준). 축소 금지(sx,sy≥1)라 겹침 없음, 왜곡 1.7배 제한.
+    function computeFit() {
+      const cx = W / 2, cy = H / 2, pad = 26;
+      let mdx = 1, mdy = 1;
+      for (const n of ns) { mdx = Math.max(mdx, Math.abs(n.x - cx) + n.r); mdy = Math.max(mdy, Math.abs(n.y - cy) + n.r); }
+      let sx = Math.max(1, (W / 2 - pad) / mdx), sy = Math.max(1, (H / 2 - pad) / mdy);
+      const lo = Math.min(sx, sy); sx = Math.min(sx, lo * 1.7); sy = Math.min(sy, lo * 1.7);
+      T = { cx, cy, sx, sy };
+    }
+    const PX = (n: Node) => T.cx + (n.x - T.cx) * T.sx, PY = (n: Node) => T.cy + (n.y - T.cy) * T.sy;
     function tick(al: number) {
       const cx = W / 2, cy = H / 2;
       const fx: number[] = new Array(ns.length).fill(0), fy: number[] = new Array(ns.length).fill(0);
@@ -76,20 +88,21 @@ export default function KgGraph({
     }
     function ego() { if (!selected) return null; const s2 = new Set([selected]); for (const e of es) { if (e.a === selected) s2.add(e.b); if (e.b === selected) s2.add(e.a); } return s2; }
     function draw() {
+      computeFit(); // 매 프레임 표시 배율 갱신 → 물리 정착과 무관하게 항상 박스에 꽉 참
       const P = pal(), eg = ego(); ctx!.clearRect(0, 0, W, H); ctx!.fillStyle = P.bg; ctx!.fillRect(0, 0, W, H);
       // 엣지 — 두께로 관계 강도(공동등장 빈도) 표현. 이 그래프 최대 가중치 대비 √정규화(빈도 편차가 커 √로 압축).
       const maxW = es.reduce((m, e) => Math.max(m, e.weight), 1);
       for (const e of es) {
         const a = byId[e.a], b = byId[e.b], inc = selected && (e.a === selected || e.b === selected);
         const relC = e.reltype ? REL_COLOR[e.reltype] : undefined;
-        ctx!.beginPath(); ctx!.moveTo(a.x, a.y); ctx!.lineTo(b.x, b.y);
+        ctx!.beginPath(); ctx!.moveTo(PX(a), PY(a)); ctx!.lineTo(PX(b), PY(b));
         if (selected && !inc) { ctx!.strokeStyle = P.edgeDim; ctx!.lineWidth = 0.7; }
         else { ctx!.strokeStyle = relC ?? P.edge; ctx!.lineWidth = (relC ? 1.6 : 0.6) + Math.sqrt(e.weight / maxW) * 4.4; }
         ctx!.stroke();
       }
       // 관계 라벨(색 배경 pill) — 검수된 reltype만
       for (const e of es) { if (!e.reltype) continue; const a = byId[e.a], b = byId[e.b]; if (selected && !(e.a === selected || e.b === selected)) continue;
-        const relC = REL_COLOR[e.reltype] ?? P.label; const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const relC = REL_COLOR[e.reltype] ?? P.label; const mx = (PX(a) + PX(b)) / 2, my = (PY(a) + PY(b)) / 2;
         ctx!.font = "700 10px " + FONT; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
         const tw = ctx!.measureText(e.reltype).width; ctx!.fillStyle = P.halo; ctx!.globalAlpha = 0.92;
         roundRect(ctx!, mx - tw / 2 - 5, my - 8, tw + 10, 16, 8); ctx!.fill(); ctx!.globalAlpha = 1;
@@ -97,22 +110,22 @@ export default function KgGraph({
         ctx!.fillStyle = relC; ctx!.fillText(e.reltype, mx, my);
       }
       // 노드
-      for (const n of ns) { const dim = selected && !(eg && eg.has(n.id)); ctx!.globalAlpha = dim ? 0.16 : 1;
-        if (n.center) { ctx!.beginPath(); ctx!.arc(n.x, n.y, n.r + 6, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 3; ctx!.stroke(); }
-        else if (n.id === selected) { ctx!.beginPath(); ctx!.arc(n.x, n.y, n.r + 5, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2.5; ctx!.stroke(); }
-        ctx!.beginPath(); ctx!.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx!.fillStyle = n.center ? P.nodeC : P.node; ctx!.fill();
+      for (const n of ns) { const dim = selected && !(eg && eg.has(n.id)); ctx!.globalAlpha = dim ? 0.16 : 1; const nx = PX(n), ny = PY(n);
+        if (n.center) { ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 6, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 3; ctx!.stroke(); }
+        else if (n.id === selected) { ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 5, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2.5; ctx!.stroke(); }
+        ctx!.beginPath(); ctx!.arc(nx, ny, n.r, 0, Math.PI * 2); ctx!.fillStyle = n.center ? P.nodeC : P.node; ctx!.fill();
         if (n.id === hovered && !dim) { ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2; ctx!.stroke(); }
       }
       // 라벨
       ctx!.globalAlpha = 1; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
       for (const n of ns) { const show = n.center || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
-        ctx!.font = (n.center ? "800 13px " : n.id === selected ? "700 12px " : "600 12px ") + FONT; const ly = n.y + n.r + 11;
-        ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(n.name, n.x, ly); ctx!.fillStyle = P.label; ctx!.fillText(n.name, n.x, ly);
+        ctx!.font = (n.center ? "800 13px " : n.id === selected ? "700 12px " : "600 12px ") + FONT; const ly = PY(n) + n.r + 11;
+        ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(n.name, PX(n), ly); ctx!.fillStyle = P.label; ctx!.fillText(n.name, PX(n), ly);
       }
     }
     function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
     function layout() { if (raf) cancelAnimationFrame(raf); if (reduce) { alpha = 1; for (let i = 0; i < 420; i++) { alpha *= 0.985; tick(Math.max(alpha, 0.02)); } draw(); return; } alpha = 1; const frame = () => { alpha *= 0.985; tick(Math.max(alpha, 0.02)); draw(); if (alpha > 0.03) raf = requestAnimationFrame(frame); else draw(); }; frame(); }
-    function pick(mx: number, my: number) { let best: string | null = null, bd = 1e9; for (const n of ns) { const d = Math.hypot(mx - n.x, my - n.y); if (d < n.r + 5 && d < bd) { bd = d; best = n.id; } } return best; }
+    function pick(mx: number, my: number) { let best: string | null = null, bd = 1e9; for (const n of ns) { const d = Math.hypot(mx - PX(n), my - PY(n)); if (d < n.r + 5 && d < bd) { bd = d; best = n.id; } } return best; }
     function rel(ev: PointerEvent) { const r = cv!.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
     const onDown = (ev: PointerEvent) => { const p = rel(ev); const n = pick(p.x, p.y); selected = n && n === selected ? null : n; draw(); if (n && clickRef.current) clickRef.current(n); };
     const onMove = (ev: PointerEvent) => { if (ev.pointerType === "touch") return; const p = rel(ev); const n = pick(p.x, p.y); cv!.style.cursor = n ? "pointer" : "default"; if (n !== hovered) { hovered = n; draw(); } };

@@ -134,9 +134,22 @@ export async function buildPersonBrief(db: D1Database, ai: unknown, id: string):
         { role: "user", content: src },
       ],
     });
-    const brief = (res.content ?? "").replace(/\s+/g, " ").trim();
+    const brief = stripHanja((res.content ?? "").replace(/\s+/g, " ").trim());
     return brief.length > 10 ? brief : null;
   } catch { return null; }
+}
+
+// Workers AI가 가끔 한자(此外·他 등)를 섞어 낸다 → 결정론 정제: 흔한 접속어를 한국어로 치환 후 잔여 한자 제거.
+//   태안 인물 브리핑의 고유명사는 전부 한글이라 한자 제거가 안전하다.
+export function stripHanja(s: string): string {
+  const REPL: Record<string, string> = {
+    "此外": "그 외", "以外": "그 외", "他는": "그는", "他가": "그가", "他를": "그를", "他의": "그의", "他": "그",
+    "又": "또한", "亦": "또한", "即": "즉", "如": "예를 들어", "等": "등",
+  };
+  let out = s;
+  for (const [k, v] of Object.entries(REPL)) out = out.split(k).join(v);
+  out = out.replace(/[㐀-䶿一-鿿豈-﫿]/g, ""); // 잔여 CJK 한자 제거
+  return out.replace(/\s+([,.!?·)])/g, "$1").replace(/\(\s*\)/g, "").replace(/\s{2,}/g, " ").trim();
 }
 
 export async function buildPersonProfile(db: D1Database, id: string, limit = 12): Promise<PersonProfile | null> {
