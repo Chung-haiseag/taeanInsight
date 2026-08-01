@@ -67,7 +67,7 @@ function ReporterPageContent() {
   const KIND_LABEL: Record<string, string> = { gov: "군청", env: "특보", spike: "급변", keyword: "키워드" };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-7xl space-y-8">
       <PageHeader
         eyebrow="기자 전용"
         title="취재 알림"
