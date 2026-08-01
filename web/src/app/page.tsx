@@ -31,7 +31,7 @@ export default function HomePage() {
   // 초기 렌더(SSR/하이드레이션 전)는 일반 홈 — 하이드레이션 후 상태와 동일하게 4xl로 감싸 폭 점프 방지
   if (state === null)
     return (
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto max-w-[1200px] space-y-6">
         <GenericHome />
       </div>
     );
@@ -45,14 +45,14 @@ export default function HomePage() {
   return (
     <>
       {state === "entitled" && (
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="mx-auto max-w-[1200px] space-y-6">
           <EntitledBanner onCancel={() => { setDemoHomeState("preview"); setState("preview"); }} />
           <OwnerHome />
         </div>
       )}
 
       {state === "preview" && (
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="mx-auto max-w-[1200px] space-y-6">
           <PreviewBanner />
           <UpsellPaywall product={MOCK_ADDON} onSubscribe={subscribe}>
             <OwnerHome blurred />
@@ -61,7 +61,7 @@ export default function HomePage() {
       )}
 
       {state === "anonymous" && (
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="mx-auto max-w-[1200px] space-y-6">
           <AnonymousBanner />
           <GenericHome />
         </div>

@@ -74,7 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
-- 2026-08-01 · 사이트 콘텐츠 폭 확대(태안신문 수준, 피드백 '폭이 좁다'): 바깥 main·헤더는 이미 max-w-7xl(1280)인데 각 페이지가 콘텐츠를 max-w-4xl(896)로 좁게 감싸 좁아 보이던 것을, 그리드·목록·대시보드 8개 페이지(홈·뉴스목록·라이브·인물·시민기자·취재알림·내페이지·멤버십)를 max-w-7xl로 확대→헤더와 정렬(로고·콘텐츠 좌측 라인 일치). 읽기 전용 3개(기사본문·리포트리더·질의답변)는 max-w-4xl 유지(한국어 본문 가독성·태안신문도 기사 칼럼은 좁음). web/src/app/{page,news,live,people,citizen,reporter,me,membership}
+- 2026-08-01 · 사이트 콘텐츠 폭을 태안신문과 실측 일치(피드백 '폭이 좁다'): 콘텐츠가 max-w-4xl(896)로 좁던 것을, 태안신문(taeannews.co.kr) 콘텐츠 컨테이너 실측(.mode-inner 1200px)에 맞춰 셸 전체를 max-w-[1200px]로 통일 — 레이아웃 main·site-header·site-footer·admin-header + 그리드/목록/대시보드 8개 페이지(홈·뉴스목록·라이브·인물·시민기자·취재알림·내페이지·멤버십). 로고·콘텐츠 좌측 라인 정렬, 우리 main 폭 브라우저 실측=1200px. 읽기 전용 3개(기사본문·리포트리더·질의답변)는 max-w-4xl 유지(한국어 본문 가독성·태안신문도 기사 칼럼은 좁음). web/src/app/*·components/{site-header,site-footer,admin-header}
 - 2026-08-01 · 비로그인 첫 화면(GenericHome) 콘텐츠·디자인 강화(방문자 첫인상): 기존 얇은 홈을 실데이터 기반 5블록으로 재구성 — ①히어로(정체성+실수치 증거 10만4천건·1990–2026·100% 편집부검토, CTA 질의/아카이브/리포트) ②실시간 '지금 태안'(LiveSummaryStrip) ③대표 콘텐츠 쇼케이스 4카드(질의응답·아카이브 getArchiveStats 실count·옛신문 디지털화 1990–2001·인물 관계망, Phosphor 라인아이콘 칩) ④실제 최신 기사(PersonalizedNewsStrip) ⑤저널리즘·신뢰 네이비 블록(편집부검토·시민기자단·주간리포트). 사용자 선택 방향=대표콘텐츠+실시간+저널리즘+최신기사 전부. 기존 디자인시스템(brand navy·teal accent·eyebrow·hairline·card-lift) 유지, 숫자는 archive/stats 실데이터·배지 남발 금지. web/src/components/home/generic-home.tsx
 - 2026-06 · 옛신문 디지털화 1991~2001 (Vision OCR, ~14k건) · tools/ebook, PLAYBOOK.md
 - 2026-06 · 띄어쓰기 transferSpacing(글자보존 이식) · tools/ebook/fix-spacing.mjs
