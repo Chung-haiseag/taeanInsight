@@ -2,6 +2,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../types";
+import { sessionUser, bearerToken } from "../auth/session_guard";
+import { hasRole } from "../auth/roles";
 
 export const reporterRouter = new Hono<{ Bindings: Env }>();
 
@@ -87,11 +89,13 @@ const DRAFT_STOP = new Set(["태안군", "태안", "안내", "공지", "새소�
 
 reporterRouter.post("/draft", async (c) => {
   if (!c.env.AI) return c.json({ error: "ai_unbound" }, 503);
-  // 등록 기자만(AI 비용 보호) — uid가 reporters에 있어야 함
+  // 기자만(AI 비용 보호) — 등록 uid(reporters 테이블) 또는 세션 role이 기자 이상.
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "reporters_only" }, 403);
   const drUid = uidOf(c);
-  if (!drUid || !c.env.ARCHIVE_DB || !(await c.env.ARCHIVE_DB.prepare("SELECT uid FROM reporters WHERE uid=?").bind(drUid).first())) {
-    return c.json({ error: "reporters_only" }, 403);
-  }
+  const su = await sessionUser(c.env.ARCHIVE_DB, bearerToken(c));
+  const roleOk = !!su && hasRole(su.role, "reporter");
+  const uidOk = !!drUid && !!(await c.env.ARCHIVE_DB.prepare("SELECT uid FROM reporters WHERE uid=?").bind(drUid).first());
+  if (!roleOk && !uidOk) return c.json({ error: "reporters_only" }, 403);
   const parsed = draftSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json({ error: "invalid" }, 400);
   const seedTitle = (parsed.data.title ?? "").replace(/^[^\]]*\]\s*/, "").trim(); // "📋 태안군청 [새소식]" 접두 제거
