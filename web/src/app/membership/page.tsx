@@ -69,7 +69,7 @@ export default function MembershipPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
+    <div className="mx-auto max-w-7xl space-y-10">
       <div>
         <PageHeader
           align="center"

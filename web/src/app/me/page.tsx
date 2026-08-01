@@ -82,7 +82,7 @@ function MeDashboard({ data }: { data: MeResponse }) {
   const segLabel = SEGMENT_LIMITS[preferences.segment]?.label ?? preferences.segment;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
+    <div className="mx-auto max-w-7xl space-y-10">
       {/* 에디토리얼 헤더 */}
       <header className="pt-2">
         <PageHeader

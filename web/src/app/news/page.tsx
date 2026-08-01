@@ -110,7 +110,7 @@ export default function NewsArchivePage() {
   const tabs = useMemo(() => sortCategoryTabs(CATEGORY_ORDER, interests), [interests]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-7xl space-y-8">
       <div>
         <PageHeader
           eyebrow="News · Archive"
