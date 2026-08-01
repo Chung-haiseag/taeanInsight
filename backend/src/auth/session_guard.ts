@@ -8,6 +8,7 @@ import { hasRole, type Role } from "./roles";
 
 export interface SessionUser {
   id: number;
+  uid: string;
   email: string;
   role: string;
   plan: string;
@@ -24,7 +25,7 @@ export async function sessionUser(db: D1Database | undefined, token: string | nu
   if (!db || !token) return null;
   const row = await db
     .prepare(
-      "SELECT u.id, u.email, u.role, u.plan FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at > ?",
+      "SELECT u.id, u.uid, u.email, u.role, u.plan FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at > ?",
     )
     .bind(token, new Date().toISOString())
     .first<SessionUser>();

@@ -1,7 +1,7 @@
 // 관리자 — 시민기자 신청 목록/결정. adminGuard 하위 마운트(/api/admin/citizen-applications).
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { decisionToStatus, shouldPromoteToCitizen } from "./applications";
+import { decisionToStatus, shouldPromoteToCitizen, shouldDemoteToUser } from "./applications";
 import { sessionUser, bearerToken } from "../auth/session_guard";
 
 export const citizenAppsRouter = new Hono<{ Bindings: Env }>();
@@ -34,11 +34,12 @@ citizenAppsRouter.post("/:id", async (c) => {
     .prepare("UPDATE citizen_applications SET status=?1, reason=COALESCE(?2, reason), decided_at=?3, decided_by=?4 WHERE id=?5")
     .bind(decisionToStatus(body.decision), body.reason ?? null, now, decider?.id ?? null, id)
     .run();
-  if (body.decision === "approve") {
-    const u = await db.prepare("SELECT role FROM users WHERE id=?").bind(app.user_id).first<{ role: string }>();
-    if (u && shouldPromoteToCitizen("approve", u.role)) {
-      await db.prepare("UPDATE users SET role='citizen' WHERE id=?").bind(app.user_id).run();
-    }
+  // 승인이면 user→citizen 승격, 반려면(이미 citizen이면) user로 회수 — 재결정 멱등성.
+  const u = await db.prepare("SELECT role FROM users WHERE id=?").bind(app.user_id).first<{ role: string }>();
+  if (u && shouldPromoteToCitizen(body.decision, u.role)) {
+    await db.prepare("UPDATE users SET role='citizen' WHERE id=?").bind(app.user_id).run();
+  } else if (u && shouldDemoteToUser(body.decision, u.role)) {
+    await db.prepare("UPDATE users SET role='user' WHERE id=?").bind(app.user_id).run();
   }
   return c.json({ ok: true });
 });

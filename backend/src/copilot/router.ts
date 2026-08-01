@@ -13,8 +13,18 @@ import { classifySensitiveTopics } from "../governance/sensitive_topics";
 import { applyGovernance } from "../governance/middleware";
 import { AI_LABEL_TEXT, type AiLabel } from "../governance/ai_label";
 import { reviewService, nextReviewId, type ReviewItem } from "../governance/review_queue";
+import { sessionUser, bearerToken } from "../auth/session_guard";
+import { hasRole } from "../auth/roles";
 
 export const copilotRouter = new Hono<{ Bindings: Env }>();
+
+// AI 작성 보조·이미지 업로드·제출은 시민기자 이상만(세션 강제). 비로그인 API 직접호출 차단.
+copilotRouter.use("*", async (c, next) => {
+  const u = await sessionUser(c.env.ARCHIVE_DB, bearerToken(c));
+  if (!u) return c.json({ error: "unauthorized", reason: "no_session" }, 401);
+  if (!hasRole(u.role, "citizen")) return c.json({ error: "forbidden", required: "citizen" }, 403);
+  await next();
+});
 
 // ── 실시간 점검 (무LLM) — 입력하면 PII·민감주제 경고 ────────
 copilotRouter.post("/check", async (c) => {

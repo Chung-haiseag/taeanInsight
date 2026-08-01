@@ -18,7 +18,7 @@ const TIMELINE = [
 
 export default function CitizenPage() {
   return (
-    <RequireRole minRole="user">
+    <RequireRole minRole="citizen" deniedHint={{ text: "시민기자만 이용할 수 있습니다. 내 페이지에서 시민기자를 신청하세요.", href: "/me", label: "시민기자 신청하러 가기" }}>
     <div className="mx-auto max-w-4xl space-y-8">
       <header className="space-y-2">
         <div className="flex items-center gap-2">
