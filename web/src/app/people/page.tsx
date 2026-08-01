@@ -261,7 +261,7 @@ function RelationGraph({ prof, onOpen }: { prof: PersonProfile; onOpen: (id: str
   return (
     <section className="rounded-lg border border-brand/15 bg-background p-2">
       <p className="px-2 pt-1 text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(원 클릭 시 이동). 바이라인 제외.</p>
-      <KgGraph nodes={prof.graph.nodes} edges={edges} centerId={centerId} onNodeClick={onOpen} height={440} />
+      <KgGraph nodes={prof.graph.nodes} edges={edges} centerId={centerId} onNodeClick={onOpen} height={560} />
       {usedRels.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 px-2 pb-1 pt-1 text-[11px]">
           {usedRels.map((r) => (

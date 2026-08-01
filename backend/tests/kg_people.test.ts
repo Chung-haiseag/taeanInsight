@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isHub, rankCoappears, yearHistogram, topTopics, HUB_MENTIONS } from "../src/kg/people";
+import { isHub, rankCoappears, yearHistogram, topTopics, HUB_MENTIONS, stripHanja } from "../src/kg/people";
 
 describe("isHub", () => {
   it("임계 경계(>=5000)", () => {
@@ -58,4 +58,21 @@ describe("topTopics", () => {
     expect(r.some((t) => t.term === "관광")).toBe(false);     // 1회는 제외(count>=2)
   });
   it("빈 입력 안전", () => { expect(topTopics([], "홍길동")).toEqual([]); });
+});
+
+describe("stripHanja — Workers AI 한자 누출 정제", () => {
+  it("흔한 한자 접속어를 한국어로 치환", () => {
+    expect(stripHanja("此外, 他는 환경미화원과 함께 나섰다")).toBe("그 외, 그는 환경미화원과 함께 나섰다");
+  });
+  it("잔여 CJK 한자는 제거하고 한글은 보존", () => {
+    expect(stripHanja("가세로는 太安의 군수다")).toBe("가세로는 의 군수다");
+    expect(stripHanja("태안군수를 역임한 공무원이다")).toBe("태안군수를 역임한 공무원이다");
+  });
+  it("한자 제거 후 공백·문장부호 정리", () => {
+    expect(stripHanja("장학금을 又 지급하였다")).toBe("장학금을 또한 지급하였다");
+  });
+  it("한자 없는 정상 문장은 그대로", () => {
+    const s = "이용희는 대한노인회 태안군지회장을 맡고 있다.";
+    expect(stripHanja(s)).toBe(s);
+  });
 });
