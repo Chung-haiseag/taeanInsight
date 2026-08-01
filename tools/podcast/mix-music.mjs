@@ -24,17 +24,20 @@ function probeDur(file) {
 }
 
 export function mixIntroOutro(speechIn, out, opts = {}) {
-  const { intro = INTRO, outro = OUTRO, fadeIn = 1.0, fadeOut = 1.2, gap = 0.35, bitrate = "128k" } = opts;
+  // introLen: 인트로를 이 초로 트림(원본 파일은 보존). 0/미설정이면 원본 전체. 기본 6초.
+  const { intro = INTRO, outro = OUTRO, fadeIn = 1.0, fadeOut = 1.2, gap = 0.35, introLen = 6.0, bitrate = "128k" } = opts;
   if (!existsSync(intro) || !existsSync(outro)) {
     console.warn("⚠ intro/outro 없음 — 음악 없이 원본 사용:", intro, outro);
     if (speechIn !== out) copyFileSync(speechIn, out);
     return false;
   }
-  const introDur = probeDur(intro), outroDur = probeDur(outro);
-  const introFo = Math.max(0, introDur - fadeOut), outroFo = Math.max(0, outroDur - fadeOut);
+  const introFull = probeDur(intro), outroDur = probeDur(outro);
+  const iLen = introLen > 0 && introLen < introFull ? introLen : introFull;
+  const introTrim = iLen < introFull ? `atrim=0:${iLen},asetpts=N/SR/TB,` : "";
+  const introFo = Math.max(0, iLen - fadeOut), outroFo = Math.max(0, outroDur - fadeOut);
   // 겹침 없이 순차 연결: 음악은 각자 구간에서 페이드로 시작·종료, 사이에 짧은 공백(apad).
   const fc =
-    `[0:a]aformat=sample_rates=48000:channel_layouts=stereo,afade=t=in:st=0:d=${fadeIn},afade=t=out:st=${introFo.toFixed(2)}:d=${fadeOut},apad=pad_dur=${gap}[i];` +
+    `[0:a]aformat=sample_rates=48000:channel_layouts=stereo,${introTrim}afade=t=in:st=0:d=${fadeIn},afade=t=out:st=${introFo.toFixed(2)}:d=${fadeOut},apad=pad_dur=${gap}[i];` +
     `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,apad=pad_dur=${gap}[s];` +
     `[2:a]aformat=sample_rates=48000:channel_layouts=stereo,afade=t=in:st=0:d=${fadeIn},afade=t=out:st=${outroFo.toFixed(2)}:d=${fadeOut}[o];` +
     `[i][s][o]concat=n=3:v=0:a=1[m]`;
