@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
@@ -87,6 +87,7 @@ export default async function LivePage() {
           <section>
             <h2 className="text-xl font-bold text-brand">지역경제</h2>
             <span className="accent-rule mt-3" aria-hidden />
+            <RealEstatePanel re={metrics.realestate} compact />
             <OilCard oil={metrics.oil} />
           </section>
 

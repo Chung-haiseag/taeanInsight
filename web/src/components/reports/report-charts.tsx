@@ -492,10 +492,10 @@ export function WeatherCards({ env }: { env: ReportMetrics["environment"] }) {
 }
 
 // ── 부동산: 집계 카드 + 가격대 막대 + 실거래 표 ──
-export function RealEstatePanel({ re }: { re: ReportMetrics["realestate"] }) {
+export function RealEstatePanel({ re, compact = false }: { re: ReportMetrics["realestate"]; compact?: boolean }) {
   if (!re.apt && !re.land) return null;
   return (
-    <div className="mt-4 space-y-5">
+    <div className={`mt-4 ${compact ? "grid gap-3 sm:grid-cols-2" : "space-y-5"}`}>
       {re.apt && (
         <div className="card p-4">
           <p className="text-sm font-semibold text-brand">아파트 실거래 · 최근 {re.apt.count}건</p>
@@ -505,7 +505,7 @@ export function RealEstatePanel({ re }: { re: ReportMetrics["realestate"] }) {
             <Stat label="최저가" value={wonFmt(re.apt.minManwon)} />
           </div>
           <RangeBar min={re.apt.minManwon} avg={re.apt.avgManwon} max={re.apt.maxManwon} />
-          <AptTable items={re.apt.items} />
+          {!compact && <AptTable items={re.apt.items} />}
         </div>
       )}
       {re.land && (
@@ -515,10 +515,10 @@ export function RealEstatePanel({ re }: { re: ReportMetrics["realestate"] }) {
             <Stat label="최고가" value={wonFmt(re.land.maxManwon)} accent />
             <Stat label="최저가" value={wonFmt(re.land.minManwon)} />
           </div>
-          <LandTable items={re.land.items} />
+          {!compact && <LandTable items={re.land.items} />}
         </div>
       )}
-      <p className="text-right text-[0.7rem] text-foreground-muted">국토교통부 실거래가 공개시스템</p>
+      <p className={`text-right text-[0.7rem] text-foreground-muted ${compact ? "sm:col-span-2" : ""}`}>국토교통부 실거래가 공개시스템</p>
     </div>
   );
 }
