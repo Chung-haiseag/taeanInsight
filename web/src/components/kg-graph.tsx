@@ -24,18 +24,20 @@ export default function KgGraph({
     const cv = cvRef.current; if (!cv) return;
     const ctx = cv.getContext("2d"); if (!ctx) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    type Node = N & { x: number; y: number; vx: number; vy: number; r: number; center: boolean };
+    type Node = N & { x: number; y: number; vx: number; vy: number; r: number; center: boolean; hx: number; hy: number };
     const byId: Record<string, Node> = {};
     // 노드 반경: 등장수에 완만·상한(블롭 방지). 중심 인물은 더 크게.
     const ns: Node[] = nodes.map((n) => {
       const center = n.id === centerId;
       const base = 10 + Math.min(Math.sqrt(Math.max(1, n.mentions)) * 0.42, center ? 22 : 12);
-      return (byId[n.id] = { ...n, x: 0, y: 0, vx: 0, vy: 0, r: base, center });
+      return (byId[n.id] = { ...n, x: 0, y: 0, vx: 0, vy: 0, r: base, center, hx: 0, hy: 0 });
     });
     const es = edges.filter((e) => byId[e.a] && byId[e.b]);
     let W = 0, H = 0, dpr = 1, raf = 0, alpha = 1, selected: string | null = null, hovered: string | null = null, seeded = false;
     // 표시 변환 — 물리는 자연 좌표에서 안정적으로 두고, 그릴 때만 캔버스에 꽉 차게 확대(축소 금지→겹침 없음).
     let T = { cx: 0, cy: 0, sx: 1, sy: 1 };
+    // 호버 상호작용 — 커서(자연 좌표) 근처 노드를 살짝 밀고, 벗어나면 홈으로 스프링백.
+    let mouse: { x: number; y: number } | null = null, hoverRaf = 0, homesReady = false;
     let s = 7; const rand = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     function theme() { const a = document.documentElement.getAttribute("data-theme"); if (a === "dark" || a === "light") return a; return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
     function pal() { const d = theme() === "dark"; return d ? { bg: "#141C28", edge: "rgba(231,235,237,.28)", edgeDim: "rgba(231,235,237,.06)", node: "#3E6B72", nodeC: "#57B2BC", ring: "#7FC9D2", label: "#E7EBED", halo: "#141C28" } : { bg: "#FBFCFC", edge: "rgba(27,36,54,.28)", edgeDim: "rgba(27,36,54,.05)", node: "#7FB0B5", nodeC: "#0E5860", ring: "#0E5860", label: "#1B2436", halo: "#FBFCFC" }; }
@@ -124,19 +126,45 @@ export default function KgGraph({
       }
     }
     function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
-    function layout() { if (raf) cancelAnimationFrame(raf); if (reduce) { alpha = 1; for (let i = 0; i < 420; i++) { alpha *= 0.985; tick(Math.max(alpha, 0.02)); } draw(); return; } alpha = 1; const frame = () => { alpha *= 0.985; tick(Math.max(alpha, 0.02)); draw(); if (alpha > 0.03) raf = requestAnimationFrame(frame); else draw(); }; frame(); }
+    function setHomes() { for (const n of ns) { n.hx = n.x; n.hy = n.y; } homesReady = true; }
+    function layout() { if (raf) cancelAnimationFrame(raf); if (reduce) { alpha = 1; for (let i = 0; i < 420; i++) { alpha *= 0.985; tick(Math.max(alpha, 0.02)); } setHomes(); draw(); return; } alpha = 1; const frame = () => { alpha *= 0.985; tick(Math.max(alpha, 0.02)); draw(); if (alpha > 0.03) raf = requestAnimationFrame(frame); else { setHomes(); draw(); } }; frame(); }
+    // 캔버스(표시) 좌표 → 자연(물리) 좌표
+    function toNatural(mx: number, my: number) { return { x: T.cx + (mx - T.cx) / (T.sx || 1), y: T.cy + (my - T.cy) / (T.sy || 1) }; }
+    // 호버 물리: 커서 반발 + 홈 스프링백. 커서 벗어나고 다 돌아오면 자동 정지.
+    function hoverTick() {
+      const R = 62, damp = 0.72, homeK = 0.10; let moving = false;
+      for (const n of ns) {
+        if (n.center) { n.x = T.cx; n.y = T.cy; continue; }              // 중심 고정
+        let fx = (n.hx - n.x) * homeK, fy = (n.hy - n.y) * homeK;        // 홈 복귀
+        if (mouse) {
+          const dx = n.x - mouse.x, dy = n.y - mouse.y, d2 = dx * dx + dy * dy;
+          if (d2 < R * R) { const d = Math.sqrt(d2) || 0.01, push = 3.2 * (1 - d / R); fx += (dx / d) * push; fy += (dy / d) * push; }
+        }
+        n.vx = (n.vx + fx) * damp; n.vy = (n.vy + fy) * damp;
+        n.x += n.vx; n.y += n.vy;
+        if (Math.abs(n.x - n.hx) > 0.3 || Math.abs(n.y - n.hy) > 0.3 || Math.abs(n.vx) > 0.3 || Math.abs(n.vy) > 0.3) moving = true;
+      }
+      draw();
+      hoverRaf = mouse || moving ? requestAnimationFrame(hoverTick) : 0;
+    }
     function pick(mx: number, my: number) { let best: string | null = null, bd = 1e9; for (const n of ns) { const d = Math.hypot(mx - PX(n), my - PY(n)); if (d < n.r + 5 && d < bd) { bd = d; best = n.id; } } return best; }
     function rel(ev: PointerEvent) { const r = cv!.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
     const onDown = (ev: PointerEvent) => { const p = rel(ev); const n = pick(p.x, p.y); selected = n && n === selected ? null : n; draw(); if (n && clickRef.current) clickRef.current(n); };
-    const onMove = (ev: PointerEvent) => { if (ev.pointerType === "touch") return; const p = rel(ev); const n = pick(p.x, p.y); cv!.style.cursor = n ? "pointer" : "default"; if (n !== hovered) { hovered = n; draw(); } };
-    const onLeave = () => { if (hovered) { hovered = null; draw(); } };
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerType === "touch") return;
+      const p = rel(ev); const n = pick(p.x, p.y); cv!.style.cursor = n ? "pointer" : "default";
+      const hchg = n !== hovered; hovered = n;
+      if (homesReady && !reduce) { mouse = toNatural(p.x, p.y); if (!hoverRaf) hoverRaf = requestAnimationFrame(hoverTick); } // 커서 반발(호버 잔움직임)
+      else if (hchg) draw();
+    };
+    const onLeave = () => { hovered = null; mouse = null; if (!hoverRaf) draw(); }; // 커서 나감 → 홈으로 스프링백 후 정지
     cv.addEventListener("pointerdown", onDown); cv.addEventListener("pointermove", onMove); cv.addEventListener("pointerleave", onLeave);
     const onResize = () => resize();
     window.addEventListener("resize", onResize);
     const mq = window.matchMedia("(prefers-color-scheme: dark)"); const onTheme = () => draw(); mq.addEventListener("change", onTheme);
     const mo = new MutationObserver(() => draw()); mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     raf = requestAnimationFrame(resize);
-    return () => { if (raf) cancelAnimationFrame(raf); cv.removeEventListener("pointerdown", onDown); cv.removeEventListener("pointermove", onMove); cv.removeEventListener("pointerleave", onLeave); window.removeEventListener("resize", onResize); mq.removeEventListener("change", onTheme); mo.disconnect(); };
+    return () => { if (raf) cancelAnimationFrame(raf); if (hoverRaf) cancelAnimationFrame(hoverRaf); cv.removeEventListener("pointerdown", onDown); cv.removeEventListener("pointermove", onMove); cv.removeEventListener("pointerleave", onLeave); window.removeEventListener("resize", onResize); mq.removeEventListener("change", onTheme); mo.disconnect(); };
   }, [nodes, edges, centerId]);
 
   return <canvas ref={cvRef} style={{ display: "block", width: "100%", height }} />;
