@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-02 · 기사 나레이션 외부 연결 + 기사 공유 기능: ①공개 오디오 CORS 전면개방 — 전역 /api/* CORS 뒤에 app.use('/api/audio/*', cors(origin:'*', GET/OPTIONS)) → 어느 외부 사이트에서도 JS 재생·임베드(검증 example.com→ACAO:*). ②오디오 캐시 private→public(뉴스 max-age=604800 immutable·팟캐스트/브리핑 public)로 CDN 엣지 캐싱. ③기사 헤더에 ShareBar — 공유(Web Share API·미지원 시 링크복사)+오디오 드롭다운(오디오 링크 복사·<audio> 임베드 코드 복사). 나레이션 URL=/api/audio/news/:idxno(공개·Range). backend index.ts·audio/router.ts, web app/news/[id]/article-client.tsx
 - 2026-08-02 · 지역경제에 부동산 실거래 요약 추가(/live): 기존 RealEstatePanel(국토부 실거래)에 compact 옵션 추가 → /live 지역경제에 아파트 평균·최고·최저·건수 + 토지(표 없이 요약, 2열)로 유가 위에 배치. 리포트는 표까지 그대로. (수산물 시세=②는 KAMIS 키/data.go.kr 활용신청 평일 승인 후 진행 예정) web/src/components/reports/report-charts.tsx(RealEstatePanel compact)·app/live/page.tsx
 - 2026-08-02 · 주간 리포트 타이틀·서브제목 축소: Masthead h1 text-display→text-3xl/4xl(패딩·간격 축소), 남은 서브제목(카드뉴스·군정소식·주요뉴스·데이터) text-display-sm→text-xl로 통일. 리포트 제목 위계 일관·콤팩트. web/src/components/reports/report-reader.tsx
 - 2026-08-02 · 주간 리포트 섹션 제목 축소(너무 큼): 번호 마커 text-3xl→lg, 제목 text-display-sm→xl, 섹션 간격 space-y-14→10·mt-10→8, accent-rule mt-3→2. 이모지도 제목 따라 축소. web/src/components/reports/report-reader.tsx

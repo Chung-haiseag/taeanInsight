@@ -22,6 +22,7 @@ import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
 import { Icon } from "@/components/icon";
+import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
 import ArticleGraph from "./article-graph";
 
@@ -151,6 +152,7 @@ export default function ArticleClient() {
         <h1 className="text-display-sm font-bold text-brand">{article.title}</h1>
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
           <NewsAudio idxno={Number(params.id)} />
+          <ShareBar idxno={Number(params.id)} title={article.title} />
           <button
             type="button"
             onClick={() => window.print()}
@@ -199,6 +201,39 @@ export default function ArticleClient() {
         />
       )}
     </article>
+  );
+}
+
+// 공유 + 오디오(나레이션) 링크·임베드 복사. 나레이션 URL은 공개·CORS 전면개방이라 어디서든 재생/임베드 가능.
+function ShareBar({ idxno, title }: { idxno: number; title: string }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
+  const audioUrl = `${API_BASE_URL}/api/audio/news/${idxno}`;
+  const embed = `<audio controls preload="none" src="${audioUrl}"></audio>`;
+  const flash = (t: string) => { setMsg(t); window.setTimeout(() => setMsg(null), 1800); };
+  const copy = async (text: string, label: string) => {
+    try { await navigator.clipboard.writeText(text); flash(label); } catch { flash("복사 실패 — 길게 눌러 복사하세요"); }
+    setMenu(false);
+  };
+  const share = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const nav = navigator as Navigator & { share?: (d: { title?: string; url?: string }) => Promise<void> };
+    if (typeof nav.share === "function") { try { await nav.share({ title, url }); } catch { /* 사용자 취소 */ } return; }
+    await copy(url, "링크가 복사됐어요");
+  };
+  const pill = "inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-background px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5";
+  return (
+    <div className="relative inline-flex items-center gap-2">
+      <button type="button" onClick={share} className={pill}><Icon name="link" /> 공유</button>
+      <button type="button" onClick={() => setMenu((v) => !v)} aria-expanded={menu} aria-haspopup="menu" className={pill}><Icon name="speaker" /> 오디오</button>
+      {menu && (
+        <div className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-xl border border-brand/15 bg-background py-1 shadow-lift" role="menu">
+          <button type="button" role="menuitem" onClick={() => copy(audioUrl, "오디오 링크 복사됨")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-brand/5"><Icon name="link" /> 오디오 링크 복사</button>
+          <button type="button" role="menuitem" onClick={() => copy(embed, "임베드 코드 복사됨")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-brand/5"><Icon name="doc" /> 임베드 코드 복사</button>
+        </div>
+      )}
+      {msg && <span className="whitespace-nowrap text-xs font-semibold text-accent">{msg}</span>}
+    </div>
   );
 }
 

@@ -56,6 +56,10 @@ app.use(
   }),
 );
 
+// 공개 오디오(기사 나레이션·팟캐스트·브리핑)는 읽기전용 미디어 → 외부 어디서든 임베드·재생 가능하게 CORS 전면 개방.
+//   전역 /api/* CORS 뒤에 등록해 오디오 경로에서는 이 열린 정책이 최종 적용(GET/OPTIONS만).
+app.use("/api/audio/*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"], maxAge: 86400 }));
+
 // 관리자 보호 — /api/admin/*·/api/cost/* 마운트. 판정 로직은 ./auth/session_guard의 adminGuard.
 app.use("/api/admin/*", adminGuard);
 app.use("/api/cost/*", adminGuard);
