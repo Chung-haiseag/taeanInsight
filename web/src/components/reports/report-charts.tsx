@@ -84,19 +84,20 @@ export function SummaryInfographic({ metrics, govCount = 0 }: { metrics: ReportM
 
   return (
     <div className="mt-5 overflow-hidden rounded-2xl border border-brand/10 bg-gradient-to-br from-accent-subtle/40 via-white/40 to-white/20 shadow-soft">
-      <div className="flex items-center gap-2 border-b border-brand/10 px-5 py-3">
-        <span className="text-lg" aria-hidden><Icon name="chart" /></span>
+      <div className="flex items-center gap-2 border-b border-brand/10 px-4 py-2">
+        <span className="text-base" aria-hidden><Icon name="chart" /></span>
         <span className="text-sm font-bold tracking-wide text-brand">이번 주 핵심 지표</span>
       </div>
-      <div className="grid grid-cols-2 gap-px bg-brand/5 sm:grid-cols-3 lg:grid-cols-4">
+      {/* auto-fit: 타일 수만큼 한 줄에 꽉 채워 빈 칸 없이 배치(반응형 자동) */}
+      <div className="grid gap-px bg-brand/5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
         {tiles.map((t, i) => (
-          <div key={i} className="flex flex-col items-center gap-1 bg-background/70 px-3 py-5 text-center">
-            <span className="text-2xl" aria-hidden>{t.icon}</span>
-            <span className="font-display text-2xl font-bold tabular-nums leading-none" style={{ color: t.color ?? "var(--brand, #2a2118)" }}>
+          <div key={i} className="flex flex-col items-center gap-0.5 bg-background/70 px-2 py-3 text-center">
+            <span className="text-base leading-none" aria-hidden>{t.icon}</span>
+            <span className="font-display text-lg font-bold tabular-nums leading-none" style={{ color: t.color ?? "var(--brand, #2a2118)" }}>
               {t.value}
             </span>
-            <span className="text-xs font-medium text-foreground">{t.label}</span>
-            {t.sub && <span className="text-[0.7rem] text-foreground-muted">{t.sub}</span>}
+            <span className="text-[11px] font-medium text-foreground">{t.label}</span>
+            {t.sub && <span className="text-[10px] leading-tight text-foreground-muted">{t.sub}</span>}
           </div>
         ))}
       </div>
