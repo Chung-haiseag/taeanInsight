@@ -70,7 +70,8 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-brand/10 bg-background/80 backdrop-blur-md">
       {/* 상단 황토 라인 */}
       <div className="h-1 bg-gradient-to-r from-accent via-accent/60 to-transparent" aria-hidden="true" />
-      <div className="container mx-auto px-4 max-w-[1200px] flex items-center justify-between h-16">
+      {/* 1행: 로고 · 접근성 · 계정 */}
+      <div className="container mx-auto px-4 max-w-[1200px] flex items-center justify-between h-14">
         <Link href="/" className="flex items-center gap-2.5 text-brand" aria-label="태안 인사이트 홈">
           <span className="inline-block w-2 h-7 bg-accent rounded-sm" aria-hidden="true" />
           <span className="flex flex-col leading-none">
@@ -79,7 +80,30 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav aria-label="주요 메뉴" className="hidden md:flex gap-7 text-sm">
+        <div className="flex items-center gap-3">
+          <A11y className="hidden md:flex" />
+          <AccountNav />
+          {/* 모바일 햄버거 */}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls="mobile-menu"
+            aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
+            className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-brand/20 text-brand"
+          >
+            {open ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 2행: 데스크톱 메뉴 전용 바(자체 행 → 넉넉·줄바꿈 없음) */}
+      <div className="hidden md:block border-t border-brand/10">
+        <nav aria-label="주요 메뉴" className="container mx-auto px-4 max-w-[1200px] flex h-11 items-center gap-x-7 overflow-x-auto text-sm">
           {navItems.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -87,7 +111,7 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative py-1 transition-colors ${active ? "text-brand font-semibold" : "text-foreground-muted hover:text-brand"}`}
+                className={`relative shrink-0 whitespace-nowrap py-1 transition-colors ${active ? "text-brand font-semibold" : "text-foreground-muted hover:text-brand"}`}
               >
                 {item.label}
                 {active && <span className="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded-full bg-accent" aria-hidden="true" />}
@@ -95,26 +119,6 @@ export function SiteHeader() {
             );
           })}
         </nav>
-
-        {/* 데스크톱 접근성 + 계정 */}
-        <A11y className="hidden md:flex" />
-        <AccountNav />
-
-        {/* 모바일 햄버거 */}
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-          aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
-          className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-brand/20 text-brand"
-        >
-          {open ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-          )}
-        </button>
       </div>
 
       {/* 모바일 메뉴 패널 */}
