@@ -2,8 +2,9 @@
 
 // 멤버십 — 구독 상품 패키징 + 사전 신청(수요 검증). 결제(PG) 연동 전 단계.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { submitLead, type PlanId } from "@/lib/api/membership";
+import { trackEvent } from "@/lib/api/reading";
 import { PageHeader } from "@/components/page-header";
 
 const PLANS: {
@@ -59,6 +60,17 @@ export default function MembershipPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // 방문 추적(전환 퍼널 분모) — 출처는 utm_source > 리퍼러 호스트 > direct.
+  useEffect(() => {
+    let src = "direct";
+    try {
+      const utm = new URL(window.location.href).searchParams.get("utm_source");
+      if (utm) src = utm.slice(0, 40);
+      else if (document.referrer) { const h = new URL(document.referrer).hostname; src = h === window.location.hostname ? "internal" : h.slice(0, 40); }
+    } catch { /* direct */ }
+    trackEvent("membership_view", src);
+  }, []);
+
   async function apply(plan: PlanId) {
     if (!/.+@.+\..+/.test(email)) { setErr("이메일을 확인해 주세요."); return; }
     setBusy(true); setErr(null);
@@ -108,7 +120,7 @@ export default function MembershipPage() {
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => { setOpen(p.id); setErr(null); }}
+              <button type="button" onClick={() => { trackEvent("membership_cta", p.id); setOpen(p.id); setErr(null); }}
                 className={`mt-5 w-full rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? "bg-accent text-background hover:brightness-95" : "border border-brand/20 text-brand hover:bg-brand/5"}`}>
                 {p.id === "org" ? "도입 문의" : "사전 신청"}
               </button>

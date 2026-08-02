@@ -11,6 +11,34 @@ async function scalar(db: D1Database, sql: string): Promise<number | null> {
 async function text1(db: D1Database, sql: string): Promise<string | null> {
   try { const r = await db.prepare(sql).first<{ v: string | null }>(); return r?.v ?? null; } catch { return null; }
 }
+async function rows<T = Record<string, unknown>>(db: D1Database, sql: string): Promise<T[]> {
+  try { const r = await db.prepare(sql).all<T>(); return r.results ?? []; } catch { return []; }
+}
+
+// 멤버십 사전신청 전환 퍼널 — 방문(usage_events membership_view)→CTA→신청(subscription_leads)→전환율.
+//   첫달무료→유료 전환/유지는 결제(PG) 연동 후 채워짐(현재 PoC라 데이터 없음).
+reportRouter.get("/membership-funnel", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const [views, ctaClicks, leads] = await Promise.all([
+    scalar(db, "SELECT COUNT(*) n FROM usage_events WHERE type='membership_view'"),
+    scalar(db, "SELECT COUNT(*) n FROM usage_events WHERE type='membership_cta'"),
+    scalar(db, "SELECT COUNT(*) n FROM subscription_leads"),
+  ]);
+  const [leadsByPlan, ctaByPlan, viewsBySource, viewsDaily, leadsDaily] = await Promise.all([
+    rows(db, "SELECT plan, COUNT(*) n FROM subscription_leads GROUP BY plan"),
+    rows(db, "SELECT ref plan, COUNT(*) n FROM usage_events WHERE type='membership_cta' AND ref IS NOT NULL GROUP BY ref"),
+    rows(db, "SELECT COALESCE(NULLIF(ref,''),'direct') src, COUNT(*) n FROM usage_events WHERE type='membership_view' GROUP BY src ORDER BY n DESC LIMIT 8"),
+    rows(db, "SELECT substr(created_at,1,10) day, COUNT(*) n FROM usage_events WHERE type='membership_view' AND created_at >= date('now','-14 day') GROUP BY day ORDER BY day"),
+    rows(db, "SELECT substr(created_at,1,10) day, COUNT(*) n FROM subscription_leads WHERE created_at >= date('now','-14 day') GROUP BY day ORDER BY day"),
+  ]);
+  const conversion = views && views > 0 ? (leads ?? 0) / views : null;
+  return c.json({
+    views: views ?? 0, ctaClicks: ctaClicks ?? 0, leads: leads ?? 0, conversion,
+    leadsByPlan, ctaByPlan, viewsBySource, viewsDaily, leadsDaily,
+    paid: null, // 첫달무료→유료 전환/유지: 결제 연동 후
+  });
+});
 
 reportRouter.get("/summary", async (c) => {
   const db = c.env.ARCHIVE_DB;

@@ -9,9 +9,9 @@ import Link from "next/link";
 import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
 import { getUsers, getCostSummary, getRoi, type AdminUser, type MonthlyCostReport, type RoiData } from "@/lib/api/admin";
-import { getReportSummary, getAdminSettings, setAdminSettings, type ReportSummary } from "@/lib/api/report";
+import { getReportSummary, getAdminSettings, setAdminSettings, getMembershipFunnel, type ReportSummary, type MembershipFunnel } from "@/lib/api/report";
 
-type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "cost" | "changelog" | "health";
+type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "cost" | "funnel" | "changelog" | "health";
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "overview", label: "프로젝트 개요" },
   { key: "tech", label: "🧠 AI·기술" },
@@ -20,6 +20,7 @@ const TABS: { key: ReportTab; label: string }[] = [
   { key: "runbook", label: "🚀 운영 절차" },
   { key: "data", label: "📦 데이터 현황" },
   { key: "cost", label: "💰 비용·성과" },
+  { key: "funnel", label: "📈 전환·구독" },
   { key: "changelog", label: "🧾 변경 이력" },
   { key: "health", label: "🩺 시스템 상태" },
 ];
@@ -33,6 +34,7 @@ function renderTab(tab: ReportTab) {
     case "runbook": return <Runbook />;
     case "data": return <DataSnapshot />;
     case "cost": return <CostPerf />;
+    case "funnel": return <MembershipFunnelPanel />;
     case "changelog": return <Changelog />;
     case "health": return <Health />;
   }
@@ -826,6 +828,72 @@ function CostPerf() {
       )}
 
       <p className="text-xs text-foreground-muted">상세 대시보드는 <code className="text-[11px]">/admin</code> 💰비용·💎성과·📊분석 탭에서.</p>
+    </div>
+  );
+}
+
+// ── 전환·구독: 사전신청 퍼널(방문→CTA→신청) + 유료전환(결제 연동 후) ──
+function MembershipFunnelPanel() {
+  const [d, setD] = useState<MembershipFunnel | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => { getMembershipFunnel().then(setD).catch(() => setErr(true)); }, []);
+  if (err) return <p className="text-sm text-foreground-muted">불러오지 못했습니다.</p>;
+  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  const pct = d.conversion != null ? `${(d.conversion * 100).toFixed(1)}%` : "—";
+  const rate = (n: number) => (d.views ? `${((n / d.views) * 100).toFixed(1)}%` : "—");
+  const planLabel: Record<string, string> = { reader: "독자", business: "사장님", org: "기관" };
+  const maxView = Math.max(1, ...d.viewsDaily.map((x) => x.n));
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-foreground-muted">멤버십 사전신청 전환 퍼널 — <b>방문 → CTA 클릭 → 사전신청</b>. (첫 달 무료 → 유료 유지는 결제 연동 후 측정)</p>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <FunnelStat label="방문" value={d.views} />
+        <FunnelStat label={`CTA 클릭 · ${rate(d.ctaClicks)}`} value={d.ctaClicks} />
+        <FunnelStat label={`사전신청 · ${rate(d.leads)}`} value={d.leads} />
+        <FunnelStat label="방문→신청 전환율" value={pct} accent />
+      </div>
+      <div className="rounded-xl border border-brand/10 p-4">
+        <p className="text-sm font-semibold text-brand">플랜별 사전신청</p>
+        <div className="mt-2 flex flex-wrap gap-2 text-sm">
+          {d.leadsByPlan.length ? d.leadsByPlan.map((p) => (
+            <span key={p.plan} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{planLabel[p.plan] ?? p.plan} <strong className="text-brand">{p.n}</strong></span>
+          )) : <span className="text-foreground-muted">아직 신청 없음</span>}
+        </div>
+      </div>
+      <div className="rounded-xl border border-brand/10 p-4">
+        <p className="text-sm font-semibold text-brand">방문 출처 Top</p>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {d.viewsBySource.length ? d.viewsBySource.map((s) => (
+            <span key={s.src} className="rounded-full border border-brand/15 bg-brand/5 px-2.5 py-1">{s.src} <strong className="text-brand">{s.n}</strong></span>
+          )) : <span className="text-foreground-muted">데이터 없음</span>}
+        </div>
+      </div>
+      {d.viewsDaily.length > 0 && (
+        <div className="rounded-xl border border-brand/10 p-4">
+          <p className="text-sm font-semibold text-brand">최근 14일 방문</p>
+          <div className="mt-3 flex items-end gap-1" style={{ height: 64 }}>
+            {d.viewsDaily.map((x) => (
+              <div key={x.day} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${x.day} · ${x.n}`}>
+                <div className="w-full rounded-t bg-accent/70" style={{ height: `${Math.round((x.n / maxView) * 52)}px` }} />
+                <span className="text-[9px] text-foreground-muted">{x.day.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="rounded-xl border border-dashed border-brand/20 bg-brand/[0.02] p-4">
+        <p className="text-sm font-semibold text-brand">첫 달 무료 → 유료 전환·유지율</p>
+        <p className="mt-1 text-xs text-foreground-muted">결제(PG) 연동 후 측정 — 현재는 결제가 PoC(실청구 없음)라 데이터가 없습니다. 결제 연동 시 무료체험→유료 전환율·N개월 유지율이 여기 표시됩니다.</p>
+      </div>
+    </div>
+  );
+}
+
+function FunnelStat({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-4 text-center ${accent ? "border-accent/40 bg-accent-subtle/20" : "border-brand/10"}`}>
+      <p className="font-display text-2xl font-bold tabular-nums text-brand">{typeof value === "number" ? value.toLocaleString() : value}</p>
+      <p className="mt-0.5 text-xs text-foreground-muted">{label}</p>
     </div>
   );
 }
