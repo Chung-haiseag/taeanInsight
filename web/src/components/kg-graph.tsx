@@ -37,13 +37,13 @@ export default function KgGraph({
     // 표시 변환 — 물리는 자연 좌표에서 안정적으로 두고, 그릴 때만 캔버스에 꽉 차게 확대(축소 금지→겹침 없음).
     let T = { cx: 0, cy: 0, sx: 1, sy: 1 };
     // 호버 상호작용 — 커서(자연 좌표) 근처 노드를 살짝 밀고, 벗어나면 홈으로 스프링백.
-    let mouse: { x: number; y: number } | null = null, hoverRaf = 0, homesReady = false;
+    let mouse: { x: number; y: number } | null = null, hoverRaf = 0, homesReady = false, fitFrozen = false;
     let s = 7; const rand = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     function theme() { const a = document.documentElement.getAttribute("data-theme"); if (a === "dark" || a === "light") return a; return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
     function pal() { const d = theme() === "dark"; return d ? { bg: "#141C28", edge: "rgba(231,235,237,.28)", edgeDim: "rgba(231,235,237,.06)", node: "#3E6B72", nodeC: "#57B2BC", ring: "#7FC9D2", label: "#E7EBED", halo: "#141C28" } : { bg: "#FBFCFC", edge: "rgba(27,36,54,.28)", edgeDim: "rgba(27,36,54,.05)", node: "#7FB0B5", nodeC: "#0E5860", ring: "#0E5860", label: "#1B2436", halo: "#FBFCFC" }; }
     const FONT = '-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
 
-    function resize() { const r = cv!.getBoundingClientRect(); W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2); cv!.width = W * dpr; cv!.height = H * dpr; ctx!.setTransform(dpr, 0, 0, dpr, 0, 0); if (!seeded) { seed(); layout(); seeded = true; } else { clampAll(); draw(); } }
+    function resize() { const r = cv!.getBoundingClientRect(); W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2); cv!.width = W * dpr; cv!.height = H * dpr; ctx!.setTransform(dpr, 0, 0, dpr, 0, 0); fitFrozen = false; if (!seeded) { seed(); layout(); seeded = true; } else { clampAll(); draw(); } }
     // 시드: 중심은 가운데, 나머지는 반경 원형 배치(관계망 방사형).
     function seed() {
       const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.34;
@@ -90,7 +90,7 @@ export default function KgGraph({
     }
     function ego() { if (!selected) return null; const s2 = new Set([selected]); for (const e of es) { if (e.a === selected) s2.add(e.b); if (e.b === selected) s2.add(e.a); } return s2; }
     function draw() {
-      computeFit(); // 매 프레임 표시 배율 갱신 → 물리 정착과 무관하게 항상 박스에 꽉 참
+      if (!fitFrozen) computeFit(); // 표시 배율 갱신 → 박스에 꽉 참. 호버 중엔 동결(겨냥한 이름이 커서 밑에서 안 움직이게).
       const P = pal(), eg = ego(); ctx!.clearRect(0, 0, W, H); ctx!.fillStyle = P.bg; ctx!.fillRect(0, 0, W, H);
       // 엣지 — 두께로 관계 강도(공동등장 빈도) 표현. 이 그래프 최대 가중치 대비 √정규화(빈도 편차가 커 √로 압축).
       const maxW = es.reduce((m, e) => Math.max(m, e.weight), 1);
@@ -132,20 +132,26 @@ export default function KgGraph({
     function toNatural(mx: number, my: number) { return { x: T.cx + (mx - T.cx) / (T.sx || 1), y: T.cy + (my - T.cy) / (T.sy || 1) }; }
     // 호버 물리: 커서 반발 + 홈 스프링백. 커서 벗어나고 다 돌아오면 자동 정지.
     function hoverTick() {
-      const R = 62, damp = 0.72, homeK = 0.10; let moving = false;
+      const R = 55, damp = 0.72, homeK = 0.10; let moving = false;
+      // 커서에 '홈'이 가장 가까운 노드 = 지금 겨냥 중인 노드 → 항상 고정(클릭 대상). 홈 기준이라 흔들림 없음.
+      let near: Node | null = null, nd = Infinity;
+      if (mouse) for (const n of ns) { if (n.center) continue; const dx = n.hx - mouse.x, dy = n.hy - mouse.y, dd = dx * dx + dy * dy; if (dd < nd) { nd = dd; near = n; } }
       for (const n of ns) {
         if (n.center) { n.x = T.cx; n.y = T.cy; continue; }              // 중심 고정
-        let fx = (n.hx - n.x) * homeK, fy = (n.hy - n.y) * homeK;        // 홈 복귀
-        if (mouse) {
+        const hold = n === near;                                         // 겨냥 노드는 밀지 않고 빠르게 홈 고정
+        const hk = hold ? 0.35 : homeK;
+        let fx = (n.hx - n.x) * hk, fy = (n.hy - n.y) * hk;              // 홈 복귀
+        if (mouse && !hold) {                                            // 나머지만 커서 반발(비켜줌)
           const dx = n.x - mouse.x, dy = n.y - mouse.y, d2 = dx * dx + dy * dy;
-          if (d2 < R * R) { const d = Math.sqrt(d2) || 0.01, push = 3.2 * (1 - d / R); fx += (dx / d) * push; fy += (dy / d) * push; }
+          if (d2 < R * R) { const d = Math.sqrt(d2) || 0.01, push = 2.6 * (1 - d / R); fx += (dx / d) * push; fy += (dy / d) * push; }
         }
         n.vx = (n.vx + fx) * damp; n.vy = (n.vy + fy) * damp;
         n.x += n.vx; n.y += n.vy;
         if (Math.abs(n.x - n.hx) > 0.3 || Math.abs(n.y - n.hy) > 0.3 || Math.abs(n.vx) > 0.3 || Math.abs(n.vy) > 0.3) moving = true;
       }
       draw();
-      hoverRaf = mouse || moving ? requestAnimationFrame(hoverTick) : 0;
+      if (mouse || moving) hoverRaf = requestAnimationFrame(hoverTick);
+      else { hoverRaf = 0; fitFrozen = false; draw(); }                  // 정착 완료 → 배율 동결 해제
     }
     // 히트: 원(반경+여유) 또는 이름 라벨 영역(원 아래). 이름 글자를 클릭해도 이동되게.
     function pick(mx: number, my: number) {
@@ -165,7 +171,7 @@ export default function KgGraph({
       if (ev.pointerType === "touch") return;
       const p = rel(ev); const n = pick(p.x, p.y); cv!.style.cursor = n ? "pointer" : "default";
       const hchg = n !== hovered; hovered = n;
-      if (homesReady && !reduce) { mouse = toNatural(p.x, p.y); if (!hoverRaf) hoverRaf = requestAnimationFrame(hoverTick); } // 커서 반발(호버 잔움직임)
+      if (homesReady && !reduce) { fitFrozen = true; mouse = toNatural(p.x, p.y); if (!hoverRaf) hoverRaf = requestAnimationFrame(hoverTick); } // 배율 동결 후 커서 반발(호버 잔움직임)
       else if (hchg) draw();
     };
     const onLeave = () => { hovered = null; mouse = null; if (!hoverRaf) draw(); }; // 커서 나감 → 홈으로 스프링백 후 정지

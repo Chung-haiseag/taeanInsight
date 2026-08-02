@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-03 · 관계망 이름 클릭 안정화(kg-graph): 호버하면 이웃이 비켜나며 computeFit이 매프레임 배율(sx/sy) 재계산→겨냥한 노드 화면 위치까지 이동해 '이름이 안 잡히던' 문제. 해법 ①커서에 '홈'이 가장 가까운 노드를 항상 제자리 고정(near·hk0.35·반발 제외)해 클릭 대상 확정, ②호버 중 표시배율 동결(fitFrozen — draw()가 computeFit 건너뜀; 커서 이탈+정착 시 해제, resize 리셋)로 겨냥한 이름이 커서 밑에서 안 움직이게. 검증: 가세로 그래프 '이성엽' 이름 클릭→이성엽 프로필 이동 확인. web/src/components/kg-graph.tsx
 - 2026-08-03 · 관계망 이름 라벨도 클릭 이동(kg-graph): 기존 pick()은 원(반경)만 히트→이름 글자 클릭 무반응이던 것을, 원 아래 라벨 박스(폭 ~name.length*8, 원아래 2~22px)도 히트에 포함. 커서도 이름 위에서 pointer(onMove가 pick 사용). people/page 안내 '원·이름 클릭 시 이동'으로 갱신. web/src/components/kg-graph.tsx·app/people/page.tsx
 - 2026-08-02 · 관계망 호버 잔움직임(kg-graph): 마우스를 그래프에 대면 커서 근처 노드가 살짝 밀렸다가 홈으로 스프링백. 정착 시 홈좌표 기록(setHomes), 표시변환 역산(toNatural)으로 커서를 자연좌표로 변환, hoverTick(반발 R62·homeK0.10·damp0.72)이 마우스 있거나 미정착 동안만 돎(정지 시 rAF 해제). 중심 고정, prefers-reduced-motion 존중(잔움직임 생략). web/src/components/kg-graph.tsx
 - 2026-08-02 · 관리자 네비 지식그래프(KG) 링크: 파일럿 잔재라 잠시 숨겼다가, 태안신문사 담당자 브리핑용으로 **복원**(대시보드·지식그래프·보고서). web/src/components/admin-header.tsx
