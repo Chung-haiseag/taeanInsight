@@ -9,7 +9,7 @@ import Link from "next/link";
 // 예전 #앵커 항목(비용·AI검수·시민기자·민감규칙·전자북)은 탭바와 중복이라 제거했다.
 const ADMIN_SECTIONS = [
   { href: "/admin", label: "대시보드" },
-  // 지식그래프(KG) 수동 검수 콘솔은 초기 파일럿 — 네비에서 숨김(라우트·데이터는 유지, 필요 시 /admin/kg 직접 접근).
+  { href: "/admin/kg", label: "🕸️ 지식그래프" },
   { href: "/admin/report", label: "📄 보고서" },
 ];
 
