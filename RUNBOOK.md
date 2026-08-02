@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-03 · 관계망 이름 라벨도 클릭 이동(kg-graph): 기존 pick()은 원(반경)만 히트→이름 글자 클릭 무반응이던 것을, 원 아래 라벨 박스(폭 ~name.length*8, 원아래 2~22px)도 히트에 포함. 커서도 이름 위에서 pointer(onMove가 pick 사용). people/page 안내 '원·이름 클릭 시 이동'으로 갱신. web/src/components/kg-graph.tsx·app/people/page.tsx
 - 2026-08-02 · 관계망 호버 잔움직임(kg-graph): 마우스를 그래프에 대면 커서 근처 노드가 살짝 밀렸다가 홈으로 스프링백. 정착 시 홈좌표 기록(setHomes), 표시변환 역산(toNatural)으로 커서를 자연좌표로 변환, hoverTick(반발 R62·homeK0.10·damp0.72)이 마우스 있거나 미정착 동안만 돎(정지 시 rAF 해제). 중심 고정, prefers-reduced-motion 존중(잔움직임 생략). web/src/components/kg-graph.tsx
 - 2026-08-02 · 관리자 네비 지식그래프(KG) 링크: 파일럿 잔재라 잠시 숨겼다가, 태안신문사 담당자 브리핑용으로 **복원**(대시보드·지식그래프·보고서). web/src/components/admin-header.tsx
 - 2026-08-02 · 예보 적중률 증명(#2-①): 방문객 실측이 없어 '예측 신뢰'를 검증가능한 날씨로 증명 — 중기예보(fetchMidForecast)를 forecast_log(mig 039)에 미래날짜 INSERT OR IGNORE(리드타임 정직), 자정 크론 fall-through에서 record+resolve(대상일 지나면 env_daily 관측과 대조: 강수 적중=pop≥50 vs 관측 pty, 기온오차=|예보tmax−관측temp|·±2℃). 공개 GET /api/reports/forecast-accuracy(:weekId보다 먼저 등록·30분캐시). 멤버십 페이지 ForecastTrust 위젯(집계 전엔 '집계 중'). 검증: 집계 SQL 시드2건→강수0.5·MAE1.35·±2 1.0. backend reports/{forecast_accuracy,router}·index.ts, web membership/page·api/report, db/039

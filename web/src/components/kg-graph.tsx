@@ -147,7 +147,18 @@ export default function KgGraph({
       draw();
       hoverRaf = mouse || moving ? requestAnimationFrame(hoverTick) : 0;
     }
-    function pick(mx: number, my: number) { let best: string | null = null, bd = 1e9; for (const n of ns) { const d = Math.hypot(mx - PX(n), my - PY(n)); if (d < n.r + 5 && d < bd) { bd = d; best = n.id; } } return best; }
+    // 히트: 원(반경+여유) 또는 이름 라벨 영역(원 아래). 이름 글자를 클릭해도 이동되게.
+    function pick(mx: number, my: number) {
+      let best: string | null = null, bd = 1e9;
+      for (const n of ns) {
+        const px = PX(n), py = PY(n), d = Math.hypot(mx - px, my - py);
+        const labelHalf = Math.max(28, n.name.length * 8);   // 대략 라벨 폭 절반
+        const onCircle = d < n.r + 6;
+        const onLabel = Math.abs(mx - px) < labelHalf && my > py + n.r - 2 && my < py + n.r + 22;
+        if ((onCircle || onLabel) && d < bd) { bd = d; best = n.id; }
+      }
+      return best;
+    }
     function rel(ev: PointerEvent) { const r = cv!.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
     const onDown = (ev: PointerEvent) => { const p = rel(ev); const n = pick(p.x, p.y); selected = n && n === selected ? null : n; draw(); if (n && clickRef.current) clickRef.current(n); };
     const onMove = (ev: PointerEvent) => {
