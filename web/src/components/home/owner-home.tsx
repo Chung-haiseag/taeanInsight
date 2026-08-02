@@ -132,7 +132,7 @@ function OwnerLive() {
       {/* 내 지역 경보·알림 */}
       <section aria-labelledby="alert-heading">
         <h2 id="alert-heading" className="text-xl font-bold text-brand">내 지역 경보·알림</h2>
-        <p className="mt-1 text-sm text-foreground-muted">적조·특보·자외선·높은 파고를 영업 영향까지 짚어 알려드려요.</p>
+        <p className="mt-1 text-sm text-foreground-muted">주말 수요 급변·특보·높은 파고·자외선·행사 임박을 영업 영향까지 짚어, <strong className="text-brand">준비할 게 있는 날 아침</strong>에만 알려드려요.</p>
         <div className="mt-4"><PushOptInButton /></div>
       </section>
 

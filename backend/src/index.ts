@@ -248,6 +248,14 @@ export default {
       } catch (e) {
         console.warn("[cron] 클리핑 다이제스트 실패:", e instanceof Error ? e.message : e);
       }
+      // 오너 준비 알림 — 수요 급변·특보·행사 임박 등 '지금 준비' 신호가 있는 날에만 사장님에게 푸시
+      try {
+        const { sendOwnerAlerts } = await import("./owner/weekly_push");
+        const o = await sendOwnerAlerts(env);
+        console.log(`[cron] 오너 준비 알림: 사용자 ${o.users}·발송 ${o.sent}${o.skipped ? ` (${o.skipped})` : ""}`);
+      } catch (e) {
+        console.warn("[cron] 오너 준비 알림 실패:", e instanceof Error ? e.message : e);
+      }
       return;
     }
 

@@ -80,3 +80,55 @@ export async function sendWeeklyOwnerPush(env: Env): Promise<WeeklyPushResult> {
   }
   return { users, sent };
 }
+
+// ── 데일리 오너 준비 알림(07:00 KST) — '지금 준비' 신호가 있는 날에만 푸시(평상시 조용히) ──
+// 주목 기준: 수요 극단(매우높음/매우낮음)·안전경보(파고·대기질·폭염/한파)·주말우천·수요 급변(추세)·행사 D-0/1.
+function alertBody(brief: OwnerBrief): string | null {
+  const acts = brief.actions ?? [];
+  if (!acts.length) return null;
+  const d = brief.demand;
+  const extreme = !!(d?.available && (d.level === "매우높음" || d.level === "매우낮음"));
+  const has = (tag: string) => acts.some((a) => a.tag === tag);
+  const festSoon = acts.some((a) => a.tag === "기회" && /D-[01]\b/.test(a.text));
+  if (!(extreme || has("안전") || has("날씨") || has("추세") || festSoon)) return null;
+  const top = [...acts].sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9));
+  const lead = top[0];
+  const parts = [`${lead.icon} ${lead.text}${lead.quant ? ` (수요 ${lead.quant})` : ""}`];
+  const safety = acts.find((a) => a.tag === "안전");
+  if (safety && safety !== lead) parts.push(`${safety.icon} ${safety.text}`);
+  return parts.join(" · ").slice(0, 170);
+}
+
+export interface OwnerAlertResult { users: number; sent: number; skipped?: string }
+
+export async function sendOwnerAlerts(env: Env): Promise<OwnerAlertResult> {
+  const vapid = vapidFromEnv(env);
+  if (!vapid) return { users: 0, sent: 0, skipped: "no_vapid" };
+  if (!env.ARCHIVE_DB) return { users: 0, sent: 0, skipped: "no_db" };
+  const repo = new D1WebPushSubscriptionRepo(env.ARCHIVE_DB);
+  const subs = await repo.listAllEnabled();
+  if (!subs.length) return { users: 0, sent: 0, skipped: "no_subscribers" };
+  const prefsRepo = new D1PreferencesRepo(env.ARCHIVE_DB);
+  const dispatcher = new WebCryptoWebPushDispatcher(vapid);
+  const byUser = new Map<string, typeof subs>();
+  for (const sub of subs) { const arr = byUser.get(sub.userId) ?? []; arr.push(sub); byUser.set(sub.userId, arr); }
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  const tag = `owneralert-${k.getUTCFullYear()}${String(k.getUTCMonth() + 1).padStart(2, "0")}${String(k.getUTCDate()).padStart(2, "0")}`;
+  let users = 0, sent = 0;
+  for (const [userId, userSubs] of byUser) {
+    try {
+      const prefs = await prefsRepo.get(userId);
+      const brief = await loadOwnerBrief(env, prefs);
+      const body = alertBody(brief);
+      if (!body) continue; // 주목할 게 없으면 조용히
+      const payload = { title: "태안 인사이트 · 오늘의 준비 알림", body, url: "/", tag };
+      users += 1;
+      for (const sub of userSubs) {
+        const res = await dispatcher.send(sub, payload);
+        if (res.ok) sent += 1;
+        else if (res.status === 410 || res.status === 404) await repo.disable(sub.userId, sub.endpoint);
+      }
+    } catch { /* 단일 사용자 실패 무시 */ }
+  }
+  return { users, sent };
+}
