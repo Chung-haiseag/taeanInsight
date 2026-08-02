@@ -161,46 +161,24 @@ function pmGrade(kind: "pm10" | "pm25", v: number | null): { color: string; labe
   return { color: "#ef4444", label: "매우나쁨" };
 }
 
-// ── 대기질 7일 추세 (PM10·PM2.5 그룹 막대) ──
+// ── 실시간 대기질 (오늘 현재값만 알기 쉽게) ──
 export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) {
-  const rows = env.trend.filter((r) => r.pm10 != null || r.pm25 != null);
-  if (!rows.length && !env.live) return null;
-  const max = Math.max(60, ...rows.flatMap((r) => [r.pm10 ?? 0, r.pm25 ?? 0]));
-
+  const l = env.live;
+  if (!l || (l.pm10 == null && l.pm25 == null && !l.grade)) return null;
   return (
     <figure className="mt-4 card p-4">
-      <figcaption className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">최근 대기질 추세 (㎍/㎥)</span>
-        <span className="flex items-center gap-3 text-xs text-foreground-muted">
-          <span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-brand/70" />PM10</span>
-          <span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-accent" />PM2.5</span>
+      <figcaption className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">실시간 대기질</span>
+        <span className="text-xs text-foreground-muted">
+          {kstHm(l.observedAt) ? `${kstHm(l.observedAt)} 관측` : "실시간"}
+          {l.grade ? <> · 통합대기 <b className="font-semibold text-foreground">{l.grade}</b></> : null}
         </span>
       </figcaption>
 
-      {rows.length > 0 && (
-        <div className="mt-4 flex items-end justify-between gap-2" style={{ height: "6.5rem" }}>
-          {rows.map((r) => (
-            <div key={r.date} className="flex flex-1 flex-col items-center justify-end gap-1">
-              <div className="flex w-full items-end justify-center gap-0.5" style={{ height: "5rem" }}>
-                <div className="w-2.5 rounded-t bg-brand/70" style={{ height: `${((r.pm10 ?? 0) / max) * 100}%` }} title={`PM10 ${r.pm10 ?? "—"}`} />
-                <div className="w-2.5 rounded-t bg-accent" style={{ height: `${((r.pm25 ?? 0) / max) * 100}%` }} title={`PM2.5 ${r.pm25 ?? "—"}`} />
-              </div>
-              <span className="text-[0.65rem] tabular-nums text-foreground-muted">{md(r.date)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {env.live && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-brand/10 pt-4 text-xs">
-          <span className="font-semibold text-foreground-muted">{kstHm(env.live.observedAt) ? `${kstHm(env.live.observedAt)} 관측` : "실시간"}</span>
-          {env.live.grade && <Pill label="통합대기" value={env.live.grade} />}
-          <PmPill kind="pm10" v={env.live.pm10} />
-          <PmPill kind="pm25" v={env.live.pm25} />
-          {env.live.temp != null && <Pill label="기온" value={`${env.live.temp}℃`} />}
-          {env.live.humidity != null && <Pill label="습도" value={`${env.live.humidity}%`} />}
-        </div>
-      )}
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <AirMetric label="미세먼지" sub="PM10" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
+        <AirMetric label="초미세먼지" sub="PM2.5" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
+      </div>
 
       <p className="mt-3 border-t border-brand/10 pt-3 text-[11px] leading-relaxed text-foreground-muted">
         <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
@@ -209,23 +187,20 @@ export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) 
   );
 }
 
-function PmPill({ kind, v }: { kind: "pm10" | "pm25"; v: number | null }) {
-  const g = pmGrade(kind, v);
+// 실시간 미세먼지 한 칸 — 값 + 등급(좋음/보통…) + 등급색 배경
+function AirMetric({ label, sub, v, g }: { label: string; sub: string; v: number | null; g: { color: string; label: string } }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-brand/5 px-2.5 py-1">
-      <i className="inline-block h-2 w-2 rounded-full" style={{ background: g.color }} />
-      <span className="font-medium text-foreground">{kind === "pm10" ? "PM10" : "PM2.5"} {v ?? "—"}</span>
-      <span className="text-foreground-muted">{g.label}</span>
-    </span>
-  );
-}
-
-function Pill({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-brand/5 px-2.5 py-1">
-      <span className="text-foreground-muted">{label}</span>
-      <span className="font-semibold text-foreground">{value}</span>
-    </span>
+    <div className="rounded-xl border p-3" style={{ borderColor: `${g.color}40`, background: `${g.color}0d` }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-foreground-muted">{label} <span className="text-[10px]">({sub})</span></span>
+        <span className="inline-flex items-center gap-1 text-xs font-bold" style={{ color: g.color }}>
+          <i className="inline-block h-2 w-2 rounded-full" style={{ background: g.color }} />{g.label}
+        </span>
+      </div>
+      <p className="mt-1 font-display text-2xl font-bold tabular-nums text-brand">
+        {v ?? "—"}<span className="ml-1 text-xs font-normal text-foreground-muted">㎍/㎥</span>
+      </p>
+    </div>
   );
 }
 

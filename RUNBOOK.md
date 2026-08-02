@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-02 · 대기질: 다일 추세 차트→오늘 실시간 카드로 단순화(알기 쉽게 요청): AirQualityTrend를 7일 막대 추세에서 '실시간 대기질' 카드로 교체 — 미세먼지(PM10)·초미세먼지(PM2.5) 2칸에 현재값+등급(좋음/보통…)+등급색 배경, 헤더에 관측시각·통합대기 등급, 하단 PM 설명 유지. 미사용 Pill/PmPill 정리(md는 표에서 계속 사용). /live·주간리포트 공통. (env.live 결측 시 자동 숨김) web/src/components/reports/report-charts.tsx
 - 2026-08-02 · /live 데이터 카드 밀도 2차(전체 촘촘): report-charts 공용 카드 여백·패딩 일괄 축소(mt-6→mt-4·card p-5→p-4, 8곳). WeatherCards p-4→p-3·값 text-xl→lg, 대기질 차트 8→6.5rem, 수요지수 text-4xl→3xl. 날씨·바다·관광·경제 카드 전부 균일 압축. 리포트 페이지에도 공유 적용. web/src/components/reports/report-charts.tsx
 - 2026-08-02 · /live 밀도 개선(정보가 너무 큼 피드백): 핵심지표 인포그래픽(SummaryInfographic)을 고정 grid-cols-4(5타일→빈칸3) 에서 auto-fit minmax(140px)로 → 타일 수만큼 한 줄 꽉 채워 빈칸 제거, 셀 축소(py-5→py-3·text-2xl→text-lg·이모지 축소). /live 섹션 제목 9개 text-display-sm→text-xl, 간격 space-y-10→8. 인포그래픽은 홈에도 공유돼 동반 개선. web/src/components/reports/report-charts.tsx·app/live/page.tsx
 - 2026-08-02 · 상단 헤더 2행 분리(메뉴 줄바꿈 정리): 한 줄에 로고+메뉴9+글자크기+고대비+계정을 몰아넣어 1200px에서 메뉴 라벨이 단어 중간 줄바꿈되던 문제(특히 최종관리자 9개). 태안신문식 2행으로 — 1행(로고·접근성·계정), 2행(메뉴 전용 바, whitespace-nowrap·shrink-0·overflow-x-auto). 메뉴가 자체 행이라 넉넉·무줄바꿈. web/src/components/site-header.tsx
