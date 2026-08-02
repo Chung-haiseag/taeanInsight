@@ -226,7 +226,7 @@ export function ReportReader({
             <span className="inline-block h-px w-6 bg-accent" aria-hidden />
             태안군청 카드뉴스
           </p>
-          <h2 className="mt-3 text-display-sm font-bold text-brand">한눈에 보는 군정 카드뉴스</h2>
+          <h2 className="mt-3 text-xl font-bold text-brand">한눈에 보는 군정 카드뉴스</h2>
           <CardNewsCarousel items={cardNews} />
         </section>
       )}
@@ -238,7 +238,7 @@ export function ReportReader({
             <span className="inline-block h-px w-6 bg-accent" aria-hidden />
             태안군청
           </p>
-          <h2 className="mt-3 text-display-sm font-bold text-brand">군정 소식 · 행사 일정</h2>
+          <h2 className="mt-3 text-xl font-bold text-brand">군정 소식 · 행사 일정</h2>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {textNotices.map((n, i) => (
               <a
@@ -273,7 +273,7 @@ export function ReportReader({
             <span className="inline-block h-px w-6 bg-accent" aria-hidden />
             이번 주 태안신문
           </p>
-          <h2 className="mt-3 text-display-sm font-bold text-brand">한 주간의 주요 뉴스</h2>
+          <h2 className="mt-3 text-xl font-bold text-brand">한 주간의 주요 뉴스</h2>
           <ul className="mt-6 divide-y divide-brand/10">
             {news.map((n) => (
               <li key={n.idxno}>
@@ -306,7 +306,7 @@ export function ReportReader({
       <details id="data" className="mt-16 break-inside-avoid rounded-2xl border-t-2 border-brand/15 pt-8 no-print">
         <summary className="cursor-pointer list-none">
           <span className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> 데이터 부록</span>
-          <h2 className="mt-3 text-display-sm font-bold text-brand"><Icon name="chart" /> 지역 데이터 (추세·다운로드) <span className="align-middle text-sm font-normal text-accent">펼치기 ▾</span></h2>
+          <h2 className="mt-3 text-xl font-bold text-brand"><Icon name="chart" /> 지역 데이터 (추세·다운로드) <span className="align-middle text-sm font-normal text-accent">펼치기 ▾</span></h2>
           <p className="mt-1 text-sm text-foreground-muted">관광 수요·환경·부동산·유가의 기간별 추세와 CSV. 관광협회·숙박체인·부동산·연구 기관용.</p>
         </summary>
         <div className="mt-6"><RegionDataPanel /></div>
@@ -525,17 +525,17 @@ function Masthead({
   gated: boolean;
 }) {
   return (
-    <div className="border-b-2 border-brand/15 pb-8">
+    <div className="border-b-2 border-brand/15 pb-6">
       <p className="eyebrow">
         <span className="inline-block h-px w-6 bg-accent" aria-hidden />
         WEEKLY INSIGHT REPORT
       </p>
-      <h1 className="mt-4 font-display text-display text-brand">주간 인사이트 리포트</h1>
-      <p className="mt-3 max-w-prose text-base leading-relaxed text-foreground-muted">
+      <h1 className="mt-2 font-display text-3xl font-bold text-brand md:text-4xl">주간 인사이트 리포트</h1>
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-foreground-muted">
         관광·기상·환경·부동산, 태안의 다음 주를 한 페이지로.
       </p>
 
-      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         {weekLabel && (
           <span className="rounded-full bg-brand px-3 py-1 text-xs font-bold text-background">{weekLabel}</span>
         )}
