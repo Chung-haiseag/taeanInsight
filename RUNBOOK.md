@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-02 · 주간 리포트 섹션 제목 축소(너무 큼): 번호 마커 text-3xl→lg, 제목 text-display-sm→xl, 섹션 간격 space-y-14→10·mt-10→8, accent-rule mt-3→2. 이모지도 제목 따라 축소. web/src/components/reports/report-reader.tsx
 - 2026-08-02 · 해변 바다 정보(MarineCard) 콤팩트화: 서브블록 여백 mt-4→3·패딩 p-4→3, 일출일몰/서핑 축소, 오늘의 물때 셀 py 축소+시각 text-base→15px+auto-fit(빈칸 제거·전폭 균등), 해변 카드 값 text-xl→base·라벨 11px·간격 축소. /live·리포트 공통. web/src/components/reports/report-charts.tsx
 - 2026-08-02 · /live 날씨+대기질 한 카드로 통합(중복 제거): 별도이던 WeatherCards(기온·습도·하늘·통합대기)+실시간대기질(PM10·PM2.5)을 WeatherAirCard 하나로 — 통합대기 등급 배지+관측시각을 카드 상단에 1회, 날씨 3칸+대기질 2칸+PM설명. 통합대기·관측시각 중복 해소. /live만 적용(주간리포트는 기존 유지). web/src/components/reports/report-charts.tsx·app/live/page.tsx
 - 2026-08-02 · 대기질: 다일 추세 차트→오늘 실시간 카드로 단순화(알기 쉽게 요청): AirQualityTrend를 7일 막대 추세에서 '실시간 대기질' 카드로 교체 — 미세먼지(PM10)·초미세먼지(PM2.5) 2칸에 현재값+등급(좋음/보통…)+등급색 배경, 헤더에 관측시각·통합대기 등급, 하단 PM 설명 유지. 미사용 Pill/PmPill 정리(md는 표에서 계속 사용). /live·주간리포트 공통. (env.live 결측 시 자동 숨김) web/src/components/reports/report-charts.tsx

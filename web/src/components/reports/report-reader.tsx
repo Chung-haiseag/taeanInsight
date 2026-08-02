@@ -142,26 +142,26 @@ export function ReportReader({
         </div>
       ) : null}
 
-      <div className="mt-10 space-y-14">
+      <div className="mt-8 space-y-10">
         {report.sections.map((s, i) => (
           <section
             key={s.key}
             className={`break-inside-avoid scroll-mt-28 ${s.emphasis === "show_small" && !s.locked ? "opacity-65" : ""}`}
           >
             {/* 섹션 헤더 */}
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-display text-3xl font-bold leading-none text-accent/70 tabular-nums">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <span className="font-display text-lg font-bold leading-none text-accent/70 tabular-nums">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <h2 className="text-display-sm font-bold text-brand">
-                <span className="mr-2" aria-hidden>{SECTION_ICON[s.key] ?? "•"}</span>
+              <h2 className="text-xl font-bold text-brand">
+                <span className="mr-1.5" aria-hidden>{SECTION_ICON[s.key] ?? "•"}</span>
                 {s.title}
               </h2>
               {s.matched && (
                 <span className="rounded-full bg-accent px-2 py-0.5 text-[0.7rem] font-semibold text-background"><Icon name="star" /> 내 관심</span>
               )}
             </div>
-            <span className="accent-rule mt-3" aria-hidden />
+            <span className="accent-rule mt-2" aria-hidden />
 
             {/* 본문 */}
             {s.locked ? (
