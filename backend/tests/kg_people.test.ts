@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isHub, rankCoappears, yearHistogram, topTopics, HUB_MENTIONS, stripHanja } from "../src/kg/people";
+import { isHub, rankCoappears, yearHistogram, topTopics, HUB_MENTIONS, stripHanja, hasForeignScript } from "../src/kg/people";
 
 describe("isHub", () => {
   it("임계 경계(>=5000)", () => {
@@ -74,5 +74,25 @@ describe("stripHanja — Workers AI 한자 누출 정제", () => {
   it("한자 없는 정상 문장은 그대로", () => {
     const s = "이용희는 대한노인회 태안군지회장을 맡고 있다.";
     expect(stripHanja(s)).toBe(s);
+  });
+  it("베트남어 로마자 누출(xuất=出) 토큰 통째 제거 + 외국문자 잔여 없음", () => {
+    const out = stripHanja("기사들은 주로 2026년에 집중적으로 xuất판되었으며 계속된다.");
+    expect(out).not.toContain("xuất");
+    expect(hasForeignScript(out)).toBe(false);
+  });
+  it("평문 영문 약어(AI·CSV)는 보존", () => {
+    expect(stripHanja("AI 보조로 CSV 자료를 제공한다.")).toBe("AI 보조로 CSV 자료를 제공한다.");
+  });
+});
+
+describe("hasForeignScript — 한글 브리핑에 섞인 비한글 문자 감지", () => {
+  it("한자·성조문자·기타 스크립트는 오염으로 감지", () => {
+    expect(hasForeignScript("2026년에 xuất판되었으며")).toBe(true);   // 베트남어 ấ
+    expect(hasForeignScript("가세로는 太安의 군수다")).toBe(true);      // 한자
+    expect(hasForeignScript("Привет 태안")).toBe(true);               // 키릴
+  });
+  it("한글·숫자·영문 약어·문장부호만이면 깨끗", () => {
+    expect(hasForeignScript("가세로는 태안군수를 역임했다.")).toBe(false);
+    expect(hasForeignScript("AI가 CSV로 2026년 자료를 제공한다.")).toBe(false);
   });
 });
