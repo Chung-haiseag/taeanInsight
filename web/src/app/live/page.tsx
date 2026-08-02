@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
+  DemandGauge, FestivalList, OilCard,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
@@ -81,7 +81,6 @@ export default async function LivePage() {
             <span className="accent-rule mt-3" aria-hidden />
             <DemandGauge demand={metrics.tourism.demand} />
             <FestivalList tour={metrics.tourism} />
-            <SeasonalFoodCard />
           </section>
 
           {/* 지역경제 */}
