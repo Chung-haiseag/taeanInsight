@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-03 · 인물 브리핑 최신성(자동 무효화 + 최신 기사 날짜 표시): 브리핑이 kg_person_bio에 영구 캐시라 새 기사가 들어와도 안 바뀌던 문제. ①mig 040으로 latest_article 컬럼 추가 — 생성 시점의 인물 최신 기사 날짜 저장, /person/:id/brief 조회 때 현재 최신 기사 날짜와 다르면(새 기사 유입) 자동 재생성. 기존 행(NULL)은 다음 조회 때 1회 재생성되며 채워짐. ②프런트 팩트 스트립에 '최신 기사 YYYY.MM.DD'(+2개월↑이면 '최근 소식 없음') 표시 — 데이터가 언제까지의 것인지 명시(예: 박용성은 6월 선거 후 기사 없어 5/29가 최신, 낡은 게 아님). backend/src/kg/public_router.ts, web/src/app/people/page.tsx, db/040. ※별건: 아카이브 수집이 2026-07-24 이후 정체(수집기 점검 필요)
 - 2026-08-03 · 인물 프로필 조회 속도 개선(병렬+상위 LIMIT): buildPersonProfile이 관계망·함께등장·기사·직위·추이·주제 6쿼리를 순차로 돌던 것을 Promise.all 병렬로. + 고차수 인물(가세로 인접 4천 엣지)에서 인접 엣지를 통째 전송하던 것을 SQL ORDER BY weight/count DESC LIMIT(personEgo 400·coappear 120)로 축소 — 상위 12만 표시하므로 결과 불변. 결과: 가세로 profile 1.7s→0.8s(윤희신 ~1.1s, json_extract 정렬 비용). backend/src/kg/people.ts·graph.ts
 - 2026-08-03 · 관계망 미검수 관계명 확대(안전 유형 점선): '검수된 것만' 정책이 너무 좁아 라벨이 1개만 보이던 문제(윤희신=검수2·AI라벨~20). 저위험 유형(협력·동료·전임·후임·소속상하)은 미검수도 '점선(AI 추정)'으로 표시, 민감(대립·갈등·가족·인척)은 검수분만 실선. 중심↔이웃은 coappear의 verified로 정확 적용, 이웃끼리(mesh)는 verified 미상이라 안전 유형만 점선. kg-graph에 estimated(점선 line+pill) 추가, 경고문·범례에 '실선=검수/점선=AI추정' 명시. web kg-graph.tsx·app/people/page.tsx
 - 2026-08-03 · 인물 소개글 가독성(문단 분할): 한 덩어리 <p>이던 AI 소개를 briefParagraphs로 문장 단위 분할 — 첫 문장=리드(굵게), 이후 2문장씩 문단(space-y-2.5). web/src/app/people/page.tsx

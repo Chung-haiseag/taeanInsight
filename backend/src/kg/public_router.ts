@@ -36,19 +36,29 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
 });
 
 // 인물 AI 전기(기사 근거 5~7문장, 미검증) — 프런트가 프로필 표시 후 지연 로드.
-//   무료 Workers AI지만 일일 뉴런 한도·지연이 있어 kg_person_bio에 인물당 1회 캐시(영구).
+//   무료 Workers AI지만 일일 뉴런 한도·지연이 있어 kg_person_bio에 캐시. 단 '생성 시점 최신 기사 날짜'를
+//   함께 저장해, 그 뒤 더 최신 기사가 들어오면 자동 재생성(무효화) → 오래된 브리핑 방지.
 //   쿼리 경로 buildPersonBriefCard와 동일 함수·프롬프트(지어내기 방지) 재사용.
 kgPublicRouter.get("/person/:id/brief", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
   const id = c.req.param("id");
-  const cached = await c.env.ARCHIVE_DB.prepare("SELECT bio FROM kg_person_bio WHERE node_id=?").bind(id).first<{ bio: string }>();
-  if (cached?.bio) { c.header("Cache-Control", "public, max-age=300"); return c.json({ brief: cached.bio, cached: true }); }
-  if (!c.env.AI) return c.json({ brief: null });
-  const brief = await buildPersonBrief(c.env.ARCHIVE_DB, c.env.AI, id);
+  const db = c.env.ARCHIVE_DB;
+  const [cached, latestRow] = await Promise.all([
+    db.prepare("SELECT bio, latest_article FROM kg_person_bio WHERE node_id=?").bind(id).first<{ bio: string; latest_article: string | null }>(),
+    db.prepare("SELECT MAX(a.published_at) AS d FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno WHERE m.node_id=?").bind(id).first<{ d: string | null }>(),
+  ]);
+  const latest = latestRow?.d ?? null;
+  // 캐시가 있고 그 이후 새 기사가 없으면(최신 기사 날짜 동일) 캐시 사용. 다르면(새 기사 유입) 재생성.
+  if (cached?.bio && cached.latest_article === latest) {
+    c.header("Cache-Control", "public, max-age=300");
+    return c.json({ brief: cached.bio, cached: true });
+  }
+  if (!c.env.AI) { c.header("Cache-Control", "public, max-age=300"); return c.json({ brief: cached?.bio ?? null, cached: !!cached?.bio }); }
+  const brief = await buildPersonBrief(db, c.env.AI, id);
   if (brief) {
-    try { await c.env.ARCHIVE_DB.prepare("INSERT OR REPLACE INTO kg_person_bio(node_id, bio) VALUES(?, ?)").bind(id, brief).run(); } catch { /* 캐시 실패는 무시 */ }
+    try { await db.prepare("INSERT OR REPLACE INTO kg_person_bio(node_id, bio, latest_article) VALUES(?, ?, ?)").bind(id, brief, latest).run(); } catch { /* 캐시 실패는 무시 */ }
   }
   c.header("Cache-Control", "public, max-age=300");
-  return c.json({ brief: brief ?? null, cached: false });
+  return c.json({ brief: brief ?? cached?.bio ?? null, cached: false });
 });

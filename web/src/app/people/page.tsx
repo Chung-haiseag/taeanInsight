@@ -208,6 +208,10 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
   const topCo = prof.coappear.slice(0, 3).map((c) => c.name);
   const desc = office ? `${office.office}${office.ordinal ? `(${office.ordinal}대)` : ""}` : null;
   const topics = prof.topics.map((t) => t.term).filter((t) => !TOPIC_NOISE.has(t)).slice(0, 6);
+  // 최신 기사 날짜 — 소개가 '언제까지의' 자료인지 독자에게 명시(오래돼 보이는 오해 방지).
+  const latestAt = prof.articles[0]?.published_at ?? null;
+  const latestArt = latestAt ? latestAt.slice(0, 10).replace(/-/g, ".") : null;
+  const staleMonths = latestAt ? Math.floor((Date.now() - new Date(latestAt).getTime()) / (30 * 864e5)) : 0;
 
   return (
     <section className="rounded-lg border border-brand/20 bg-accent/5 p-4">
@@ -240,6 +244,7 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
         <span>아카이브 <strong className="text-foreground">{prof.person.mentions.toLocaleString()}건</strong></span>
         {years && <span>활동 <strong className="text-foreground">{years}</strong></span>}
         {desc && <span>직위 <strong className="text-foreground">{desc}</strong></span>}
+        {latestArt && <span>최신 기사 <strong className="text-foreground">{latestArt}</strong>{staleMonths >= 2 ? <span className="text-amber-600"> · 최근 소식 없음</span> : null}</span>}
         {topCo.length > 0 && <span>자주 동반 <strong className="text-foreground">{topCo.join(" · ")}</strong></span>}
       </div>
       {topics.length > 0 && (
