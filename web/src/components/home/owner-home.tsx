@@ -93,15 +93,21 @@ function OwnerLive() {
         {brief.actions.length > 0 ? (
           <div className="mt-4 space-y-2.5">
             {brief.actions.map((a, i) => (
-              <article key={i} className="card-lift flex gap-4 card-accent p-5">
+              <article key={i} className="card-lift flex items-center gap-4 card-accent p-5">
                 <span className="text-2xl" aria-hidden>{a.icon}</span>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-brand">
                     {a.text}
-                    {a.tag && <span className={`ml-2 align-middle rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${a.tag === "안전" ? "bg-red-100 text-red-700" : a.tag === "매출" ? "bg-accent/20 text-accent" : "bg-brand/10 text-brand"}`}>{a.tag}</span>}
+                    {a.tag && <span className={`ml-2 align-middle rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${a.tag === "안전" ? "bg-red-100 text-red-700" : a.tag === "매출" ? "bg-accent/20 text-accent" : a.tag === "판단" ? "bg-brand text-background" : "bg-brand/10 text-brand"}`}>{a.tag}</span>}
                   </p>
                   <p className="mt-1 text-sm text-foreground-muted">{a.why}</p>
                 </div>
+                {a.quant && (
+                  <div className="shrink-0 text-center">
+                    <p className="font-display text-2xl font-bold leading-none tabular-nums text-accent">{a.quant}</p>
+                    <p className="mt-0.5 text-[10px] text-foreground-muted">수요지수</p>
+                  </div>
+                )}
               </article>
             ))}
           </div>

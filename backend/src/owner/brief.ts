@@ -10,7 +10,7 @@ import { REGION } from "../region";
 // 읍·면 코드 → 라벨 (지역설정에서 파생)
 const EUP_LABEL: Record<string, string> = Object.fromEntries(REGION.eupMyeon.map((e) => [e.code, e.label]));
 
-export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
+export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number; quant?: string }
 // 숙박 전용 운영 보드 — 주말 수요로 예상 가동률·권장가·매출 추정
 export interface LodgingBoard {
   weekend: { sat: string; sun: string };
@@ -208,43 +208,66 @@ function buildActions(industry: ShopIndustry | null, m: ReportMetrics): OwnerAct
 
   const demand = m.tourism.demand;
   const lv = demand?.level;
+  const idx = demand?.index ?? null;                    // 주말 수요지수(0~100)
+  const t = m.trends;
+  const dl = t?.demand?.delta ?? null;                  // 전주 대비 지수 변화
   const high = lv === "높음" || lv === "매우높음";
   const low = lv === "낮음" || lv === "매우낮음";
   const w = m.environment.live;
 
+  // 정량 문구 — 지수·전주대비·주말날씨·기여요인(왜 그런지)
+  const dq = idx != null ? `수요지수 ${idx}/100${dl != null ? ` (전주 ${dl >= 0 ? "+" : ""}${Math.round(dl)})` : ""}` : "";
+  const satW = demand?.weather?.sat;
+  const wkWx = satW ? `토 ${satW.sky ?? ""}${satW.tmax != null ? ` ${satW.tmax}℃` : ""}${satW.pop != null ? ` 강수 ${satW.pop}%` : ""}`.replace(/\s+/g, " ").trim() : "";
+  const topFactors = (demand?.factors ?? []).slice(0, 2).map((f) => `${f.effect >= 0 ? "+" : ""}${f.effect} ${f.label}`).join(" · ");
+  const dwhy = [dq, wkWx].filter(Boolean).join(" · ");
+
+  // ── 0) 이번 주말 한 줄 판단(정량 요약) — 사장님이 제일 먼저 볼 결론 ──
+  if (demand?.available && idx != null) {
+    const stance = high ? "성수기 태세 — 인력·재고 최대치" : low ? "한산 — 프로모션·비용 절감" : "평시 운영";
+    out.push({
+      icon: high ? "🔥" : low ? "🧊" : "📊",
+      text: `이번 주말 ${lv} → ${stance}`,
+      why: [dwhy, topFactors].filter(Boolean).join(" · "),
+      quant: `${idx}`,
+      tag: "판단", priority: 0,
+    });
+  }
+
   // ── 1) 안전·긴급 ──
   const wave = Math.max(0, ...(m.tourism.marine?.beaches ?? []).map((b) => b.waveHeight ?? 0));
   if (wave >= 2 && beachLinked) {
-    out.push({ icon: "🌊", text: `파고 ${wave.toFixed(1)}m — 해변·해상 활동 자제 안내`, why: "높은 파고", tag: "안전", priority: 1 });
+    out.push({ icon: "🌊", text: `파고 ${wave.toFixed(1)}m — 해변·해상 활동 자제 안내`, why: "높은 파고·안전 우선", tag: "안전", priority: 1 });
   }
   if (w?.grade === "나쁨" || w?.grade === "매우나쁨") {
-    out.push({ icon: "😷", text: `대기질 '${w.grade}' — 실내 좌석·환기, 민감군 안내`, why: `PM10 ${w.pm10 ?? "—"}`, tag: "안전", priority: 1 });
+    out.push({ icon: "😷", text: `대기질 '${w.grade}' — 실내 좌석 안내·환기`, why: `PM10 ${w.pm10 ?? "—"}㎍/㎥`, tag: "안전", priority: 1 });
   }
   if (w?.temp != null && w.temp >= 31) {
-    out.push({ icon: "🥵", text: food ? "시원한 메뉴·냉방 점검, 야외석 차양" : "냉방·그늘·생수 비치", why: `기온 ${w.temp}℃`, tag: "안전", priority: 1 });
+    out.push({ icon: "🥵", text: food ? "시원한 메뉴·냉방 점검, 야외석 차양" : "냉방·그늘·생수 비치", why: `현재 ${w.temp}℃ 폭염`, tag: "안전", priority: 1 });
   } else if (w?.temp != null && w.temp <= 0) {
-    out.push({ icon: "🧊", text: "난방·온수·결빙 대비", why: `기온 ${w.temp}℃`, tag: "안전", priority: 1 });
+    out.push({ icon: "🧊", text: "난방·온수·결빙 대비", why: `현재 ${w.temp}℃ 한파`, tag: "안전", priority: 1 });
   }
 
-  // ── 2) 매출(수요) — 업종 세분화 ──
+  // ── 2) 매출(수요) — 업종별 행동 + 정량 근거 + 규모 힌트 ──
   if (high) {
-    if (ind === "lodging") out.push({ icon: "🛏", text: morning ? "객실 풀가동 준비 · 노쇼 대비 예약금 안내" : "주말 요금 상향·만실 대비 예약 마감 점검", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
-    else if (ind === "food") out.push({ icon: "🍽", text: morning ? "식자재 추가 발주·인력 보강" : "피크 회전율·예약/웨이팅 동선 준비", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
-    else if (ind === "cafe") out.push({ icon: "☕", text: "음료·디저트 재고 보강, 테이크아웃 동선 준비", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
-    else if (ind === "leisure") out.push({ icon: "🎟", text: "예약 슬롯 확대·안전요원/장비 점검", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
-    else if (ind === "retail") out.push({ icon: "🛍", text: "인기 품목 재고 보강·영업시간 연장 검토", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
-    else out.push({ icon: "📈", text: "주말 방문객 증가 대비(재고·인력)", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    const mag = lv === "매우높음" ? "평소 성수기 수준" : "평소보다 +20~30% 예상";
+    let icon = "📈", text = "주말 방문객 증가 대비 — 재고·인력 확보";
+    if (ind === "lodging") { icon = "🛏"; text = morning ? "객실 풀가동 준비 · 노쇼 대비 예약금 안내" : "주말 요금 상향·만실 대비 예약 마감 점검"; }
+    else if (ind === "food") { icon = "🍽"; text = morning ? "식자재 추가 발주 · 홀 인력 +1 검토" : "피크 회전율·예약/웨이팅 동선 준비"; }
+    else if (ind === "cafe") { icon = "☕"; text = "음료·디저트 재고 보강, 테이크아웃 동선 준비"; }
+    else if (ind === "leisure") { icon = "🎟"; text = "예약 슬롯 확대·안전요원/장비 점검"; }
+    else if (ind === "retail") { icon = "🛍"; text = "인기 품목 재고 보강·영업시간 연장 검토"; }
+    out.push({ icon, text, why: `${dwhy} → ${mag}`, quant: idx != null ? `${idx}` : undefined, tag: "매출", priority: 2 });
   } else if (low) {
-    out.push({ icon: "🏷", text: ind === "lodging" ? "빈 객실 막판 할인·연박 프로모션" : "한산 시간대 프로모션·SNS·세트 할인", why: `수요 '${lv}'`, tag: "매출", priority: 2 });
+    out.push({ icon: "🏷", text: ind === "lodging" ? "빈 객실 막판 할인·연박 프로모션" : "한산 시간대 프로모션·SNS·세트 할인", why: `${dwhy} → 수요 약함, 비용·재고 최소화`, quant: idx != null ? `${idx}` : undefined, tag: "매출", priority: 2 });
   }
 
   // ── 3) 추세(전주 대비)·주말 날씨 ──
-  const t = m.trends;
   if (t?.interest && t.interest.delta >= 20) {
-    out.push({ icon: "🔎", text: "검색 관심도 급증 — 예약·문의 응대 대비, 게시물 노출↑", why: `검색 전주 대비 +${Math.round(t.interest.delta)}%`, tag: "추세", priority: 3 });
+    out.push({ icon: "🔎", text: "검색 관심도 급증 — 예약·문의 응대·게시물 노출↑", why: `검색 전주 대비 +${Math.round(t.interest.delta)}%`, tag: "추세", priority: 3 });
   }
   if (t?.demand && t.demand.delta >= 10) {
-    out.push({ icon: "📊", text: "수요 상승세 — 주말 인력·재고 미리 확보", why: `수요 전주 대비 +${Math.round(t.demand.delta)}`, tag: "추세", priority: 3 });
+    out.push({ icon: "📊", text: "수요 상승세 — 주말 인력·재고 미리 확보", why: `수요지수 전주 대비 +${Math.round(t.demand.delta)}`, tag: "추세", priority: 3 });
   }
   // 주말 강수 확률(데이터랩보다 정확) — 환불/실내 대비
   const wkRain = [demand?.weather?.sat, demand?.weather?.sun].some((d) => d && d.pop != null && d.pop >= 60);

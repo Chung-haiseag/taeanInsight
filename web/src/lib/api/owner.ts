@@ -4,7 +4,7 @@ import type { DemandForecast, TideInfo } from "./reports";
 
 export type ShopIndustry = "lodging" | "food" | "cafe" | "leisure" | "retail" | "fishing" | "salt" | "farming" | "travel" | "realtor" | "golf" | "aqua" | "other";
 export interface ShopProfile { industry: ShopIndustry; eupMyeon?: string; capacity?: number; name?: string; basePrice?: number; weekendPrice?: number }
-export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number }
+export interface OwnerAction { icon: string; text: string; why: string; tag?: string; priority?: number; quant?: string }
 export interface OwnerLive { pm10: number | null; pm25: number | null; grade: string | null; temp: number | null; humidity: number | null; sky: string | null; observedAt: string | null }
 export interface LodgingBoard {
   weekend: { sat: string; sun: string };
