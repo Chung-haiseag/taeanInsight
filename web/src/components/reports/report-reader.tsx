@@ -9,7 +9,7 @@ import Link from "next/link";
 
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { Icon } from "@/components/icon";
-import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGauge, MarineCard, SummaryInfographic, SeasonalFoodCard, OilCard } from "@/components/reports/report-charts";
+import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGauge, MarineCard, SummaryInfographic, OilCard } from "@/components/reports/report-charts";
 import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
 import { RegionDataPanel } from "@/components/reports/region-data-panel";
@@ -70,12 +70,7 @@ function SectionVisual({ sectionKey, metrics }: { sectionKey: string; metrics: R
         </>
       );
     case "events":
-      return (
-        <>
-          <FestivalList tour={metrics.tourism} />
-          <SeasonalFoodCard />
-        </>
-      );
+      return <FestivalList tour={metrics.tourism} />;
     default:
       return null;
   }

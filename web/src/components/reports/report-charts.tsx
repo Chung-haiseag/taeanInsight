@@ -2,7 +2,6 @@
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
 import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices } from "@/lib/api/reports";
-import { FRONT_REGION } from "@/lib/region";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -247,29 +246,6 @@ export function WeatherAirCard({ env }: { env: ReportMetrics["environment"] }) {
         </>
       )}
     </figure>
-  );
-}
-
-// ── 이달의 제철 먹거리 (정적 데이터, API 불요) — 지역값은 lib/region.ts ──
-export function SeasonalFoodCard() {
-  // KST 기준 현재 월
-  const month = new Date(Date.now() + 9 * 3600 * 1000).getUTCMonth() + 1;
-  const items = FRONT_REGION.seasonalFoods.filter((f) => f.months.includes(month));
-  if (!items.length) return null;
-  return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🍽 {month}월 제철 {FRONT_REGION.name} 먹거리</span>
-        <span className="text-[0.7rem] text-foreground-muted">지역 특산</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {items.map((f) => (
-          <span key={f.name} className="inline-flex items-center gap-1.5 rounded-full bg-accent-subtle/40 px-3 py-1.5 text-sm font-medium text-brand">
-            <span aria-hidden>{f.emoji}</span>{f.name}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }
 
