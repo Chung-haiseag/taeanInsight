@@ -374,7 +374,7 @@ export function MarineCard({ marine }: { marine: MarineInfo | null }) {
 
       {/* 일출·일몰 + 갯벌체험 추천 */}
       {(marine.sun || marine.mudflat.length > 0) && (
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-brand/5 px-4 py-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg bg-brand/5 px-3 py-2 text-[13px]">
           {marine.sun && (
             <>
               <span className="inline-flex items-center gap-1"><span aria-hidden>🌅</span><span className="text-foreground-muted">일출</span><b className="tabular-nums text-brand">{marine.sun.sunrise}</b></span>
@@ -392,16 +392,16 @@ export function MarineCard({ marine }: { marine: MarineInfo | null }) {
 
       {/* 서핑지수 — 만리포 */}
       {marine.surf && marine.surf.levels.length > 0 && (
-        <div className="mt-4 rounded-xl border border-brand/10 bg-brand/5 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-brand">🏄 서핑지수 · {marine.surf.spot}</span>
+        <div className="mt-3 rounded-lg border border-brand/10 bg-brand/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="text-[13px] font-semibold text-brand">🏄 서핑지수 · {marine.surf.spot}</span>
             <span className="text-[0.7rem] text-foreground-muted">
               {marine.surf.noon} · 파고 {marine.surf.wave ?? "—"}m·주기 {marine.surf.period ?? "—"}s·바람 {marine.surf.wind ?? "—"}m/s
             </span>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {marine.surf.levels.map((l, i) => (
-              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-[0.7rem]">
+              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[0.7rem]">
                 <span className="text-foreground-muted">{l.grade}</span>
                 <span className="font-bold" style={{ color: IDX_COLOR[l.index] ?? "#64748b" }}>{l.index}</span>
               </span>
@@ -412,70 +412,70 @@ export function MarineCard({ marine }: { marine: MarineInfo | null }) {
 
       {/* 오늘의 물때(밀물/썰물) — 안흥 기준 */}
       {marine.tide && marine.tide.events.length > 0 && (
-        <div className="mt-4 rounded-xl border border-brand/10 bg-accent-subtle/20 p-4">
+        <div className="mt-3 rounded-lg border border-brand/10 bg-accent-subtle/20 p-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-brand">🌊 오늘의 물때</span>
+            <span className="text-[13px] font-semibold text-brand">🌊 오늘의 물때</span>
             <span className="text-[0.7rem] text-foreground-muted">{marine.tide.station} 기준</span>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))" }}>
             {marine.tide.events.map((e, i) => (
-              <div key={i} className={`rounded-lg px-3 py-2 text-center ${e.type === "고조" ? "bg-blue-100" : "bg-amber-100"}`}>
+              <div key={i} className={`rounded-md px-2 py-1.5 text-center ${e.type === "고조" ? "bg-blue-100" : "bg-amber-100"}`}>
                 <p className={`text-[0.7rem] font-semibold ${e.type === "고조" ? "text-blue-700" : "text-amber-700"}`}>
                   {e.type === "고조" ? "🌊 만조" : "🏝 간조"}
                 </p>
-                <p className="mt-0.5 text-base font-bold tabular-nums text-foreground">{e.time}</p>
-                {e.level != null && <p className="text-[0.7rem] tabular-nums text-foreground-muted">{e.level}cm</p>}
+                <p className="text-[15px] font-bold tabular-nums text-foreground">{e.time}</p>
+                {e.level != null && <p className="text-[0.65rem] tabular-nums text-foreground-muted">{e.level}cm</p>}
               </div>
             ))}
           </div>
         </div>
       )}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
         {marine.beaches.map((b) => {
           const w = waveLabel(b.waveHeight);
           return (
-            <div key={`${b.source}-${b.name}`} className="rounded-xl border border-brand/10 bg-brand/5 p-4">
+            <div key={`${b.source}-${b.name}`} className="rounded-lg border border-brand/10 bg-brand/5 p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-brand">🏖 {b.name}</span>
+                <span className="text-sm font-semibold text-brand">🏖 {b.name}</span>
                 <div className="flex items-center gap-1.5">
                   {b.beachIndex && (
-                    <span className="rounded-full px-2 py-0.5 text-[0.7rem] font-bold text-white" style={{ background: IDX_COLOR[b.beachIndex] ?? "#64748b" }}>
+                    <span className="rounded-full px-2 py-0.5 text-[0.65rem] font-bold text-white" style={{ background: IDX_COLOR[b.beachIndex] ?? "#64748b" }}>
                       해수욕 {b.beachIndex}
                     </span>
                   )}
-                  {b.openStat && <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[0.65rem] text-foreground-muted">{b.openStat}</span>}
+                  {b.openStat && <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[0.6rem] text-foreground-muted">{b.openStat}</span>}
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <div>
-                  <p className="text-xs text-foreground-muted">수온</p>
-                  <p className="text-xl font-bold tabular-nums text-brand">{b.waterTemp != null ? `${b.waterTemp}℃` : "—"}</p>
+                  <p className="text-[11px] text-foreground-muted">수온</p>
+                  <p className="text-base font-bold tabular-nums text-brand">{b.waterTemp != null ? `${b.waterTemp}℃` : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-foreground-muted">파고</p>
-                  <p className="text-xl font-bold tabular-nums" style={{ color: w.color }}>
+                  <p className="text-[11px] text-foreground-muted">파고</p>
+                  <p className="text-base font-bold tabular-nums" style={{ color: w.color }}>
                     {b.waveHeight != null ? `${b.waveHeight}m` : "—"}
-                    <span className="ml-1 text-xs font-medium">{w.label}</span>
+                    <span className="ml-1 text-[11px] font-medium">{w.label}</span>
                   </p>
                 </div>
                 {b.airTemp != null && (
                   <div>
-                    <p className="text-xs text-foreground-muted">기온</p>
-                    <p className="text-xl font-bold tabular-nums text-brand">{b.airTemp}℃</p>
+                    <p className="text-[11px] text-foreground-muted">기온</p>
+                    <p className="text-base font-bold tabular-nums text-brand">{b.airTemp}℃</p>
                   </div>
                 )}
                 {b.wind != null && (
                   <div>
-                    <p className="text-xs text-foreground-muted">바람</p>
-                    <p className="text-xl font-bold tabular-nums text-brand">{b.wind}<span className="text-xs">m/s</span></p>
+                    <p className="text-[11px] text-foreground-muted">바람</p>
+                    <p className="text-base font-bold tabular-nums text-brand">{b.wind}<span className="text-[11px]">m/s</span></p>
                   </div>
                 )}
               </div>
               {/* 밀물/썰물 (있을 때만) */}
               {b.tides.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5 border-t border-brand/10 pt-3">
+                <div className="mt-2 flex flex-wrap gap-1.5 border-t border-brand/10 pt-2">
                   {b.tides.map((t, i) => (
-                    <span key={i} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.7rem] ${t.type === "고조" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                    <span key={i} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] ${t.type === "고조" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
                       {t.type === "고조" ? "🌊 만조" : "🏝 간조"} {hhmm(t.time)}
                       {t.level != null ? ` ${t.level}cm` : ""}
                     </span>
