@@ -46,6 +46,16 @@ export interface MembershipFunnel {
 }
 export const getMembershipFunnel = () => apiFetch<MembershipFunnel>("/api/admin/report/membership-funnel");
 
+// 예보 적중률(공개) — 우리 날씨 예보 vs 실제 관측. 예측 신뢰의 정직한 근거.
+export interface ForecastAccuracy {
+  count: number;
+  rainHitRate: number | null;
+  tempMae: number | null;
+  tempWithin2Rate: number | null;
+  recent: { date: string; predTmax: number | null; obsTemp: number | null; predPop: number | null; obsRain: boolean; rainHit: number | null }[];
+}
+export const getForecastAccuracy = () => apiFetch<ForecastAccuracy>("/api/reports/forecast-accuracy");
+
 // 공개 기능 설정(관리자) — 조회는 관리자, 변경은 superadmin(백엔드 강제).
 export const getAdminSettings = () => apiFetch<{ publicPeople: boolean }>("/api/admin/settings");
 export const setAdminSettings = (patch: { publicPeople: boolean }) =>

@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { submitLead, type PlanId } from "@/lib/api/membership";
 import { trackEvent } from "@/lib/api/reading";
+import { getForecastAccuracy, type ForecastAccuracy } from "@/lib/api/report";
 import { PageHeader } from "@/components/page-header";
 
 const PLANS: {
@@ -90,6 +91,7 @@ export default function MembershipPage() {
           description={<>지역신문이 만드는 AI 인텔리전스 — 뉴스를 넘어, <strong className="text-brand">결정에 쓰는 정보</strong>를 드립니다.</>}
         />
         <p className="mt-3 text-center text-xs text-foreground-muted">지금은 사전 신청 기간입니다. 정식 오픈 시 가장 먼저 안내드리며, 사전 신청자는 첫 달 무료 혜택을 드립니다.</p>
+        <div className="mt-5"><ForecastTrust /></div>
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">
@@ -136,6 +138,28 @@ export default function MembershipPage() {
           AI로 연결해 만듭니다. 멤버십 수익은 <strong className="text-brand">지역 언론이 계속 지역을 기록하는 데</strong> 쓰입니다.
         </p>
       </section>
+    </div>
+  );
+}
+
+// 예보 적중률 — 우리 날씨 예보가 실제와 얼마나 맞았는지(예측 신뢰의 정직한 근거).
+function ForecastTrust() {
+  const [a, setA] = useState<ForecastAccuracy | null>(null);
+  useEffect(() => { getForecastAccuracy().then(setA).catch(() => {}); }, []);
+  if (!a) return null;
+  const rain = a.rainHitRate != null ? `${Math.round(a.rainHitRate * 100)}%` : null;
+  const t2 = a.tempWithin2Rate != null ? `${Math.round(a.tempWithin2Rate * 100)}%` : null;
+  return (
+    <div className="mx-auto max-w-2xl rounded-xl border border-brand/15 bg-accent-subtle/15 px-4 py-3 text-center text-sm">
+      <span className="font-semibold text-brand">🎯 우리 예보, 실제와 이만큼 맞았습니다</span>
+      {a.count > 0 ? (
+        <p className="mt-1 text-foreground-muted">
+          최근 <strong className="text-brand">{a.count}일</strong> 검증 · 강수 예보 적중 <strong className="text-brand">{rain ?? "—"}</strong>
+          {a.tempMae != null && <> · 기온 평균오차 <strong className="text-brand">±{a.tempMae}℃</strong>{t2 && <> (±2℃ 이내 {t2})</>}</>}
+        </p>
+      ) : (
+        <p className="mt-1 text-foreground-muted">매일 예보와 실제를 대조해 적중률을 집계하고 있어요 — 곧 공개됩니다.</p>
+      )}
     </div>
   );
 }

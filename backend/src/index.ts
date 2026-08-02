@@ -286,6 +286,15 @@ export default {
     } catch (e) {
       console.warn("[cron] 환경 스냅샷 실패:", e instanceof Error ? e.message : e);
     }
+    // 예보 적중률 — 미래 날씨 예보 기록 + 지난 대상일을 방금 갱신된 관측(env_daily)과 대조(예측 신뢰 증명)
+    try {
+      const { recordForecasts, resolveForecasts } = await import("./reports/forecast_accuracy");
+      const rec = await recordForecasts(env);
+      const res = await resolveForecasts(env);
+      if (rec.recorded || res.resolved) console.log(`[cron] 예보 적중률: 기록 ${rec.recorded}·해소 ${res.resolved}`);
+    } catch (e) {
+      console.warn("[cron] 예보 적중률 실패:", e instanceof Error ? e.message : e);
+    }
     // 관광 수요지수 로그 — 다가오는 주말 지수를 누적 저장(예보 갱신 추적·백테스트 기반)
     try {
       const { logDemand } = await import("./tour/demand_log");

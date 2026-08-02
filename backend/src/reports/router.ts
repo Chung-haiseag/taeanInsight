@@ -177,6 +177,13 @@ reportsRouter.get("/metrics", async (c) => {
   return res;
 });
 
+// 예보 적중률(공개) — 우리 날씨 예보 vs 실제 관측. 예측 신뢰의 정직한 근거. (:weekId보다 먼저 등록)
+reportsRouter.get("/forecast-accuracy", async (c) => {
+  const { getForecastAccuracy } = await import("./forecast_accuracy");
+  c.header("Cache-Control", "public, max-age=1800");
+  return c.json(await getForecastAccuracy(c.env));
+});
+
 // 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님
 // 최신 리포트 조회 시 '지금'까지의 최신 기사를 보여줌(발행일에 고정 X) — 실시간성 확보.
 // 과거 리포트(weekId가 최신이 아님) 조회면 그 주 창으로 한정.
