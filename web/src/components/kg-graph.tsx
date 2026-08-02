@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 
 interface N { id: string; name: string; mentions: number }
-interface E { a: string; b: string; weight: number; reltype?: string }
+interface E { a: string; b: string; weight: number; reltype?: string; estimated?: boolean }
 
 // 관계 유형별 색(검수된 관계만 프런트에서 reltype을 실어 보냄). light/dark 공용은 아래 pal()에서 톤 조정.
 const REL_COLOR: Record<string, string> = {
@@ -100,16 +100,19 @@ export default function KgGraph({
         ctx!.beginPath(); ctx!.moveTo(PX(a), PY(a)); ctx!.lineTo(PX(b), PY(b));
         if (selected && !inc) { ctx!.strokeStyle = P.edgeDim; ctx!.lineWidth = 0.7; }
         else { ctx!.strokeStyle = relC ?? P.edge; ctx!.lineWidth = (relC ? 1.6 : 0.6) + Math.sqrt(e.weight / maxW) * 4.4; }
-        ctx!.stroke();
+        if (relC && e.estimated) ctx!.setLineDash([6, 4]);     // 미검수(AI 추정) 관계는 점선
+        ctx!.stroke(); ctx!.setLineDash([]);
       }
       // 관계 라벨(색 배경 pill) — 검수된 reltype만
       for (const e of es) { if (!e.reltype) continue; const a = byId[e.a], b = byId[e.b]; if (selected && !(e.a === selected || e.b === selected)) continue;
         const relC = REL_COLOR[e.reltype] ?? P.label; const mx = (PX(a) + PX(b)) / 2, my = (PY(a) + PY(b)) / 2;
         ctx!.font = "700 10px " + FONT; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
-        const tw = ctx!.measureText(e.reltype).width; ctx!.fillStyle = P.halo; ctx!.globalAlpha = 0.92;
+        const tw = ctx!.measureText(e.reltype).width; ctx!.fillStyle = P.halo; ctx!.globalAlpha = e.estimated ? 0.8 : 0.92;
         roundRect(ctx!, mx - tw / 2 - 5, my - 8, tw + 10, 16, 8); ctx!.fill(); ctx!.globalAlpha = 1;
-        ctx!.lineWidth = 1.2; ctx!.strokeStyle = relC; roundRect(ctx!, mx - tw / 2 - 5, my - 8, tw + 10, 16, 8); ctx!.stroke();
-        ctx!.fillStyle = relC; ctx!.fillText(e.reltype, mx, my);
+        ctx!.lineWidth = 1.2; ctx!.strokeStyle = relC;
+        if (e.estimated) ctx!.setLineDash([3, 2]);             // 미검수 pill 테두리도 점선
+        roundRect(ctx!, mx - tw / 2 - 5, my - 8, tw + 10, 16, 8); ctx!.stroke(); ctx!.setLineDash([]);
+        ctx!.globalAlpha = e.estimated ? 0.85 : 1; ctx!.fillStyle = relC; ctx!.fillText(e.reltype, mx, my); ctx!.globalAlpha = 1;
       }
       // 노드
       for (const n of ns) { const dim = selected && !(eg && eg.has(n.id)); ctx!.globalAlpha = dim ? 0.16 : 1; const nx = PX(n), ny = PY(n);

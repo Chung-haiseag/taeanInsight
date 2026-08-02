@@ -64,7 +64,7 @@ export default function PeoplePage() {
         <p className="font-semibold">⚠️ 실험 기능 · AI 자동 추출(미검증)</p>
         <p className="mt-1 leading-relaxed">
           아래 인물·관계는 AI가 <strong>기사에서 자동으로 뽑아낸</strong> 것으로 <strong>사람이 검증하지 않았습니다</strong>. ‘함께 등장’은 같은 기사에 나온 빈도일 뿐 실제 관계를 뜻하지 않습니다.
-          관계 <strong>라벨</strong>은 검수된 것만 표시합니다. 참고용으로만 보시고, 정확한 사실은 <Link href="/news" className="underline">기사 원문</Link>을 확인하세요.
+          관계 <strong>라벨</strong>은 <strong>실선=검수됨</strong>, <strong>점선=AI 추정(미검수)</strong>이며, 민감한 관계(대립·갈등·가족·인척)는 검수된 것만 표시합니다. 참고용으로만 보시고, 정확한 사실은 <Link href="/news" className="underline">기사 원문</Link>을 확인하세요.
         </p>
       </div>
 
@@ -183,6 +183,14 @@ export default function PeoplePage() {
 
 // ── 인물 소개(기사 근거 AI 전기 + 확정 팩트 스트립) ─────────────
 const TOPIC_NOISE = new Set(["개최", "대상", "성황", "성료", "실시", "위한", "한다", "선정", "진행"]);
+// 한 덩어리 소개글을 읽기 좋게 문단 분할 — 첫 문장은 리드(누구인가), 이후는 2문장씩 묶어 문단으로.
+function briefParagraphs(text: string): string[] {
+  const s = text.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+  if (s.length <= 2) return s;
+  const paras = [s[0]];
+  for (let i = 1; i < s.length; i += 2) paras.push(s.slice(i, i + 2).join(" "));
+  return paras;
+}
 function PersonIntro({ prof }: { prof: PersonProfile }) {
   const pid = prof.graph.center?.id;
   const [brief, setBrief] = useState<string | null | undefined>(undefined); // undefined=로딩, null=근거부족
@@ -216,7 +224,11 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
           <p className="pt-1 text-[11px] text-foreground-muted">기사에서 인물 소개를 작성하는 중…</p>
         </div>
       ) : brief ? (
-        <p className="text-sm leading-relaxed text-foreground">{brief}</p>
+        <div className="space-y-2.5 text-sm leading-relaxed text-foreground">
+          {briefParagraphs(brief).map((p, i) => (
+            <p key={i} className={i === 0 ? "font-medium" : undefined}>{p}</p>
+          ))}
+        </div>
       ) : (
         <p className="text-sm leading-relaxed text-foreground">
           <strong className="text-brand">{prof.person.name}</strong> — {desc ? `${desc} · ` : ""}아카이브 기사 <strong>{prof.person.mentions.toLocaleString()}건</strong>에 등장{years ? ` (${years})` : ""}.
@@ -249,28 +261,41 @@ const REL_LEGEND: Record<string, string> = {
   "소속·상하": "#2563eb",
   "가족·인척": "#d97706",
 };
+// 미검수(AI 추정)라도 그래프에 노출을 허용하는 '저위험' 관계 유형. 민감한 대립·갈등·가족·인척은 검수된 것만.
+const SAFE_UNVERIFIED = new Set(["협력·동료", "전임·후임", "소속·상하"]);
 function RelationGraph({ prof, onOpen }: { prof: PersonProfile; onOpen: (id: string) => void }) {
   const centerId = prof.graph.center?.id;
-  // 관계 라벨은 검수(verified)된 것만 그래프에 실어 색·라벨로 표시.
-  const verifiedRel = new Map(prof.coappear.filter((c) => c.verified === 1 && c.reltype).map((c) => [c.id, c.reltype as string]));
+  // 중심↔이웃: coappear가 verified를 담고 있어 정책 정확 적용 — 검수(전 유형)=실선, 미검수라도 안전 유형=점선(AI 추정).
+  const centerRel = new Map(
+    prof.coappear
+      .filter((c) => c.reltype && (c.verified === 1 || SAFE_UNVERIFIED.has(c.reltype)))
+      .map((c) => [c.id, { reltype: c.reltype as string, estimated: c.verified !== 1 }] as const),
+  );
   const edges = prof.graph.edges.map((e) => {
     const other = e.a === centerId ? e.b : e.b === centerId ? e.a : null;
-    return { ...e, reltype: other ? verifiedRel.get(other) : undefined };
+    if (other) { const r = centerRel.get(other); return { ...e, reltype: r?.reltype, estimated: r?.estimated }; }
+    // 이웃끼리(mesh)는 verified 미상 → 안전 유형만 'AI 추정'(점선)으로. 민감·기타는 숨김.
+    const rel = e.reltype && SAFE_UNVERIFIED.has(e.reltype) ? e.reltype : undefined;
+    return { ...e, reltype: rel, estimated: rel ? true : undefined };
   });
   const usedRels = [...new Set(edges.map((e) => e.reltype).filter(Boolean) as string[])];
+  const hasEstimated = edges.some((e) => e.reltype && e.estimated);
+  const hasVerified = edges.some((e) => e.reltype && !e.estimated);
   return (
     <section className="rounded-lg border border-brand/15 bg-background p-2">
       <p className="px-2 pt-1 text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(<strong>원·이름 클릭 시 그 사람으로 이동</strong>). 바이라인 제외.</p>
       <KgGraph nodes={prof.graph.nodes} edges={edges} centerId={centerId} onNodeClick={onOpen} height={640} />
       {usedRels.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 px-2 pb-1 pt-1 text-[11px]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 pb-1 pt-1 text-[11px]">
           {usedRels.map((r) => (
             <span key={r} className="inline-flex items-center gap-1">
               <span className="inline-block h-2.5 w-4 rounded-sm" style={{ background: REL_LEGEND[r] ?? "#888" }} />
               {r}
             </span>
           ))}
-          <span className="text-foreground-muted">— 검수된 관계만 색으로 표시(나머지는 함께 등장)</span>
+          <span className="text-foreground-muted">
+            — {hasVerified && "실선=검수됨"}{hasVerified && hasEstimated && " · "}{hasEstimated && "점선=AI 추정(미검수)"} · 민감 관계(대립·갈등·가족·인척)는 검수된 것만
+          </span>
         </div>
       )}
     </section>

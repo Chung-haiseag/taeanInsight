@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 };
 
 const TIMELINE = [
-  { phase: "준비", date: "2026-06 말", task: "공고문·지원서·평가 기준 확정" },
-  { phase: "모집·선발", date: "2026-07 중순", task: "8명 선발 (읍·면 균형·연령 다양성)" },
-  { phase: "교육", date: "2026-07 말 ~ 08", task: "6회 교육 + AI Co-Pilot 실습" },
-  { phase: "활동·발행", date: "2026-09 ~ 11", task: "1인당 3개월 총 6편" },
+  { phase: "준비", date: "2026-07", task: "공고문·지원서·평가 기준 확정" },
+  { phase: "모집·선발", date: "2026-08 중", task: "8명 선발 (읍·면 균형·연령 다양성)" },
+  { phase: "교육", date: "2026-08 말", task: "6회 교육 + AI Co-Pilot 실습" },
+  { phase: "활동·발행", date: "2026-09 ~ 11", task: "1인당 총 4편 (편당 5만원·총 20만원)" },
 ];
 
 export default function CitizenPage() {
@@ -45,11 +45,11 @@ export default function CitizenPage() {
           <Icon name="megaphone" /> 2026년 시민기자 모집 안내
         </h2>
         <ul className="text-sm text-foreground-muted space-y-1">
-          <li>· 모집 시기: 2026년 7월 중순 (사업 일정 v1.5 조정 반영)</li>
+          <li>· 모집 시기: 2026년 8월 중 (공고)</li>
           <li>· 선발 인원: 8명 (읍·면별 균형, 20~60대 연령 다양성)</li>
           <li>· 활동 기간: 2026년 9월 ~ 11월 (3개월)</li>
-          <li>· 발행량: 1인당 3개월 총 6편</li>
-          <li>· 원고료: 편당 5만원 (매월 말 자동 정산)</li>
+          <li>· 발행량: 1인당 총 4편</li>
+          <li>· 원고료: 편당 5만원 · 1인당 총 20만원 (매월 말 자동 정산)</li>
         </ul>
       </section>
 

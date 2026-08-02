@@ -61,7 +61,7 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
   // 인접 엣지 — weight·reltype만 json_extract로 뽑아(articles 배열 제외) 고차수 인물의 응답 페이로드를 줄인다.
   const inc = await db.prepare(
     `SELECT src_id, dst_id, CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS weight, json_extract(attrs_json,'$.reltype') AS reltype ` +
-    `FROM kg_edges WHERE rel='coappears' AND (src_id IN (${gph}) OR dst_id IN (${gph}))`,
+    `FROM kg_edges WHERE rel='coappears' AND (src_id IN (${gph}) OR dst_id IN (${gph})) ORDER BY weight DESC LIMIT 400`,
   ).bind(...group, ...group).all<{ src_id: string; dst_id: string; weight: number | null; reltype: string | null }>();
   const rawEdges: Edge[] = (inc.results ?? []).map((e) => ({ a: e.src_id, b: e.dst_id, weight: Number(e.weight) || 1, reltype: e.reltype ? e.reltype : undefined }));
   // 이웃 노드 전량 조회는 D1 바인딩 파라미터(쿼리당 100개) 한도를 넘긴다(가세로=이웃 4,070명). 엣지만 canonical

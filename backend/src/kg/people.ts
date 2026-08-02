@@ -176,65 +176,61 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
 
   const hubIds = await loadHubIds(db);
 
-  // 관계망(바이라인 제외)
-  const graph = await personEgo(db, id, limit, hubIds);
-
-  // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회.
-  // 관계 검수(B3 활성화)를 위해 엣지 id·verified·relreason도 함께 실어 준다.
-  const inc = await db.prepare(
-    "SELECT id AS edgeId, verified, CASE WHEN src_id=? THEN dst_id ELSE src_id END AS otherId, " +
-    "CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS count, " +
-    "json_extract(attrs_json,'$.reltype') AS reltype, " +
-    "json_extract(attrs_json,'$.relreason') AS reason " +
-    "FROM kg_edges WHERE rel='coappears' AND (src_id=? OR dst_id=?)",
-  ).bind(id, id, id).all<{ edgeId: string; verified: number; otherId: string; count: number; reltype: string | null; reason: string | null }>();
-  const incRows = inc.results ?? [];
-  const rmap = new Map(incRows.map((e) => [e.otherId, e.reltype && e.reltype !== "기타" ? e.reltype : undefined] as const));
-  const emap = new Map(incRows.map((e) => [e.otherId, { edgeId: e.edgeId, verified: Number(e.verified) || 0, reason: e.reason ?? undefined }] as const));
-  const top = rankCoappears(incRows.map((e) => ({ otherId: e.otherId, count: Number(e.count) || 0 })), hubIds, limit);
-  let coappear: PersonProfile["coappear"] = [];
-  if (top.length) {
+  // 관계망·함께등장·기사·직위·추이·주제를 병렬 조회 — 서로 독립이라 순차 D1 왕복 대신 동시 실행으로 지연 단축.
+  const graphP = personEgo(db, id, limit, hubIds);
+  const coappearP = (async (): Promise<PersonProfile["coappear"]> => {
+    // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회. 검수용 엣지 id·verified·relreason 포함.
+    const inc = await db.prepare(
+      "SELECT id AS edgeId, verified, CASE WHEN src_id=? THEN dst_id ELSE src_id END AS otherId, " +
+      "CAST(json_extract(attrs_json,'$.weight') AS INTEGER) AS count, " +
+      "json_extract(attrs_json,'$.reltype') AS reltype, " +
+      "json_extract(attrs_json,'$.relreason') AS reason " +
+      "FROM kg_edges WHERE rel='coappears' AND (src_id=? OR dst_id=?) ORDER BY count DESC LIMIT 120",
+    ).bind(id, id, id).all<{ edgeId: string; verified: number; otherId: string; count: number; reltype: string | null; reason: string | null }>();
+    const incRows = inc.results ?? [];
+    const rmap = new Map(incRows.map((e) => [e.otherId, e.reltype && e.reltype !== "기타" ? e.reltype : undefined] as const));
+    const emap = new Map(incRows.map((e) => [e.otherId, { edgeId: e.edgeId, verified: Number(e.verified) || 0, reason: e.reason ?? undefined }] as const));
+    const top = rankCoappears(incRows.map((e) => ({ otherId: e.otherId, count: Number(e.count) || 0 })), hubIds, limit);
+    if (!top.length) return [];
     const ids = top.map((t) => t.otherId);
     const ph = ids.map(() => "?").join(",");
     const nm = await db.prepare(`SELECT id, name FROM kg_nodes WHERE id IN (${ph})`).bind(...ids).all<{ id: string; name: string }>();
     const nmap = new Map((nm.results ?? []).map((x) => [x.id, x.name] as const));
-    coappear = top.map((t) => {
+    return top.map((t) => {
       const meta = emap.get(t.otherId);
       return { id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count, reltype: rmap.get(t.otherId), edgeId: meta?.edgeId, verified: meta?.verified, reason: meta?.reason };
     });
-  }
-
+  })();
   // 나온 기사(최신순 30)
-  const arts = await db.prepare(
+  const artsP = db.prepare(
     "SELECT a.idxno AS idxno, a.title AS title, a.published_at AS published_at " +
     "FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno WHERE m.node_id=? " +
     "ORDER BY a.published_at DESC LIMIT 30",
   ).bind(id).all<{ idxno: number; title: string; published_at: string }>();
-
   // 직위·소속(verified held만)
-  const off = await db.prepare(
+  const offP = db.prepare(
     "SELECT o.name AS office, e.attrs_json AS attrs_json FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id " +
     "WHERE e.src_id=? AND e.rel='held' AND e.verified=1",
   ).bind(id).all<{ office: string; attrs_json: string | null }>();
+  // 시기별 추이(연도별 기사 수)
+  const tlP = db.prepare(
+    "SELECT CAST(strftime('%Y', a.published_at) AS INTEGER) AS year, COUNT(*) AS count " +
+    "FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno " +
+    "WHERE m.node_id=? AND a.published_at IS NOT NULL GROUP BY year ORDER BY year",
+  ).bind(id).all<{ year: number | null; count: number }>();
+  // 대표 사안 — 제목 최대 300건에서 자주 나오는 키워드
+  const ttP = db.prepare(
+    "SELECT a.title AS title FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno " +
+    "WHERE m.node_id=? AND a.title IS NOT NULL ORDER BY a.published_at DESC LIMIT 300",
+  ).bind(id).all<{ title: string }>();
+
+  const [graph, coappear, arts, off, tl, tt] = await Promise.all([graphP, coappearP, artsP, offP, tlP, ttP]);
   const offices = (off.results ?? []).map((x) => {
     let a: { start?: string; end?: string; ordinal?: number } = {};
     try { a = JSON.parse(x.attrs_json ?? "{}"); } catch { /* */ }
     return { office: x.office, start: a.start ?? null, end: a.end ?? null, ordinal: a.ordinal ?? null };
   });
-
-  // 시기별 추이(연도별 기사 수)
-  const tl = await db.prepare(
-    "SELECT CAST(strftime('%Y', a.published_at) AS INTEGER) AS year, COUNT(*) AS count " +
-    "FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno " +
-    "WHERE m.node_id=? AND a.published_at IS NOT NULL GROUP BY year ORDER BY year",
-  ).bind(id).all<{ year: number | null; count: number }>();
   const timeline = yearHistogram(tl.results ?? []);
-
-  // 대표 사안 — 제목 최대 300건에서 자주 나오는 키워드
-  const tt = await db.prepare(
-    "SELECT a.title AS title FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno " +
-    "WHERE m.node_id=? AND a.title IS NOT NULL ORDER BY a.published_at DESC LIMIT 300",
-  ).bind(id).all<{ title: string }>();
   const topics = topTopics((tt.results ?? []).map((x) => x.title), p.name);
 
   return {
