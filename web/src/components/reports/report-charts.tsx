@@ -201,6 +201,10 @@ export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) 
           {env.live.humidity != null && <Pill label="습도" value={`${env.live.humidity}%`} />}
         </div>
       )}
+
+      <p className="mt-3 border-t border-brand/10 pt-3 text-[11px] leading-relaxed text-foreground-muted">
+        <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
+      </p>
     </figure>
   );
 }
