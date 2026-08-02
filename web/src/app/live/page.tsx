@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews } from "@/lib/api/reports";
 import {
-  SummaryInfographic, WeatherCards, AirQualityTrend, MarineCard,
+  SummaryInfographic, WeatherAirCard, MarineCard,
   DemandGauge, FestivalList, SeasonalFoodCard, OilCard,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
@@ -65,8 +65,7 @@ export default async function LivePage() {
           <section>
             <h2 className="text-xl font-bold text-brand">날씨·대기질</h2>
             <span className="accent-rule mt-3" aria-hidden />
-            <WeatherCards env={metrics.environment} />
-            <AirQualityTrend env={metrics.environment} />
+            <WeatherAirCard env={metrics.environment} />
           </section>
 
           {/* 바다 */}

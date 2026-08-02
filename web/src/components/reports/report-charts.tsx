@@ -204,6 +204,52 @@ function AirMetric({ label, sub, v, g }: { label: string; sub: string; v: number
   );
 }
 
+// ── 날씨 + 대기질 통합(실시간, 한 카드) — 통합대기·관측시각 중복 제거 ──
+export function WeatherAirCard({ env }: { env: ReportMetrics["environment"] }) {
+  const l = env.live;
+  if (!l) return null;
+  const weather: Array<{ label: string; value: string }> = [];
+  if (l.temp != null) weather.push({ label: "기온", value: `${l.temp}℃` });
+  if (l.humidity != null) weather.push({ label: "습도", value: `${l.humidity}%` });
+  if (l.sky) weather.push({ label: "하늘", value: l.sky });
+  const hasAir = l.pm10 != null || l.pm25 != null || !!l.grade;
+  if (!weather.length && !hasAir) return null;
+  const time = kstHm(l.observedAt) ? `${kstHm(l.observedAt)} 관측` : "실시간";
+  return (
+    <figure className="mt-4 card p-4">
+      <figcaption className="flex flex-wrap items-center justify-between gap-2">
+        {l.grade
+          ? <span className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white" style={{ background: AIR_COLOR[l.grade] ?? "#64748b" }}>통합대기 {l.grade}</span>
+          : <span className="text-sm font-semibold text-brand">실시간 날씨·대기질</span>}
+        <span className="text-xs text-foreground-muted">{time} · 기상청·에어코리아</span>
+      </figcaption>
+
+      {weather.length > 0 && (
+        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${weather.length}, minmax(0, 1fr))` }}>
+          {weather.map((w) => (
+            <div key={w.label} className="rounded-lg border border-brand/10 bg-white/60 px-3 py-2 text-center">
+              <p className="text-[11px] font-medium text-foreground-muted">{w.label}</p>
+              <p className="mt-0.5 text-lg font-bold text-brand">{w.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasAir && (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <AirMetric label="미세먼지" sub="PM10" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
+            <AirMetric label="초미세먼지" sub="PM2.5" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
+          </div>
+          <p className="mt-3 border-t border-brand/10 pt-3 text-[11px] leading-relaxed text-foreground-muted">
+            <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
+          </p>
+        </>
+      )}
+    </figure>
+  );
+}
+
 // ── 이달의 제철 먹거리 (정적 데이터, API 불요) — 지역값은 lib/region.ts ──
 export function SeasonalFoodCard() {
   // KST 기준 현재 월
