@@ -168,7 +168,7 @@ export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) 
   const max = Math.max(60, ...rows.flatMap((r) => [r.pm10 ?? 0, r.pm25 ?? 0]));
 
   return (
-    <figure className="mt-6 card p-5">
+    <figure className="mt-4 card p-4">
       <figcaption className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-brand">최근 대기질 추세 (㎍/㎥)</span>
         <span className="flex items-center gap-3 text-xs text-foreground-muted">
@@ -178,10 +178,10 @@ export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) 
       </figcaption>
 
       {rows.length > 0 && (
-        <div className="mt-4 flex items-end justify-between gap-2" style={{ height: "8rem" }}>
+        <div className="mt-4 flex items-end justify-between gap-2" style={{ height: "6.5rem" }}>
           {rows.map((r) => (
             <div key={r.date} className="flex flex-1 flex-col items-center justify-end gap-1">
-              <div className="flex w-full items-end justify-center gap-0.5" style={{ height: "6rem" }}>
+              <div className="flex w-full items-end justify-center gap-0.5" style={{ height: "5rem" }}>
                 <div className="w-2.5 rounded-t bg-brand/70" style={{ height: `${((r.pm10 ?? 0) / max) * 100}%` }} title={`PM10 ${r.pm10 ?? "—"}`} />
                 <div className="w-2.5 rounded-t bg-accent" style={{ height: `${((r.pm25 ?? 0) / max) * 100}%` }} title={`PM2.5 ${r.pm25 ?? "—"}`} />
               </div>
@@ -232,7 +232,7 @@ export function SeasonalFoodCard() {
   const items = FRONT_REGION.seasonalFoods.filter((f) => f.months.includes(month));
   if (!items.length) return null;
   return (
-    <div className="mt-6 card p-5">
+    <div className="mt-4 card p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-brand">🍽 {month}월 제철 {FRONT_REGION.name} 먹거리</span>
         <span className="text-[0.7rem] text-foreground-muted">지역 특산</span>
@@ -268,7 +268,7 @@ export function DemandGauge({ demand }: { demand: DemandForecast | null }) {
   const color = LEVEL_COLOR[demand.level];
   const pct = Math.max(0, Math.min(100, demand.index));
   return (
-    <div className="mt-6 card p-5">
+    <div className="mt-4 card p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-brand">주말 관광 수요지수</span>
         <span className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white" style={{ background: color }}>
@@ -279,7 +279,7 @@ export function DemandGauge({ demand }: { demand: DemandForecast | null }) {
       {/* 지수 + 게이지 막대 */}
       <div className="mt-4 flex items-end gap-4">
         <div className="flex items-baseline gap-1">
-          <span className="font-display text-4xl font-bold tabular-nums" style={{ color }}>{demand.index}</span>
+          <span className="font-display text-3xl font-bold tabular-nums" style={{ color }}>{demand.index}</span>
           <span className="text-sm text-foreground-muted">/ 100</span>
         </div>
         <div className="flex-1 pb-1.5">
@@ -341,7 +341,7 @@ const IDX_COLOR: Record<string, string> = {
 export function MarineCard({ marine }: { marine: MarineInfo | null }) {
   if (!marine || !marine.available || (!marine.beaches.length && !marine.tide)) return null;
   return (
-    <div className="mt-6 card p-5">
+    <div className="mt-4 card p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-brand">해변 바다 정보</span>
         <span className="text-[0.7rem] text-foreground-muted">기상청·국립해양조사원</span>
@@ -476,11 +476,11 @@ export function WeatherCards({ env }: { env: ReportMetrics["environment"] }) {
   if (l.grade) cards.push({ label: "통합대기", value: l.grade });
   if (!cards.length) return null;
   return (
-    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
       {cards.map((c) => (
-        <div key={c.label} className="rounded-2xl border border-brand/10 bg-white/60 p-4 text-center shadow-soft">
-          <p className="text-xs font-medium text-foreground-muted">{c.label}</p>
-          <p className="mt-1 text-xl font-bold text-brand">{c.value}</p>
+        <div key={c.label} className="rounded-xl border border-brand/10 bg-white/60 p-3 text-center shadow-soft">
+          <p className="text-[11px] font-medium text-foreground-muted">{c.label}</p>
+          <p className="mt-0.5 text-lg font-bold text-brand">{c.value}</p>
         </div>
       ))}
       <p className="col-span-full -mt-1 text-right text-[0.7rem] text-foreground-muted">
@@ -494,9 +494,9 @@ export function WeatherCards({ env }: { env: ReportMetrics["environment"] }) {
 export function RealEstatePanel({ re }: { re: ReportMetrics["realestate"] }) {
   if (!re.apt && !re.land) return null;
   return (
-    <div className="mt-6 space-y-5">
+    <div className="mt-4 space-y-5">
       {re.apt && (
-        <div className="card p-5">
+        <div className="card p-4">
           <p className="text-sm font-semibold text-brand">아파트 실거래 · 최근 {re.apt.count}건</p>
           <div className="mt-3 grid grid-cols-3 gap-3 text-center">
             <Stat label="평균가" value={wonFmt(re.apt.avgManwon)} />
@@ -508,7 +508,7 @@ export function RealEstatePanel({ re }: { re: ReportMetrics["realestate"] }) {
         </div>
       )}
       {re.land && (
-        <div className="card p-5">
+        <div className="card p-4">
           <p className="text-sm font-semibold text-brand">토지 실거래 · 최근 {re.land.count}건</p>
           <div className="mt-3 grid grid-cols-2 gap-3 text-center">
             <Stat label="최고가" value={wonFmt(re.land.maxManwon)} accent />
@@ -529,7 +529,7 @@ export function OilCard({ oil }: { oil: OilPrices | null }) {
   if (oil.gasoline) rows.push({ label: "휘발유", emoji: "⛽", v: oil.gasoline });
   if (oil.diesel) rows.push({ label: "경유", emoji: "🛢", v: oil.diesel });
   return (
-    <div className="mt-6 card p-5">
+    <div className="mt-4 card p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-brand">충남 주유 평균가</span>
         <span className="text-[0.7rem] text-foreground-muted">오피넷 · ℓ당</span>
@@ -649,7 +649,7 @@ function ymd8(d: string): string {
 export function FestivalList({ tour }: { tour: ReportMetrics["tourism"] }) {
   if (!tour.festivals.length) return null;
   return (
-    <div className="mt-6 card p-5">
+    <div className="mt-4 card p-4">
       <p className="text-sm font-semibold text-brand">현재·예정 축제</p>
       <ul className="mt-3 space-y-2">
         {tour.festivals.map((f, i) => (

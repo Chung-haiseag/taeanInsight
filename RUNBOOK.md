@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
+- 2026-08-02 · /live 데이터 카드 밀도 2차(전체 촘촘): report-charts 공용 카드 여백·패딩 일괄 축소(mt-6→mt-4·card p-5→p-4, 8곳). WeatherCards p-4→p-3·값 text-xl→lg, 대기질 차트 8→6.5rem, 수요지수 text-4xl→3xl. 날씨·바다·관광·경제 카드 전부 균일 압축. 리포트 페이지에도 공유 적용. web/src/components/reports/report-charts.tsx
 - 2026-08-02 · /live 밀도 개선(정보가 너무 큼 피드백): 핵심지표 인포그래픽(SummaryInfographic)을 고정 grid-cols-4(5타일→빈칸3) 에서 auto-fit minmax(140px)로 → 타일 수만큼 한 줄 꽉 채워 빈칸 제거, 셀 축소(py-5→py-3·text-2xl→text-lg·이모지 축소). /live 섹션 제목 9개 text-display-sm→text-xl, 간격 space-y-10→8. 인포그래픽은 홈에도 공유돼 동반 개선. web/src/components/reports/report-charts.tsx·app/live/page.tsx
 - 2026-08-02 · 상단 헤더 2행 분리(메뉴 줄바꿈 정리): 한 줄에 로고+메뉴9+글자크기+고대비+계정을 몰아넣어 1200px에서 메뉴 라벨이 단어 중간 줄바꿈되던 문제(특히 최종관리자 9개). 태안신문식 2행으로 — 1행(로고·접근성·계정), 2행(메뉴 전용 바, whitespace-nowrap·shrink-0·overflow-x-auto). 메뉴가 자체 행이라 넉넉·무줄바꿈. web/src/components/site-header.tsx
 - 2026-08-01 · 팟캐스트 인트로·아웃트로 음악 합성(로고송): 사용자 제공 음악(intro·outro.mp3, tools/podcast/assets/)을 ffmpeg로 합성. 인트로는 6초로 트림(introLen 기본 6, 원본 파일 보존). **인사말과 겹치지 않게** 크로스페이드 대신 순차 연결(concat) — [인트로 페이드인→페이드아웃]→0.35s공백→[말소리 원본]→0.35s공백→[아웃트로 페이드인→페이드아웃], +21.1s(인트로6+아웃14.4+공백0.7). 공용 헬퍼 tools/podcast/mix-music.mjs(assets 없으면 원본 폴백), gen-podcast·gen-briefing 업로드 직전에 연결→향후 회차 자동 적용. 기존 6편(2026-W26~W31) 백필 재합성·R2 교체(원본 로컬 백업). 라이브 확인 6편 원본+21.1s. tools/podcast/{mix-music,gen-podcast,gen-briefing,assets}
