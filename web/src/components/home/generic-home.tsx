@@ -29,28 +29,28 @@ export function GenericHome() {
   const totalKo = total ? formatManBun(total) : null; // "10만 4,024" 형태
 
   return (
-    <div className="space-y-20">
+    <div className="space-y-14">
       {/* Hero — 좌측 정렬 에디토리얼 */}
-      <section className="pt-6 md:pt-10">
+      <section className="pt-4 md:pt-6">
         <p className="eyebrow">
           <span className="inline-block h-px w-6 bg-accent" aria-hidden="true" />
           태안 인사이트 · 지역 저널리즘
         </p>
-        <h1 className="mt-5 font-sans text-display text-brand">
+        <h1 className="mt-3 font-sans text-3xl font-bold leading-[1.15] text-brand sm:text-4xl md:text-5xl">
           태안의 어제와 오늘을, 한곳에서.
         </h1>
-        <span className="accent-rule mt-6" aria-hidden="true" />
-        <p className="mt-6 max-w-prose text-lg leading-relaxed text-foreground-muted">
+        <span className="accent-rule mt-4" aria-hidden="true" />
+        <p className="mt-4 max-w-prose leading-relaxed text-foreground-muted">
           {total ? <><strong className="font-semibold text-brand">{totalKo}건</strong>의 지역 기록과 실시간 현황을 한 번에. </> : "지역 기록과 실시간 현황을 한 번에. "}
           자연어로 묻고, 근거와 함께 답을 받으세요. 모든 콘텐츠는 편집부 검토를 거쳐 발행됩니다.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-2.5">
           <Link href="/query" className="btn-accent">무엇이든 질문</Link>
           <Link href="/news" className="btn-ghost">뉴스 아카이브</Link>
           <Link href="/reports" className="btn-ghost">주간 리포트</Link>
         </div>
         {(total || span) && (
-          <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4 border-t border-brand/10 pt-6">
+          <dl className="mt-7 flex flex-wrap gap-x-8 gap-y-4 border-t border-brand/10 pt-5">
             {total && <HeroStat value={totalKo!} unit="건" label="지역 기사 아카이브" />}
             {minY && maxY && <HeroStat value={`${minY}–${String(maxY).slice(2)}`} unit="" label={span ? `${span}년치 기록` : "수록 기간"} />}
             <HeroStat value="100" unit="%" label="편집부 검토 발행" />
@@ -68,7 +68,7 @@ export function GenericHome() {
       <section aria-labelledby="showcase-heading">
         <div className="hairline pt-8">
           <p className="eyebrow">둘러보기</p>
-          <h2 id="showcase-heading" className="mt-2 text-display-sm font-bold text-brand">
+          <h2 id="showcase-heading" className="mt-2 text-2xl font-bold text-brand md:text-3xl">
             태안을 읽는 네 가지 길
           </h2>
         </div>
@@ -111,18 +111,18 @@ export function GenericHome() {
       <PersonalizedNewsStrip />
 
       {/* 지역 저널리즘·신뢰 — 진한 네이비 블록 */}
-      <section className="rounded-3xl bg-brand px-6 py-12 text-background md:px-12 md:py-16">
+      <section className="rounded-3xl bg-brand px-6 py-9 text-background md:px-10 md:py-12">
         <p className="eyebrow text-accent-subtle">우리의 약속</p>
-        <h2 className="mt-3 text-display-sm font-bold">사람이 검토한 지역 인텔리전스</h2>
-        <p className="mt-4 max-w-prose text-background/70">
+        <h2 className="mt-2 text-2xl font-bold md:text-3xl">사람이 검토한 지역 인텔리전스</h2>
+        <p className="mt-3 max-w-prose text-background/70">
           기계가 모으고, 편집부가 확인합니다. 예측과 요약은 발행 전 사람의 손을 거치고, AI 답변에는 언제나 출처를 표기합니다.
         </p>
-        <div className="mt-10 grid gap-8 md:grid-cols-3">
+        <div className="mt-7 grid gap-6 md:grid-cols-3">
           <Stat value="100%" label="편집부 검토 후 발행" />
           <Stat value={span ? `${span}년` : "36년"} label={minY && maxY ? `${minY}–${maxY} 기록` : "지역 기록"} />
           <Stat value="시민기자단" label="함께 쓰는 지역 저널리즘" />
         </div>
-        <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-background/15 pt-6">
+        <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-background/15 pt-5">
           <Link href="/reports" className="text-sm font-semibold text-accent-subtle hover:underline">주간 리포트 →</Link>
           <Link href="/citizen" className="text-sm font-semibold text-accent-subtle hover:underline">시민기자단 →</Link>
           <Link href="/membership" className="text-sm font-semibold text-accent-subtle hover:underline">멤버십 →</Link>

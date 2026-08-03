@@ -75,6 +75,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
 - 2026-08-03 · 수집 관측성: 관리자 보고서 '데이터 신선도'에 '마지막 수집 실행'(news_cache.updated_at, KST) 추가 — 최신 기사 날짜와 대조해 '수집기 고장 vs 새글 없음' 구분. backend/src/report/router.ts, web app/admin/report·lib/api/report
+- 2026-08-03 · 방문자 홈 가독성 정리: 히어로 h1 text-display(≤72px)→text-3xl~5xl(≤48px), 섹션 간격 space-y-20→14, 히어로/쇼케이스/신뢰 섹션 제목·마진 축소(과대 여백·거대 제목 정리). web/src/components/home/generic-home.tsx
 - 2026-08-03 · 방문자 첫화면에 '이번 주말 관광 수요 예측' 미끼 카드(#1): 기존 수요지수 엔진(GET /api/conditions/demand — 날씨·물때·축제·연휴·계절 규칙기반 0~100)을 공개 방문자 홈(GenericHome)에 대표 예측으로 노출. getWeekendDemand() 클라이언트 + WeekendDemandCard(지수·등급·근거요인·주말날씨) + 사장님 멤버십 전환 미끼 + 적중률 고지. 무료 지수=hook, 사장님 상세=전환 구조. 검증: 비로그인 홈에 67/100·높음·근거 표시 확인. web lib/api/reports·components/home/generic-home
 - 2026-08-03 · 로그인 아이디(username) 지원: 이메일 없이 단순 아이디로 로그인. mig 043 users.username(부분 유니크). /login이 id(username 또는 email)로 조회(WHERE username=? OR email=?, 하위호환 email 필드도 수용). 기자 생성은 username 기반(이메일 미입력 시 내부 합성 이메일로 NOT NULL 충족). 로그인 폼·관리자 생성폼·회원표 아이디 표시로 변경. 검증: 테스트계정 username 로그인 토큰발급·오답거부 확인. backend auth/router·admin_router, web login-client·lib/api/auth·admin·app/admin/page, db/043
 - 2026-08-03 · 회원 관리 수정·삭제: 관리자 👥회원표에 '관리' 열(이름·비번·삭제) 추가. /set에 displayName(이름수정), 신규 /reset-password(비번 지정/자동→1회 반환·기존 세션 무효화), /delete(상위등급·최종관리자·본인 삭제 금지, 세션 함께 삭제). 프런트는 prompt/confirm로 처리. 검증: 테스트계정 생성→이름수정→비번재설정→삭제 API 왕복 확인(잔여 없음). backend auth/admin_router, web lib/api/admin·app/admin/page
