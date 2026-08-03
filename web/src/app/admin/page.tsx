@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { getSession, logout, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, createReporter, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser, type CitizenApp, type CreatedReporter } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, createReporter, resetUserPassword, deleteUser, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser, type CitizenApp, type CreatedReporter } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -225,9 +225,29 @@ function UsersSection() {
   const load = () => getUsers().then((r) => setUsers(r.users)).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
   const loadApps = () => getCitizenApplications("pending").then((r) => setApps(r.applications)).catch(() => {});
   useEffect(() => { void load(); loadApps(); }, []);
-  async function patch(id: number, p: { role?: string; plan?: string }) {
+  async function patch(id: number, p: { role?: string; plan?: string; displayName?: string }) {
     setSaving(id);
     try { await setUserAccess(id, p); await load(); } catch (e) { alert(e instanceof Error ? e.message : "변경 실패"); } finally { setSaving(null); }
+  }
+  async function editName(u: AdminUser) {
+    const name = window.prompt("이름 수정:", u.display_name ?? "");
+    if (name === null) return;
+    await patch(u.id, { displayName: name.trim() });
+  }
+  async function resetPw(u: AdminUser) {
+    const pw = window.prompt(`${u.email}\n새 비밀번호(8자 이상, 비우면 자동 생성):`, "");
+    if (pw === null) return;
+    if (pw && pw.length < 8) { alert("비밀번호는 8자 이상이어야 합니다."); return; }
+    setSaving(u.id);
+    try {
+      const r = await resetUserPassword(u.id, pw || undefined);
+      window.prompt("✅ 비밀번호가 재설정되었습니다. 복사해 전달하세요(다시 표시 안 됨):", `아이디: ${r.email}\n비밀번호: ${r.tempPassword}`);
+    } catch (e) { alert(e instanceof Error ? e.message : "재설정 실패"); } finally { setSaving(null); }
+  }
+  async function removeUser(u: AdminUser) {
+    if (!window.confirm(`정말 삭제할까요?\n\n${u.email} (${u.display_name ?? "이름없음"})\n\n이 회원의 로그인·데이터가 삭제됩니다. 되돌릴 수 없습니다.`)) return;
+    setSaving(u.id);
+    try { await deleteUser(u.id); await load(); } catch (e) { alert(e instanceof Error ? e.message : "삭제 실패(상위 등급·본인은 삭제 불가)"); } finally { setSaving(null); }
   }
   async function decide(id: number, decision: "approve" | "reject") {
     const reason = decision === "reject" ? (window.prompt("반려 사유(선택):") ?? undefined) : undefined;
@@ -295,7 +315,7 @@ function UsersSection() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
-              <th className="py-2 pr-3">이메일</th><th className="py-2 pr-3">이름</th><th className="py-2 pr-3">가입</th><th className="py-2 pr-3">역할</th><th className="py-2">플랜</th>
+              <th className="py-2 pr-3">이메일</th><th className="py-2 pr-3">이름</th><th className="py-2 pr-3">가입</th><th className="py-2 pr-3">역할</th><th className="py-2 pr-3">플랜</th><th className="py-2">관리</th>
             </tr></thead>
             <tbody>
               {users.map((u) => (
@@ -309,11 +329,18 @@ function UsersSection() {
                       <option value="user">일반</option><option value="citizen">시민기자</option><option value="reporter">기자</option><option value="admin">관리자</option>
                     </select>
                   </td>
-                  <td className="py-2">
+                  <td className="py-2 pr-3">
                     <select value={u.plan} disabled={saving === u.id} onChange={(e) => void patch(u.id, { plan: e.target.value })}
                       className="rounded border border-brand/20 bg-background px-2 py-1 text-xs">
                       <option value="free">무료</option><option value="reader">독자(유료)</option><option value="business">비즈니스</option><option value="org">기관</option>
                     </select>
+                  </td>
+                  <td className="py-2">
+                    <div className="flex items-center gap-1">
+                      <button type="button" disabled={saving === u.id} onClick={() => void editName(u)} className="rounded border border-brand/20 px-2 py-1 text-xs hover:bg-brand/5" title="이름 수정">이름</button>
+                      <button type="button" disabled={saving === u.id} onClick={() => void resetPw(u)} className="rounded border border-brand/20 px-2 py-1 text-xs hover:bg-brand/5" title="비밀번호 재설정">비번</button>
+                      <button type="button" disabled={saving === u.id} onClick={() => void removeUser(u)} className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50" title="회원 삭제">삭제</button>
+                    </div>
                   </td>
                 </tr>
               ))}

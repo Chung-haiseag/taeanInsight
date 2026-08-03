@@ -67,8 +67,16 @@ export interface AdminUser {
 export async function getUsers(): Promise<{ users: AdminUser[] }> {
   return apiFetch<{ users: AdminUser[] }>("/api/admin/users");
 }
-export async function setUserAccess(id: number, patch: { role?: string; plan?: string }): Promise<{ ok: boolean }> {
+export async function setUserAccess(id: number, patch: { role?: string; plan?: string; displayName?: string }): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/api/admin/users/set", { method: "POST", body: JSON.stringify({ id, ...patch }) });
+}
+// 비밀번호 재설정 — 새 비번 1회 반환. 기존 세션은 무효화됨.
+export async function resetUserPassword(id: number, password?: string): Promise<{ ok: boolean; email: string; tempPassword: string }> {
+  return apiFetch<{ ok: boolean; email: string; tempPassword: string }>("/api/admin/users/reset-password", { method: "POST", body: JSON.stringify({ id, password: password || undefined }) });
+}
+// 회원 삭제
+export async function deleteUser(id: number): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/admin/users/delete", { method: "POST", body: JSON.stringify({ id }) });
 }
 // 기자 계정 생성(superadmin) — 임시 비밀번호를 1회 반환. 화면에 표시 후 안전하게 전달.
 export interface CreatedReporter { ok: boolean; email: string; displayName: string | null; tempPassword: string }

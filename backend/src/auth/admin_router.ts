@@ -28,12 +28,13 @@ const setSchema = z.object({
   id: z.number().int(),
   role: z.enum(["user", "citizen", "reporter", "admin", "superadmin"]).optional(),
   plan: z.enum(["free", "reader", "business", "org"]).optional(),
+  displayName: z.string().max(40).optional(), // 이름 수정
 });
 adminUsersRouter.post("/set", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
   const p = setSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!p.success || (!p.data.role && !p.data.plan)) return c.json({ error: "invalid_input" }, 400);
+  if (!p.success || (!p.data.role && !p.data.plan && p.data.displayName === undefined)) return c.json({ error: "invalid_input" }, 400);
 
   // 요청자 실효 등급 — 세션 role, 없고 X-Admin-Token 일치면 superadmin(루트 비상권).
   const env = c.env as Env & { ADMIN_TOKEN?: string };
@@ -53,6 +54,51 @@ adminUsersRouter.post("/set", async (c) => {
   }
   if (p.data.role) await db.prepare("UPDATE users SET role=? WHERE id=?").bind(p.data.role, p.data.id).run();
   if (p.data.plan) await db.prepare("UPDATE users SET plan=? WHERE id=?").bind(p.data.plan, p.data.id).run();
+  if (p.data.displayName !== undefined) await db.prepare("UPDATE users SET display_name=? WHERE id=?").bind(p.data.displayName || null, p.data.id).run();
+  return c.json({ ok: true });
+});
+
+// POST /api/admin/users/reset-password — 비밀번호 재설정(관리자). 지정 또는 자동, 새 비번 1회 반환. 기존 세션 무효화.
+const resetSchema = z.object({ id: z.number().int(), password: z.string().min(8).max(200).optional() });
+adminUsersRouter.post("/reset-password", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const p = resetSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!p.success) return c.json({ error: "invalid_input", hint: "비밀번호 8자 이상(비우면 자동)" }, 400);
+  const env = c.env as Env & { ADMIN_TOKEN?: string };
+  const su = await sessionUser(db, bearerToken(c));
+  const tokenOk = !!env.ADMIN_TOKEN && c.req.header("X-Admin-Token") === env.ADMIN_TOKEN;
+  const requesterRole = deriveRequesterRole(su, tokenOk);
+  const target = await db.prepare("SELECT role, email FROM users WHERE id=?").bind(p.data.id).first<{ role: string; email: string }>();
+  if (!target) return c.json({ error: "not_found" }, 404);
+  if (!canModifyUser(requesterRole, target.role)) return c.json({ error: "insufficient_privilege" }, 403);
+  const newPassword = p.data.password ?? genTempPassword();
+  const salt = randHex(16);
+  const hash = await hashPw(newPassword, salt);
+  await db.prepare("UPDATE users SET pw_hash=?, pw_salt=? WHERE id=?").bind(hash, salt, p.data.id).run();
+  await db.prepare("DELETE FROM sessions WHERE user_id=?").bind(p.data.id).run(); // 기존 로그인 무효화
+  return c.json({ ok: true, email: target.email, tempPassword: newPassword });
+});
+
+// POST /api/admin/users/delete — 회원 삭제. 상위/동급·본인은 삭제 금지. 세션도 함께 삭제.
+const delSchema = z.object({ id: z.number().int() });
+adminUsersRouter.post("/delete", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "no_db" }, 503);
+  const p = delSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!p.success) return c.json({ error: "invalid_input" }, 400);
+  const env = c.env as Env & { ADMIN_TOKEN?: string };
+  const su = await sessionUser(db, bearerToken(c));
+  const tokenOk = !!env.ADMIN_TOKEN && c.req.header("X-Admin-Token") === env.ADMIN_TOKEN;
+  const requesterRole = deriveRequesterRole(su, tokenOk);
+  if (su && su.id === p.data.id) return c.json({ error: "cannot_delete_self", hint: "본인 계정은 삭제할 수 없음" }, 400);
+  const target = await db.prepare("SELECT role FROM users WHERE id=?").bind(p.data.id).first<{ role: string }>();
+  if (!target) return c.json({ error: "not_found" }, 404);
+  if (!canModifyUser(requesterRole, target.role) || target.role === "superadmin") {
+    return c.json({ error: "insufficient_privilege", hint: "상위 등급·최종관리자는 삭제 불가" }, 403);
+  }
+  await db.prepare("DELETE FROM sessions WHERE user_id=?").bind(p.data.id).run();
+  await db.prepare("DELETE FROM users WHERE id=?").bind(p.data.id).run();
   return c.json({ ok: true });
 });
 
