@@ -219,7 +219,7 @@ function UsersSection() {
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
   const [apps, setApps] = useState<CitizenApp[]>([]);
-  const [rEmail, setREmail] = useState(""); const [rName, setRName] = useState("");
+  const [rEmail, setREmail] = useState(""); const [rName, setRName] = useState(""); const [rPw, setRPw] = useState("");
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<CreatedReporter | null>(null);
   const load = () => getUsers().then((r) => setUsers(r.users)).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
@@ -235,10 +235,11 @@ function UsersSection() {
   }
   async function makeReporter() {
     if (!/.+@.+\..+/.test(rEmail)) { alert("이메일을 확인하세요."); return; }
+    if (rPw && rPw.length < 8) { alert("비밀번호는 8자 이상이어야 합니다(비우면 자동 생성)."); return; }
     setCreating(true); setCreated(null);
     try {
-      const r = await createReporter(rEmail.trim(), rName.trim() || undefined);
-      setCreated(r); setREmail(""); setRName(""); await load();
+      const r = await createReporter(rEmail.trim(), rName.trim() || undefined, rPw || undefined);
+      setCreated(r); setREmail(""); setRName(""); setRPw(""); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "생성 실패(이미 있는 이메일이거나 권한 없음)"); }
     finally { setCreating(false); }
   }
@@ -266,12 +267,14 @@ function UsersSection() {
       {/* 기자 계정 직접 생성 — 임시 비밀번호는 여기서만 1회 표시(서버 생성·해시 저장) */}
       <div className="rounded-lg border border-brand/20 bg-background p-3">
         <p className="mb-1 text-sm font-semibold text-brand">📰 태안신문 기자 계정 만들기</p>
-        <p className="mb-2 text-[11px] text-foreground-muted">이메일이 아이디입니다. 생성 시 임시 비밀번호가 아래에 <strong>딱 한 번</strong> 표시됩니다 — 기자에게 안전하게 전달하고, 첫 로그인 후 비밀번호를 바꾸도록 안내하세요.</p>
+        <p className="mb-2 text-[11px] text-foreground-muted">이메일이 아이디입니다. 비밀번호를 직접 정하거나(8자 이상) <strong>비우면 자동 생성</strong>됩니다. 생성된 비밀번호는 아래에 <strong>딱 한 번</strong> 표시되니 기자에게 안전하게 전달하고, 첫 로그인 후 변경하도록 안내하세요.</p>
         <div className="flex flex-wrap items-center gap-2">
           <input type="email" value={rEmail} onChange={(e) => setREmail(e.target.value)} placeholder="기자 이메일(아이디)"
-            className="min-w-[220px] flex-1 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
+            className="min-w-[200px] flex-1 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
           <input type="text" value={rName} onChange={(e) => setRName(e.target.value)} placeholder="이름(선택)"
-            className="w-32 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
+            className="w-28 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
+          <input type="text" value={rPw} onChange={(e) => setRPw(e.target.value)} placeholder="비밀번호(선택·자동)"
+            className="w-40 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
           <button type="button" disabled={creating} onClick={() => void makeReporter()}
             className="rounded bg-brand px-3 py-1.5 text-sm font-semibold text-background disabled:opacity-60">{creating ? "생성 중…" : "계정 생성"}</button>
         </div>

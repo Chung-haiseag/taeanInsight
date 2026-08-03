@@ -58,12 +58,16 @@ adminUsersRouter.post("/set", async (c) => {
 
 // POST /api/admin/users/create — 기자 계정 직접 생성(superadmin). 임시 비밀번호를 서버가 생성해 1회 반환(화면 표시용).
 //   비밀번호는 해시(pw_hash)로만 저장. reporter 임명 권한(superadmin)과 동일 게이트.
-const createSchema = z.object({ email: z.string().email().max(120), displayName: z.string().max(40).optional() });
+const createSchema = z.object({
+  email: z.string().email().max(120),
+  displayName: z.string().max(40).optional(),
+  password: z.string().min(8).max(200).optional(), // 직접 지정(8자+). 비우면 서버가 자동 생성.
+});
 adminUsersRouter.post("/create", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
   const p = createSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!p.success) return c.json({ error: "invalid_input", hint: "이메일 형식" }, 400);
+  if (!p.success) return c.json({ error: "invalid_input", hint: "이메일 형식 · 비밀번호는 8자 이상(비우면 자동 생성)" }, 400);
   const env = c.env as Env & { ADMIN_TOKEN?: string };
   const su = await sessionUser(db, bearerToken(c));
   const tokenOk = !!env.ADMIN_TOKEN && c.req.header("X-Admin-Token") === env.ADMIN_TOKEN;
@@ -74,7 +78,7 @@ adminUsersRouter.post("/create", async (c) => {
   const exists = await db.prepare("SELECT id FROM users WHERE email=?").bind(email).first();
   if (exists) return c.json({ error: "email_taken", hint: "이미 있는 이메일" }, 409);
 
-  const tempPassword = genTempPassword();
+  const tempPassword = p.data.password ?? genTempPassword(); // 지정 비번 우선, 없으면 자동 생성
   const salt = randHex(16);
   const hash = await hashPw(tempPassword, salt);
   const uid = `u_${randHex(11)}`;

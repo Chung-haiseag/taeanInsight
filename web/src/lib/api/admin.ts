@@ -72,8 +72,8 @@ export async function setUserAccess(id: number, patch: { role?: string; plan?: s
 }
 // 기자 계정 생성(superadmin) — 임시 비밀번호를 1회 반환. 화면에 표시 후 안전하게 전달.
 export interface CreatedReporter { ok: boolean; email: string; displayName: string | null; tempPassword: string }
-export async function createReporter(email: string, displayName?: string): Promise<CreatedReporter> {
-  return apiFetch<CreatedReporter>("/api/admin/users/create", { method: "POST", body: JSON.stringify({ email, displayName }) });
+export async function createReporter(email: string, displayName?: string, password?: string): Promise<CreatedReporter> {
+  return apiFetch<CreatedReporter>("/api/admin/users/create", { method: "POST", body: JSON.stringify({ email, displayName, password: password || undefined }) });
 }
 
 // 시민기자 신청 대기열 — backend /api/admin/citizen-applications
