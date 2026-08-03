@@ -399,8 +399,8 @@ function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
         </figure>
       )}
 
-      {/* 본문 */}
-      <div className="space-y-5 text-[1.05rem] leading-[1.9] text-foreground">
+      {/* 본문 — 줄간격·문단간격은 가독성 기준(과도한 여백 방지) */}
+      <div className="space-y-4 text-[1.02rem] leading-[1.7] text-foreground">
         {paras.map((p, i) => (
           <p key={i}><QuotedText text={p} /></p>
         ))}
