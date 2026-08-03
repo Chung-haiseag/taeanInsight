@@ -29,7 +29,7 @@ export function GenericHome() {
   const totalKo = total ? formatManBun(total) : null; // "10만 4,024" 형태
 
   return (
-    <div className="space-y-14">
+    <div className="space-y-10">
       {/* Hero — 좌측 정렬 에디토리얼 */}
       <section className="pt-4 md:pt-6">
         <p className="eyebrow">
@@ -164,42 +164,42 @@ function WeekendDemandCard() {
   if (!d) return null; // 예보 데이터 없으면 조용히 숨김
   const high = d.level === "매우높음" || d.level === "높음";
   const low = d.level === "낮음" || d.level === "매우낮음";
-  const toneCls = high ? "border-accent/40 bg-accent/5" : low ? "border-blue-200 bg-blue-50/40" : "border-brand/15 bg-background";
+  const toneCls = high ? "border-accent bg-accent/10" : low ? "border-blue-300 bg-blue-50" : "border-brand/25 bg-background";
   const badgeCls = high ? "bg-accent text-background" : low ? "bg-blue-100 text-blue-700" : "bg-brand/10 text-brand";
   const top = d.factors.filter((f) => Math.abs(f.effect) >= 1).sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect)).slice(0, 3);
   const wx = (w: DemandForecast["weather"]["sat"], day: string) => w
     ? <span>{day} {w.tmax != null ? `${w.tmax}°` : ""}{w.pop != null ? ` · 강수 ${w.pop}%` : ""}</span> : null;
   return (
-    <section aria-labelledby="demand-heading" className={`rounded-2xl border p-5 shadow-card ${toneCls}`}>
+    <section aria-labelledby="demand-heading" className={`rounded-2xl border-2 p-6 shadow-card md:p-7 ${toneCls}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden="true" />예측 인사이트 · 이번 주말</p>
-          <h2 id="demand-heading" className="mt-2 text-xl font-bold text-brand">이번 주말 태안 관광 수요</h2>
-          <p className="text-xs text-foreground-muted">{d.weekend.sat} ~ {d.weekend.sun.slice(5)}</p>
+          <h2 id="demand-heading" className="mt-2 text-2xl font-bold text-brand md:text-3xl">이번 주말 태안 관광 수요</h2>
+          <p className="mt-0.5 text-sm text-foreground-muted">{d.weekend.sat} ~ {d.weekend.sun.slice(5)}</p>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-4xl font-bold leading-none text-brand tabular-nums">{d.index}<span className="text-lg font-medium text-foreground-muted">/100</span></div>
-          <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${badgeCls}`}>{d.level}</span>
+          <div className="text-5xl font-extrabold leading-none text-brand tabular-nums md:text-6xl">{d.index}<span className="text-xl font-bold text-foreground-muted">/100</span></div>
+          <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold ${badgeCls}`}>{d.level}</span>
         </div>
       </div>
-      <p className="mt-3 text-sm font-medium text-foreground">{d.headline}</p>
+      <p className="mt-4 text-base font-semibold leading-relaxed text-foreground md:text-lg">{d.headline}</p>
       {top.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+        <div className="mt-3 flex flex-wrap gap-2 text-sm">
           {top.map((f, i) => (
-            <span key={i} className="rounded-full bg-brand/10 px-2 py-0.5 text-brand" title={f.detail}>{f.effect >= 0 ? "+" : ""}{f.effect} {f.label}</span>
+            <span key={i} className="rounded-full bg-brand/10 px-3 py-1 font-medium text-brand" title={f.detail}>{f.effect >= 0 ? "+" : ""}{f.effect} {f.label}</span>
           ))}
         </div>
       )}
       {(d.weather.sat || d.weather.sun) && (
-        <div className="mt-3 flex gap-5 border-t border-brand/10 pt-3 text-xs text-foreground-muted">
+        <div className="mt-4 flex gap-6 border-t border-brand/10 pt-3 text-sm text-foreground-muted">
           {wx(d.weather.sat, "토")}{wx(d.weather.sun, "일")}
         </div>
       )}
-      <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-brand/5 px-3 py-2">
-        <p className="text-xs text-foreground-muted">우리 가게는 이번 주말 어떻게 준비할까요? <strong className="text-brand">업종별 상세 예측·준비 체크리스트</strong></p>
-        <Link href="/membership" className="shrink-0 text-xs font-semibold text-accent hover:underline">사장님 멤버십 →</Link>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand/5 px-4 py-3">
+        <p className="text-sm text-foreground-muted">우리 가게는 이번 주말 어떻게 준비할까요? <strong className="text-brand">업종별 상세 예측·준비 체크리스트</strong></p>
+        <Link href="/membership" className="shrink-0 rounded-lg bg-accent px-3.5 py-1.5 text-sm font-bold text-background hover:brightness-95">사장님 멤버십 →</Link>
       </div>
-      <p className="mt-2 text-[10px] text-foreground-muted">규칙기반 예측(날씨·물때·축제·연휴·계절). 예측과 실제를 대조해 적중률을 공개합니다.</p>
+      <p className="mt-2.5 text-[11px] text-foreground-muted">규칙기반 예측(날씨·물때·축제·연휴·계절). 예측과 실제를 대조해 적중률을 공개합니다.</p>
     </section>
   );
 }
