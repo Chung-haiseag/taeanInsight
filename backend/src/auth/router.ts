@@ -57,6 +57,12 @@ const credSchema = z.object({
   password: z.string().min(8).max(200),
   displayName: z.string().max(40).optional(),
 });
+// 로그인 — id(아이디 username 또는 이메일) 또는 email(하위호환). 둘 중 하나 필수.
+const loginSchema = z.object({
+  id: z.string().min(1).max(120).optional(),
+  email: z.string().max(120).optional(),
+  password: z.string().min(1).max(200),
+});
 
 // POST /api/auth/signup — 이메일+비번, 현재 익명 uid를 계정에 귀속
 authRouter.post("/signup", async (c) => {
@@ -88,17 +94,19 @@ authRouter.post("/login", async (c) => {
   if (!db) return c.json({ error: "no_db" }, 503);
   const rl = (c.env as Env & { LOGIN_RL?: import("../types").RateLimit }).LOGIN_RL;
   if (rl && !(await rl.limit({ key: `login:${clientIp(c)}` })).success) return c.json({ error: "rate_limited", hint: "잠시 후 다시 시도하세요" }, 429);
-  const parsed = credSchema.pick({ email: true, password: true }).safeParse(await c.req.json().catch(() => ({})));
+  // id(아이디 username 또는 이메일) + password. 하위호환: email 필드도 받음.
+  const parsed = loginSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json({ error: "invalid_input" }, 400);
-  const email = parsed.data.email.toLowerCase().trim();
-  const user = await db.prepare("SELECT id, pw_hash, pw_salt, uid, display_name FROM users WHERE email=?")
-    .bind(email).first<{ id: number; pw_hash: string; pw_salt: string; uid: string; display_name: string | null }>();
+  const ident = (parsed.data.id ?? parsed.data.email ?? "").toLowerCase().trim();
+  if (!ident) return c.json({ error: "invalid_input" }, 400);
+  const user = await db.prepare("SELECT id, email, pw_hash, pw_salt, uid, display_name FROM users WHERE username=? OR email=?")
+    .bind(ident, ident).first<{ id: number; email: string; pw_hash: string; pw_salt: string; uid: string; display_name: string | null }>();
   if (!user) return c.json({ error: "invalid_credentials" }, 401);
   const hash = await hashPw(parsed.data.password, user.pw_salt);
   if (!safeEq(hash, user.pw_hash)) return c.json({ error: "invalid_credentials" }, 401);
   await db.prepare("UPDATE users SET last_login_at=? WHERE id=?").bind(new Date().toISOString(), user.id).run();
   const token = await createSession(db, user.id);
-  return c.json({ token, uid: user.uid, email, displayName: user.display_name });
+  return c.json({ token, uid: user.uid, email: user.email, displayName: user.display_name });
 });
 
 // GET /api/auth/me — 세션 토큰 검증

@@ -61,7 +61,7 @@ export async function getJobs(): Promise<{ jobs: JobStatus[]; generatedAt: strin
 
 // 회원 관리 — backend /api/admin/users
 export interface AdminUser {
-  id: number; email: string; display_name: string | null; role: string; plan: string;
+  id: number; email: string; username: string | null; display_name: string | null; role: string; plan: string;
   provider: string; created_at: string; last_login_at: string | null;
 }
 export async function getUsers(): Promise<{ users: AdminUser[] }> {
@@ -78,10 +78,10 @@ export async function resetUserPassword(id: number, password?: string): Promise<
 export async function deleteUser(id: number): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/api/admin/users/delete", { method: "POST", body: JSON.stringify({ id }) });
 }
-// 기자 계정 생성(superadmin) — 임시 비밀번호를 1회 반환. 화면에 표시 후 안전하게 전달.
-export interface CreatedReporter { ok: boolean; email: string; displayName: string | null; tempPassword: string }
-export async function createReporter(email: string, displayName?: string, password?: string): Promise<CreatedReporter> {
-  return apiFetch<CreatedReporter>("/api/admin/users/create", { method: "POST", body: JSON.stringify({ email, displayName, password: password || undefined }) });
+// 기자 계정 생성(superadmin) — 아이디(username) 기반. 임시 비밀번호를 1회 반환.
+export interface CreatedReporter { ok: boolean; loginId: string; username: string | null; email: string; displayName: string | null; tempPassword: string }
+export async function createReporter(username: string, displayName?: string, password?: string): Promise<CreatedReporter> {
+  return apiFetch<CreatedReporter>("/api/admin/users/create", { method: "POST", body: JSON.stringify({ username, displayName, password: password || undefined }) });
 }
 
 // 시민기자 신청 대기열 — backend /api/admin/citizen-applications

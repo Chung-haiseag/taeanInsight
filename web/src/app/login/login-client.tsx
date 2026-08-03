@@ -7,8 +7,8 @@ import { login, signup, startKakaoLogin, consumeKakaoCallback } from "@/lib/api/
 
 const ERR: Record<string, string> = {
   email_taken: "이미 가입된 이메일입니다.",
-  invalid_credentials: "이메일 또는 비밀번호가 올바르지 않습니다.",
-  invalid_input: "이메일과 8자 이상 비밀번호를 입력하세요.",
+  invalid_credentials: "아이디(또는 이메일) 또는 비밀번호가 올바르지 않습니다.",
+  invalid_input: "아이디(또는 이메일)와 비밀번호를 입력하세요.",
 };
 
 // 카카오 로그인 — 도메인·KAKAO_REST_KEY 설정 완료 후 true로 켜기(백엔드·콜백은 이미 완비)
@@ -70,7 +70,9 @@ export function LoginClient() {
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름(선택)" maxLength={40}
             className="w-full rounded-lg border border-brand/20 px-3 py-2.5 text-sm" />
         )}
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" required autoComplete="email"
+        <input type={mode === "login" ? "text" : "email"} value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder={mode === "login" ? "아이디 또는 이메일" : "이메일"} required
+          autoComplete={mode === "login" ? "username" : "email"}
           className="w-full rounded-lg border border-brand/20 px-3 py-2.5 text-sm" />
         <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="비밀번호(8자 이상)" required minLength={8}
           autoComplete={mode === "login" ? "current-password" : "new-password"}

@@ -36,8 +36,9 @@ export async function signup(email: string, password: string, displayName?: stri
   return { ok: true, account: { email: String(data.email), uid: String(data.uid), displayName: (data.displayName as string) ?? null } };
 }
 
-export async function login(email: string, password: string): Promise<{ ok: boolean; error?: string; account?: Account }> {
-  const { ok, data } = await post("/api/auth/login", { email, password });
+// id = 아이디(username) 또는 이메일
+export async function login(id: string, password: string): Promise<{ ok: boolean; error?: string; account?: Account }> {
+  const { ok, data } = await post("/api/auth/login", { id, password });
   if (!ok) return { ok: false, error: String(data.error ?? "로그인 실패") };
   setAuthToken(String(data.token));
   setUid(String(data.uid)); // 정규 uid로 교체 → 기존 개인화 동기화

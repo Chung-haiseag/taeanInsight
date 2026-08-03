@@ -254,13 +254,13 @@ function UsersSection() {
     try { await decideCitizenApplication(id, decision, reason); await loadApps(); await load(); } catch (e) { alert(e instanceof Error ? e.message : "처리 실패"); }
   }
   async function makeReporter() {
-    if (!/.+@.+\..+/.test(rEmail)) { alert("이메일을 확인하세요."); return; }
+    if (!/^[A-Za-z0-9._-]{3,30}$/.test(rEmail.trim())) { alert("아이디는 3~30자 영문·숫자·._- 로 입력하세요."); return; }
     if (rPw && rPw.length < 8) { alert("비밀번호는 8자 이상이어야 합니다(비우면 자동 생성)."); return; }
     setCreating(true); setCreated(null);
     try {
       const r = await createReporter(rEmail.trim(), rName.trim() || undefined, rPw || undefined);
       setCreated(r); setREmail(""); setRName(""); setRPw(""); await load();
-    } catch (e) { alert(e instanceof Error ? e.message : "생성 실패(이미 있는 이메일이거나 권한 없음)"); }
+    } catch (e) { alert(e instanceof Error ? e.message : "생성 실패(이미 있는 아이디이거나 권한 없음)"); }
     finally { setCreating(false); }
   }
   if (err) return <p className="text-sm text-red-600">{err}</p>;
@@ -287,9 +287,9 @@ function UsersSection() {
       {/* 기자 계정 직접 생성 — 임시 비밀번호는 여기서만 1회 표시(서버 생성·해시 저장) */}
       <div className="rounded-lg border border-brand/20 bg-background p-3">
         <p className="mb-1 text-sm font-semibold text-brand">📰 태안신문 기자 계정 만들기</p>
-        <p className="mb-2 text-[11px] text-foreground-muted">이메일이 아이디입니다. 비밀번호를 직접 정하거나(8자 이상) <strong>비우면 자동 생성</strong>됩니다. 생성된 비밀번호는 아래에 <strong>딱 한 번</strong> 표시되니 기자에게 안전하게 전달하고, 첫 로그인 후 변경하도록 안내하세요.</p>
+        <p className="mb-2 text-[11px] text-foreground-muted">아이디(영문·숫자 3~30자, 예: <code>kija01</code>)로 로그인합니다. 비밀번호를 직접 정하거나(8자 이상) <strong>비우면 자동 생성</strong>됩니다. 생성된 비밀번호는 아래에 <strong>딱 한 번</strong> 표시되니 기자에게 안전하게 전달하고, 첫 로그인 후 변경하도록 안내하세요.</p>
         <div className="flex flex-wrap items-center gap-2">
-          <input type="email" value={rEmail} onChange={(e) => setREmail(e.target.value)} placeholder="기자 이메일(아이디)"
+          <input type="text" value={rEmail} onChange={(e) => setREmail(e.target.value)} placeholder="아이디(영문·숫자)"
             className="min-w-[200px] flex-1 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
           <input type="text" value={rName} onChange={(e) => setRName(e.target.value)} placeholder="이름(선택)"
             className="w-28 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
@@ -302,10 +302,10 @@ function UsersSection() {
           <div className="mt-2 rounded-md border border-green-300 bg-green-50 p-2.5 text-sm">
             <p className="font-semibold text-green-900">✅ 기자 계정 생성됨 — 이 비밀번호는 다시 표시되지 않습니다</p>
             <div className="mt-1 grid gap-0.5 font-mono text-[13px] text-green-900">
-              <div>아이디: <strong>{created.email}</strong></div>
+              <div>아이디: <strong>{created.loginId}</strong></div>
               <div>임시 비밀번호: <strong className="select-all">{created.tempPassword}</strong></div>
             </div>
-            <button type="button" onClick={() => { void navigator.clipboard?.writeText(`아이디: ${created.email}\n임시 비밀번호: ${created.tempPassword}`); }}
+            <button type="button" onClick={() => { void navigator.clipboard?.writeText(`아이디: ${created.loginId}\n임시 비밀번호: ${created.tempPassword}`); }}
               className="mt-1.5 rounded border border-green-400 px-2 py-0.5 text-xs font-semibold text-green-800">아이디·비번 복사</button>
           </div>
         )}
@@ -315,12 +315,12 @@ function UsersSection() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
-              <th className="py-2 pr-3">이메일</th><th className="py-2 pr-3">이름</th><th className="py-2 pr-3">가입</th><th className="py-2 pr-3">역할</th><th className="py-2 pr-3">플랜</th><th className="py-2">관리</th>
+              <th className="py-2 pr-3">아이디/이메일</th><th className="py-2 pr-3">이름</th><th className="py-2 pr-3">가입</th><th className="py-2 pr-3">역할</th><th className="py-2 pr-3">플랜</th><th className="py-2">관리</th>
             </tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id} className="border-b border-brand/5">
-                  <td className="py-2 pr-3">{u.email}<span className="ml-1 text-[10px] text-foreground-muted">{u.provider === "kakao" ? "카카오" : ""}</span></td>
+                  <td className="py-2 pr-3">{u.username ?? u.email}<span className="ml-1 text-[10px] text-foreground-muted">{u.username ? "아이디" : u.provider === "kakao" ? "카카오" : ""}</span></td>
                   <td className="py-2 pr-3">{u.display_name ?? "-"}</td>
                   <td className="py-2 pr-3 text-xs text-foreground-muted">{u.created_at.slice(0, 10)}</td>
                   <td className="py-2 pr-3">

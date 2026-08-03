@@ -20,7 +20,7 @@ adminUsersRouter.get("/", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
   const r = await db.prepare(
-    "SELECT id, email, display_name, role, plan, provider, created_at, last_login_at FROM users ORDER BY id DESC LIMIT 200").all();
+    "SELECT id, email, username, display_name, role, plan, provider, created_at, last_login_at FROM users ORDER BY id DESC LIMIT 200").all();
   return c.json({ users: r.results ?? [] });
 });
 
@@ -105,31 +105,34 @@ adminUsersRouter.post("/delete", async (c) => {
 // POST /api/admin/users/create — 기자 계정 직접 생성(superadmin). 임시 비밀번호를 서버가 생성해 1회 반환(화면 표시용).
 //   비밀번호는 해시(pw_hash)로만 저장. reporter 임명 권한(superadmin)과 동일 게이트.
 const createSchema = z.object({
-  email: z.string().email().max(120),
+  username: z.string().regex(/^[A-Za-z0-9._-]{3,30}$/, "3~30자 영문·숫자·._-").optional(), // 단순 아이디(이메일 없이 로그인)
+  email: z.string().email().max(120).optional(),
   displayName: z.string().max(40).optional(),
   password: z.string().min(8).max(200).optional(), // 직접 지정(8자+). 비우면 서버가 자동 생성.
-});
+}).refine((d) => !!(d.username || d.email), { message: "아이디 또는 이메일 필요" });
 adminUsersRouter.post("/create", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
   const p = createSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!p.success) return c.json({ error: "invalid_input", hint: "이메일 형식 · 비밀번호는 8자 이상(비우면 자동 생성)" }, 400);
+  if (!p.success) return c.json({ error: "invalid_input", hint: "아이디(3~30자 영문·숫자) 또는 이메일 · 비번 8자+(비우면 자동)" }, 400);
   const env = c.env as Env & { ADMIN_TOKEN?: string };
   const su = await sessionUser(db, bearerToken(c));
   const tokenOk = !!env.ADMIN_TOKEN && c.req.header("X-Admin-Token") === env.ADMIN_TOKEN;
   const requesterRole = deriveRequesterRole(su, tokenOk);
   if (!canAssignRole(requesterRole, "reporter")) return c.json({ error: "insufficient_privilege", hint: "기자 계정 생성은 superadmin만" }, 403);
 
-  const email = p.data.email.toLowerCase().trim();
-  const exists = await db.prepare("SELECT id FROM users WHERE email=?").bind(email).first();
-  if (exists) return c.json({ error: "email_taken", hint: "이미 있는 이메일" }, 409);
+  const username = p.data.username ? p.data.username.toLowerCase().trim() : null;
+  // 이메일 미입력 시 내부 합성 이메일(NOT NULL 제약 충족용, 로그인엔 아이디 사용).
+  const email = p.data.email ? p.data.email.toLowerCase().trim() : `${username}@kija.taeannews.local`;
+  if (username && await db.prepare("SELECT id FROM users WHERE username=?").bind(username).first()) return c.json({ error: "username_taken", hint: "이미 있는 아이디" }, 409);
+  if (await db.prepare("SELECT id FROM users WHERE email=?").bind(email).first()) return c.json({ error: "email_taken", hint: "이미 있는 이메일/아이디" }, 409);
 
   const tempPassword = p.data.password ?? genTempPassword(); // 지정 비번 우선, 없으면 자동 생성
   const salt = randHex(16);
   const hash = await hashPw(tempPassword, salt);
   const uid = `u_${randHex(11)}`;
   const now = new Date().toISOString();
-  await db.prepare("INSERT INTO users (email, pw_hash, pw_salt, uid, display_name, role, created_at, last_login_at) VALUES (?,?,?,?,?,?,?,?)")
-    .bind(email, hash, salt, uid, p.data.displayName ?? null, "reporter", now, now).run();
-  return c.json({ ok: true, email, displayName: p.data.displayName ?? null, tempPassword }); // tempPassword는 이 응답에서만
+  await db.prepare("INSERT INTO users (email, username, pw_hash, pw_salt, uid, display_name, role, created_at, last_login_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .bind(email, username, hash, salt, uid, p.data.displayName ?? null, "reporter", now, now).run();
+  return c.json({ ok: true, loginId: username ?? email, username, email, displayName: p.data.displayName ?? null, tempPassword }); // tempPassword는 이 응답에서만
 });
