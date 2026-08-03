@@ -17,7 +17,7 @@ export interface ReportSummary {
     envDays: number | null;
     reporters: number | null;
   };
-  freshness: { latestArticle: string | null; latestRegional: string | null; latestEnv: string | null };
+  freshness: { latestArticle: string | null; latestRegional: string | null; latestEnv: string | null; lastCollected: string | null };
   config: {
     taeanLogin: boolean;
     dataGoKr: boolean;

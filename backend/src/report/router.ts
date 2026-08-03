@@ -64,10 +64,11 @@ reportRouter.get("/summary", async (c) => {
     scalar(db, "SELECT COUNT(*) n FROM reporters"),
   ]);
 
-  const [latestArticle, latestRegional, latestEnv] = await Promise.all([
+  const [latestArticle, latestRegional, latestEnv, lastCollected] = await Promise.all([
     text1(db, "SELECT MAX(published_at) v FROM archive_articles"),
     text1(db, "SELECT MAX(published_at) v FROM regional_news"),
     text1(db, "SELECT MAX(date) v FROM env_daily"),
+    text1(db, "SELECT updated_at v FROM news_cache WHERE id=1"), // 뉴스 수집기 마지막 실행 시각(고장 vs 새글 없음 구분)
   ]);
 
   // 외부 연동 설정 여부(값 아님). env를 레코드로 보고 존재만 확인.
@@ -90,7 +91,7 @@ reportRouter.get("/summary", async (c) => {
       articles, ebook, kgNodes, kgEdges, users, regionalNews, facts,
       pendingApplications, pushSubs, citizenArticles, govNotices, weeklyReports, envDays, reporters,
     },
-    freshness: { latestArticle, latestRegional, latestEnv },
+    freshness: { latestArticle, latestRegional, latestEnv, lastCollected },
     config,
     generatedAt: new Date().toISOString(),
   });

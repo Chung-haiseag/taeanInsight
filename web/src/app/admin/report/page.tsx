@@ -717,6 +717,7 @@ function Health() {
       <Card title="데이터 신선도">
         <KV
           rows={[
+            ["마지막 수집 실행", s?.freshness.lastCollected ? new Date(s.freshness.lastCollected).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"],
             ["최신 자사 기사", s?.freshness.latestArticle?.slice(0, 10) ?? "—"],
             ["최신 지역언론", s?.freshness.latestRegional?.slice(0, 10) ?? "—"],
             ["최신 환경 스냅샷", s?.freshness.latestEnv?.slice(0, 10) ?? "—"],
