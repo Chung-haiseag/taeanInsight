@@ -39,6 +39,44 @@ envRouter.get("/marine", async (c) => {
   return c.json(await loadMarine(c.env));
 });
 
+// 해수욕장 보드 — 해변별 해수욕 적합도 점수·랭킹('이번 주말 어느 해변')
+envRouter.get("/beaches", async (c) => {
+  const { loadMarine } = await import("../tour/marine");
+  const { rankBeaches } = await import("../tour/beach_board");
+  const m = await loadMarine(c.env);
+  const ranked = rankBeaches(
+    (m.beaches ?? []).map((b) => ({ name: b.name, beachIndex: b.beachIndex, waveHeight: b.waveHeight, waterTemp: b.waterTemp })),
+  );
+  return c.json({
+    available: !!m.available && ranked.length > 0,
+    updatedAt: m.beaches?.[0]?.observedAt ?? null,
+    top: ranked[0] ?? null,
+    beaches: ranked,
+    tide: m.tide ?? null,
+    sun: m.sun ?? null,
+  });
+});
+
+// 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
+//   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.
+envRouter.get("/traffic", async (c) => {
+  const { latestTraffic } = await import("../tour/traffic");
+  const t = await latestTraffic(c.env);
+  return c.json({ available: !!t, ...(t ?? {}) });
+});
+
+// 로컬 크롤러(tools/traffic/refresh-traffic.mjs)가 도로공사 권역 교통량을 받아 적재.
+envRouter.post("/traffic/ingest", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const token = c.env.GOV_IMPORT_TOKEN;
+  if (!token || c.req.header("authorization") !== `Bearer ${token}`) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { region?: string; inbound?: number; outbound?: number; sumDate?: string; sumTm?: string };
+  if (!body.sumDate || body.inbound == null || body.outbound == null) return c.json({ error: "invalid_input" }, 400);
+  const { ingestTraffic } = await import("../tour/traffic");
+  await ingestTraffic(c.env.ARCHIVE_DB, body);
+  return c.json({ ok: true });
+});
+
 // 해무 CCTV 스틸컷(국립해양조사원) — D1 캐시 우선(즉시), 오래되면 백그라운드 갱신.
 envRouter.get("/seafog", async (c) => {
   const { loadSeafogFast, refreshSeafogCache } = await import("./seafog");

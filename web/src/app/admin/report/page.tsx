@@ -616,6 +616,14 @@ function Runbook() {
 
 // ── 📦 데이터 현황(라이브) ─────────────────────────────────────
 const nn = (v: number | null) => (v === null ? "—" : v.toLocaleString());
+const DS_STATUS: Record<string, { label: string; cls: string }> = {
+  live: { label: "라이브", cls: "bg-green-100 text-green-800" },
+  progress: { label: "진행중", cls: "bg-blue-100 text-blue-800" },
+  check: { label: "확인필요", cls: "bg-amber-100 text-amber-800" },
+  parked: { label: "보류", cls: "bg-gray-200 text-gray-700" },
+  rejected: { label: "미채택", cls: "bg-red-100 text-red-700" },
+};
+
 function DataSnapshot() {
   const [s, setS] = useState<ReportSummary | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -661,6 +669,27 @@ function DataSnapshot() {
           ]}
         />
       </Card>
+      {s.dataSources && s.dataSources.length > 0 && (
+        <Card title="관광 분석 데이터 소스 현황">
+          <p className="mb-3 text-xs text-foreground-muted">수요 예측·해변 보드에 쓰는 데이터의 상태 기록(라이브 지표 + 채택/보류 판정).</p>
+          <ul className="space-y-2.5">
+            {s.dataSources.map((d) => {
+              const st = DS_STATUS[d.status] ?? DS_STATUS.parked;
+              return (
+                <li key={d.key} className="border-b border-brand/10 pb-2.5 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
+                    <span className="text-sm font-semibold text-brand">{d.name}</span>
+                    {d.granularity && <span className="text-[11px] text-foreground-muted">· {d.granularity}</span>}
+                    {d.metric && <span className="ml-auto text-xs font-semibold text-foreground">{d.metric}</span>}
+                  </div>
+                  <p className="mt-0.5 text-xs text-foreground-muted">{d.note}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
       <p className="text-xs text-foreground-muted">기준 {s.generatedAt.slice(0, 16).replace("T", " ")} · 라이브 집계</p>
     </div>
   );

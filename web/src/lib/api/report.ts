@@ -29,6 +29,14 @@ export interface ReportSummary {
     adminToken: boolean;
     slack: boolean;
   };
+  dataSources?: Array<{
+    key: string;
+    name: string;
+    status: "live" | "progress" | "check" | "parked" | "rejected";
+    granularity?: string;
+    metric: string | null;
+    note: string;
+  }>;
   generatedAt: string;
 }
 

@@ -138,6 +138,33 @@ export async function getWeekendDemand(): Promise<DemandForecast | null> {
   } catch { return null; }
 }
 
+// 해수욕장 보드 — 해변별 해수욕 적합도 점수·랭킹('이번 주말 어느 해변').
+export interface BeachScoreView {
+  name: string;
+  score: number;
+  level: "최고" | "좋음" | "보통" | "주의" | "비추천";
+  reasons: string[];
+  beachIndex: string | null;
+  waveHeight: number | null;
+  waterTemp: number | null;
+}
+export interface BeachBoardView {
+  available: boolean;
+  updatedAt: string | null;
+  top: BeachScoreView | null;
+  beaches: BeachScoreView[];
+  tide: TideInfo | null;
+  sun: SunInfo | null;
+}
+export async function getBeaches(): Promise<BeachBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/beaches`, { next: { revalidate: 900 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as BeachBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 섹션별 차트·표·카드용 수치(실패 시 null) — 산문과 독립적으로 항상 최신값
 export async function fetchReportMetrics(): Promise<ReportMetrics | null> {
   try {

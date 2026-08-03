@@ -126,13 +126,26 @@ function weatherScore(d: DayWeather | null): { score: number; note: string } {
   return { score: s, note: notes.join("·") || "무난" };
 }
 
-// 계절 기본점(월별): 해수욕장 성수기(7~8월) 최고, 봄·가을 주말 강세
+// 계절 기본점(월별) — 태안 3년(2023-08~2026-07) 실제 외부 방문객 일평균을 8월=45로 정규화.
+//   출처: 한국관광공사 빅데이터 지역별 방문자수(외지인+외국인). tour_visitors 백필로 산출.
+//   실측 교훈: 정점은 8월, 그 다음이 5·10월(봄꽃·가을 행락+축제). 7월은 장마·폭염으로 오히려 소강.
+//   (구 규칙은 7~8월을 성수기 최고=45로 봤으나 7월 실측은 33에 그침 → 고평가 교정.)
+const SEASON_BASE: Record<number, { score: number; note: string }> = {
+  1: { score: 21, note: "겨울 비수기" },
+  2: { score: 24, note: "겨울 비수기" },
+  3: { score: 28, note: "봄 진입" },
+  4: { score: 38, note: "봄꽃 행락철" },
+  5: { score: 43, note: "봄 관광 성수(신록·연휴)" },
+  6: { score: 37, note: "초여름" },
+  7: { score: 33, note: "장마·폭염 소강" },
+  8: { score: 45, note: "해수욕장 성수기 정점" },
+  9: { score: 40, note: "초가을 관광철" },
+  10: { score: 44, note: "가을 행락·축제 성수" },
+  11: { score: 30, note: "늦가을" },
+  12: { score: 22, note: "겨울 비수기" },
+};
 function seasonBase(month: number): { score: number; note: string } {
-  if (month === 7 || month === 8) return { score: 45, note: "해수욕장 성수기" };
-  if (month === 5 || month === 6 || month === 9) return { score: 32, note: "봄·초가을 관광철" };
-  if (month === 4 || month === 10) return { score: 28, note: "행락철" };
-  if (month === 11 || month === 3) return { score: 18, note: "비수기 진입" };
-  return { score: 12, note: "겨울 비수기" };
+  return SEASON_BASE[month] ?? { score: 30, note: "관광철" };
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
@@ -146,7 +159,7 @@ function levelOf(i: number): DemandForecast["level"] {
 
 // prefetch: 상위(loadReportMetrics)에서 이미 받은 marine·search를 넘기면 중복 호출을 피한다.
 export async function forecastDemand(
-  env: { DATA_GO_KR_KEY?: string; TAEAN_NX?: string; TAEAN_NY?: string; NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string },
+  env: { DATA_GO_KR_KEY?: string; DATA_GO_KR_KEY_TOUR?: string; TAEAN_NX?: string; TAEAN_NY?: string; NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string },
   prefetch?: { marine?: { beaches: Array<{ waterTemp: number | null; waveHeight: number | null; beachIndex: string | null }> }; search?: { deltaPct: number } | null },
 ): Promise<DemandForecast> {
   const empty: DemandForecast = {
@@ -155,6 +168,8 @@ export async function forecastDemand(
   };
   const key = env.DATA_GO_KR_KEY;
   if (!key) return empty;
+  // 공휴일(특일정보)은 방문자 API 키(DATA_GO_KR_KEY_TOUR)에 등록돼 있어 그 키 우선(없으면 폴백).
+  const holKey = env.DATA_GO_KR_KEY_TOUR || key;
   const nx = env.TAEAN_NX || REGION.grid.nx;
   const ny = env.TAEAN_NY || REGION.grid.ny;
   const now = kstNow();
@@ -171,8 +186,8 @@ export async function forecastDemand(
 
   const [weather, holThis, holNext, tour, marine, search] = await Promise.all([
     fetchWeekendWeather(key, nx, ny, sat, sun),
-    fetchHolidays(key, sat.getUTCFullYear(), month),
-    fetchHolidays(key, sun.getUTCFullYear(), sun.getUTCMonth() + 1),
+    fetchHolidays(holKey, sat.getUTCFullYear(), month),
+    fetchHolidays(holKey, sun.getUTCFullYear(), sun.getUTCMonth() + 1),
     fetchTour(env as { DATA_GO_KR_KEY?: string }).catch(() => ({ available: false, festivals: [] as Array<{ title: string; start: string; end: string }> })),
     marineP,
     searchP,

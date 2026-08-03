@@ -311,6 +311,16 @@ export default {
     } catch (e) {
       console.warn("[cron] 백테스트 실측 적재 실패:", e instanceof Error ? e.message : e);
     }
+    // 관광 방문자 실측(한국관광공사 빅데이터) — 신규 방문자 수집 + 주말 정답(actual_visit) 채움(적중률 증명 근거)
+    try {
+      const { ingestRecentVisitors, resolveVisitActuals } = await import("./tour/visitors");
+      const ing = await ingestRecentVisitors(env);
+      const res = await resolveVisitActuals(env);
+      if (ing.upserted || res.filled) console.log(`[cron] 관광 방문자: 수집 ${ing.upserted}행(${ing.from}~${ing.to})·주말정답 ${res.filled}주`);
+    } catch (e) {
+      console.warn("[cron] 관광 방문자 수집 실패:", e instanceof Error ? e.message : e);
+    }
+    // (교통량은 data.ex.co.kr이 Worker에서 안 닿아 로컬 크롤러→/traffic/ingest로 적재. cron 아님)
     // 군청 목록(제목·날짜·링크) 매일 자동 갱신 — 목록 페이지는 Worker에서 200으로 열림.
     // 본문·카드뉴스 이미지는 한국 IP 로컬 크롤러(tools/gov/ingest-gov.mjs)가 보충(있으면 보존).
     try {

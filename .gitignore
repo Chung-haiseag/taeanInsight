@@ -81,3 +81,6 @@ tools/news-audio/news-audio.log
 
 # 로컬 오디오 실험 산출물(생성물, 커밋 제외)
 backend/audio/
+
+tools/traffic/.ex_key
+tools/traffic/traffic.log

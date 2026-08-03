@@ -71,6 +71,41 @@ reportRouter.get("/summary", async (c) => {
     text1(db, "SELECT updated_at v FROM news_cache WHERE id=1"), // 뉴스 수집기 마지막 실행 시각(고장 vs 새글 없음 구분)
   ]);
 
+  // 관광 분석 데이터 소스 현황 — 라이브 지표 + 상태 기록(정리·상설 기록).
+  const [visitorRows, visitorFrom, visitorTo, demandTotal, demandFilled, trafficSnaps] = await Promise.all([
+    scalar(db, "SELECT COUNT(*) n FROM tour_visitors WHERE signgu_code='44825'"),
+    text1(db, "SELECT MIN(base_ymd) v FROM tour_visitors WHERE signgu_code='44825'"),
+    text1(db, "SELECT MAX(base_ymd) v FROM tour_visitors WHERE signgu_code='44825'"),
+    scalar(db, "SELECT COUNT(DISTINCT weekend_sat) n FROM tour_demand_log"),
+    scalar(db, "SELECT COUNT(DISTINCT weekend_sat) n FROM tour_demand_log WHERE actual_visit IS NOT NULL"),
+    scalar(db, "SELECT COUNT(*) n FROM traffic_daily"),
+  ]);
+  const ymd = (s: string | null) => (s ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : "?");
+  // status: live(가동) | progress(진행중) | check(확인필요) | parked(보류) | rejected(미채택)
+  const dataSources = [
+    { key: "visitors", name: "관광 방문자 실측 (KTO 빅데이터)", status: "live", granularity: "태안군·일별·외지인/현지인/외국인",
+      metric: visitorRows != null ? `${visitorRows.toLocaleString()}행 · ${ymd(visitorFrom)}~${ymd(visitorTo)}` : null,
+      note: "수요지수 정답(백테스트) + seasonBase 데이터 재보정" },
+    { key: "demandActuals", name: "수요지수 백테스트 정답", status: "live", granularity: "주말별",
+      metric: `실측 채움 ${demandFilled ?? 0}/${demandTotal ?? 0} 주말`,
+      note: "예측 vs 실제 방문자 대조(≥4주 시 적중률 공개)" },
+    { key: "beaches", name: "해수욕장 보드 (KHOA+기상청)", status: "live", granularity: "해수욕장별",
+      metric: "/beaches 공개", note: "수온·파고·해수욕지수 종합 적합도 랭킹" },
+    { key: "weather", name: "날씨 (기상청 단기예보)", status: "live", granularity: "태안 격자·주말",
+      metric: (c.env as unknown as Record<string, unknown>).DATA_GO_KR_KEY ? "키 설정됨" : "키 없음", note: "수요지수 입력" },
+    { key: "search", name: "검색 관심도 (네이버 데이터랩)", status: "live", granularity: "태안 키워드",
+      metric: null, note: "선행지표 + 백테스트 대용" },
+    { key: "holiday", name: "공휴일 연휴 요인 (특일정보)", status: "live", granularity: "월별",
+      metric: "특일정보 활용신청 완료", note: "공휴일·대체공휴일로 주말 인접 연휴 가산(DATA_GO_KR_KEY_TOUR 사용)" },
+    { key: "traffic", name: "충남 고속도로 유입 교통량 (도로공사)", status: "live", granularity: "대전충남본부·시간당",
+      metric: trafficSnaps != null ? `스냅샷 ${trafficSnaps}건` : "실시간 /api/conditions/traffic",
+      note: "출구(진출=도착 유입) 선행지표. 태안 단독 IC 실시간 미제공→권역 프록시" },
+    { key: "consumption", name: "관광소비·수요강도·다양성 (카드)", status: "parked", granularity: "시군구·월별",
+      metric: null, note: "승인됐으나 전 조회 빈 응답(미적재). 파생지표라 보류" },
+    { key: "attractions", name: "관광지점 입장객 (문화관광연구원)", status: "rejected", granularity: "지점별·월별",
+      metric: null, note: "태안 등록 5개 시설뿐·해수욕장 누락 → 반쪽이라 미채택" },
+  ];
+
   // 외부 연동 설정 여부(값 아님). env를 레코드로 보고 존재만 확인.
   const e = c.env as unknown as Record<string, unknown>;
   const has = (k: string) => !!e[k];
@@ -93,6 +128,7 @@ reportRouter.get("/summary", async (c) => {
     },
     freshness: { latestArticle, latestRegional, latestEnv, lastCollected },
     config,
+    dataSources,
     generatedAt: new Date().toISOString(),
   });
 });

@@ -17,7 +17,9 @@ export interface Env {
   SLACK_WEBHOOK_URL?: string;
   TAEAN_ID?: string;              // 태안신문 회원 로그인 ID (전문 수집용)
   TAEAN_PW?: string;              // 태안신문 회원 로그인 PW
-  DATA_GO_KR_KEY?: string;        // 공공데이터포털 인증키 (날씨·대기질)
+  DATA_GO_KR_KEY?: string;        // 공공데이터포털 인증키 (날씨·대기질·공휴일)
+  DATA_GO_KR_KEY_TOUR?: string;   // 관광공사 빅데이터 방문자수 전용 키(API별 등록이 달라 분리). 없으면 DATA_GO_KR_KEY 폴백
+  DATA_EX_KEY?: string;           // 한국도로공사(data.ex.co.kr) 공개키 — 실시간 권역 교통량(충남 유입 선행지표)
   WEB_SEARCH_API_KEY?: string;    // 웹 보강 RAG 검색(Tavily 등) 키. 미설정 시 웹 비활성.
   TAEAN_NX?: string;              // 기상청 격자 X (기본 51)
   TAEAN_NY?: string;              // 기상청 격자 Y (기본 109)

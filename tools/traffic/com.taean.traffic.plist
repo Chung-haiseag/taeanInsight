@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 충남 고속도로 교통량 로컬 수집 자동화(macOS launchd). 1시간마다 + 로그인 시 1회.
+     도로공사 데이터가 시간당 집계라 1시간 주기. data.ex.co.kr은 Worker가 못 닿아 로컬 수집 필요.
+     설치: cp tools/traffic/com.taean.traffic.plist ~/Library/LaunchAgents/
+           launchctl load ~/Library/LaunchAgents/com.taean.traffic.plist
+     해제: launchctl unload ~/Library/LaunchAgents/com.taean.traffic.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.taean.traffic</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Applications/taean/tools/traffic/run-traffic.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Applications/taean/tools/traffic/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Applications/taean/tools/traffic/launchd.err.log</string>
+</dict>
+</plist>
