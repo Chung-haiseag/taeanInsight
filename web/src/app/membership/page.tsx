@@ -14,7 +14,7 @@ const PLANS: {
   {
     id: "reader",
     name: "인사이트 독자",
-    price: "월 3,900원",
+    price: "월 3,000원",
     tagline: "태안을 가장 깊게 읽는 방법",
     features: [
       "주간 인사이트 리포트 전문(잠금 해제)",
