@@ -12,6 +12,7 @@ import { Icon, type IconName } from "@/components/icon";
 import { PersonalizedNewsStrip } from "@/components/home/personalized-news";
 import { LiveSummaryStrip } from "@/components/home/live-summary";
 import { getArchiveStats, type ArchiveStats } from "@/lib/api/archive";
+import { getWeekendDemand, type DemandForecast } from "@/lib/api/reports";
 
 export function GenericHome() {
   const [stats, setStats] = useState<ArchiveStats | null>(null);
@@ -56,6 +57,9 @@ export function GenericHome() {
           </dl>
         )}
       </section>
+
+      {/* 예측 인사이트 — 이번 주말 관광 지수(대표 예측·미끼) */}
+      <WeekendDemandCard />
 
       {/* 지금 태안 — 라이브 핵심 지표(실데이터) */}
       <LiveSummaryStrip />
@@ -145,6 +149,58 @@ function HeroStat({ value, unit, label }: { value: string; unit: string; label: 
       </p>
       <p className="mt-1 text-xs text-foreground-muted">{label}</p>
     </div>
+  );
+}
+
+// 이번 주말 관광 수요 지수 — 규칙기반 예측(날씨·물때·축제·연휴·계절). 방문자용 대표 예측 + 사장님 전환 미끼.
+function WeekendDemandCard() {
+  const [d, setD] = useState<DemandForecast | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    getWeekendDemand().then((r) => { if (alive) setD(r); }).catch(() => { if (alive) setD(null); });
+    return () => { alive = false; };
+  }, []);
+  if (d === undefined) return <div className="h-40 animate-pulse rounded-2xl bg-brand/5" aria-hidden />;
+  if (!d) return null; // 예보 데이터 없으면 조용히 숨김
+  const high = d.level === "매우높음" || d.level === "높음";
+  const low = d.level === "낮음" || d.level === "매우낮음";
+  const toneCls = high ? "border-accent/40 bg-accent/5" : low ? "border-blue-200 bg-blue-50/40" : "border-brand/15 bg-background";
+  const badgeCls = high ? "bg-accent text-background" : low ? "bg-blue-100 text-blue-700" : "bg-brand/10 text-brand";
+  const top = d.factors.filter((f) => Math.abs(f.effect) >= 1).sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect)).slice(0, 3);
+  const wx = (w: DemandForecast["weather"]["sat"], day: string) => w
+    ? <span>{day} {w.tmax != null ? `${w.tmax}°` : ""}{w.pop != null ? ` · 강수 ${w.pop}%` : ""}</span> : null;
+  return (
+    <section aria-labelledby="demand-heading" className={`rounded-2xl border p-5 shadow-card ${toneCls}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden="true" />예측 인사이트 · 이번 주말</p>
+          <h2 id="demand-heading" className="mt-2 text-xl font-bold text-brand">이번 주말 태안 관광 수요</h2>
+          <p className="text-xs text-foreground-muted">{d.weekend.sat} ~ {d.weekend.sun.slice(5)}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-4xl font-bold leading-none text-brand tabular-nums">{d.index}<span className="text-lg font-medium text-foreground-muted">/100</span></div>
+          <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${badgeCls}`}>{d.level}</span>
+        </div>
+      </div>
+      <p className="mt-3 text-sm font-medium text-foreground">{d.headline}</p>
+      {top.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+          {top.map((f, i) => (
+            <span key={i} className="rounded-full bg-brand/10 px-2 py-0.5 text-brand" title={f.detail}>{f.effect >= 0 ? "+" : ""}{f.effect} {f.label}</span>
+          ))}
+        </div>
+      )}
+      {(d.weather.sat || d.weather.sun) && (
+        <div className="mt-3 flex gap-5 border-t border-brand/10 pt-3 text-xs text-foreground-muted">
+          {wx(d.weather.sat, "토")}{wx(d.weather.sun, "일")}
+        </div>
+      )}
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-brand/5 px-3 py-2">
+        <p className="text-xs text-foreground-muted">우리 가게는 이번 주말 어떻게 준비할까요? <strong className="text-brand">업종별 상세 예측·준비 체크리스트</strong></p>
+        <Link href="/membership" className="shrink-0 text-xs font-semibold text-accent hover:underline">사장님 멤버십 →</Link>
+      </div>
+      <p className="mt-2 text-[10px] text-foreground-muted">규칙기반 예측(날씨·물때·축제·연휴·계절). 예측과 실제를 대조해 적중률을 공개합니다.</p>
+    </section>
   );
 }
 

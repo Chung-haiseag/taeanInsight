@@ -128,6 +128,16 @@ export interface DemandForecast {
   holidays: Array<{ date: string; name: string }>;
 }
 
+// 다가오는 주말 관광 수요지수(0~100) — 공개. 방문자 첫화면·라이브의 '예측 인사이트' 미끼.
+export async function getWeekendDemand(): Promise<DemandForecast | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/demand`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as DemandForecast;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 섹션별 차트·표·카드용 수치(실패 시 null) — 산문과 독립적으로 항상 최신값
 export async function fetchReportMetrics(): Promise<ReportMetrics | null> {
   try {
