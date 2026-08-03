@@ -11,6 +11,25 @@ export const kgPublicRouter = new Hono<{ Bindings: Env }>();
 
 const isOn = (c: { env: Env }) => getSetting(c.env.ARCHIVE_DB, SETTING_PUBLIC_PEOPLE, "on").then((v) => v === "on");
 
+// 전국 인물처럼 지역 AI 소개를 억제한 경우, 최소한의 정확·출처있는 소개로 한국어 위키백과 요약을 붙인다.
+//   무료·키 불필요(REST summary API). 동음이의·미존재는 null. 라이선스(CC BY-SA) 준수 위해 프런트에서 출처·링크 표기.
+export interface WikiSummary { extract: string; url: string; thumbnail?: string }
+async function fetchWikiSummary(title: string): Promise<WikiSummary | null> {
+  try {
+    const res = await fetch(`https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}?redirect=true`, {
+      headers: { "User-Agent": "TaeanInsightBot/1.0 (https://insight.taeannews.co.kr; taeannews@taeannews.co.kr)", Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { type?: string; extract?: string; content_urls?: { desktop?: { page?: string } }; thumbnail?: { source?: string } };
+    if (j.type === "disambiguation" || !j.extract || j.extract.length < 20) return null;
+    return {
+      extract: j.extract,
+      url: j.content_urls?.desktop?.page ?? `https://ko.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+      ...(j.thumbnail?.source ? { thumbnail: j.thumbnail.source } : {}),
+    };
+  } catch { return null; }
+}
+
 // 공개 여부(프런트 페이지·네비가 확인). 짧게 edge 캐시.
 kgPublicRouter.get("/status", async (c) => {
   const enabled = await isOn(c);
@@ -44,8 +63,13 @@ kgPublicRouter.get("/person/:id/brief", async (c) => {
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
   const id = c.req.param("id");
   const db = c.env.ARCHIVE_DB;
-  // 전국 인물 등 억제 대상은 AI 소개를 만들지도 서빙하지도 않음(팩트·관계망만). 프런트가 이 플래그로 섹션 숨김.
-  if (await isBioSuppressed(db, id)) { c.header("Cache-Control", "public, max-age=300"); return c.json({ brief: null, suppressed: true }); }
+  // 전국 인물 등 억제 대상: 로컬 AI 소개 대신 한국어 위키백과 요약을 붙여 준다(정확·출처있음). 없으면 안내만.
+  if (await isBioSuppressed(db, id)) {
+    const nameRow = await db.prepare("SELECT name FROM kg_nodes WHERE id=?").bind(id).first<{ name: string }>();
+    const wiki = nameRow?.name ? await fetchWikiSummary(nameRow.name) : null;
+    c.header("Cache-Control", "public, max-age=86400");
+    return c.json({ brief: null, suppressed: true, wiki });
+  }
   const [cached, latestRow] = await Promise.all([
     db.prepare("SELECT bio, latest_article FROM kg_person_bio WHERE node_id=?").bind(id).first<{ bio: string; latest_article: string | null }>(),
     db.prepare("SELECT MAX(a.published_at) AS d FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno WHERE m.node_id=?").bind(id).first<{ d: string | null }>(),

@@ -9,7 +9,7 @@ import Link from "next/link";
 
 import KgGraph from "@/components/kg-graph";
 import { PageHeader } from "@/components/page-header";
-import { searchPersonsPublic, getPersonProfilePublic, getPersonBriefPublic, getKgStatus } from "@/lib/api/kg-public";
+import { searchPersonsPublic, getPersonProfilePublic, getPersonBriefPublic, getKgStatus, type WikiSummary } from "@/lib/api/kg-public";
 import type { PersonSearchResult, PersonProfile } from "@/lib/api/kg";
 
 export default function PeoplePage() {
@@ -195,11 +195,12 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
   const pid = prof.graph.center?.id;
   const [brief, setBrief] = useState<string | null | undefined>(undefined); // undefined=로딩, null=근거부족
   const [suppressed, setSuppressed] = useState(false); // 전국 인물 등 AI 소개 억제
+  const [wiki, setWiki] = useState<WikiSummary | null>(null); // 억제 시 위키백과 요약 대체
   useEffect(() => {
     let alive = true;
-    setBrief(undefined); setSuppressed(false);
+    setBrief(undefined); setSuppressed(false); setWiki(null);
     if (!pid) { setBrief(null); return; }
-    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); } }).catch(() => { if (alive) setBrief(null); });
+    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); setWiki(r.wiki ?? null); } }).catch(() => { if (alive) setBrief(null); });
     return () => { alive = false; };
   }, [pid]);
 
@@ -218,13 +219,31 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
     <section className="rounded-lg border border-brand/20 bg-accent/5 p-4">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-bold text-brand">인물 소개</h3>
-        {!suppressed && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">AI 요약 · 기사 근거</span>}
+        {suppressed
+          ? (wiki && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">위키백과 요약</span>)
+          : <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">AI 요약 · 기사 근거</span>}
       </div>
-      {/* AI 전기 — 지연 로드. 전국 인물 등 억제 대상은 서술 대신 안내(팩트·관계망은 유지). */}
+      {/* AI 전기 — 지연 로드. 전국 인물 등 억제 대상은 로컬 AI 소개 대신 위키백과 요약(있으면)·안내. 팩트·관계망은 유지. */}
       {suppressed ? (
-        <p className="text-sm leading-relaxed text-foreground-muted">
-          전국 단위 인물이라 지역 아카이브 기반 AI 소개는 제공하지 않습니다. 아래 집계·관계망과 ‘나온 기사’ 원문을 참고하세요.
-        </p>
+        wiki ? (
+          <div className="space-y-2">
+            <div className="flex gap-3">
+              {wiki.thumbnail && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={wiki.thumbnail} alt="" className="h-20 w-20 shrink-0 rounded-md object-cover" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+              )}
+              <p className="text-sm leading-relaxed text-foreground">{wiki.extract}</p>
+            </div>
+            <p className="text-[11px] text-foreground-muted">
+              전국 인물이라 지역 AI 소개 대신 위키백과 요약을 제공합니다. 출처:{" "}
+              <a href={wiki.url} target="_blank" rel="noopener noreferrer" className="underline">위키백과</a>
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed text-foreground-muted">
+            전국 단위 인물이라 지역 아카이브 기반 AI 소개는 제공하지 않습니다. 아래 집계·관계망과 ‘나온 기사’ 원문을 참고하세요.
+          </p>
+        )
       ) : brief === undefined ? (
         <div className="space-y-1.5" aria-hidden>
           <div className="h-3 w-11/12 animate-pulse rounded bg-brand/10" />
