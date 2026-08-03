@@ -118,6 +118,7 @@ export function searchPersons(q: string): Promise<{ results: PersonSearchResult[
 
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
+  photo?: string | null; // 역대 군수·현직 군의원 공식 사진 URL(백엔드 상대경로), 없으면 null
   graph: { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] };
   coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];

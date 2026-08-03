@@ -10,6 +10,7 @@ import Link from "next/link";
 import KgGraph from "@/components/kg-graph";
 import { PageHeader } from "@/components/page-header";
 import { searchPersonsPublic, getPersonProfilePublic, getPersonBriefPublic, getKgStatus, type WikiSummary } from "@/lib/api/kg-public";
+import { API_BASE_URL } from "@/lib/api/client";
 import type { PersonSearchResult, PersonProfile } from "@/lib/api/kg";
 
 export default function PeoplePage() {
@@ -103,12 +104,21 @@ export default function PeoplePage() {
       {/* 프로필 */}
       {prof && prof.person && (
         <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-brand">{prof.person.name}</h2>
-              <p className="text-xs text-foreground-muted">아카이브 등장 {prof.person.mentions.toLocaleString()}건</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {prof.photo && (
+                // 역대 군수·현직 군의원 공식 사진(R2). 로드 실패 시 조용히 숨김.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`${API_BASE_URL}${prof.photo}`} alt={prof.person.name}
+                  className="h-16 w-16 shrink-0 rounded-full border border-brand/15 object-cover"
+                  loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+              )}
+              <div>
+                <h2 className="text-2xl font-bold text-brand">{prof.person.name}</h2>
+                <p className="text-xs text-foreground-muted">아카이브 등장 {prof.person.mentions.toLocaleString()}건</p>
+              </div>
             </div>
-            <button type="button" onClick={() => setProf(null)} className="text-sm text-accent underline">← 검색으로</button>
+            <button type="button" onClick={() => setProf(null)} className="shrink-0 text-sm text-accent underline">← 검색으로</button>
           </div>
 
           <PersonIntro prof={prof} />
