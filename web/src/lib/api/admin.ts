@@ -70,6 +70,11 @@ export async function getUsers(): Promise<{ users: AdminUser[] }> {
 export async function setUserAccess(id: number, patch: { role?: string; plan?: string }): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/api/admin/users/set", { method: "POST", body: JSON.stringify({ id, ...patch }) });
 }
+// 기자 계정 생성(superadmin) — 임시 비밀번호를 1회 반환. 화면에 표시 후 안전하게 전달.
+export interface CreatedReporter { ok: boolean; email: string; displayName: string | null; tempPassword: string }
+export async function createReporter(email: string, displayName?: string): Promise<CreatedReporter> {
+  return apiFetch<CreatedReporter>("/api/admin/users/create", { method: "POST", body: JSON.stringify({ email, displayName }) });
+}
 
 // 시민기자 신청 대기열 — backend /api/admin/citizen-applications
 export interface CitizenApp { id: number; user_id: number; status: string; reason: string | null; applied_at: string; email: string; role: string }

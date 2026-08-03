@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { getSession, logout, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser, type CitizenApp } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, createReporter, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser, type CitizenApp, type CreatedReporter } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -219,6 +219,9 @@ function UsersSection() {
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
   const [apps, setApps] = useState<CitizenApp[]>([]);
+  const [rEmail, setREmail] = useState(""); const [rName, setRName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<CreatedReporter | null>(null);
   const load = () => getUsers().then((r) => setUsers(r.users)).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
   const loadApps = () => getCitizenApplications("pending").then((r) => setApps(r.applications)).catch(() => {});
   useEffect(() => { void load(); loadApps(); }, []);
@@ -229,6 +232,15 @@ function UsersSection() {
   async function decide(id: number, decision: "approve" | "reject") {
     const reason = decision === "reject" ? (window.prompt("반려 사유(선택):") ?? undefined) : undefined;
     try { await decideCitizenApplication(id, decision, reason); await loadApps(); await load(); } catch (e) { alert(e instanceof Error ? e.message : "처리 실패"); }
+  }
+  async function makeReporter() {
+    if (!/.+@.+\..+/.test(rEmail)) { alert("이메일을 확인하세요."); return; }
+    setCreating(true); setCreated(null);
+    try {
+      const r = await createReporter(rEmail.trim(), rName.trim() || undefined);
+      setCreated(r); setREmail(""); setRName(""); await load();
+    } catch (e) { alert(e instanceof Error ? e.message : "생성 실패(이미 있는 이메일이거나 권한 없음)"); }
+    finally { setCreating(false); }
   }
   if (err) return <p className="text-sm text-red-600">{err}</p>;
   if (!users) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
@@ -250,6 +262,32 @@ function UsersSection() {
           </ul>
         )}
       </div>
+
+      {/* 기자 계정 직접 생성 — 임시 비밀번호는 여기서만 1회 표시(서버 생성·해시 저장) */}
+      <div className="rounded-lg border border-brand/20 bg-background p-3">
+        <p className="mb-1 text-sm font-semibold text-brand">📰 태안신문 기자 계정 만들기</p>
+        <p className="mb-2 text-[11px] text-foreground-muted">이메일이 아이디입니다. 생성 시 임시 비밀번호가 아래에 <strong>딱 한 번</strong> 표시됩니다 — 기자에게 안전하게 전달하고, 첫 로그인 후 비밀번호를 바꾸도록 안내하세요.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="email" value={rEmail} onChange={(e) => setREmail(e.target.value)} placeholder="기자 이메일(아이디)"
+            className="min-w-[220px] flex-1 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
+          <input type="text" value={rName} onChange={(e) => setRName(e.target.value)} placeholder="이름(선택)"
+            className="w-32 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
+          <button type="button" disabled={creating} onClick={() => void makeReporter()}
+            className="rounded bg-brand px-3 py-1.5 text-sm font-semibold text-background disabled:opacity-60">{creating ? "생성 중…" : "계정 생성"}</button>
+        </div>
+        {created && (
+          <div className="mt-2 rounded-md border border-green-300 bg-green-50 p-2.5 text-sm">
+            <p className="font-semibold text-green-900">✅ 기자 계정 생성됨 — 이 비밀번호는 다시 표시되지 않습니다</p>
+            <div className="mt-1 grid gap-0.5 font-mono text-[13px] text-green-900">
+              <div>아이디: <strong>{created.email}</strong></div>
+              <div>임시 비밀번호: <strong className="select-all">{created.tempPassword}</strong></div>
+            </div>
+            <button type="button" onClick={() => { void navigator.clipboard?.writeText(`아이디: ${created.email}\n임시 비밀번호: ${created.tempPassword}`); }}
+              className="mt-1.5 rounded border border-green-400 px-2 py-0.5 text-xs font-semibold text-green-800">아이디·비번 복사</button>
+          </div>
+        )}
+      </div>
+
       {users.length === 0 ? <p className="text-sm text-foreground-muted">가입 회원이 없습니다.</p> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

@@ -26,10 +26,10 @@ function clientIp(c: { req: { header: (k: string) => string | undefined } }): st
 function toHex(buf: ArrayBuffer): string {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-function randHex(bytes = 32): string {
+export function randHex(bytes = 32): string {
   return toHex(crypto.getRandomValues(new Uint8Array(bytes)).buffer);
 }
-async function hashPw(pw: string, saltHex: string): Promise<string> {
+export async function hashPw(pw: string, saltHex: string): Promise<string> {
   const salt = Uint8Array.from(saltHex.match(/../g)!.map((h) => parseInt(h, 16)));
   const key = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" }, key, 256);
