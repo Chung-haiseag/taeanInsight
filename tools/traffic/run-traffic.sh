@@ -18,4 +18,5 @@ fi
 export TAEAN_GOV_TOKEN="$TOKEN" EX_API_KEY="$KEY"
 
 NODE="$(command -v node || echo /usr/local/bin/node)"
+[ -x "$NODE" ] || NODE="/opt/homebrew/bin/node"
 "$NODE" tools/traffic/refresh-traffic.mjs >> tools/traffic/traffic.log 2>&1
