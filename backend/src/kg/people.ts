@@ -151,13 +151,13 @@ export async function buildPersonBrief(db: D1Database, ai: unknown, id: string):
       const res = await client.complete({
         channel: "realtime", maxTokens: 650, temperature: attempt === 0 ? 0.25 : 0.1,
         messages: [
-          { role: "system", content: SYS + (attempt > 0 ? "\n- (재작성 지시) 직전 출력에 한글이 아닌 문자가 섞였다. 이번엔 반드시 한글·숫자·문장부호만 쓰고 한자·로마자 음차를 한 글자도 넣지 마라." : "") },
+          { role: "system", content: SYS + (attempt > 0 ? "\n- (재작성 지시) 직전 출력에 한글이 아닌 문자나 로마자로 옮긴 한국어 단어가 섞였다. 이번엔 반드시 한글·숫자·문장부호만 쓰고, 어떤 한국어 단어도 영어·로마자로 바꾸지 마라(예: '민주주의'를 'demokracy'로, '출판'을 'xuất'로 쓰지 말고 반드시 한글로)." : "") },
           { role: "user", content: src },
         ],
       });
       const raw = (res.content ?? "").replace(/\s+/g, " ").trim();
       if (raw.length <= 10) continue;
-      if (!hasForeignScript(raw)) return stripHanja(raw);   // 깨끗 → 문장부호만 정리해 반환
+      if (!hasForeignScript(raw) && !/[A-Za-z]{4,}/.test(raw)) return stripHanja(raw);   // 깨끗(외국문자·로마자 오출력 없음) → 반환
       contaminated = raw;                                    // 오염 → 재작성
     }
     const cleaned = stripHanja(contaminated ?? "");          // 재시도도 오염 → 최후 방어(토큰 제거)
@@ -180,6 +180,7 @@ export function stripHanja(s: string): string {
   for (const [k, v] of Object.entries(REPL)) out = out.split(k).join(v);
   // 성조문자(라틴 확장/추가)가 포함된 라틴 토큰은 통째 제거(예: 'xuất') — 깨진 잔음절보다 낫다.
   out = out.replace(new RegExp("[A-Za-z]*[\\u00C0-\\u024F\\u1E00-\\u1EFF][A-Za-z\\u00C0-\\u024F\\u1E00-\\u1EFF]*", "g"), "");
+  out = out.replace(/[A-Za-z]{4,}/g, "");                      // 4자+ 평문 라틴(로마자 오출력, 예: 'demokracy') 제거. AI·CSV 등 약어(≤3)는 보존
   out = out.replace(new RegExp(FOREIGN_CHAR.source, "g"), ""); // 잔여 CJK·기타 외국문자 통합 제거
   return out.replace(/\s+([,.!?·)])/g, "$1").replace(/\(\s*\)/g, "").replace(/\s{2,}/g, " ").trim();
 }

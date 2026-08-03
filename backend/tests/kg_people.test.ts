@@ -83,6 +83,11 @@ describe("stripHanja — Workers AI 한자 누출 정제", () => {
   it("평문 영문 약어(AI·CSV)는 보존", () => {
     expect(stripHanja("AI 보조로 CSV 자료를 제공한다.")).toBe("AI 보조로 CSV 자료를 제공한다.");
   });
+  it("4자+ 평문 로마자 오출력(demokracy·existed)은 제거, 약어(≤3)는 보존", () => {
+    expect(stripHanja("정치인들이 demokracy 제도를 말했다")).toBe("정치인들이 제도를 말했다");
+    expect(stripHanja("그 문제가 existed 하였다")).toBe("그 문제가 하였다");
+    expect(stripHanja("AI·CSV·PDF 제공")).toBe("AI·CSV·PDF 제공");
+  });
 });
 
 describe("hasForeignScript — 한글 브리핑에 섞인 비한글 문자 감지", () => {
