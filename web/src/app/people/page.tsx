@@ -194,11 +194,12 @@ function briefParagraphs(text: string): string[] {
 function PersonIntro({ prof }: { prof: PersonProfile }) {
   const pid = prof.graph.center?.id;
   const [brief, setBrief] = useState<string | null | undefined>(undefined); // undefined=로딩, null=근거부족
+  const [suppressed, setSuppressed] = useState(false); // 전국 인물 등 AI 소개 억제
   useEffect(() => {
     let alive = true;
-    setBrief(undefined);
+    setBrief(undefined); setSuppressed(false);
     if (!pid) { setBrief(null); return; }
-    getPersonBriefPublic(pid).then((r) => { if (alive) setBrief(r.brief); }).catch(() => { if (alive) setBrief(null); });
+    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); } }).catch(() => { if (alive) setBrief(null); });
     return () => { alive = false; };
   }, [pid]);
 
@@ -217,10 +218,14 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
     <section className="rounded-lg border border-brand/20 bg-accent/5 p-4">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-bold text-brand">인물 소개</h3>
-        <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">AI 요약 · 기사 근거</span>
+        {!suppressed && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">AI 요약 · 기사 근거</span>}
       </div>
-      {/* AI 전기 — 지연 로드(기사 제목·본문 근거). 없으면 결정론 한 줄로 폴백 */}
-      {brief === undefined ? (
+      {/* AI 전기 — 지연 로드. 전국 인물 등 억제 대상은 서술 대신 안내(팩트·관계망은 유지). */}
+      {suppressed ? (
+        <p className="text-sm leading-relaxed text-foreground-muted">
+          전국 단위 인물이라 지역 아카이브 기반 AI 소개는 제공하지 않습니다. 아래 집계·관계망과 ‘나온 기사’ 원문을 참고하세요.
+        </p>
+      ) : brief === undefined ? (
         <div className="space-y-1.5" aria-hidden>
           <div className="h-3 w-11/12 animate-pulse rounded bg-brand/10" />
           <div className="h-3 w-full animate-pulse rounded bg-brand/10" />
@@ -253,7 +258,7 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
           {topics.map((t) => <span key={t} className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] text-brand">{t}</span>)}
         </div>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>
+      {!suppressed && <p className="mt-2 text-[11px] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>}
     </section>
   );
 }

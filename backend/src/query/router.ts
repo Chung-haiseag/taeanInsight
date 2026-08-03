@@ -268,9 +268,10 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
 async function buildPersonBriefCard(env: Env, query: string, offRegion: boolean): Promise<{ id: string; name: string; text: string; photo?: string } | null> {
   try {
     if (!env.ARCHIVE_DB || !env.AI || offRegion) return null;
-    const { detectPersonInQuery, buildPersonBrief } = await import("../kg/people");
+    const { detectPersonInQuery, buildPersonBrief, isBioSuppressed } = await import("../kg/people");
     const hit = await detectPersonInQuery(env.ARCHIVE_DB, query);
     if (!hit) return null;
+    if (await isBioSuppressed(env.ARCHIVE_DB, hit.id)) return null; // 전국 인물 등은 AI 소개 카드 미첨부
     const text = await buildPersonBrief(env.ARCHIVE_DB, env.AI, hit.id);
     if (!text) return null;
     // 감지 인물이 역대 군수 또는 현직 군의원이면 공식 사진을 덧붙인다.

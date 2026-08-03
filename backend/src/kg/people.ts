@@ -94,6 +94,12 @@ export function topTopics(titles: string[], personName: string, limit = 10): { t
     .map(([term, count]) => ({ term, count }));
 }
 
+// 전국 인물(대통령·주요 정치인) 등 AI 소개를 숨길 대상인지. 지역 아카이브 파편 언급이라 서술 품질↓·민감.
+export async function isBioSuppressed(db: D1Database, id: string): Promise<boolean> {
+  try { return !!(await db.prepare("SELECT 1 AS x FROM kg_bio_suppressed WHERE node_id=?").bind(id).first()); }
+  catch { return false; } // 테이블 없으면(마이그레이션 전) 억제 안 함
+}
+
 // AI 인물 브리핑 — 직위·나온 기사 제목·주요 관계를 Workers AI로 3~4문장 요약(무료, 제목 근거로만).
 export async function buildPersonBrief(db: D1Database, ai: unknown, id: string): Promise<string | null> {
   const prof = await buildPersonProfile(db, id, 10);

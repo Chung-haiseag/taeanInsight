@@ -4,7 +4,7 @@
 //   공개 여부는 app_settings.public_people 플래그로 superadmin이 즉시 토글(배포 불필요).
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { searchPersons, buildPersonProfile, buildPersonBrief } from "./people";
+import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed } from "./people";
 import { getSetting, SETTING_PUBLIC_PEOPLE } from "../settings";
 
 export const kgPublicRouter = new Hono<{ Bindings: Env }>();
@@ -44,6 +44,8 @@ kgPublicRouter.get("/person/:id/brief", async (c) => {
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
   const id = c.req.param("id");
   const db = c.env.ARCHIVE_DB;
+  // 전국 인물 등 억제 대상은 AI 소개를 만들지도 서빙하지도 않음(팩트·관계망만). 프런트가 이 플래그로 섹션 숨김.
+  if (await isBioSuppressed(db, id)) { c.header("Cache-Control", "public, max-age=300"); return c.json({ brief: null, suppressed: true }); }
   const [cached, latestRow] = await Promise.all([
     db.prepare("SELECT bio, latest_article FROM kg_person_bio WHERE node_id=?").bind(id).first<{ bio: string; latest_article: string | null }>(),
     db.prepare("SELECT MAX(a.published_at) AS d FROM kg_mentions m JOIN archive_articles a ON a.idxno=m.article_idxno WHERE m.node_id=?").bind(id).first<{ d: string | null }>(),

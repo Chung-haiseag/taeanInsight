@@ -8,9 +8,9 @@ export const searchPersonsPublic = (q: string) =>
 export const getPersonProfilePublic = (id: string) =>
   apiFetch<PersonProfile>(`/api/kg/person/${encodeURIComponent(id)}/profile`);
 
-// AI 전기(기사 근거 5~7문장, 미검증) — 프로필 표시 후 지연 로드. null이면 근거 부족.
+// AI 전기(기사 근거 5~7문장, 미검증) — 프로필 표시 후 지연 로드. null이면 근거 부족, suppressed면 전국 인물 등 소개 억제.
 export const getPersonBriefPublic = (id: string) =>
-  apiFetch<{ brief: string | null }>(`/api/kg/person/${encodeURIComponent(id)}/brief`);
+  apiFetch<{ brief: string | null; suppressed?: boolean }>(`/api/kg/person/${encodeURIComponent(id)}/brief`);
 
 // 공개 여부(페이지·네비가 확인)
 export const getKgStatus = () => apiFetch<{ enabled: boolean }>("/api/kg/status");
