@@ -12,7 +12,7 @@ export const getPersonProfilePublic = (id: string) =>
 //   suppressed일 때 wiki(한국어 위키백과 요약)가 있으면 로컬 AI 소개 대신 그걸 보여준다.
 export interface WikiSummary { extract: string; url: string; thumbnail?: string }
 export const getPersonBriefPublic = (id: string) =>
-  apiFetch<{ brief: string | null; suppressed?: boolean; wiki?: WikiSummary | null }>(`/api/kg/person/${encodeURIComponent(id)}/brief`);
+  apiFetch<{ brief: string | null; suppressed?: boolean; wiki?: WikiSummary | null; byline?: boolean }>(`/api/kg/person/${encodeURIComponent(id)}/brief`);
 
 // 공개 여부(페이지·네비가 확인)
 export const getKgStatus = () => apiFetch<{ enabled: boolean }>("/api/kg/status");

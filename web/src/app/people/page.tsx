@@ -206,11 +206,12 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
   const [brief, setBrief] = useState<string | null | undefined>(undefined); // undefined=로딩, null=근거부족
   const [suppressed, setSuppressed] = useState(false); // 전국 인물 등 AI 소개 억제
   const [wiki, setWiki] = useState<WikiSummary | null>(null); // 억제 시 위키백과 요약 대체
+  const [byline, setByline] = useState(false); // 초허브(기자·편집인) — 소개 억제
   useEffect(() => {
     let alive = true;
-    setBrief(undefined); setSuppressed(false); setWiki(null);
+    setBrief(undefined); setSuppressed(false); setWiki(null); setByline(false);
     if (!pid) { setBrief(null); return; }
-    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); setWiki(r.wiki ?? null); } }).catch(() => { if (alive) setBrief(null); });
+    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); setWiki(r.wiki ?? null); setByline(!!r.byline); } }).catch(() => { if (alive) setBrief(null); });
     return () => { alive = false; };
   }, [pid]);
 
@@ -235,7 +236,11 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
       </div>
       {/* AI 전기 — 지연 로드. 전국 인물 등 억제 대상은 로컬 AI 소개 대신 위키백과 요약(있으면)·안내. 팩트·관계망은 유지. */}
       {suppressed ? (
-        wiki ? (
+        byline ? (
+          <p className="text-sm leading-relaxed text-foreground-muted">
+            이 인물은 기사 작성자(기자·편집인)로 보여 인물 소개를 제공하지 않습니다. ‘아카이브 등장’ 수는 대체로 이 사람이 <strong>쓴 기사</strong> 수입니다.
+          </p>
+        ) : wiki ? (
           <div className="space-y-2">
             <p className="text-sm leading-relaxed text-foreground">{wiki.extract}</p>
             <p className="text-[11px] text-foreground-muted">

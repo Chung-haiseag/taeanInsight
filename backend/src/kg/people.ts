@@ -97,6 +97,13 @@ export function topTopics(titles: string[], personName: string, limit = 10): { t
     .map(([term, count]) => ({ term, count }));
 }
 
+// 초허브(바이라인=기자·편집인, 등장≥HUB_MENTIONS)인지. 이들은 '쓴' 기사가 등장으로 잡혀 AI 소개가
+//   기사 주제를 본인 행위로 오인함(예: 기자 신문웅을 '태안군수'로) → 소개 억제 대상.
+export async function isPersonHub(db: D1Database, id: string): Promise<boolean> {
+  try { const r = await db.prepare("SELECT COUNT(*) AS n FROM kg_mentions WHERE node_id=?").bind(id).first<{ n: number }>(); return isHub(Number(r?.n) || 0); }
+  catch { return false; }
+}
+
 // 전국 인물(대통령·주요 정치인) 등 AI 소개를 숨길 대상인지. 지역 아카이브 파편 언급이라 서술 품질↓·민감.
 export async function isBioSuppressed(db: D1Database, id: string): Promise<boolean> {
   try { return !!(await db.prepare("SELECT 1 AS x FROM kg_bio_suppressed WHERE node_id=?").bind(id).first()); }

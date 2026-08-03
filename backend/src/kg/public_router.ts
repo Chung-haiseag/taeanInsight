@@ -4,7 +4,7 @@
 //   공개 여부는 app_settings.public_people 플래그로 superadmin이 즉시 토글(배포 불필요).
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed } from "./people";
+import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed, isPersonHub } from "./people";
 import { getSetting, SETTING_PUBLIC_PEOPLE } from "../settings";
 
 export const kgPublicRouter = new Hono<{ Bindings: Env }>();
@@ -78,7 +78,8 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
   const prof = await buildPersonProfile(c.env.ARCHIVE_DB, c.req.param("id"), 12);
   if (!prof) return c.json({ error: "not_found" }, 404);
   // R2 공식 사진(군수·의원)이 없으면, 위키백과에 인물 사진이 있을 때 아바타로 사용(도지사·국회의원 등).
-  if (!prof.photo && prof.person) {
+  //   단 초허브(바이라인)는 위키 오매칭 위험이 있어 위키 사진을 붙이지 않는다.
+  if (!prof.photo && prof.person && !prof.person.isHub) {
     const w = await getWikiCached(c.env.ARCHIVE_DB, prof.person.name);
     if (w.summary?.thumbnail) prof.photo = w.summary.thumbnail; // 절대 URL(upload.wikimedia.org)
   }
@@ -94,6 +95,11 @@ kgPublicRouter.get("/person/:id/brief", async (c) => {
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
   const id = c.req.param("id");
   const db = c.env.ARCHIVE_DB;
+  // 초허브(바이라인=기자·편집인): 본인이 쓴 기사가 등장으로 잡혀 AI 소개가 기사 주제를 본인 행위로 오인 → 억제.
+  if (await isPersonHub(db, id)) {
+    c.header("Cache-Control", "public, max-age=86400");
+    return c.json({ brief: null, suppressed: true, byline: true });
+  }
   // 전국 인물 등 억제 대상: 로컬 AI 소개 대신 한국어 위키백과 요약을 붙여 준다(정확·출처있음). 없으면 안내만.
   if (await isBioSuppressed(db, id)) {
     const nameRow = await db.prepare("SELECT name FROM kg_nodes WHERE id=?").bind(id).first<{ name: string }>();
