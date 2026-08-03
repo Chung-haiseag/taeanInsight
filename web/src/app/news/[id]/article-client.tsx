@@ -381,20 +381,35 @@ function QuotedText({ text }: { text: string }) {
 }
 
 function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
-  const paras = splitParagraphs(article.body || "");
+  const allParas = splitParagraphs(article.body || "");
   const isEbook = idxno >= 90000001 && idxno <= 90099999;
+  const leadImg = article.images[0] ?? null;
+  // 사진설명: 사진이 있고 첫 문단이 짧으면(≤45자 = 캡션) 본문에서 분리해 사진 아래 중앙에 배치.
+  const hasCaption = !!leadImg && allParas.length > 1 && allParas[0].length <= 45;
+  const paras = hasCaption ? allParas.slice(1) : allParas;
+  const restImages = leadImg ? article.images.slice(1) : article.images;
   return (
     <div className="space-y-5">
+      {/* 리드 사진 — 맨 위 + 사진설명(중앙) */}
+      {leadImg && (
+        <figure className="space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={leadImg} alt="" className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 720px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          {hasCaption && <figcaption className="text-center text-sm text-foreground-muted">{allParas[0]}</figcaption>}
+        </figure>
+      )}
+
+      {/* 본문 */}
       <div className="space-y-5 text-[1.05rem] leading-[1.9] text-foreground">
         {paras.map((p, i) => (
           <p key={i}><QuotedText text={p} /></p>
         ))}
       </div>
 
-      {/* 본문 사진 */}
-      {article.images.length > 0 && (
+      {/* 나머지 본문 사진(리드 외) */}
+      {restImages.length > 0 && (
         <div className="space-y-3">
-          {article.images.map((src) => (
+          {restImages.map((src) => (
             // 자연 크기 표시(작으면 작게), 단 본문 폭·높이 상한만 둠 — 작은 사진이 흐릿하게 늘어나지 않게
             // eslint-disable-next-line @next/next/no-img-element
             <img key={src} src={src} alt="" className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
