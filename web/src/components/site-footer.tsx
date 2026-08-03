@@ -23,7 +23,7 @@ export function SiteFooter() {
           <p className="font-semibold mb-2">운영</p>
           <ul className="space-y-1 text-background/70">
             <li>발행: 태안신문</li>
-            <li>주관: (주)엔씨투</li>
+            <li>개발: (주)엔씨투</li>
             <li>문의: taeannews@taeannews.co.kr</li>
             <li>전화: 041-670-1234</li>
           </ul>
