@@ -15,9 +15,12 @@ const isOn = (c: { env: Env }) => getSetting(c.env.ARCHIVE_DB, SETTING_PUBLIC_PE
 //   무료·키 불필요(REST summary API). 동음이의·미존재는 null. 라이선스(CC BY-SA) 준수 위해 프런트에서 출처·링크 표기.
 export interface WikiSummary { extract: string; url: string; thumbnail?: string }
 async function fetchWikiSummary(title: string): Promise<WikiSummary | null> {
+  const ctrl = new AbortController();                       // AbortSignal.timeout은 이 런타임서 throw → AbortController+setTimeout로 대체
+  const timer = setTimeout(() => ctrl.abort(), 4000);
   try {
     const res = await fetch(`https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}?redirect=true`, {
       headers: { "User-Agent": "TaeanInsightBot/1.0 (https://insight.taeannews.co.kr; taeannews@taeannews.co.kr)", Accept: "application/json" },
+      signal: ctrl.signal,
     });
     if (!res.ok) return null;
     const j = (await res.json()) as { type?: string; extract?: string; content_urls?: { desktop?: { page?: string } }; thumbnail?: { source?: string } };
@@ -27,7 +30,30 @@ async function fetchWikiSummary(title: string): Promise<WikiSummary | null> {
       url: j.content_urls?.desktop?.page ?? `https://ko.wikipedia.org/wiki/${encodeURIComponent(title)}`,
       ...(j.thumbnail?.source ? { thumbnail: j.thumbnail.source } : {}),
     };
-  } catch { return null; }
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+
+// 위키 요약·사진을 D1(wiki_cache)에 7일 TTL로 캐시. found=0도 캐시해 페이지 없는 인물의 재요청을 막는다.
+async function getWikiCached(db: D1Database, name: string): Promise<{ found: boolean; summary: WikiSummary | null }> {
+  const nm = (name || "").trim();
+  if (!nm) return { found: false, summary: null };
+  try {
+    const row = await db.prepare("SELECT found, extract, url, thumbnail, checked_at FROM wiki_cache WHERE name=?").bind(nm)
+      .first<{ found: number; extract: string | null; url: string | null; thumbnail: string | null; checked_at: string }>();
+    if (row) {
+      const ageMs = Date.now() - Date.parse(row.checked_at.replace(" ", "T") + "Z");
+      if (!(ageMs > 7 * 864e5)) { // 7일 이내면 캐시 사용
+        if (!row.found || !row.extract || !row.url) return { found: !!row.found, summary: null };
+        return { found: true, summary: { extract: row.extract, url: row.url, ...(row.thumbnail ? { thumbnail: row.thumbnail } : {}) } };
+      }
+    }
+  } catch { /* 캐시 조회 실패 → 신선 조회 */ }
+  const w = await fetchWikiSummary(nm);
+  try {
+    await db.prepare("INSERT OR REPLACE INTO wiki_cache(name, found, extract, url, thumbnail, checked_at) VALUES(?,?,?,?,?,datetime('now'))")
+      .bind(nm, w ? 1 : 0, w?.extract ?? null, w?.url ?? null, w?.thumbnail ?? null).run();
+  } catch { /* 캐시 저장 실패 무시 */ }
+  return { found: !!w, summary: w };
 }
 
 // 공개 여부(프런트 페이지·네비가 확인). 짧게 edge 캐시.
@@ -51,6 +77,11 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
   const prof = await buildPersonProfile(c.env.ARCHIVE_DB, c.req.param("id"), 12);
   if (!prof) return c.json({ error: "not_found" }, 404);
+  // R2 공식 사진(군수·의원)이 없으면, 위키백과에 인물 사진이 있을 때 아바타로 사용(도지사·국회의원 등).
+  if (!prof.photo && prof.person) {
+    const w = await getWikiCached(c.env.ARCHIVE_DB, prof.person.name);
+    if (w.summary?.thumbnail) prof.photo = w.summary.thumbnail; // 절대 URL(upload.wikimedia.org)
+  }
   return c.json(prof);
 });
 
@@ -66,7 +97,7 @@ kgPublicRouter.get("/person/:id/brief", async (c) => {
   // 전국 인물 등 억제 대상: 로컬 AI 소개 대신 한국어 위키백과 요약을 붙여 준다(정확·출처있음). 없으면 안내만.
   if (await isBioSuppressed(db, id)) {
     const nameRow = await db.prepare("SELECT name FROM kg_nodes WHERE id=?").bind(id).first<{ name: string }>();
-    const wiki = nameRow?.name ? await fetchWikiSummary(nameRow.name) : null;
+    const wiki = nameRow?.name ? (await getWikiCached(db, nameRow.name)).summary : null;
     c.header("Cache-Control", "public, max-age=86400");
     return c.json({ brief: null, suppressed: true, wiki });
   }

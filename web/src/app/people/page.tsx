@@ -109,7 +109,7 @@ export default function PeoplePage() {
               {prof.photo && (
                 // 역대 군수·현직 군의원 공식 사진(R2). 로드 실패 시 조용히 숨김.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`${API_BASE_URL}${prof.photo}`} alt={prof.person.name}
+                <img src={prof.photo.startsWith("http") ? prof.photo : `${API_BASE_URL}${prof.photo}`} alt={prof.person.name}
                   className="h-16 w-16 shrink-0 rounded-full border border-brand/15 object-cover"
                   loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               )}
@@ -237,13 +237,7 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
       {suppressed ? (
         wiki ? (
           <div className="space-y-2">
-            <div className="flex gap-3">
-              {wiki.thumbnail && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={wiki.thumbnail} alt="" className="h-20 w-20 shrink-0 rounded-md object-cover" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-              )}
-              <p className="text-sm leading-relaxed text-foreground">{wiki.extract}</p>
-            </div>
+            <p className="text-sm leading-relaxed text-foreground">{wiki.extract}</p>
             <p className="text-[11px] text-foreground-muted">
               전국 인물이라 지역 AI 소개 대신 위키백과 요약을 제공합니다. 출처:{" "}
               <a href={wiki.url} target="_blank" rel="noopener noreferrer" className="underline">위키백과</a>
