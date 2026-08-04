@@ -36,7 +36,7 @@ export function GenericHome() {
           <span className="inline-block h-px w-6 bg-accent" aria-hidden="true" />
           태안 인사이트 · 지역 저널리즘
         </p>
-        <h1 className="mt-3 font-sans text-3xl font-bold leading-[1.15] text-brand sm:text-4xl md:text-5xl">
+        <h1 className="mt-3 font-sans text-2xl font-bold leading-[1.2] text-brand sm:text-3xl md:text-4xl">
           태안의 어제와 오늘을, 한곳에서.
         </h1>
         <span className="accent-rule mt-4" aria-hidden="true" />
@@ -144,8 +144,8 @@ function formatManBun(n: number): string {
 function HeroStat({ value, unit, label }: { value: string; unit: string; label: string }) {
   return (
     <div>
-      <p className="font-display text-2xl font-bold tabular-nums text-brand md:text-3xl">
-        {value}<span className="ml-0.5 text-base font-semibold text-foreground-muted">{unit}</span>
+      <p className="font-display text-xl font-bold tabular-nums text-brand md:text-2xl">
+        {value}<span className="ml-0.5 text-sm font-semibold text-foreground-muted">{unit}</span>
       </p>
       <p className="mt-1 text-xs text-foreground-muted">{label}</p>
     </div>
@@ -178,7 +178,7 @@ function WeekendDemandCard() {
           <p className="mt-0.5 text-sm text-foreground-muted">{d.weekend.sat} ~ {d.weekend.sun.slice(5)}</p>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-5xl font-extrabold leading-none text-brand tabular-nums md:text-6xl">{d.index}<span className="text-xl font-bold text-foreground-muted">/100</span></div>
+          <div className="text-4xl font-extrabold leading-none text-brand tabular-nums md:text-5xl">{d.index}<span className="text-lg font-bold text-foreground-muted">/100</span></div>
           <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold ${badgeCls}`}>{d.level}</span>
         </div>
       </div>

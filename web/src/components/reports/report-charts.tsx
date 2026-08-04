@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -524,6 +524,75 @@ export function RealEstatePanel({ re, compact = false }: { re: ReportMetrics["re
 }
 
 // ── 충남 주유 평균가 (오피넷) ──
+// 태안 산업 구조 — 큐레이션(통계청 지역내총생산·전국사업체조사). '태안은 관광만이 아니다'를
+//   실측 근거로 보여줌 → 사장님 멤버십이 농업·수산·관광 전 부문을 대상으로 하는 근거.
+const TAEAN_PILLARS = [
+  { emoji: "🌾", name: "농업", desc: "마늘·생강·고추·쌀 주산지", stat: "지역총생산 1차산업 8.3% (전국의 약 5배)" },
+  { emoji: "🐟", name: "수산업", desc: "갯벌·연안 — 바지락·굴·김·꽃게·대하", stat: "국가어항(안흥·모항)·양식·맨손어업" },
+  { emoji: "🏖️", name: "관광·서비스", desc: "숙박·음식·도소매 사업체 다수", stat: "종사자 숙박·음식 22.8% · 도소매 16.1%" },
+  { emoji: "⚡", name: "에너지", desc: "태안화력발전소", stat: "지역총생산 최대 단일 부문(전기·가스 54.6%)" },
+];
+export function IndustryStructure() {
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🏭 태안 산업 구조</span>
+        <span className="text-[0.7rem] text-foreground-muted">농업·수산·관광 다부문</span>
+      </div>
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+        {TAEAN_PILLARS.map((p) => (
+          <div key={p.name} className="rounded-xl bg-brand/5 p-3">
+            <p className="text-sm font-bold text-brand">{p.emoji} {p.name}</p>
+            <p className="mt-0.5 text-xs text-foreground">{p.desc}</p>
+            <p className="mt-0.5 text-[0.7rem] text-foreground-muted">{p.stat}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">통계청 지역내총생산·전국사업체조사 기준 구조. 정밀 최신 산업별 취업자 통계는 KOSIS 연동 예정.</p>
+    </div>
+  );
+}
+
+// 태안 농산물 도매 시세 — 마늘·생강 등 전국 도매시장 평균 낙찰가(농업 사장님 근거).
+export function AgriCard({ agri }: { agri: AgriBoardView | null }) {
+  if (!agri || !agri.crops.some((c) => c.wonPerKg != null)) return null;
+  const rows = agri.crops.filter((c) => c.wonPerKg != null);
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🧑‍🌾 태안 농수산물 시세</span>
+        <span className="text-[0.7rem] text-foreground-muted">전국 도매 평균 · kg당{agri.date ? ` · ${agri.date.slice(5)}` : ""}</span>
+      </div>
+      {(["농산물", "해조류"] as const).map((cat) => {
+        const catRows = rows.filter((c) => c.cat === cat);
+        if (!catRows.length) return null;
+        return (
+          <div key={cat} className="mt-3">
+            <p className="mb-1.5 text-[0.7rem] font-semibold text-foreground-muted">{cat === "농산물" ? "🌾 농산물" : "🌿 해조류"}</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {catRows.map((c) => {
+                const d = c.deltaPct;
+                return (
+                  <div key={c.key} className="rounded-xl bg-brand/5 p-3">
+                    <p className="text-xs text-foreground-muted">{c.emoji} {c.name}</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-brand">{c.wonPerKg!.toLocaleString()}<span className="text-xs font-medium">원</span></p>
+                    {d != null && (
+                      <p className="mt-0.5 text-[0.7rem]" style={{ color: d > 0 ? "#dc2626" : d < 0 ? "#16a34a" : "#64748b" }}>
+                        전일 {d > 0 ? "▲" : d < 0 ? "▼" : "—"}{Math.abs(d)}%
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 공영도매시장 경매 낙찰가 중앙값(신선 원물). 태안 주산지 농산물·해조류 참고가 · 어패류(우럭·꽃게)는 준비중.</p>
+    </div>
+  );
+}
+
 export function OilCard({ oil }: { oil: OilPrices | null }) {
   if (!oil || (!oil.gasoline && !oil.diesel)) return null;
   const rows: Array<{ label: string; emoji: string; v: NonNullable<OilPrices["gasoline"]> }> = [];

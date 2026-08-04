@@ -165,6 +165,39 @@ export async function getBeaches(): Promise<BeachBoardView | null> {
   } catch { return null; }
 }
 
+// 갯벌 물때 적기 — 며칠간 조차·낮 간조로 '언제 갯벌 체험이 좋은가'.
+export interface MudflatDayView {
+  date: string;
+  weekday: string;
+  range: number | null;
+  tideLabel: string;
+  daytimeLows: Array<{ time: string; level: number | null }>;
+  best: { time: string; level: number | null } | null;
+  score: number;
+  good: boolean;
+}
+export interface MudflatBoardView { available: boolean; station: string; days: MudflatDayView[]; best: MudflatDayView | null }
+
+// 태안 농산물 도매 시세 — 마늘·생강·고추 등 전국 도매시장 평균 낙찰가(농업 사장님).
+export interface CropPriceView { key: string; name: string; emoji: string; cat: "농산물" | "해조류"; wonPerKg: number | null; prevWonPerKg: number | null; deltaPct: number | null; count: number }
+export interface AgriBoardView { available: boolean; date: string | null; prevDate: string | null; crops: CropPriceView[] }
+export async function getAgriPrices(): Promise<AgriBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/agri`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as AgriBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+export async function getMudflat(): Promise<MudflatBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as MudflatBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 섹션별 차트·표·카드용 수치(실패 시 null) — 산문과 독립적으로 항상 최신값
 export async function fetchReportMetrics(): Promise<ReportMetrics | null> {
   try {

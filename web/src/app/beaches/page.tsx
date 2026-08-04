@@ -2,7 +2,7 @@
 //   공개 페이지. 데이터: GET /api/conditions/beaches (loadMarine + rankBeaches).
 //   실시간 해양 관측/예보 기반 — 태안 관광의 본체인 '해변'을 지점 단위로 보여준다.
 
-import { getBeaches, type BeachScoreView } from "@/lib/api/reports";
+import { getBeaches, getMudflat, type BeachScoreView, type MudflatDayView } from "@/lib/api/reports";
 import { PageHeader } from "@/components/page-header";
 
 export const revalidate = 900;
@@ -16,7 +16,7 @@ const LEVEL_STYLE: Record<BeachScoreView["level"], { ring: string; badge: string
 };
 
 export default async function BeachesPage() {
-  const board = await getBeaches();
+  const [board, mudflat] = await Promise.all([getBeaches(), getMudflat()]);
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-8">
@@ -24,7 +24,7 @@ export default async function BeachesPage() {
         align="center"
         eyebrow="BEACH BOARD"
         title="이번 주말, 태안 어느 해변?"
-        description={<>수온·파고·해수욕지수·물때를 종합한 <strong className="text-brand">해변별 해수욕 적합도</strong> — 실시간 해양 데이터 기반.</>}
+        description={<><strong className="text-brand">해변별 해수욕 적합도</strong>(수온·파고·해수욕지수) + <strong className="text-brand">갯벌 물때 적기</strong> — 실시간 해양 데이터 기반.</>}
       />
 
       {!board ? (
@@ -83,9 +83,47 @@ export default async function BeachesPage() {
           </p>
         </>
       )}
+
+      {mudflat && mudflat.days.length > 0 && (
+        <section className="space-y-4 pt-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-xl font-bold text-brand">🦪 갯벌 물때 적기</h2>
+            <span className="text-xs text-foreground-muted">{mudflat.station} 조석 기준</span>
+          </div>
+
+          {mudflat.best && (
+            <div className="rounded-2xl border-2 border-accent bg-accent-subtle/25 p-5 shadow-card">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-accent">갯벌 체험 추천</p>
+              <p className="mt-1 text-lg font-bold text-brand">
+                {fmtMd(mudflat.best.date)}({mudflat.best.weekday}) · {mudflat.best.tideLabel}
+              </p>
+              <p className="mt-0.5 text-sm text-foreground-muted">
+                최적 간조 <strong className="text-brand">{mudflat.best.best?.time}</strong>
+                {mudflat.best.best?.level != null && <> (조위 {mudflat.best.best.level}cm)</>} 전후로 갯벌이 가장 많이 드러납니다.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {mudflat.days.map((d: MudflatDayView) => (
+              <div key={d.date} className={`rounded-xl border p-3 text-center ${d.good ? "border-accent/40 bg-accent-subtle/10" : "border-brand/12 bg-background"}`}>
+                <p className="text-sm font-bold text-brand">{fmtMd(d.date)}<span className="text-foreground-muted">({d.weekday})</span></p>
+                <p className="mt-1 text-[11px] text-foreground-muted">{d.tideLabel}{d.range != null && <> · {d.range}m</>}</p>
+                <p className="mt-1.5 text-xs">
+                  {d.best ? <>낮 간조<br /><strong className="text-brand">{d.best.time}</strong></> : <span className="text-foreground-muted">낮 간조 없음</span>}
+                </p>
+                <p className="mt-1 text-[11px]">{d.good ? <span className="text-accent font-semibold">✅ 적기</span> : <span className="text-foreground-muted">—</span>}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-foreground-muted">조차가 클수록(사리) 갯벌이 많이 드러납니다. 물때는 빠르게 바뀌니 현장에서 밀물 시각을 꼭 확인하세요.</p>
+        </section>
+      )}
     </div>
   );
 }
+
+const fmtMd = (iso: string) => { const [, m, d] = iso.split("-"); return `${Number(m)}/${Number(d)}`; };
 
 function Chip({ label, value }: { label: string; value: string }) {
   return (

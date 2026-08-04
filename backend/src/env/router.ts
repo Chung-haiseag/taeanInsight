@@ -16,6 +16,7 @@ let cache: { at: number; data: Conditions } | null = null;
 let tourCache: { at: number; data: TourInfo } | null = null;
 const TOUR_TTL_MS = 6 * 3600 * 1000; // 관광 정보는 자주 안 바뀜 — 6시간 캐시
 let demandCache: { at: number; data: DemandForecast } | null = null;
+let agriCache: { at: number; data: unknown } | null = null;
 const DEMAND_TTL_MS = 3 * 3600 * 1000; // 수요지수 — 예보 갱신 주기 고려 3시간 캐시
 
 async function cached(env: Env): Promise<Conditions> {
@@ -55,6 +56,22 @@ envRouter.get("/beaches", async (c) => {
     tide: m.tide ?? null,
     sun: m.sun ?? null,
   });
+});
+
+// 태안 농산물 도매 시세 — 마늘·생강·고추 등 전국 도매시장 경매 평균가(농업 사장님 근거). 3h 캐시.
+envRouter.get("/agri", async (c) => {
+  const now = Date.now();
+  if (agriCache && now - agriCache.at < 3 * 3600_000) return c.json(agriCache.data);
+  const { loadAgriPrices } = await import("../tour/agri");
+  const data = await loadAgriPrices(c.env);
+  if (data.available) agriCache = { at: now, data };
+  return c.json(data);
+});
+
+// 갯벌 물때 적기 — 며칠간 조차·낮 간조로 '언제 갯벌 체험이 좋은가' 추천(KHOA 조석 재사용).
+envRouter.get("/mudflat", async (c) => {
+  const { loadMudflat } = await import("../tour/mudflat");
+  return c.json(await loadMudflat(c.env));
 });
 
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
