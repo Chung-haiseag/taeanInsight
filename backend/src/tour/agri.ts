@@ -82,31 +82,29 @@ export async function loadAgriPrices(env: Env): Promise<AgriBoard> {
   const key = env.DATA_GO_KR_KEY;
   if (!key) return { available: false, date: null, prevDate: null, crops: [] };
 
-  // 마늘(대표 품목)로 최근 거래일 탐색
-  let date: string | null = null;
-  for (let i = 0; i <= 6; i++) {
-    const d = kstYmd(i);
-    const probe = await fetchCropAuctions(key, d, "12", "09");
-    if (probe.length) { date = d; break; }
-  }
+  // 거래일 탐색 — 마늘(대표)로 최근 7일 병렬 조회 후 데이터 있는 날짜 = date(최신)·prevDate(직전).
+  //   과거엔 순차 walk-back이라 /live 병목(≈7s)이었음 → 병렬화.
+  const candidates = Array.from({ length: 7 }, (_, i) => kstYmd(i));
+  const probes = await Promise.all(candidates.map((d) => fetchCropAuctions(key, d, "12", "09").then((r) => (r.length ? d : null))));
+  const tradedDays = probes.filter((d): d is string => d != null); // 최신순(candidates가 오늘→과거)
+  const date = tradedDays[0] ?? null;
+  const prevDate = tradedDays[1] ?? null;
   if (!date) return { available: false, date: null, prevDate: null, crops: [] };
-  // 직전 거래일(date 다음날부터 최대 -6일)
-  const baseOffset = Math.round((Date.now() + 9 * 3600 * 1000 - new Date(date + "T00:00:00Z").getTime()) / 86_400_000);
-  let prevDate: string | null = null;
-  for (let i = baseOffset + 1; i <= baseOffset + 6; i++) {
-    const d = kstYmd(i);
-    const probe = await fetchCropAuctions(key, d, "12", "09");
-    if (probe.length) { prevDate = d; break; }
-  }
 
-  const crops: CropPrice[] = [];
-  for (const c of TAEAN_CROPS) {
-    const cur = aggregatePrices(await fetchCropAuctions(key, date, c.lclsf, c.mclsf));
-    const prev = prevDate ? aggregatePrices(await fetchCropAuctions(key, prevDate, c.lclsf, c.mclsf)) : { wonPerKg: null };
-    const deltaPct = cur.wonPerKg != null && prev.wonPerKg != null && prev.wonPerKg > 0
-      ? Math.round(((cur.wonPerKg - prev.wonPerKg) / prev.wonPerKg) * 1000) / 10
-      : null;
-    crops.push({ key: c.key, name: c.name, emoji: c.emoji, cat: c.cat, wonPerKg: cur.wonPerKg, prevWonPerKg: prev.wonPerKg ?? null, deltaPct, count: cur.count });
-  }
+  // 품목별 cur/prev 전부 병렬(과거 16회 순차 → 병렬).
+  const crops: CropPrice[] = await Promise.all(
+    TAEAN_CROPS.map(async (c) => {
+      const [curRaw, prevRaw] = await Promise.all([
+        fetchCropAuctions(key, date, c.lclsf, c.mclsf),
+        prevDate ? fetchCropAuctions(key, prevDate, c.lclsf, c.mclsf) : Promise.resolve([]),
+      ]);
+      const cur = aggregatePrices(curRaw);
+      const prev = prevDate ? aggregatePrices(prevRaw) : { wonPerKg: null };
+      const deltaPct = cur.wonPerKg != null && prev.wonPerKg != null && prev.wonPerKg > 0
+        ? Math.round(((cur.wonPerKg - prev.wonPerKg) / prev.wonPerKg) * 1000) / 10
+        : null;
+      return { key: c.key, name: c.name, emoji: c.emoji, cat: c.cat, wonPerKg: cur.wonPerKg, prevWonPerKg: prev.wonPerKg ?? null, deltaPct, count: cur.count };
+    }),
+  );
   return { available: crops.some((c) => c.wonPerKg != null), date, prevDate, crops };
 }
