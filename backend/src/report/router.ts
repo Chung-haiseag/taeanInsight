@@ -112,6 +112,8 @@ reportRouter.get("/summary", async (c) => {
       metric: "/live 지역경제(큐레이션)", note: "통계청 지역총생산·사업체조사 기준 구조 카드. 정밀 최신 산업별 취업자는 KOSIS OpenAPI 키(kosis.kr 무료) 연동 예정" },
     { key: "seafood", name: "수산물 소매 시세 (KAMIS 어패류)", status: "live", granularity: "품목별·일별",
       metric: "/api/conditions/seafood · 8품목", note: "꽃게·바지락·전복·낙지·꼬막·새우·오징어·갈치 소매가+주간등락(KAMIS 부류600). Worker가 KAMIS 직접 못 닿아(HTTP전용+인증서오류) 로컬 크롤러→D1 미러(교통량 패턴). 해조류(미역·다시마)는 별도 농수산물 카드. ※우럭=조피볼락은 KAMIS 소매목록 없음" },
+    { key: "auction", name: "태안 위판장 경매가 (산지 경락가)", status: "live", granularity: "위판장·어종별·일별",
+      metric: "/api/conditions/auction", note: "사장님이 위판장에서 실제 받는 경락가(소매가와 짝). 해수부 위판장별 위탁판매(apis.data.go.kr/1192000, 활용신청 완료)를 Worker 직접 호출→서산·안면도수협 태안 위판장(안흥·모항·채석포·백사장·영목)만 필터. 어종별 물량가중 평균 경락가+위판량. 위판 3~4일 후 반영, 6h 캐시" },
     { key: "consumption", name: "관광소비·수요강도·다양성 (카드)", status: "parked", granularity: "시군구·월별",
       metric: null, note: "승인됐으나 전 조회 빈 응답(미적재). 파생지표라 보류" },
     { key: "attractions", name: "관광지점 입장객 (문화관광연구원)", status: "rejected", granularity: "지점별·월별",

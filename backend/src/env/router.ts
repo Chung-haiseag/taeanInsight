@@ -89,6 +89,18 @@ envRouter.get("/seafood", async (c) => {
   return c.json(await loadSeafood(c.env));
 });
 
+// 태안 위판장 경매가(경락가) — 사장님이 위판장에서 실제 받는 값(소매가와 짝). 해수부 위판 API를 Worker가 직접 호출.
+//   전국 21k건/일 중 태안 조합(서산·안면도수협)만 필터·집계. 3~4일 지연이라 6시간 캐시.
+let auctionCache: { at: number; data: unknown } | null = null;
+envRouter.get("/auction", async (c) => {
+  const now = Date.now();
+  if (auctionCache && now - auctionCache.at < 6 * 3600_000) return c.json(auctionCache.data);
+  const { loadAuction } = await import("../tour/auction");
+  const data = await loadAuction(c.env);
+  if (data.available) auctionCache = { at: now, data };
+  return c.json(data);
+});
+
 // 로컬 크롤러(tools/seafood/refresh-seafood.mjs)가 KAMIS 어패류 소매가를 받아 적재. 공유 토큰(GOV_IMPORT_TOKEN).
 envRouter.post("/seafood/ingest", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
