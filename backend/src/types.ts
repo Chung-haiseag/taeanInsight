@@ -35,8 +35,10 @@ export interface Env {
   GEMINI_API_KEY?: string;        // Gemini API 키(팟캐스트 멀티스피커 TTS, NotebookLM급)
   KAKAO_REST_KEY?: string;        // 카카오 로그인 REST API 키(OAuth)
   OPINET_KEY?: string;            // 오피넷 유가정보 certkey (충남 주유 평균가)
-  NAVER_CLIENT_ID?: string;       // 네이버 데이터랩 검색어트렌드
+  NAVER_CLIENT_ID?: string;       // 네이버 로그인/기타 앱 키
   NAVER_CLIENT_SECRET?: string;
+  NAVER_DATALAB_ID?: string;      // 데이터랩 검색어트렌드 전용 앱(기존 앱과 API 조합 불가 → 분리). 없으면 위 키로 폴백
+  NAVER_DATALAB_SECRET?: string;
   ITS_API_KEY?: string;           // 국가교통정보센터(ITS) 실시간 CCTV
 
   // 태안신문 아카이브 바인딩

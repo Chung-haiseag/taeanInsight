@@ -13,27 +13,37 @@ export interface SearchTrend {
   prev: number;            // 직전 주 비율
   deltaPct: number;        // 전주 대비 % 증감
   weeks: Array<{ period: string; ratio: number }>;
+  lodging: { latest: number; prev: number; deltaPct: number } | null; // 숙박 검색 선행 proxy
 }
+
+// 숙박 수요 선행 proxy — '태안 펜션/숙박/캠핑' 검색량(예약 전 검색). 실예약률 대용.
+const LODGING_KEYWORDS = ["태안 펜션", "태안 숙박", "안면도 펜션", "태안 캠핑", "만리포 펜션"];
 
 function ymd(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-async function fetchSearchTrendImpl(env: { NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string }): Promise<SearchTrend | null> {
-  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return null;
+async function fetchSearchTrendImpl(env: { NAVER_CLIENT_ID?: string; NAVER_CLIENT_SECRET?: string; NAVER_DATALAB_ID?: string; NAVER_DATALAB_SECRET?: string }): Promise<SearchTrend | null> {
+  // 데이터랩 검색어트렌드는 전용 앱 키(NAVER_DATALAB_*)가 있으면 우선 — 기존 로그인 앱과 API 조합 불가하므로 분리.
+  const cid = env.NAVER_DATALAB_ID || env.NAVER_CLIENT_ID;
+  const csecret = env.NAVER_DATALAB_SECRET || env.NAVER_CLIENT_SECRET;
+  if (!cid || !csecret) return null;
   const now = new Date(Date.now() + 9 * 3600 * 1000);
   const start = new Date(now.getTime() - 70 * 86400000); // 약 10주
   try {
     const res = await fetch(DATALAB, {
       method: "POST",
       headers: {
-        "X-Naver-Client-Id": env.NAVER_CLIENT_ID,
-        "X-Naver-Client-Secret": env.NAVER_CLIENT_SECRET,
+        "X-Naver-Client-Id": cid,
+        "X-Naver-Client-Secret": csecret,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         startDate: ymd(start), endDate: ymd(now), timeUnit: "week",
-        keywordGroups: [{ groupName: REGION.searchGroupName, keywords: KEYWORDS }],
+        keywordGroups: [
+          { groupName: REGION.searchGroupName, keywords: KEYWORDS },
+          { groupName: "태안숙박", keywords: LODGING_KEYWORDS },
+        ],
       }),
       signal: AbortSignal.timeout(8000),
     });
@@ -45,7 +55,15 @@ async function fetchSearchTrendImpl(env: { NAVER_CLIENT_ID?: string; NAVER_CLIEN
     const latest = weeks[weeks.length - 1].ratio;
     const prev = weeks[weeks.length - 2].ratio;
     const deltaPct = prev > 0 ? Math.round(((latest - prev) / prev) * 100) : 0;
-    return { latest, prev, deltaPct, weeks };
+    // 숙박 그룹(results[1])
+    const ld = j.results?.[1]?.data ?? [];
+    let lodging: SearchTrend["lodging"] = null;
+    if (ld.length >= 2) {
+      const lLatest = Math.round(ld[ld.length - 1].ratio * 10) / 10;
+      const lPrev = Math.round(ld[ld.length - 2].ratio * 10) / 10;
+      lodging = { latest: lLatest, prev: lPrev, deltaPct: lPrev > 0 ? Math.round(((lLatest - lPrev) / lPrev) * 100) : 0 };
+    }
+    return { latest, prev, deltaPct, weeks, lodging };
   } catch {
     return null;
   }

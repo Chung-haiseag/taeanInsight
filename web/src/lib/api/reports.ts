@@ -188,6 +188,21 @@ export interface FestivalView {
   from: [number, number]; to: [number, number];
   impact: "대형" | "중형" | "소형"; exact2026?: boolean; nextStart: string;
 }
+// 기상특보 — 태안(충남) 발효 특보. 안전·급감 신호.
+export interface WeatherAlertView {
+  active: boolean;
+  warnings: Array<{ type: string; level: "경보" | "주의보"; active: boolean }>;
+  label: string; penalty: number; issuedAt: string | null;
+}
+export async function getWeatherAlert(): Promise<WeatherAlertView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/weather-alert`, { next: { revalidate: 600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as WeatherAlertView;
+    return d.active ? d : null;
+  } catch { return null; }
+}
+
 export async function getFestivals(): Promise<FestivalView[]> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/festivals`, { next: { revalidate: 3600 } });

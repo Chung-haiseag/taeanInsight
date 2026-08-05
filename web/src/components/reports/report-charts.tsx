@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, FestivalView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -524,6 +524,22 @@ export function RealEstatePanel({ re, compact = false }: { re: ReportMetrics["re
 }
 
 // ── 충남 주유 평균가 (오피넷) ──
+// 기상특보 안전 배너 — 발효 시에만. 태풍·호우·풍랑=위험, 폭염=주의.
+export function WeatherAlertBanner({ alert }: { alert: WeatherAlertView | null }) {
+  if (!alert || !alert.active) return null;
+  const severe = alert.warnings.some((w) => w.active && ["태풍", "호우", "풍랑", "대설", "폭풍해일", "한파"].includes(w.type));
+  const cls = severe ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900";
+  return (
+    <div className={`mt-4 flex items-start gap-3 rounded-xl border p-3.5 ${cls}`} role="alert">
+      <span className="text-lg" aria-hidden>{severe ? "🚨" : "⚠️"}</span>
+      <div className="text-sm">
+        <b>기상특보 발효 — {alert.label}</b>
+        <p className="mt-0.5 text-xs opacity-90">{severe ? "야외활동·해수욕·물놀이 위험. 안전에 유의하세요." : "야외활동 시 건강·안전에 유의하세요."} (충남 광역특보구역 기준)</p>
+      </div>
+    </div>
+  );
+}
+
 // 태안 축제·행사 캘린더 — 다가오는 축제(수요 동인). 대형=강조.
 const FEST_STYLE: Record<string, string> = {
   "대형": "bg-accent text-background", "중형": "bg-brand/70 text-background", "소형": "bg-brand/10 text-brand",

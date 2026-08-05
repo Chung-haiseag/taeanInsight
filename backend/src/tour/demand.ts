@@ -8,6 +8,7 @@ import { fetchTour } from "../env/tour";
 import { loadMarine } from "./marine";
 import { fetchSearchTrend } from "../env/search_trend";
 import { festivalsOnWeekend, festivalBoost } from "./festivals";
+import { fetchWeatherAlert } from "./weather_alert";
 import { REGION } from "../region";
 
 const KMA_BASE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
@@ -25,6 +26,7 @@ export interface DemandForecast {
   weather: { sat: DayWeather | null; sun: DayWeather | null };
   festivals: Array<{ title: string; start: string; end: string }>;
   holidays: Array<{ date: string; name: string }>;
+  lodging?: { latest: number; prev: number; deltaPct: number } | null; // 숙박 검색 선행 proxy
 }
 
 const SKY: Record<string, string> = { "1": "맑음", "3": "구름많음", "4": "흐림" };
@@ -185,13 +187,14 @@ export async function forecastDemand(
     ? Promise.resolve(prefetch.search ?? null)
     : fetchSearchTrend(env).catch(() => null);
 
-  const [weather, holThis, holNext, tour, marine, search] = await Promise.all([
+  const [weather, holThis, holNext, tour, marine, search, alert] = await Promise.all([
     fetchWeekendWeather(key, nx, ny, sat, sun),
     fetchHolidays(holKey, sat.getUTCFullYear(), month),
     fetchHolidays(holKey, sun.getUTCFullYear(), sun.getUTCMonth() + 1),
     fetchTour(env as { DATA_GO_KR_KEY?: string }).catch(() => ({ available: false, festivals: [] as Array<{ title: string; start: string; end: string }> })),
     marineP,
     searchP,
+    fetchWeatherAlert(env).catch(() => null),
   ]);
   const holidays = [...holThis, ...holNext].filter((h, i, a) => a.findIndex((x) => x.date === h.date) === i);
 
@@ -266,6 +269,20 @@ export async function forecastDemand(
     if (e !== 0) factors.push({ label: "검색관심도", effect: e, detail: `전주 대비 ${d > 0 ? "+" : ""}${d}%` });
   }
 
+  // ⑧ 숙박 검색 관심도(선행 proxy — '태안 펜션/숙박' 검색). 예약률 대용. 직접 호출 시에만(프리페치엔 없음).
+  const lodging = (search as { lodging?: { latest: number; prev: number; deltaPct: number } | null } | null)?.lodging ?? null;
+  if (lodging && Number.isFinite(lodging.deltaPct)) {
+    const d = lodging.deltaPct;
+    let e = 0;
+    if (d >= 30) e = 6; else if (d >= 15) e = 3; else if (d <= -30) e = -5; else if (d <= -15) e = -3;
+    if (e !== 0) factors.push({ label: "숙박관심도", effect: e, detail: `펜션·숙박 검색 전주 대비 ${d > 0 ? "+" : ""}${d}%` });
+  }
+
+  // ⑨ 기상특보(급감 신호) — 태풍·호우·풍랑·폭염 등 발효 시 관광 급감. 현재 발효 특보 기준.
+  if (alert && alert.active && alert.penalty < 0) {
+    factors.push({ label: "기상특보", effect: alert.penalty, detail: alert.label });
+  }
+
   const index = clamp(factors.reduce((s, f) => s + f.effect, 0));
   const level = levelOf(index);
   const wTxt = best.note;
@@ -279,6 +296,7 @@ export async function forecastDemand(
     weekend: { sat: satIso, sun: sunIso },
     index, level, headline, factors,
     weather,
+    lodging,
     festivals: taeanFests.length
       ? taeanFests.map((f) => ({ title: f.name, start: `${sat.getUTCFullYear()}-${String(f.from[0]).padStart(2, "0")}-${String(f.from[1]).padStart(2, "0")}`, end: `${sat.getUTCFullYear()}-${String(f.to[0]).padStart(2, "0")}-${String(f.to[1]).padStart(2, "0")}` }))
       : fests.map((f) => ({ title: f.title, start: f.start, end: f.end })),
