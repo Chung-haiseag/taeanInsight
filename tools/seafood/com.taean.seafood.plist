@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- KAMIS 어패류 소매 시세 로컬 수집 자동화(macOS launchd). 매일 17:10 + 로그인 시 1회.
+     KAMIS 소매가는 하루 1회 갱신이라 일 1회면 충분. www.kamis.co.kr은 Worker가 못 닿아(HTTP전용+인증서오류) 로컬 수집 필요.
+     설치: cp tools/seafood/com.taean.seafood.plist ~/Library/LaunchAgents/
+           launchctl load ~/Library/LaunchAgents/com.taean.seafood.plist
+     해제: launchctl unload ~/Library/LaunchAgents/com.taean.seafood.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.taean.seafood</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Applications/taean/tools/seafood/run-seafood.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>17</integer>
+    <key>Minute</key>
+    <integer>10</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Applications/taean/tools/seafood/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Applications/taean/tools/seafood/launchd.err.log</string>
+</dict>
+</plist>

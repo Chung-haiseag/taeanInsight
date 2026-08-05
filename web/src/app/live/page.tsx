@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
@@ -28,7 +28,7 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
   const latest = await fetchLatestReport();
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, festivals, weatherAlert] = await Promise.all([
+  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -36,6 +36,7 @@ export default async function LivePage() {
     latest ? fetchWeeklyNews(latest.weekId) : Promise.resolve([]),
     fetchTvNews(8),
     getAgriPrices(),
+    getSeafood(),
     getFestivals(),
     getWeatherAlert(),
   ]);
@@ -95,6 +96,7 @@ export default async function LivePage() {
             <span className="accent-rule mt-3" aria-hidden />
             <RealEstatePanel re={metrics.realestate} compact />
             <AgriCard agri={agri} />
+            <SeafoodCard seafood={seafood} />
             <OilCard oil={metrics.oil} />
             <IndustryStructure />
           </section>

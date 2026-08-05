@@ -84,3 +84,6 @@ backend/audio/
 
 tools/traffic/.ex_key
 tools/traffic/traffic.log
+
+tools/seafood/.kamis_key
+tools/seafood/*.log
