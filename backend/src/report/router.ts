@@ -106,6 +106,8 @@ reportRouter.get("/summary", async (c) => {
       note: "출구(진출=도착 유입) 선행지표. 태안 단독 IC 실시간 미제공→권역 프록시" },
     { key: "mudflat", name: "갯벌 물때 적기 (KHOA 조석)", status: "live", granularity: "안흥·일별 5일",
       metric: "/api/conditions/mudflat", note: "조차(사리)+낮 간조로 갯벌 체험 적기·최적일 추천(/beaches)" },
+    { key: "fishing", name: "낚시 출조 지수 (배낚시·선상)", status: "live", granularity: "신진도·안흥 근해·3일",
+      metric: "/api/conditions/fishing", note: "안전(파고·풍속·풍랑특보 베토)×조과(물때·수온·제철어종)로 '언제 배 뜰까·뭐 잡힐까'. 기상청 단기예보 파고(WAV)·풍속+KHOA 조석+수온+특보, 전부 보유소스(새 키 불필요). 제철어종 큐레이션. /beaches" },
     { key: "agri", name: "농산물 도매 시세 (공영도매시장 경매)", status: "live", granularity: "품목별·일별",
       metric: "/api/conditions/agri", note: "마늘·생강·고추·감자·양파 전국 도매 낙찰가 중앙값(태안 주산지). data.go.kr 15141808, 우리 키" },
     { key: "industry", name: "태안 산업 구조", status: "live", granularity: "부문(농업·수산·관광·에너지)",

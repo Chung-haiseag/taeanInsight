@@ -76,7 +76,8 @@ function ymdPlus(base: Date, add: number): { ymd: string; iso: string; wd: strin
 }
 
 interface Item { predcDt?: string; extrSe?: string; predcTdlvVl?: string }
-async function fetchTideEvents(key: string, obsCode: string, ymd: string): Promise<TideEvent[]> {
+// KHOA 조석예보(고·저조 시각·조위). 낚시 지수(fishing.ts)에서도 재사용.
+export async function fetchTideEvents(key: string, obsCode: string, ymd: string): Promise<TideEvent[]> {
   const sp = new URLSearchParams({ serviceKey: key, type: "json", obsCode, reqDate: ymd, numOfRows: "20" });
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), 8000);
