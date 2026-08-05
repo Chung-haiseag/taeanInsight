@@ -265,6 +265,18 @@ export async function getSunset(): Promise<SunsetBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 제철 수산물 최적 타이밍 — 태안 대표 수산물 제철 달력 + 현재 경락가.
+export type PeakStatus = "성수기" | "제철임박" | "비성수기";
+export interface SeasonalItemView { name: string; emoji: string; status: PeakStatus; peakMonths: number[]; note: string; pricePerKg: number | null }
+export interface SeasonalBoardView { available: boolean; month: number; inSeason: SeasonalItemView[]; upcoming: SeasonalItemView[]; all: SeasonalItemView[] }
+export async function getSeasonal(): Promise<SeasonalBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/seasonal`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as SeasonalBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });

@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SunsetBoardView, SunsetGrade, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -699,6 +699,36 @@ export function AuctionCard({ auction }: { auction: AuctionBoardView | null }) {
         </table>
       </div>
       <p className="mt-2 text-[0.7rem] text-foreground-muted">해양수산부 위판장별 위탁판매 · 물량가중 평균 경락가. 서산·안면도수협 태안 위판장 · 위판 3~4일 후 반영.</p>
+    </div>
+  );
+}
+
+// 제철 수산물 최적 타이밍 — 태안 대표 수산물 제철 달력 + 현재 경락가. 관광객(식도락)·소비자용.
+export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null }) {
+  if (!seasonal || !seasonal.inSeason.length) return null;
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🗓️ 태안 제철 수산물</span>
+        <span className="text-[0.7rem] text-foreground-muted">{seasonal.month}월 제철</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {seasonal.inSeason.map((s) => (
+          <div key={s.name} className="rounded-xl bg-accent-subtle/20 p-3">
+            <p className="text-sm font-bold text-brand">{s.emoji} {s.name}</p>
+            <p className="mt-0.5 text-[0.7rem] text-foreground-muted">{s.note}</p>
+            {s.pricePerKg != null && (
+              <p className="mt-1 text-xs font-semibold tabular-nums text-brand">위판 {s.pricePerKg.toLocaleString()}<span className="text-[0.65rem] font-medium text-foreground-muted">원/kg</span></p>
+            )}
+          </div>
+        ))}
+      </div>
+      {seasonal.upcoming.length > 0 && (
+        <p className="mt-3 text-xs text-foreground-muted">
+          <span className="font-semibold text-brand">다가오는 제철</span> {seasonal.upcoming.map((s) => <span key={s.name} className="mr-1.5 inline-block">{s.emoji}{s.name}</span>)}
+        </p>
+      )}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</p>
     </div>
   );
 }
