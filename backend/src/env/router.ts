@@ -149,6 +149,10 @@ envRouter.get("/fishing", (c) =>
 envRouter.get("/sunset", (c) =>
   edgeCached(c, "sunset", 3600_000, () => import("../tour/sunset").then((m) => m.loadSunset(c.env))));
 
+// 제철 수산물 최적 타이밍 — 태안 대표 수산물 제철 달력 + 현재 경락가(위판 재사용). 관광객·소비자용.
+envRouter.get("/seasonal", (c) =>
+  edgeCached(c, "seasonal", 6 * 3600_000, () => import("../tour/seasonal").then((m) => m.loadSeasonal(c.env))));
+
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
 //   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.
 envRouter.get("/traffic", async (c) => {
