@@ -230,6 +230,17 @@ export async function getSeafood(): Promise<SeafoodBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 태안 위판장 경매가(경락가) — 사장님이 위판장에서 실제 받는 값(소매가와 짝). 해수부 위판 API.
+export interface FishAuctionView { fish: string; status: string; avgPricePerKg: number; totalKg: number; totalAmount: number; count: number }
+export interface AuctionBoardView { available: boolean; date: string | null; markets: string[]; totalAmount: number; fish: FishAuctionView[] }
+export async function getAuction(): Promise<AuctionBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/auction`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as AuctionBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });

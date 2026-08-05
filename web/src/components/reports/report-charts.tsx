@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -663,6 +663,42 @@ export function SeafoodCard({ seafood }: { seafood: SeafoodBoardView | null }) {
         })}
       </div>
       <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 소매 평균가(KAMIS) · 주간=1주일 전 대비. 태안 갯벌·연안 대표 어패류 참고가.</p>
+    </div>
+  );
+}
+
+// 태안 위판장 경매가(경락가) — 사장님이 산지 위판장에서 실제 받는 값. 소매가 카드와 짝(소비자 vs 산지).
+export function AuctionCard({ auction }: { auction: AuctionBoardView | null }) {
+  if (!auction || !auction.fish.length) return null;
+  const wt = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)}톤` : `${kg.toLocaleString()}kg`);
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🎣 태안 위판장 경매가</span>
+        <span className="text-[0.7rem] text-foreground-muted">산지 경락가 · {auction.date ? auction.date.slice(5) : ""}</span>
+      </div>
+      <p className="mt-1 text-[0.7rem] text-foreground-muted">{auction.markets.join(" · ")}{auction.totalAmount > 0 ? ` · 당일 위판 ${Math.round(auction.totalAmount / 10000).toLocaleString()}만원` : ""}</p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[0.7rem] text-foreground-muted">
+              <th className="pb-1.5 font-medium">어종</th>
+              <th className="pb-1.5 text-right font-medium">경락가</th>
+              <th className="pb-1.5 text-right font-medium">위판량</th>
+            </tr>
+          </thead>
+          <tbody>
+            {auction.fish.map((f) => (
+              <tr key={f.fish} className="border-t border-brand/10">
+                <td className="py-1.5 text-foreground">{f.fish}{f.status && f.status !== "없음" ? <span className="ml-1 text-[0.65rem] text-foreground-muted">{f.status}</span> : null}</td>
+                <td className="py-1.5 text-right font-bold tabular-nums text-brand">{f.avgPricePerKg.toLocaleString()}<span className="text-[0.65rem] font-medium text-foreground-muted">원/kg</span></td>
+                <td className="py-1.5 text-right tabular-nums text-foreground-muted">{wt(f.totalKg)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">해양수산부 위판장별 위탁판매 · 물량가중 평균 경락가. 서산·안면도수협 태안 위판장 · 위판 3~4일 후 반영.</p>
     </div>
   );
 }
