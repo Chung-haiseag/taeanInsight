@@ -145,6 +145,10 @@ envRouter.get("/mudflat", async (c) => {
 envRouter.get("/fishing", (c) =>
   edgeCached(c, "fishing", 3600_000, () => import("../tour/fishing").then((m) => m.loadFishing(c.env))));
 
+// 낙조(노을) 예보 — 태안 낙조 명소 "오늘 노을 예쁠까"(무료 유입). 하늘·습도·미세먼지·일몰로 3일 예측.
+envRouter.get("/sunset", (c) =>
+  edgeCached(c, "sunset", 3600_000, () => import("../tour/sunset").then((m) => m.loadSunset(c.env))));
+
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
 //   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.
 envRouter.get("/traffic", async (c) => {

@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SunsetBoardView, SunsetGrade, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -702,6 +702,51 @@ export function AuctionCard({ auction }: { auction: AuctionBoardView | null }) {
     </div>
   );
 }
+
+// 낙조(노을) 예보 — 태안 낙조 명소 "오늘 노을 예쁠까". 무료 유입·공유용.
+const SUNSET_STYLE: Record<SunsetGrade, { badge: string; emoji: string }> = {
+  "환상적": { badge: "bg-orange-500 text-background", emoji: "🌅" },
+  "좋음": { badge: "bg-amber-500 text-background", emoji: "🌇" },
+  "보통": { badge: "bg-brand/70 text-background", emoji: "🌤" },
+  "흐림": { badge: "bg-brand/40 text-background", emoji: "☁️" },
+  "기대난망": { badge: "bg-brand/30 text-background", emoji: "🌧" },
+};
+export function SunsetCard({ sunset }: { sunset: SunsetBoardView | null }) {
+  if (!sunset || !sunset.days.length) return null;
+  const today = sunset.days[0];
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-orange-200/50 bg-gradient-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-400/20 dark:from-orange-950/30 dark:to-amber-950/20">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">{SUNSET_STYLE[today.grade].emoji} 오늘의 낙조</span>
+        <span className="text-[0.7rem] text-foreground-muted">{sunset.spots.join(" · ")}</span>
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-4">
+        <div>
+          <span className={`inline-block rounded-full px-3 py-0.5 text-sm font-bold ${SUNSET_STYLE[today.grade].badge}`}>{today.grade}</span>
+          <p className="mt-1.5 text-xs text-foreground-muted">{today.reasons.join(" · ")}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-extrabold leading-none text-brand">{today.score}<span className="text-sm font-bold text-foreground-muted">/100</span></p>
+          {today.sunset && <p className="mt-1 text-xs text-foreground-muted">일몰 {today.sunset}</p>}
+        </div>
+      </div>
+      {sunset.days.length > 1 && (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {sunset.days.map((d) => (
+            <div key={d.date} className="rounded-lg bg-background/60 p-2 text-center">
+              <p className="text-[0.7rem] font-semibold text-brand">{fmtMd(d.date)}({d.weekday})</p>
+              <p className="mt-0.5 text-sm font-bold text-brand">{SUNSET_STYLE[d.grade].emoji} {d.grade}</p>
+              <p className="text-[0.65rem] text-foreground-muted">일몰 {d.sunset}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">하늘상태·습도·미세먼지·일몰시각 종합. 구름 적당·청명할수록 노을이 붉게 물듭니다.</p>
+    </div>
+  );
+}
+
+const fmtMd = (iso: string) => { const [, m, d] = iso.split("-"); return `${Number(m)}/${Number(d)}`; };
 
 export function OilCard({ oil }: { oil: OilPrices | null }) {
   if (!oil || (!oil.gasoline && !oil.diesel)) return null;

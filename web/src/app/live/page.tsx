@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getSunset, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, SunsetCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
@@ -28,7 +28,7 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
   const latest = await fetchLatestReport();
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, festivals, weatherAlert] = await Promise.all([
+  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, sunset, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -38,6 +38,7 @@ export default async function LivePage() {
     getAgriPrices(),
     getSeafood(),
     getAuction(),
+    getSunset(),
     getFestivals(),
     getWeatherAlert(),
   ]);
@@ -80,6 +81,7 @@ export default async function LivePage() {
             <h2 className="text-xl font-bold text-brand">바다·해변</h2>
             <span className="accent-rule mt-3" aria-hidden />
             <MarineCard marine={metrics.tourism.marine} />
+            <SunsetCard sunset={sunset} />
           </section>
 
           {/* 관광 */}
