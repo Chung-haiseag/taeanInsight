@@ -58,6 +58,14 @@ envRouter.get("/beaches", async (c) => {
   });
 });
 
+// 태안 축제·행사 캘린더 — 다가오는 축제(큐레이션). 수요 예측의 핵심 동인.
+envRouter.get("/festivals", async (c) => {
+  const { upcomingFestivals } = await import("../tour/festivals");
+  const now = new Date(Date.now() + 9 * 3600 * 1000);
+  const iso = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
+  return c.json({ available: true, festivals: upcomingFestivals(iso) });
+});
+
 // 태안 농산물 도매 시세 — 마늘·생강·고추 등 전국 도매시장 경매 평균가(농업 사장님 근거). 3h 캐시.
 envRouter.get("/agri", async (c) => {
   const now = Date.now();

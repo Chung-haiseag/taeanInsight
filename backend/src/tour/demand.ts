@@ -7,6 +7,7 @@
 import { fetchTour } from "../env/tour";
 import { loadMarine } from "./marine";
 import { fetchSearchTrend } from "../env/search_trend";
+import { festivalsOnWeekend, festivalBoost } from "./festivals";
 import { REGION } from "../region";
 
 const KMA_BASE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
@@ -217,14 +218,18 @@ export async function forecastDemand(
     factors.push({ label: "연휴", effect: 18, detail: adjacent.map((h) => h.name).join("·") + " 연휴" });
   }
 
-  // ⑤ 축제(주말과 기간 겹침 = 가산)
+  // ⑤ 축제(태안 큐레이션 캘린더 — TourAPI는 태안 0건이라 무용) — 주말 겹침 = 임팩트 가산
+  const taeanFests = festivalsOnWeekend(satIso, sunIso);
+  if (taeanFests.length) {
+    const eff = festivalBoost(taeanFests);
+    const hasBig = taeanFests.some((f) => f.impact === "대형");
+    factors.push({ label: "축제", effect: eff, detail: taeanFests.map((f) => f.name).join(", ") + (hasBig ? " (대형)" : "") });
+  }
+  // (TourAPI 축제는 관광지 표시용으로만 유지)
   const fests = (tour.festivals ?? []).filter((f) => {
     const s = f.start || "00000000", e = f.end || "99999999";
     return s <= ymd(sun) && e >= ymd(sat);
   }).slice(0, 5);
-  if (fests.length) {
-    factors.push({ label: "축제", effect: Math.min(15, 6 + fests.length * 3), detail: fests.map((f) => f.title).join(", ") });
-  }
 
   // ⑥ 바다 상태 — 해수욕지수(국립해양조사원) 우선, 없으면 수온 추정. + 파고 안전.
   const beachSeason = month >= 6 && month <= 9;
@@ -274,7 +279,9 @@ export async function forecastDemand(
     weekend: { sat: satIso, sun: sunIso },
     index, level, headline, factors,
     weather,
-    festivals: fests.map((f) => ({ title: f.title, start: f.start, end: f.end })),
+    festivals: taeanFests.length
+      ? taeanFests.map((f) => ({ title: f.name, start: `${sat.getUTCFullYear()}-${String(f.from[0]).padStart(2, "0")}-${String(f.from[1]).padStart(2, "0")}`, end: `${sat.getUTCFullYear()}-${String(f.to[0]).padStart(2, "0")}-${String(f.to[1]).padStart(2, "0")}` }))
+      : fests.map((f) => ({ title: f.title, start: f.start, end: f.end })),
     holidays: adjacent,
   };
 }

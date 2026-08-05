@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getFestivals } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, IndustryStructure,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, IndustryStructure, FestivalCalendar,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
@@ -28,7 +28,7 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
   const latest = await fetchLatestReport();
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri] = await Promise.all([
+  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, festivals] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -36,6 +36,7 @@ export default async function LivePage() {
     latest ? fetchWeeklyNews(latest.weekId) : Promise.resolve([]),
     fetchTvNews(8),
     getAgriPrices(),
+    getFestivals(),
   ]);
 
   return (
@@ -81,6 +82,7 @@ export default async function LivePage() {
             <h2 className="text-xl font-bold text-brand">관광·이벤트</h2>
             <span className="accent-rule mt-3" aria-hidden />
             <DemandGauge demand={metrics.tourism.demand} />
+            <FestivalCalendar festivals={festivals} />
             <FestivalList tour={metrics.tourism} />
           </section>
 

@@ -181,6 +181,21 @@ export interface MudflatBoardView { available: boolean; station: string; days: M
 // 태안 농산물 도매 시세 — 마늘·생강·고추 등 전국 도매시장 평균 낙찰가(농업 사장님).
 export interface CropPriceView { key: string; name: string; emoji: string; cat: "농산물" | "해조류"; wonPerKg: number | null; prevWonPerKg: number | null; deltaPct: number | null; count: number }
 export interface AgriBoardView { available: boolean; date: string | null; prevDate: string | null; crops: CropPriceView[] }
+
+// 태안 축제·행사 캘린더 — 수요 예측의 핵심 동인. 다가오는 축제.
+export interface FestivalView {
+  key: string; name: string; category: string; area: string;
+  from: [number, number]; to: [number, number];
+  impact: "대형" | "중형" | "소형"; exact2026?: boolean; nextStart: string;
+}
+export async function getFestivals(): Promise<FestivalView[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/festivals`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const d = (await res.json()) as { festivals?: FestivalView[] };
+    return d.festivals ?? [];
+  } catch { return []; }
+}
 export async function getAgriPrices(): Promise<AgriBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/agri`, { next: { revalidate: 3600 } });

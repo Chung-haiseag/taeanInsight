@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, FestivalView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -524,6 +524,33 @@ export function RealEstatePanel({ re, compact = false }: { re: ReportMetrics["re
 }
 
 // ── 충남 주유 평균가 (오피넷) ──
+// 태안 축제·행사 캘린더 — 다가오는 축제(수요 동인). 대형=강조.
+const FEST_STYLE: Record<string, string> = {
+  "대형": "bg-accent text-background", "중형": "bg-brand/70 text-background", "소형": "bg-brand/10 text-brand",
+};
+const mmdd = (iso: string) => { const [, m, d] = iso.split("-"); return `${Number(m)}/${Number(d)}`; };
+export function FestivalCalendar({ festivals }: { festivals: FestivalView[] }) {
+  if (!festivals.length) return null;
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🎪 다가오는 태안 축제</span>
+        <span className="text-[0.7rem] text-foreground-muted">수요 예측 반영</span>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {festivals.slice(0, 6).map((f) => (
+          <li key={f.key} className="flex items-center gap-2.5">
+            <span className="w-14 shrink-0 text-xs font-semibold tabular-nums text-foreground-muted">{mmdd(f.nextStart)}~{mmdd(`2026-${String(f.to[0]).padStart(2, "0")}-${String(f.to[1]).padStart(2, "0")}`)}</span>
+            <span className="flex-1 text-sm font-medium text-brand">{f.name}<span className="ml-1.5 text-[0.7rem] text-foreground-muted">{f.area}</span></span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${FEST_STYLE[f.impact]}`}>{f.impact}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">태안군 문화관광 큐레이션. 대형 축제(튤립·대하) 주말은 방문 급증 — 사장님 준비 필수.</p>
+    </div>
+  );
+}
+
 // 태안 산업 구조 — 큐레이션(통계청 지역내총생산·전국사업체조사). '태안은 관광만이 아니다'를
 //   실측 근거로 보여줌 → 사장님 멤버십이 농업·수산·관광 전 부문을 대상으로 하는 근거.
 const TAEAN_PILLARS = [

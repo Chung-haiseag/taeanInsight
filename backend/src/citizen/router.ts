@@ -19,6 +19,16 @@ citizenRouter.get("/reporters", (c) => {
   return c.json({ reporters: svc.reporters(), summary: svc.summary() });
 });
 
+// 2026 공개 모집 지원자 목록(신문 광고/QR 유입) — 관리자 선발용
+citizenRouter.get("/recruit", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ applicants: [], total: 0 });
+  const res = await db
+    .prepare("SELECT id, name, phone, email, region, age_group, interest, motivation, status, created_at FROM citizen_recruit ORDER BY id DESC LIMIT 300")
+    .all();
+  return c.json({ applicants: res.results ?? [], total: (res.results ?? []).length });
+});
+
 // 이번 달 정산 처리(이체 완료 표시)
 citizenRouter.post("/settlements/:reporterId/pay", (c) => {
   const updated = svc.paySettlement(c.req.param("reporterId"));

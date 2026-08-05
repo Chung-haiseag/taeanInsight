@@ -91,6 +91,8 @@ reportRouter.get("/summary", async (c) => {
       note: "예측 vs 실제 방문자 대조(≥4주 시 적중률 공개)" },
     { key: "beaches", name: "해수욕장 보드 (KHOA+기상청)", status: "live", granularity: "해수욕장별",
       metric: "/beaches 공개", note: "수온·파고·해수욕지수 종합 적합도 랭킹" },
+    { key: "festivals", name: "태안 축제·행사 캘린더 (큐레이션)", status: "live", granularity: "축제별·시기",
+      metric: "13개 축제", note: "TourAPI 태안 0건→큐레이션 대체. 수요 동인 반영(대형=튤립·대하). 방문자 실측 피크와 일치 검증. 매년 공식일정 갱신" },
     { key: "weather", name: "날씨 (기상청 단기예보)", status: "live", granularity: "태안 격자·주말",
       metric: (c.env as unknown as Record<string, unknown>).DATA_GO_KR_KEY ? "키 설정됨" : "키 없음", note: "수요지수 입력" },
     { key: "search", name: "검색 관심도 (네이버 데이터랩)", status: "live", granularity: "태안 키워드",
