@@ -33,7 +33,8 @@ export interface BeachMarine {
 const TAEAN_LAT = REGION.center.lat;
 const TAEAN_LON = REGION.center.lon;
 
-function sunTimes(y: number, m: number, d: number, lat: number, lonEast: number): { sunrise: string; sunset: string } | null {
+// 일출·일몰(KST "HH:MM"). 낙조 예보(sunset.ts)에서 며칠치 일몰에 재사용.
+export function sunTimes(y: number, m: number, d: number, lat: number, lonEast: number): { sunrise: string; sunset: string } | null {
   const rad = Math.PI / 180;
   // 그날 00:00 UTC의 율리우스적일(Julian Day)
   const a = Math.floor((14 - m) / 12), yy = y + 4800 - a, mm = m + 12 * a - 3;

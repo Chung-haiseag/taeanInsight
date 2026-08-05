@@ -253,6 +253,18 @@ export async function getFishing(): Promise<FishingBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 낙조(노을) 예보 — 태안 낙조 명소 3일. "오늘 노을 예쁠까".
+export type SunsetGrade = "환상적" | "좋음" | "보통" | "흐림" | "기대난망";
+export interface SunsetDayView { date: string; weekday: string; sunset: string | null; score: number; grade: SunsetGrade; reasons: string[]; sky: string | null }
+export interface SunsetBoardView { available: boolean; spots: string[]; days: SunsetDayView[]; best: SunsetDayView | null }
+export async function getSunset(): Promise<SunsetBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/sunset`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as SunsetBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });
