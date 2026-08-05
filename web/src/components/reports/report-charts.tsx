@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -631,7 +631,38 @@ export function AgriCard({ agri }: { agri: AgriBoardView | null }) {
           </div>
         );
       })}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 공영도매시장 경매 낙찰가 중앙값(신선 원물). 태안 주산지 농산물·해조류 참고가 · 어패류(우럭·꽃게)는 준비중.</p>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 공영도매시장 경매 낙찰가 중앙값(신선 원물). 태안 주산지 농산물·해조류 참고가 · 어패류는 아래 수산물 카드.</p>
+    </div>
+  );
+}
+
+// 어패류 소매 시세(KAMIS) — 태안 수산 사장님·주민용. 단위가 품목마다 달라(1kg·1마리·100g 등) 단위 병기.
+export function SeafoodCard({ seafood }: { seafood: SeafoodBoardView | null }) {
+  if (!seafood || !seafood.items.length) return null;
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🐟 태안 수산물 소매 시세</span>
+        <span className="text-[0.7rem] text-foreground-muted">KAMIS 소매가{seafood.date ? ` · ${seafood.date.slice(5)}` : ""}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {seafood.items.map((s) => {
+          const d = s.deltaPct;
+          return (
+            <div key={s.code} className="rounded-xl bg-brand/5 p-3">
+              <p className="text-xs text-foreground-muted">{s.emoji} {s.name}</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-brand">{s.price.toLocaleString()}<span className="text-xs font-medium">원</span></p>
+              <p className="text-[0.65rem] text-foreground-muted">/{s.unit}</p>
+              {d != null && (
+                <p className="mt-0.5 text-[0.7rem]" style={{ color: d > 0 ? "#dc2626" : d < 0 ? "#16a34a" : "#64748b" }}>
+                  주간 {d > 0 ? "▲" : d < 0 ? "▼" : "—"}{Math.abs(d)}%
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 소매 평균가(KAMIS) · 주간=1주일 전 대비. 태안 갯벌·연안 대표 어패류 참고가.</p>
     </div>
   );
 }

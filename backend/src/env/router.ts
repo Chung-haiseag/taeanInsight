@@ -82,6 +82,25 @@ envRouter.get("/agri", async (c) => {
   return c.json(data);
 });
 
+// 어패류 소매 시세(KAMIS) — D1 미러 서빙(로컬 크롤러가 KAMIS에서 적재). 수산 사장님·주민용.
+//   Worker는 KAMIS(www.kamis.co.kr) 직접 못 닿음(HTTP 전용+HTTPS 인증서 오류) → 교통량과 동일 미러 패턴.
+envRouter.get("/seafood", async (c) => {
+  const { loadSeafood } = await import("../tour/seafood");
+  return c.json(await loadSeafood(c.env));
+});
+
+// 로컬 크롤러(tools/seafood/refresh-seafood.mjs)가 KAMIS 어패류 소매가를 받아 적재. 공유 토큰(GOV_IMPORT_TOKEN).
+envRouter.post("/seafood/ingest", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const token = c.env.GOV_IMPORT_TOKEN;
+  if (!token || c.req.header("authorization") !== `Bearer ${token}`) return c.json({ error: "unauthorized" }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { date?: string; items?: unknown };
+  if (!body.date || !Array.isArray(body.items) || !body.items.length) return c.json({ error: "invalid_input" }, 400);
+  const { ingestSeafood } = await import("../tour/seafood");
+  const n = await ingestSeafood(c.env.ARCHIVE_DB, body.date, body.items as never);
+  return c.json({ ok: true, ingested: n });
+});
+
 // 갯벌 물때 적기 — 며칠간 조차·낮 간조로 '언제 갯벌 체험이 좋은가' 추천(KHOA 조석 재사용).
 envRouter.get("/mudflat", async (c) => {
   const { loadMudflat } = await import("../tour/mudflat");

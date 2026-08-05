@@ -219,6 +219,17 @@ export async function getAgriPrices(): Promise<AgriBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 어패류 소매 시세(KAMIS) — 태안 수산 사장님·주민용. 꽃게·바지락·전복·낙지·꼬막·새우·오징어·갈치.
+export interface SeafoodPriceView { code: string; name: string; emoji: string; kind: string; unit: string; price: number; prevPrice: number | null; deltaPct: number | null }
+export interface SeafoodBoardView { available: boolean; date: string | null; items: SeafoodPriceView[] }
+export async function getSeafood(): Promise<SeafoodBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/seafood`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as SeafoodBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });
