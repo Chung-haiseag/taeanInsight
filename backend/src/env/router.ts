@@ -16,8 +16,43 @@ let cache: { at: number; data: Conditions } | null = null;
 let tourCache: { at: number; data: TourInfo } | null = null;
 const TOUR_TTL_MS = 6 * 3600 * 1000; // 관광 정보는 자주 안 바뀜 — 6시간 캐시
 let demandCache: { at: number; data: DemandForecast } | null = null;
-let agriCache: { at: number; data: unknown } | null = null;
 const DEMAND_TTL_MS = 3 * 3600 * 1000; // 수요지수 — 예보 갱신 주기 고려 3시간 캐시
+
+// D1 기반 엣지 캐시 — 아이솔레이트 간 공유 + stale-while-revalidate.
+//   Cloudflare Cache API는 workers.dev에서 no-op이라 D1(kv_cache)로 지속. 외부 API 느린 엔드포인트
+//   (agri·auction·fishing)의 콜드 지연 제거: 신선하면 즉시, 오래되면 stale 즉시반환 + 백그라운드 갱신.
+//   과거 모듈변수 캐시는 아이솔레이트마다 비어 콜드마다 재계산(agri ≈7s → /live 병목)했음.
+async function edgeCached(
+  c: { env: Env; executionCtx: { waitUntil: (p: Promise<unknown>) => void } },
+  name: string,
+  freshMs: number,
+  produce: () => Promise<unknown>,
+): Promise<Response> {
+  const db = c.env.ARCHIVE_DB;
+  const jsonResp = (body: string) => new Response(body, { headers: { "content-type": "application/json; charset=utf-8" } });
+  const store = async (): Promise<string> => {
+    const data = await produce();
+    const body = JSON.stringify(data);
+    // available:false(일시 실패)는 캐시하지 않음 — 실패 상태 고정 방지.
+    if (db && (!data || (data as { available?: boolean }).available !== false)) {
+      try {
+        await db.prepare("INSERT INTO kv_cache (k,v,ts) VALUES (?1,?2,?3) ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts")
+          .bind(name, body, Date.now()).run();
+      } catch { /* 캐시 실패는 무시(응답은 정상) */ }
+    }
+    return body;
+  };
+  if (db) {
+    try {
+      const row = await db.prepare("SELECT v, ts FROM kv_cache WHERE k=?1").bind(name).first<{ v: string; ts: number }>();
+      if (row?.v) {
+        if (Date.now() - Number(row.ts) >= freshMs) c.executionCtx.waitUntil(store().catch(() => {})); // stale → 백그라운드 갱신
+        return jsonResp(row.v);
+      }
+    } catch { /* 조회 실패 → 직접 계산 */ }
+  }
+  return jsonResp(await store());
+}
 
 async function cached(env: Env): Promise<Conditions> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
@@ -73,14 +108,8 @@ envRouter.get("/festivals", async (c) => {
 });
 
 // 태안 농산물 도매 시세 — 마늘·생강·고추 등 전국 도매시장 경매 평균가(농업 사장님 근거). 3h 캐시.
-envRouter.get("/agri", async (c) => {
-  const now = Date.now();
-  if (agriCache && now - agriCache.at < 3 * 3600_000) return c.json(agriCache.data);
-  const { loadAgriPrices } = await import("../tour/agri");
-  const data = await loadAgriPrices(c.env);
-  if (data.available) agriCache = { at: now, data };
-  return c.json(data);
-});
+envRouter.get("/agri", (c) =>
+  edgeCached(c, "agri", 3 * 3600_000, () => import("../tour/agri").then((m) => m.loadAgriPrices(c.env))));
 
 // 어패류 소매 시세(KAMIS) — D1 미러 서빙(로컬 크롤러가 KAMIS에서 적재). 수산 사장님·주민용.
 //   Worker는 KAMIS(www.kamis.co.kr) 직접 못 닿음(HTTP 전용+HTTPS 인증서 오류) → 교통량과 동일 미러 패턴.
@@ -90,16 +119,9 @@ envRouter.get("/seafood", async (c) => {
 });
 
 // 태안 위판장 경매가(경락가) — 사장님이 위판장에서 실제 받는 값(소매가와 짝). 해수부 위판 API를 Worker가 직접 호출.
-//   전국 21k건/일 중 태안 조합(서산·안면도수협)만 필터·집계. 3~4일 지연이라 6시간 캐시.
-let auctionCache: { at: number; data: unknown } | null = null;
-envRouter.get("/auction", async (c) => {
-  const now = Date.now();
-  if (auctionCache && now - auctionCache.at < 6 * 3600_000) return c.json(auctionCache.data);
-  const { loadAuction } = await import("../tour/auction");
-  const data = await loadAuction(c.env);
-  if (data.available) auctionCache = { at: now, data };
-  return c.json(data);
-});
+//   전국 21k건/일 중 태안 조합(서산·안면도수협)만 필터·집계. 3~4일 지연이라 6시간 엣지 캐시.
+envRouter.get("/auction", (c) =>
+  edgeCached(c, "auction", 6 * 3600_000, () => import("../tour/auction").then((m) => m.loadAuction(c.env))));
 
 // 로컬 크롤러(tools/seafood/refresh-seafood.mjs)가 KAMIS 어패류 소매가를 받아 적재. 공유 토큰(GOV_IMPORT_TOKEN).
 envRouter.post("/seafood/ingest", async (c) => {
@@ -120,15 +142,8 @@ envRouter.get("/mudflat", async (c) => {
 });
 
 // 낚시 출조 지수(배낚시·선상) — 신진도·안흥 근해 3일. 안전(파고·풍속·특보)×조과(물때·수온·제철어종).
-let fishingCache: { at: number; data: unknown } | null = null;
-envRouter.get("/fishing", async (c) => {
-  const now = Date.now();
-  if (fishingCache && now - fishingCache.at < 3600_000) return c.json(fishingCache.data);
-  const { loadFishing } = await import("../tour/fishing");
-  const data = await loadFishing(c.env);
-  if (data.available) fishingCache = { at: now, data };
-  return c.json(data);
-});
+envRouter.get("/fishing", (c) =>
+  edgeCached(c, "fishing", 3600_000, () => import("../tour/fishing").then((m) => m.loadFishing(c.env))));
 
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
 //   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.

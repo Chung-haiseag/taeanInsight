@@ -18,8 +18,8 @@ export const metadata: Metadata = {
   openGraph: { title: "지금 태안 — 실시간 현황", description: "날씨·대기질·바다·물때·관광 수요를 한눈에", type: "website", locale: "ko_KR", siteName: "태안 인사이트" },
 };
 
-// 실시간성 위주 — 1분 ISR(metrics는 백엔드 스냅샷이 30분 주기로 신선)
-export const revalidate = 60;
+// 실시간성 위주 — 3분 ISR(metrics 스냅샷 30분·도매 일단위라 60초는 과함, 재생성 부하만 큼)
+export const revalidate = 180;
 
 function decodeEntities(s: string): string {
   return s.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#039;/g, "'");
