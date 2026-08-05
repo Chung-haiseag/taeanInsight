@@ -119,6 +119,17 @@ envRouter.get("/mudflat", async (c) => {
   return c.json(await loadMudflat(c.env));
 });
 
+// 낚시 출조 지수(배낚시·선상) — 신진도·안흥 근해 3일. 안전(파고·풍속·특보)×조과(물때·수온·제철어종).
+let fishingCache: { at: number; data: unknown } | null = null;
+envRouter.get("/fishing", async (c) => {
+  const now = Date.now();
+  if (fishingCache && now - fishingCache.at < 3600_000) return c.json(fishingCache.data);
+  const { loadFishing } = await import("../tour/fishing");
+  const data = await loadFishing(c.env);
+  if (data.available) fishingCache = { at: now, data };
+  return c.json(data);
+});
+
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
 //   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.
 envRouter.get("/traffic", async (c) => {

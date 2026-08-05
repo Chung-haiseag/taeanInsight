@@ -241,6 +241,18 @@ export async function getAuction(): Promise<AuctionBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 낚시 출조 지수(배낚시) — 신진도·안흥 근해 3일 예보.
+export type FishingGrade = "최적" | "좋음" | "보통" | "주의" | "출조자제";
+export interface FishingDayView { date: string; weekday: string; score: number; grade: FishingGrade; waveHeight: number | null; windSpeed: number | null; tideRange: number | null; reasons: string[]; species: string[]; highTides: string[]; lowTides: string[] }
+export interface FishingBoardView { available: boolean; spot: string; waterTemp: number | null; todaySpecies: string[]; days: FishingDayView[]; best: FishingDayView | null }
+export async function getFishing(): Promise<FishingBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/fishing`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as FishingBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });

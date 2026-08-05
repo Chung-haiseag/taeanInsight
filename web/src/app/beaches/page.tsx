@@ -2,10 +2,18 @@
 //   공개 페이지. 데이터: GET /api/conditions/beaches (loadMarine + rankBeaches).
 //   실시간 해양 관측/예보 기반 — 태안 관광의 본체인 '해변'을 지점 단위로 보여준다.
 
-import { getBeaches, getMudflat, type BeachScoreView, type MudflatDayView } from "@/lib/api/reports";
+import { getBeaches, getMudflat, getFishing, type BeachScoreView, type MudflatDayView, type FishingDayView, type FishingGrade } from "@/lib/api/reports";
 import { PageHeader } from "@/components/page-header";
 
 export const revalidate = 900;
+
+const FISHING_STYLE: Record<FishingGrade, { ring: string; badge: string }> = {
+  "최적": { ring: "border-accent bg-accent-subtle/25", badge: "bg-accent text-background" },
+  "좋음": { ring: "border-brand/20 bg-background", badge: "bg-brand text-background" },
+  "보통": { ring: "border-brand/15 bg-background", badge: "bg-brand/70 text-background" },
+  "주의": { ring: "border-amber-300 bg-amber-50", badge: "bg-amber-500 text-background" },
+  "출조자제": { ring: "border-red-200 bg-red-50", badge: "bg-red-500 text-background" },
+};
 
 const LEVEL_STYLE: Record<BeachScoreView["level"], { ring: string; badge: string; dot: string }> = {
   "최고": { ring: "border-accent bg-accent-subtle/25", badge: "bg-accent text-background", dot: "🟢" },
@@ -16,7 +24,7 @@ const LEVEL_STYLE: Record<BeachScoreView["level"], { ring: string; badge: string
 };
 
 export default async function BeachesPage() {
-  const [board, mudflat] = await Promise.all([getBeaches(), getMudflat()]);
+  const [board, mudflat, fishing] = await Promise.all([getBeaches(), getMudflat(), getFishing()]);
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-8">
@@ -24,7 +32,7 @@ export default async function BeachesPage() {
         align="center"
         eyebrow="BEACH BOARD"
         title="이번 주말, 태안 어느 해변?"
-        description={<><strong className="text-brand">해변별 해수욕 적합도</strong>(수온·파고·해수욕지수) + <strong className="text-brand">갯벌 물때 적기</strong> — 실시간 해양 데이터 기반.</>}
+        description={<><strong className="text-brand">해변별 해수욕 적합도</strong> + <strong className="text-brand">갯벌 물때</strong> + <strong className="text-brand">낚시 출조 지수</strong> — 실시간 해양 데이터 기반.</>}
       />
 
       {!board ? (
@@ -117,6 +125,55 @@ export default async function BeachesPage() {
             ))}
           </div>
           <p className="text-xs text-foreground-muted">조차가 클수록(사리) 갯벌이 많이 드러납니다. 물때는 빠르게 바뀌니 현장에서 밀물 시각을 꼭 확인하세요.</p>
+        </section>
+      )}
+
+      {fishing && fishing.days.length > 0 && (
+        <section className="space-y-4 pt-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-xl font-bold text-brand">🎣 낚시 출조 지수 <span className="text-sm font-medium text-foreground-muted">배낚시·선상</span></h2>
+            <span className="text-xs text-foreground-muted">{fishing.spot}{fishing.waterTemp != null && <> · 수온 {Math.round(fishing.waterTemp)}℃</>}</span>
+          </div>
+
+          {fishing.todaySpecies.length > 0 && (
+            <p className="text-sm text-foreground-muted">오늘의 제철 어종: {fishing.todaySpecies.map((s) => <span key={s} className="mr-1.5 inline-block rounded-full bg-brand/5 px-2 py-0.5 text-xs font-semibold text-brand">{s}</span>)}</p>
+          )}
+
+          {fishing.best && (
+            <div className="rounded-2xl border-2 border-accent bg-accent-subtle/25 p-5 shadow-card">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-accent">출조 추천일</p>
+              <div className="mt-1 flex items-end justify-between gap-4">
+                <p className="text-lg font-bold text-brand">{fmtMd(fishing.best.date)}({fishing.best.weekday}) · {fishing.best.reasons.join(" · ")}</p>
+                <p className="text-right text-3xl font-extrabold leading-none text-brand">{fishing.best.score}<span className="text-base font-bold text-foreground-muted">/100</span></p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {fishing.days.map((d: FishingDayView) => (
+              <div key={d.date} className={`rounded-2xl border p-4 shadow-card ${FISHING_STYLE[d.grade].ring}`}>
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-brand">{fmtMd(d.date)}<span className="text-foreground-muted">({d.weekday})</span></p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-extrabold text-brand">{d.score}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${FISHING_STYLE[d.grade].badge}`}>{d.grade}</span>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {d.waveHeight != null && <Chip label="파고" value={`${d.waveHeight.toFixed(1)}m`} />}
+                  {d.windSpeed != null && <Chip label="바람" value={`${Math.round(d.windSpeed)}m/s`} />}
+                  {d.tideRange != null && <Chip label="조차" value={`${d.tideRange.toFixed(1)}m`} />}
+                </div>
+                {d.highTides.length > 0 && (
+                  <p className="mt-2 text-[11px] text-foreground-muted">만조 {d.highTides.join(" · ")}{d.lowTides.length > 0 && <> · 간조 {d.lowTides.join(" · ")}</>}</p>
+                )}
+                {d.reasons.length > 0 && <p className="mt-1 text-[11px] text-foreground-muted">{d.reasons.join(" · ")}</p>}
+              </div>
+            ))}
+          </div>
+          <p className="rounded-xl border border-brand/10 bg-accent-subtle/15 px-4 py-3 text-center text-xs text-foreground-muted">
+            파고·풍속·물때·수온·제철어종을 종합한 규칙 점수(선상 기준)입니다. <strong className="text-brand">출항 전 풍랑특보·선장 안내</strong>를 반드시 확인하세요. 안전이 최우선입니다.
+          </p>
         </section>
       )}
     </div>
