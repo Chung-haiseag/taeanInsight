@@ -58,6 +58,12 @@ envRouter.get("/beaches", async (c) => {
   });
 });
 
+// 기상특보 — 태안(충남) 발효 특보. 관광 급감·안전 신호.
+envRouter.get("/weather-alert", async (c) => {
+  const { fetchWeatherAlert } = await import("../tour/weather_alert");
+  return c.json(await fetchWeatherAlert(c.env));
+});
+
 // 태안 축제·행사 캘린더 — 다가오는 축제(큐레이션). 수요 예측의 핵심 동인.
 envRouter.get("/festivals", async (c) => {
   const { upcomingFestivals } = await import("../tour/festivals");

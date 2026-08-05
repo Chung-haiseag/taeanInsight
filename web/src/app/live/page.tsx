@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getFestivals } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, IndustryStructure, FestivalCalendar,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
@@ -28,7 +28,7 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
   const latest = await fetchLatestReport();
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, festivals] = await Promise.all([
+  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -37,6 +37,7 @@ export default async function LivePage() {
     fetchTvNews(8),
     getAgriPrices(),
     getFestivals(),
+    getWeatherAlert(),
   ]);
 
   return (
@@ -47,6 +48,8 @@ export default async function LivePage() {
         description="실시간 날씨·대기질·바다·물때·관광 수요를 한 화면에."
         actions={<LiveClock />}
       />
+
+      <WeatherAlertBanner alert={weatherAlert} />
 
       {!metrics ? (
         <div className="mt-10 card p-8 text-center">
