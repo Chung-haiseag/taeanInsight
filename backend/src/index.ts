@@ -258,6 +258,14 @@ export default {
       } catch (e) {
         console.warn("[cron] 오너 준비 알림 실패:", e instanceof Error ? e.message : e);
       }
+      // "오늘의 태안" 일일 브리핑 — 매일 전 구독자에게(날씨·미세먼지·물때·축제·뉴스 한 줄). 유통·구독 습관형성.
+      try {
+        const { sendDailyBriefing } = await import("./notifications/daily_briefing");
+        const b = await sendDailyBriefing(env);
+        console.log(`[cron] 오늘의 태안 브리핑: 구독 ${b.subscribers}·발송 ${b.sent}${b.skipped ? ` (${b.skipped})` : ""}`);
+      } catch (e) {
+        console.warn("[cron] 오늘의 태안 브리핑 실패:", e instanceof Error ? e.message : e);
+      }
       return;
     }
 
