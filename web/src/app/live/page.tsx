@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getSeasonal, getSunset, getFog, getDust, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getSeasonal, getSunset, getFog, getDust, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
   DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, SeasonalCard, SunsetCard, FogCard, DustCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
+import { TodayBriefBanner } from "@/components/reports/today-brief-banner";
 import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
 import { PageHeader } from "@/components/page-header";
@@ -28,7 +29,7 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
   const latest = await fetchLatestReport();
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, seasonal, sunset, fog, dust, festivals, weatherAlert] = await Promise.all([
+  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, seasonal, sunset, fog, dust, todayBrief, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -42,6 +43,7 @@ export default async function LivePage() {
     getSunset(),
     getFog(),
     getDust(),
+    getTodayBrief(),
     getFestivals(),
     getWeatherAlert(),
   ]);
@@ -56,6 +58,7 @@ export default async function LivePage() {
       />
 
       <WeatherAlertBanner alert={weatherAlert} />
+      <TodayBriefBanner brief={todayBrief} vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
 
       {!metrics ? (
         <div className="mt-10 card p-8 text-center">

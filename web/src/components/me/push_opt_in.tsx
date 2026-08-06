@@ -13,9 +13,12 @@ type Status = "unknown" | "unsupported" | "default" | "granted" | "denied" | "su
 interface Props {
   vapidPublicKey?: string;
   onSubscribed?: (sub: PushSubscriptionJSON) => void;
+  label?: string;         // 미구독 상태 제목(기본: 적조·특보)
+  description?: string;    // 미구독 상태 설명
+  subscribedText?: string; // 구독 완료 안내
 }
 
-export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
+export function PushOptInButton({ vapidPublicKey, onSubscribed, label, description, subscribedText }: Props) {
   const [status, setStatus] = useState<Status>("unknown");
   const [error, setError] = useState<string | null>(null);
   const [testMsg, setTestMsg] = useState<string | null>(null);
@@ -114,7 +117,7 @@ export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
   if (status === "subscribed") {
     return (
       <div className="border border-accent/40 rounded p-3 bg-accent-subtle/40 text-sm text-brand flex items-center justify-between gap-3">
-        <span>✅ 알림이 활성화되었습니다. 매주 금요일 맞춤 브리핑·특보를 보내드려요.</span>
+        <span>{subscribedText ?? "✅ 알림이 활성화되었습니다. 매주 금요일 맞춤 브리핑·특보를 보내드려요."}</span>
         <button
           type="button"
           onClick={async () => {
@@ -135,9 +138,9 @@ export function PushOptInButton({ vapidPublicKey, onSubscribed }: Props) {
   return (
     <div className="border border-brand/15 rounded p-3 bg-background flex items-center justify-between gap-3">
       <div className="text-sm">
-        <p className="font-semibold text-brand">관심 지역 적조·특보 알림 받기</p>
+        <p className="font-semibold text-brand">{label ?? "관심 지역 적조·특보 알림 받기"}</p>
         <p className="text-xs text-foreground-muted">
-          무료. 사이트를 닫아둬도 알림이 옵니다. 언제든 끌 수 있어요.
+          {description ?? "무료. 사이트를 닫아둬도 알림이 옵니다. 언제든 끌 수 있어요."}
         </p>
       </div>
       <button
