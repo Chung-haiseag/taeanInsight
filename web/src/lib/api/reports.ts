@@ -277,6 +277,18 @@ export async function getSeasonal(): Promise<SeasonalBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 해무(바다안개) 예보 — 서해안 해무 위험도 3일(안전).
+export type FogGrade = "짙은 해무" | "해무 가능" | "옅은 안개" | "양호";
+export interface FogDayView { date: string; weekday: string; score: number; grade: FogGrade; reasons: string[]; reh: number | null; airTemp: number | null }
+export interface FogBoardView { available: boolean; waterTemp: number | null; days: FogDayView[]; worst: FogDayView | null }
+export async function getFog(): Promise<FogBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/fog`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as FogBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });

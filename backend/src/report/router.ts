@@ -108,6 +108,8 @@ reportRouter.get("/summary", async (c) => {
       metric: "/api/conditions/mudflat", note: "조차(사리)+낮 간조로 갯벌 체험 적기·최적일 추천(/beaches)" },
     { key: "fishing", name: "낚시 출조 지수 (배낚시·선상)", status: "live", granularity: "신진도·안흥 근해·3일",
       metric: "/api/conditions/fishing", note: "안전(파고·풍속·풍랑특보 베토)×조과(물때·수온·제철어종)로 '언제 배 뜰까·뭐 잡힐까'. 기상청 단기예보 파고(WAV)·풍속+KHOA 조석+수온+특보, 전부 보유소스(새 키 불필요). 제철어종 큐레이션. /beaches" },
+    { key: "fog", name: "해무(바다안개) 예보", status: "live", granularity: "태안·새벽~오전·3일",
+      metric: "/api/conditions/fog", note: "서해안 해무 위험도(통근·낚싯배·관광 가시거리 안전). 습도(지배)·기온-수온차(이류무)·풍속·풍향으로 예측→짙은해무~양호. 저습도 게이트. 기상청 단기예보(새벽 0600)+당일 수온, 새 키 불필요. 위험(≥40)일 때만 /live 카드 노출" },
     { key: "seasonal", name: "제철 수산물 최적 타이밍", status: "live", granularity: "어종·월별",
       metric: "/api/conditions/seasonal", note: "태안 대표 수산물(대하·꽃게·우럭·주꾸미·바지락·낙지·붕장어·전복·굴·감태 등) 제철 달력 + 위판 경락가 자동 오버레이. '이번 달 제철/다가오는 제철'. 관광객 식도락·소비자용. 큐레이션+auction 재사용, 새 키 불필요. /live 지역경제" },
     { key: "sunset", name: "낙조(노을) 예보", status: "live", granularity: "낙조명소·3일",
