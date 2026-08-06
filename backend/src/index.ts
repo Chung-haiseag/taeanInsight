@@ -48,7 +48,7 @@ app.use(
   "/api/*",
   cors({
     origin: (origin) =>
-      /^https?:\/\/(localhost(:\d+)?|.*\.workers\.dev|.*\.taeannews\.co\.kr)$/.test(origin)
+      /^https?:\/\/(localhost(:\d+)?|.*\.workers\.dev|.*\.taeannews\.co\.kr|(www\.)?axtaeannews\.co\.kr)$/.test(origin)
         ? origin
         : "",
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
