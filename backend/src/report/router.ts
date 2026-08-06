@@ -71,6 +71,10 @@ reportRouter.get("/summary", async (c) => {
     text1(db, "SELECT updated_at v FROM news_cache WHERE id=1"), // 뉴스 수집기 마지막 실행 시각(고장 vs 새글 없음 구분)
   ]);
 
+  // 일일 브리핑 푸시 — 구독자 수·어제(오늘) 발송 통계(구독 전환 관찰용)
+  const lastBriefing = await import("../notifications/daily_briefing").then((m) => m.getLastBriefingState(db)).catch(() => null);
+  const push = { subscribers: pushSubs ?? 0, lastBriefing };
+
   // 관광 분석 데이터 소스 현황 — 라이브 지표 + 상태 기록(정리·상설 기록).
   const [visitorRows, visitorFrom, visitorTo, demandTotal, demandFilled, trafficSnaps] = await Promise.all([
     scalar(db, "SELECT COUNT(*) n FROM tour_visitors WHERE signgu_code='44825'"),
@@ -151,6 +155,7 @@ reportRouter.get("/summary", async (c) => {
       pendingApplications, pushSubs, citizenArticles, govNotices, weeklyReports, envDays, reporters,
     },
     freshness: { latestArticle, latestRegional, latestEnv, lastCollected },
+    push,
     config,
     dataSources,
     generatedAt: new Date().toISOString(),
