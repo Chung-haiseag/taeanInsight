@@ -118,6 +118,8 @@ reportRouter.get("/summary", async (c) => {
       metric: "/api/conditions/bloom", note: "태안 꽃 관광(튤립·유채·목련·알리움·수국·해바라기·꽃무릇·억새·단풍·동백) 지금 상태(만개/개화중/절정지남)+만개 D-day. 낙조처럼 무료 바이럴 유입·축제 연동. 평년 개화창 큐레이션+날짜계산, 새 키 불필요. GDD 정밀보정은 향후. /live 관광" },
     { key: "fog", name: "해무(바다안개) 예보", status: "live", granularity: "태안·새벽~오전·3일",
       metric: "/api/conditions/fog", note: "서해안 해무 위험도(통근·낚싯배·관광 가시거리 안전). 습도(지배)·기온-수온차(이류무)·풍속·풍향으로 예측→짙은해무~양호. 저습도 게이트. 기상청 단기예보(새벽 0600)+당일 수온, 새 키 불필요. 위험(≥40)일 때만 /live 카드 노출" },
+    { key: "auctionForecast", name: "위판 물량·값 추세 예측", status: "live", granularity: "어종·주간 추세",
+      metric: "/api/conditions/auction-forecast", note: "최신 위판일 vs 약 1주 전 비교 → 어종별 물량·경락가 주간 변화·전망(값 강세/약세·물량 늘어 안정 등). 사장님·중매인·식당 사입. 위판 경매가(auction) 데이터를 예측으로 확장. Worker 직접, 새 키 불필요. 검증: 살오징어 값-18%물량+54%→약세" },
     { key: "seasonal", name: "제철 수산물 최적 타이밍", status: "live", granularity: "어종·월별",
       metric: "/api/conditions/seasonal", note: "태안 대표 수산물(대하·꽃게·우럭·주꾸미·바지락·낙지·붕장어·전복·굴·감태 등) 제철 달력 + 위판 경락가 자동 오버레이. '이번 달 제철/다가오는 제철'. 관광객 식도락·소비자용. 큐레이션+auction 재사용, 새 키 불필요. /live 지역경제" },
     { key: "sunset", name: "낙조(노을) 예보", status: "live", granularity: "낙조명소·3일",

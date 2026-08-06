@@ -241,6 +241,19 @@ export async function getAuction(): Promise<AuctionBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 위판 물량·값 추세 예측 — 최신 위판일 vs 약 1주 전. 어종별 전망(사장님·중매인).
+export type AuctionTone = "up" | "down" | "flat";
+export interface FishForecastView { fish: string; avgPricePerKg: number; totalKg: number; volPct: number | null; pricePct: number | null; label: string; tone: AuctionTone }
+export interface AuctionForecastView { available: boolean; date: string | null; prevDate: string | null; items: FishForecastView[] }
+export async function getAuctionForecast(): Promise<AuctionForecastView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/auction-forecast`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as AuctionForecastView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 낚시 출조 지수(배낚시) — 신진도·안흥 근해 3일 예보.
 export type FishingGrade = "최적" | "좋음" | "보통" | "주의" | "출조자제";
 export interface FishingDayView { date: string; weekday: string; score: number; grade: FishingGrade; waveHeight: number | null; windSpeed: number | null; tideRange: number | null; reasons: string[]; species: string[]; highTides: string[]; lowTides: string[] }

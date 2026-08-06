@@ -123,6 +123,10 @@ envRouter.get("/seafood", async (c) => {
 envRouter.get("/auction", (c) =>
   edgeCached(c, "auction", 6 * 3600_000, () => import("../tour/auction").then((m) => m.loadAuction(c.env))));
 
+// 위판 물량·값 추세 예측 — 최신 위판일 vs 약 1주 전 비교로 어종별 전망(사장님·중매인). 호출 많아 6h 엣지캐시.
+envRouter.get("/auction-forecast", (c) =>
+  edgeCached(c, "auction-forecast", 6 * 3600_000, () => import("../tour/auction_forecast").then((m) => m.loadAuctionForecast(c.env))));
+
 // 로컬 크롤러(tools/seafood/refresh-seafood.mjs)가 KAMIS 어패류 소매가를 받아 적재. 공유 토큰(GOV_IMPORT_TOKEN).
 envRouter.post("/seafood/ingest", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
