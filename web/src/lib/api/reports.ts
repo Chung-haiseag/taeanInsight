@@ -300,6 +300,19 @@ export async function getTodayBrief(): Promise<TodayBriefView | null> {
   } catch { return null; }
 }
 
+// 꽃·단풍 개화 예측 — 지금 볼 수 있는 꽃 + 다가오는 개화(만개 D-day).
+export type BloomStatus = "만개" | "개화중" | "절정지남" | "개화전" | "종료";
+export interface BloomItemView { name: string; emoji: string; kind: "꽃" | "단풍" | "억새"; place: string; note: string; status: BloomStatus; daysToPeak: number }
+export interface BloomBoardView { available: boolean; month: number; active: BloomItemView[]; upcoming: BloomItemView[] }
+export async function getBloom(): Promise<BloomBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/bloom`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as BloomBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 미세먼지 예보 — 충남(태안) PM10·PM2.5 오늘~모레 등급.
 export interface DustDayView { date: string; pm10: string | null; pm25: string | null; overall: string | null }
 export interface DustBoardView { available: boolean; city: string; days: DustDayView[] }

@@ -114,6 +114,8 @@ reportRouter.get("/summary", async (c) => {
       metric: "/api/conditions/fishing", note: "안전(파고·풍속·풍랑특보 베토)×조과(물때·수온·제철어종)로 '언제 배 뜰까·뭐 잡힐까'. 기상청 단기예보 파고(WAV)·풍속+KHOA 조석+수온+특보, 전부 보유소스(새 키 불필요). 제철어종 큐레이션. /beaches" },
     { key: "dust", name: "미세먼지 예보 (에어코리아)", status: "live", granularity: "충남·오늘~모레",
       metric: "/api/conditions/dust", note: "충남 PM10·PM2.5 예보 등급(좋음~매우나쁨). 태안화력 인접이라 주민 건강 관심. 현재 미세먼지(실시간)의 예보판. 에어코리아 대기질예보통보 API(기존 키). 간헐 SERVICETIMEOUT 재시도. /live 날씨·대기질" },
+    { key: "bloom", name: "꽃·단풍 개화 예측", status: "live", granularity: "꽃/단풍 12종·상태·D-day",
+      metric: "/api/conditions/bloom", note: "태안 꽃 관광(튤립·유채·목련·알리움·수국·해바라기·꽃무릇·억새·단풍·동백) 지금 상태(만개/개화중/절정지남)+만개 D-day. 낙조처럼 무료 바이럴 유입·축제 연동. 평년 개화창 큐레이션+날짜계산, 새 키 불필요. GDD 정밀보정은 향후. /live 관광" },
     { key: "fog", name: "해무(바다안개) 예보", status: "live", granularity: "태안·새벽~오전·3일",
       metric: "/api/conditions/fog", note: "서해안 해무 위험도(통근·낚싯배·관광 가시거리 안전). 습도(지배)·기온-수온차(이류무)·풍속·풍향으로 예측→짙은해무~양호. 저습도 게이트. 기상청 단기예보(새벽 0600)+당일 수온, 새 키 불필요. 위험(≥40)일 때만 /live 카드 노출" },
     { key: "seasonal", name: "제철 수산물 최적 타이밍", status: "live", granularity: "어종·월별",

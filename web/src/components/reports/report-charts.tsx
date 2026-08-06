@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -699,6 +699,43 @@ export function AuctionCard({ auction }: { auction: AuctionBoardView | null }) {
         </table>
       </div>
       <p className="mt-2 text-[0.7rem] text-foreground-muted">해양수산부 위판장별 위탁판매 · 물량가중 평균 경락가. 서산·안면도수협 태안 위판장 · 위판 3~4일 후 반영.</p>
+    </div>
+  );
+}
+
+// 꽃·단풍 개화 예측 — 태안 꽃 관광 "지금 뭐가 피었나 · 만개 D-며칠". 무료 유입·나들이 계획용.
+const BLOOM_BADGE: Record<BloomStatus, string> = {
+  "만개": "bg-pink-500 text-white", "개화중": "bg-accent text-background", "절정지남": "bg-amber-500 text-white",
+  "개화전": "bg-brand/50 text-background", "종료": "bg-brand/30 text-background",
+};
+export function BloomCard({ bloom }: { bloom: BloomBoardView | null }) {
+  if (!bloom || (!bloom.active.length && !bloom.upcoming.length)) return null;
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200/50 bg-gradient-to-br from-pink-50 to-rose-50 p-4 dark:border-pink-400/20 dark:from-pink-950/20 dark:to-rose-950/15">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🌷 태안 꽃·단풍 개화</span>
+        <span className="text-[0.7rem] text-foreground-muted">지금 & 다가오는 개화</span>
+      </div>
+      {bloom.active.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {bloom.active.map((b) => (
+            <div key={b.name} className="rounded-xl bg-background/60 p-2.5">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-sm font-bold text-brand">{b.emoji} {b.name}</span>
+                <span className={`rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold ${BLOOM_BADGE[b.status]}`}>{b.status}</span>
+              </div>
+              <p className="mt-0.5 text-[0.65rem] text-foreground-muted">{b.place}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {bloom.upcoming.length > 0 && (
+        <p className="mt-3 text-xs text-foreground-muted">
+          <span className="font-semibold text-brand">다가오는 개화</span>{" "}
+          {bloom.upcoming.map((b) => <span key={b.name} className="mr-2 inline-block">{b.emoji}{b.name} <strong className="text-brand">만개 D-{b.daysToPeak}</strong></span>)}
+        </p>
+      )}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">평년 개화창 기준 · 그해 기온에 따라 며칠 이동. 나들이 전 현장 개화 상황도 확인하세요.</p>
     </div>
   );
 }

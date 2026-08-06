@@ -161,6 +161,12 @@ envRouter.get("/fog", (c) =>
 envRouter.get("/dust", (c) =>
   edgeCached(c, "dust", 3 * 3600_000, () => import("../tour/dust").then((m) => m.loadDustForecast(c.env))));
 
+// 꽃·단풍 개화 예측 — 태안 꽃 관광(튤립·유채·단풍 등) 지금 상태·만개 D-day. 계산만(외부호출 없음).
+envRouter.get("/bloom", async (c) => {
+  const { loadBloom } = await import("../tour/bloom");
+  return c.json(loadBloom());
+});
+
 // "오늘의 태안" 한 줄 브리핑 — 매일 아침 Web Push로도 발송(cron). 미리보기 겸 공개 표시용.
 envRouter.get("/today-brief", (c) =>
   edgeCached(c, "today-brief", 1800_000, () => import("../notifications/daily_briefing").then((m) => m.buildDailyBriefing(c.env).then((b) => (b ? { available: true, ...b } : { available: false })))));
