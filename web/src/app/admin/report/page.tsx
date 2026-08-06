@@ -294,7 +294,7 @@ function TechOverview() {
 }
 
 // ── ② 운영 정보 ────────────────────────────────────────────────
-const APP_URL = "https://taean-insight.chs9182.workers.dev";
+const APP_URL = "https://axtaeannews.co.kr";
 const API_URL = "https://taean-insight-api.chs9182.workers.dev";
 
 const SECRETS = [

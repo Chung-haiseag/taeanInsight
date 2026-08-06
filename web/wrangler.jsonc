@@ -1,6 +1,12 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "taean-insight",
+  // 커스텀 도메인 — axtaeannews.co.kr(가가도메인 등록·Cloudflare 존, 2026-08-06). root+www 모두 이 웹 Worker로.
+  "routes": [
+    { "pattern": "axtaeannews.co.kr", "custom_domain": true },
+    { "pattern": "www.axtaeannews.co.kr", "custom_domain": true }
+  ],
+  "workers_dev": true, // 기존 taean-insight.chs9182.workers.dev도 유지(전환 중 폴백)
   "compatibility_date": "2026-05-27",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "main": ".open-next/worker.js",
