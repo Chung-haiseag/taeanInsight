@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -805,6 +805,52 @@ export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null 
         </p>
       )}
       <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</p>
+    </div>
+  );
+}
+
+// 산불위험 지수 — 건조기 위험할 때만 노출(높음/매우높음). 공공안전.
+export function FireRiskCard({ fire }: { fire: FireBoardView | null }) {
+  if (!fire || (fire.level !== "높음" && fire.level !== "매우높음")) return null;
+  const red = fire.level === "매우높음";
+  return (
+    <div className={`mt-4 rounded-2xl border p-4 ${red ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🔥 산불위험 {fire.level}</span>
+        <span className="text-[0.7rem] text-foreground-muted">건조기 안전</span>
+      </div>
+      {fire.reasons.length > 0 && <p className="mt-1.5 text-xs text-foreground-muted">{fire.reasons.join(" · ")}</p>}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">건조·강풍으로 산불 확산 위험이 높습니다. 논밭두렁·쓰레기 소각 금지, 입산 시 화기 주의.</p>
+    </div>
+  );
+}
+
+// 영농 경보 — 서리·한파·폭염 + 이번 달 농사 적기. 경보/할일 있을 때만 노출.
+export function FarmCard({ farm }: { farm: FarmBoardView | null }) {
+  if (!farm || (!farm.alerts.length && !farm.tasks.length)) return null;
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🌾 영농 정보 <span className="text-xs font-medium text-foreground-muted">{farm.month}월</span></span>
+      </div>
+      {farm.alerts.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {farm.alerts.map((a) => (
+            <p key={a.kind} className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-foreground dark:bg-amber-950/20">⚠️ {a.text}</p>
+          ))}
+        </div>
+      )}
+      {farm.tasks.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {farm.tasks.map((t, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-full border border-brand/15 bg-brand/5 px-2.5 py-1 text-xs">
+              <span>{t.emoji} {t.crop}</span>
+              <span className="font-semibold text-brand">{t.task}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 주요작물 파종·수확 적기 + 기상 위험. 지역 농업기술센터 지침도 확인하세요.</p>
     </div>
   );
 }

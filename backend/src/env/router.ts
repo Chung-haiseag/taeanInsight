@@ -171,6 +171,14 @@ envRouter.get("/bloom", async (c) => {
   return c.json(loadBloom());
 });
 
+// 산불위험 지수 — 봄·가을 건조기 안전(건조특보·습도·풍속·계절). 위험할 때만 노출.
+envRouter.get("/fire-risk", (c) =>
+  edgeCached(c, "fire-risk", 3600_000, () => import("../tour/fire_risk").then((m) => m.loadFireRisk(c.env))));
+
+// 영농 경보 — 서리·한파·폭염 + 이번 달 농사 적기(파종/수확). 농업 사장님·주민.
+envRouter.get("/farm", (c) =>
+  edgeCached(c, "farm", 3600_000, () => import("../tour/farm").then((m) => m.loadFarm(c.env))));
+
 // "오늘의 태안" 한 줄 브리핑 — 매일 아침 Web Push로도 발송(cron). 미리보기 겸 공개 표시용.
 envRouter.get("/today-brief", (c) =>
   edgeCached(c, "today-brief", 1800_000, () => import("../notifications/daily_briefing").then((m) => m.buildDailyBriefing(c.env).then((b) => (b ? { available: true, ...b } : { available: false })))));

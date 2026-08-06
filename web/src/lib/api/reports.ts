@@ -326,6 +326,30 @@ export async function getBloom(): Promise<BloomBoardView | null> {
   } catch { return null; }
 }
 
+// 산불위험 지수 — 건조기 안전. 위험할 때만 노출.
+export type FireLevel = "낮음" | "보통" | "높음" | "매우높음";
+export interface FireBoardView { available: boolean; score: number; level: FireLevel; reasons: string[] }
+export async function getFireRisk(): Promise<FireBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/fire-risk`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as FireBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+// 영농 경보 — 서리·한파·폭염 + 이번 달 농사 적기.
+export interface FarmAlertView { kind: "서리" | "한파" | "폭염"; text: string }
+export interface FarmTaskView { crop: string; emoji: string; task: "파종 적기" | "수확 적기" }
+export interface FarmBoardView { available: boolean; month: number; alerts: FarmAlertView[]; tasks: FarmTaskView[] }
+export async function getFarm(): Promise<FarmBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/farm`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as FarmBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 미세먼지 예보 — 충남(태안) PM10·PM2.5 오늘~모레 등급.
 export interface DustDayView { date: string; pm10: string | null; pm25: string | null; overall: string | null }
 export interface DustBoardView { available: boolean; city: string; days: DustDayView[] }
