@@ -289,6 +289,17 @@ export async function getFog(): Promise<FogBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 미세먼지 예보 — 충남(태안) PM10·PM2.5 오늘~모레 등급.
+export interface DustDayView { date: string; pm10: string | null; pm25: string | null; overall: string | null }
+export interface DustBoardView { available: boolean; city: string; days: DustDayView[] }
+export async function getDust(): Promise<DustBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/dust`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as DustBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });

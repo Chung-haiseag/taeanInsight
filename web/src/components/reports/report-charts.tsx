@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -729,6 +729,48 @@ export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null 
         </p>
       )}
       <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</p>
+    </div>
+  );
+}
+
+// 미세먼지 예보 — 충남(태안) PM10·PM2.5 오늘~모레 등급. 태안화력 인접·주민 건강.
+const DUST_COLOR: Record<string, string> = {
+  "좋음": "#2563eb", "보통": "#16a34a", "나쁨": "#f59e0b", "매우나쁨": "#dc2626",
+};
+function DustPill({ grade }: { grade: string | null }) {
+  if (!grade) return <span className="text-foreground-muted">—</span>;
+  return <span className="rounded-full px-2 py-0.5 text-[0.7rem] font-bold text-white" style={{ backgroundColor: DUST_COLOR[grade] ?? "#64748b" }}>{grade}</span>;
+}
+export function DustCard({ dust }: { dust: DustBoardView | null }) {
+  if (!dust || !dust.days.length) return null;
+  const label = (i: number) => (i === 0 ? "오늘" : i === 1 ? "내일" : "모레");
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🌫️ 미세먼지 예보</span>
+        <span className="text-[0.7rem] text-foreground-muted">{dust.city} · 에어코리아</span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[0.7rem] text-foreground-muted">
+              <th className="pb-1.5 font-medium">구분</th>
+              {dust.days.map((d, i) => <th key={d.date} className="pb-1.5 text-center font-medium">{label(i)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-brand/10">
+              <td className="py-1.5 text-foreground-muted">미세먼지(PM10)</td>
+              {dust.days.map((d) => <td key={d.date} className="py-1.5 text-center"><DustPill grade={d.pm10} /></td>)}
+            </tr>
+            <tr className="border-t border-brand/10">
+              <td className="py-1.5 text-foreground-muted">초미세(PM2.5)</td>
+              {dust.days.map((d) => <td key={d.date} className="py-1.5 text-center"><DustPill grade={d.pm25} /></td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {dust.days[0]?.overall && <p className="mt-2 text-[0.7rem] text-foreground-muted">{dust.days[0].overall}</p>}
     </div>
   );
 }
