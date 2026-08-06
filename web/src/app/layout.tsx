@@ -23,7 +23,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://insight.taeannews.co.kr"),
+  metadataBase: new URL("https://axtaeannews.co.kr"),
   title: {
     default: "태안 인사이트 | 태안신문",
     template: "%s | 태안 인사이트",
