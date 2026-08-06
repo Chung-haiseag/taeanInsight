@@ -161,6 +161,10 @@ envRouter.get("/fog", (c) =>
 envRouter.get("/dust", (c) =>
   edgeCached(c, "dust", 3 * 3600_000, () => import("../tour/dust").then((m) => m.loadDustForecast(c.env))));
 
+// "오늘의 태안" 한 줄 브리핑 — 매일 아침 Web Push로도 발송(cron). 미리보기 겸 공개 표시용.
+envRouter.get("/today-brief", (c) =>
+  edgeCached(c, "today-brief", 1800_000, () => import("../notifications/daily_briefing").then((m) => m.buildDailyBriefing(c.env).then((b) => (b ? { available: true, ...b } : { available: false })))));
+
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
 //   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.
 envRouter.get("/traffic", async (c) => {
