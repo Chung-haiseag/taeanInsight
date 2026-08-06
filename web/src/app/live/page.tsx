@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getAuctionForecast, getSeasonal, getSunset, getFog, getDust, getBloom, getFireRisk, getFarm, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getAuctionForecast, getSeasonal, getSunset, getFog, getDust, getBloom, getFireRisk, getFarm, getAqua, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, AuctionForecastCard, SeasonalCard, SunsetCard, FogCard, DustCard, BloomCard, FireRiskCard, FarmCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, AuctionForecastCard, SeasonalCard, SunsetCard, FogCard, DustCard, BloomCard, FireRiskCard, FarmCard, AquaCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
 import { TodayBriefBanner } from "@/components/reports/today-brief-banner";
 import { CctvPlayer } from "@/components/reports/cctv-player";
@@ -29,7 +29,7 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
   const latest = await fetchLatestReport();
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, auctionForecast, seasonal, sunset, fog, dust, bloom, fireRisk, farm, todayBrief, festivals, weatherAlert] = await Promise.all([
+  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, auctionForecast, seasonal, sunset, fog, dust, bloom, fireRisk, farm, aqua, todayBrief, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -47,6 +47,7 @@ export default async function LivePage() {
     getBloom(),
     getFireRisk(),
     getFarm(),
+    getAqua(),
     getTodayBrief(),
     getFestivals(),
     getWeatherAlert(),
@@ -114,6 +115,7 @@ export default async function LivePage() {
             <RealEstatePanel re={metrics.realestate} compact />
             <AgriCard agri={agri} />
             <FarmCard farm={farm} />
+            <AquaCard aqua={aqua} />
             <SeafoodCard seafood={seafood} />
             <AuctionCard auction={auction} />
             <AuctionForecastCard forecast={auctionForecast} />

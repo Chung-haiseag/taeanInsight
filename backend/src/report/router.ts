@@ -136,6 +136,8 @@ reportRouter.get("/summary", async (c) => {
       metric: "/api/conditions/seafood · 8품목", note: "꽃게·바지락·전복·낙지·꼬막·새우·오징어·갈치 소매가+주간등락(KAMIS 부류600). Worker가 KAMIS 직접 못 닿아(HTTP전용+인증서오류) 로컬 크롤러→D1 미러(교통량 패턴). 해조류(미역·다시마)는 별도 농수산물 카드. ※우럭=조피볼락은 KAMIS 소매목록 없음" },
     { key: "auction", name: "태안 위판장 경매가 (산지 경락가)", status: "live", granularity: "위판장·어종별·일별",
       metric: "/api/conditions/auction", note: "사장님이 위판장에서 실제 받는 경락가(소매가와 짝). 해수부 위판장별 위탁판매(apis.data.go.kr/1192000, 활용신청 완료)를 Worker 직접 호출→서산·안면도수협 태안 위판장(안흥·모항·채석포·백사장·영목)만 필터. 어종별 물량가중 평균 경락가+위판량. 위판 3~4일 후 반영, 6h 캐시" },
+    { key: "aqua", name: "양식 수온 경보 (고수온·저수온)", status: "progress", granularity: "표층수온·조건부",
+      metric: "/api/conditions/aqua", note: "양식 어가 폐사 조기경보(우럭·전복·굴). 고수온 관심27·주의28·경보29 / 저수온 냉수대. 위험할 때만 노출. ⚠️임시=표층 수온(KHOA) 근사. 용존산소(빈산소)·양식장 실측은 실시간어장정보(15058376) 활용신청 후 정식화 예정. 현재 새 키 없이 가동" },
     { key: "consumption", name: "관광소비·수요강도·다양성 (카드)", status: "parked", granularity: "시군구·월별",
       metric: null, note: "승인됐으나 전 조회 빈 응답(미적재). 파생지표라 보류" },
     { key: "attractions", name: "관광지점 입장객 (문화관광연구원)", status: "rejected", granularity: "지점별·월별",

@@ -326,6 +326,18 @@ export async function getBloom(): Promise<BloomBoardView | null> {
   } catch { return null; }
 }
 
+// 양식 수온 경보(고수온·저수온) — 양식 어가 폐사 조기경보. 위험할 때만 노출.
+export type AquaLevel = "정상" | "관심" | "주의" | "경보";
+export interface AquaBoardView { available: boolean; waterTemp: number | null; level: AquaLevel; label: string | null; note: string | null }
+export async function getAqua(): Promise<AquaBoardView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/aqua`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as AquaBoardView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 산불위험 지수 — 건조기 안전. 위험할 때만 노출.
 export type FireLevel = "낮음" | "보통" | "높음" | "매우높음";
 export interface FireBoardView { available: boolean; score: number; level: FireLevel; reasons: string[] }
