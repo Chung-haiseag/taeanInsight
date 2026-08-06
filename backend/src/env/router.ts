@@ -157,6 +157,10 @@ envRouter.get("/seasonal", (c) =>
 envRouter.get("/fog", (c) =>
   edgeCached(c, "fog", 3600_000, () => import("../tour/fog").then((m) => m.loadFog(c.env))));
 
+// 미세먼지 예보 — 충남(태안) PM10·PM2.5 오늘~모레 예보 등급(태안화력 인접, 주민 건강). 에어코리아 예보 API.
+envRouter.get("/dust", (c) =>
+  edgeCached(c, "dust", 3 * 3600_000, () => import("../tour/dust").then((m) => m.loadDustForecast(c.env))));
+
 // 충남 고속도로 유입 교통량(대전충남본부) — D1 미러 서빙(로컬 크롤러가 도로공사에서 적재).
 //   data.ex.co.kr은 Worker에서 못 닿아(타임아웃) ITS CCTV와 동일하게 로컬→ingest→D1 방식.
 envRouter.get("/traffic", async (c) => {
