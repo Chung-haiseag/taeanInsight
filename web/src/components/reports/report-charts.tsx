@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -729,6 +729,36 @@ export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null 
         </p>
       )}
       <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</p>
+    </div>
+  );
+}
+
+// 해무(바다안개) 예보 — 위험 있을 때만 표시(양호면 숨김). 통근·낚싯배·관광 안전.
+const FOG_STYLE: Record<FogGrade, { ring: string; badge: string; emoji: string }> = {
+  "짙은 해무": { ring: "border-red-300 bg-red-50 dark:bg-red-950/20", badge: "bg-red-500 text-background", emoji: "🌫️" },
+  "해무 가능": { ring: "border-amber-300 bg-amber-50 dark:bg-amber-950/20", badge: "bg-amber-500 text-background", emoji: "🌁" },
+  "옅은 안개": { ring: "border-brand/15 bg-background", badge: "bg-brand/60 text-background", emoji: "🌁" },
+  "양호": { ring: "border-brand/15 bg-background", badge: "bg-brand/50 text-background", emoji: "☀️" },
+};
+export function FogCard({ fog }: { fog: FogBoardView | null }) {
+  // 앞으로 3일 해무 위험이 없으면(전부 양호/옅음) 표시하지 않음 — 뜨면 곧 주의 신호.
+  if (!fog || !fog.worst || fog.worst.score < 40) return null;
+  return (
+    <div className={`mt-4 rounded-2xl border p-4 ${FOG_STYLE[fog.worst.grade].ring}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">{FOG_STYLE[fog.worst.grade].emoji} 해무(바다안개) 주의</span>
+        <span className="text-[0.7rem] text-foreground-muted">가시거리·안전 · 새벽~오전</span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {fog.days.map((d) => (
+          <div key={d.date} className="rounded-lg bg-background/60 p-2 text-center">
+            <p className="text-[0.7rem] font-semibold text-brand">{fmtMd(d.date)}({d.weekday})</p>
+            <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[0.7rem] font-bold ${FOG_STYLE[d.grade].badge}`}>{d.grade}</span>
+            {d.reh != null && <p className="mt-0.5 text-[0.65rem] text-foreground-muted">습도 {d.reh}%</p>}
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">습도·기온-수온차·풍속 종합 예측. 해무 시 도로·항해 가시거리 급감 — 서행·출항 확인 필수.</p>
     </div>
   );
 }
