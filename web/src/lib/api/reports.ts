@@ -289,6 +289,17 @@ export async function getFog(): Promise<FogBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// "오늘의 태안" 한 줄 브리핑 — 매일 아침 Web Push로도 발송. 배너 표시용.
+export interface TodayBriefView { title: string; body: string }
+export async function getTodayBrief(): Promise<TodayBriefView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/today-brief`, { next: { revalidate: 900 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as { available?: boolean; title?: string; body?: string };
+    return d.available && d.title && d.body ? { title: d.title, body: d.body } : null;
+  } catch { return null; }
+}
+
 // 미세먼지 예보 — 충남(태안) PM10·PM2.5 오늘~모레 등급.
 export interface DustDayView { date: string; pm10: string | null; pm25: string | null; overall: string | null }
 export interface DustBoardView { available: boolean; city: string; days: DustDayView[] }
