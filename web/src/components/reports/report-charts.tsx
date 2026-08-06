@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -663,6 +663,45 @@ export function SeafoodCard({ seafood }: { seafood: SeafoodBoardView | null }) {
         })}
       </div>
       <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 소매 평균가(KAMIS) · 주간=1주일 전 대비. 태안 갯벌·연안 대표 어패류 참고가.</p>
+    </div>
+  );
+}
+
+// 위판 물량·값 추세 예측 — 최신 위판일 vs 약 1주 전. 어종별 전망(사장님·중매인).
+const TONE_COLOR: Record<AuctionTone, string> = { up: "#dc2626", down: "#2563eb", flat: "#64748b" };
+export function AuctionForecastCard({ forecast }: { forecast: AuctionForecastView | null }) {
+  if (!forecast || !forecast.items.length) return null;
+  const pct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "▲" : v < 0 ? "▼" : "—"}${Math.abs(v)}%`);
+  const wt = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)}톤` : `${kg.toLocaleString()}kg`);
+  return (
+    <div className="mt-4 card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">📈 위판 물량·값 추세</span>
+        <span className="text-[0.7rem] text-foreground-muted">{forecast.date?.slice(5)} vs {forecast.prevDate?.slice(5)}(주간)</span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[0.7rem] text-foreground-muted">
+              <th className="pb-1.5 font-medium">어종</th>
+              <th className="pb-1.5 text-right font-medium">경락가</th>
+              <th className="pb-1.5 text-right font-medium">값·물량</th>
+              <th className="pb-1.5 text-right font-medium">전망</th>
+            </tr>
+          </thead>
+          <tbody>
+            {forecast.items.map((f) => (
+              <tr key={f.fish} className="border-t border-brand/10">
+                <td className="py-1.5 text-foreground">{f.fish}</td>
+                <td className="py-1.5 text-right font-semibold tabular-nums text-brand">{f.avgPricePerKg.toLocaleString()}<span className="text-[0.6rem] text-foreground-muted">/kg</span></td>
+                <td className="py-1.5 text-right text-[0.7rem] tabular-nums text-foreground-muted"><span style={{ color: TONE_COLOR[f.tone] }}>{pct(f.pricePct)}</span> · {pct(f.volPct)} {wt(f.totalKg)}</td>
+                <td className="py-1.5 text-right text-[0.7rem] font-semibold" style={{ color: TONE_COLOR[f.tone] }}>{f.label}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">해수부 위판 실적 주간 비교(태안 위판장). 물량↑값↓=지금 사입 유리 · 물량↓값↑=귀해짐. 위판 3~4일 후 반영.</p>
     </div>
   );
 }

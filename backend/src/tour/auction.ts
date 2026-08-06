@@ -7,7 +7,8 @@ import type { Env } from "../types";
 
 const BASE = "https://apis.data.go.kr/1192000/select0040List/getselect0040List";
 // 태안 위판 조합(이 조합들의 위판장은 전부 태안군 연안). 조합명으로 필터해 전국 21k건 중 태안만 조회.
-const TAEAN_ORGS = ["서산수산업협동조합", "안면도수산업협동조합"];
+//   위판 물량 추세 예측(auction_forecast.ts)에서도 재사용.
+export const TAEAN_ORGS = ["서산수산업협동조합", "안면도수산업협동조합"];
 
 export interface AuctionRecord {
   csmtmktNm?: string;      // 위판장명(안흥판매사업소 등)
@@ -68,8 +69,8 @@ function toIso(compact: string): string {
   return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
 }
 
-// 한 조합·한 날짜의 전 위판 레코드(numOfRows 상한 100 → 페이지네이션).
-async function fetchOrgDay(key: string, baseDt: string, org: string): Promise<AuctionRecord[]> {
+// 한 조합·한 날짜의 전 위판 레코드(numOfRows 상한 100 → 페이지네이션). 추세 예측에서도 재사용.
+export async function fetchOrgDay(key: string, baseDt: string, org: string): Promise<AuctionRecord[]> {
   const out: AuctionRecord[] = [];
   for (let page = 1; page <= 12; page++) {
     const qs = new URLSearchParams({
