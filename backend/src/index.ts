@@ -233,16 +233,10 @@ export default {
       return;
     }
 
-    // ── 아침(07:00 KST) — 환경·안전 자동 알림(위험 임계 초과 시 통합 푸시) ──
+    // ── 아침(07:00 KST) — "오늘의 태안" 브리핑(안전경보 흡수)·기자 다이제스트·오너 알림 ──
     if (_event.cron === "0 22 * * *") {
-      try {
-        const { runEnvAlerts } = await import("./notifications/env_alerts");
-        const r = await runEnvAlerts(env);
-        console.log(`[cron] 환경·안전 알림: 경보 ${r.alerts}건, 발송 ${r.sent}${r.skipped ? ` (${r.skipped})` : ""}`);
-      } catch (e) {
-        console.warn("[cron] 환경·안전 알림 실패:", e instanceof Error ? e.message : e);
-      }
-      // 일간 언론 클리핑 다이제스트(기자에게 어제의 태안 외부보도 1건 묶음)
+      // ※환경·안전 알림은 별도 발송하지 않음 — "오늘의 태안" 브리핑이 안전경보를 흡수(중복 알림 방지).
+      //   일간 언론 클리핑 다이제스트(기자에게 어제의 태안 외부보도 1건 묶음)
       try {
         const { sendClippingDigest } = await import("./clips/router");
         const d = await sendClippingDigest(env);
