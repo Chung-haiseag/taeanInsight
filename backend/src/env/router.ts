@@ -179,6 +179,11 @@ envRouter.get("/fire-risk", (c) =>
 envRouter.get("/farm", (c) =>
   edgeCached(c, "farm", 3600_000, () => import("../tour/farm").then((m) => m.loadFarm(c.env))));
 
+// 양식 수온 경보(고수온·저수온) — 양식 어가 폐사 조기경보. 위험할 때만 노출.
+//   ※임시(표층 수온). 용존산소·양식장 수온은 실시간어장정보(15058376) 활용신청 후 정식화.
+envRouter.get("/aqua", (c) =>
+  edgeCached(c, "aqua", 3600_000, () => import("../tour/aqua").then((m) => m.loadAquaAlert(c.env))));
+
 // "오늘의 태안" 한 줄 브리핑 — 매일 아침 Web Push로도 발송(cron). 미리보기 겸 공개 표시용.
 envRouter.get("/today-brief", (c) =>
   edgeCached(c, "today-brief", 1800_000, () => import("../notifications/daily_briefing").then((m) => m.buildDailyBriefing(c.env).then((b) => (b ? { available: true, ...b } : { available: false })))));

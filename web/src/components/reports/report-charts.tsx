@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, AquaBoardView, AquaLevel, FestivalView, WeatherAlertView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -805,6 +805,22 @@ export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null 
         </p>
       )}
       <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</p>
+    </div>
+  );
+}
+
+// 양식 수온 경보(고수온·저수온) — 양식 어가용. 위험(관심+)일 때만 노출.
+const AQUA_COLOR: Record<AquaLevel, string> = { "경보": "#dc2626", "주의": "#f59e0b", "관심": "#eab308", "정상": "#64748b" };
+export function AquaCard({ aqua }: { aqua: AquaBoardView | null }) {
+  if (!aqua || aqua.level === "정상" || !aqua.label) return null;
+  return (
+    <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: AQUA_COLOR[aqua.level] + "66", background: AQUA_COLOR[aqua.level] + "10" }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">🦪 양식 {aqua.label}</span>
+        {aqua.waterTemp != null && <span className="text-[0.7rem] font-semibold" style={{ color: AQUA_COLOR[aqua.level] }}>수온 {aqua.waterTemp}℃</span>}
+      </div>
+      {aqua.note && <p className="mt-1.5 text-xs text-foreground-muted">{aqua.note}</p>}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">표층 수온 기준 조기경보(우럭·전복·굴 등). 양식장 실측 수온·용존산소는 현장 확인 필수.</p>
     </div>
   );
 }
