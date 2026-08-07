@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { AILabelBadge } from "@/components/ai-label-badge";
 import { getSession, logout, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getCostSummary, getAnalytics, getRoi, getJobs, getUsers, setUserAccess, createReporter, resetUserPassword, deleteUser, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type JobStatus, type AdminUser, type CitizenApp, type CreatedReporter } from "@/lib/api/admin";
+import { getCostSummary, getAnalytics, getRoi, getUsers, setUserAccess, createReporter, resetUserPassword, deleteUser, getCitizenApplications, decideCitizenApplication, type MonthlyCostReport, type AnalyticsData, type RoiData, type AdminUser, type CitizenApp, type CreatedReporter } from "@/lib/api/admin";
 import {
   decideReview,
   getReviewQueue,
@@ -115,9 +115,9 @@ function AdminGate({ account, onOk }: { account: Account | null; onOk: () => voi
   );
 }
 
-type AdminTab = "users" | "jobs" | "roi" | "analytics" | "cost" | "funnel" | "health" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections";
+// ⚙️ 자동화는 보고서(/admin/report)로 이동 — 대시보드는 실행·비즈니스 지표 중심.
+type AdminTab = "users" | "roi" | "analytics" | "cost" | "funnel" | "health" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
-  { key: "jobs", label: "⚙️ 자동화" },
   { key: "users", label: "👥 회원" },
   { key: "roi", label: "💎 성과" },
   { key: "analytics", label: "📊 분석" },
@@ -201,7 +201,6 @@ export default function AdminPage() {
         ))}
       </div>
 
-      <div className={tab === "jobs" ? "" : "hidden"}><JobsSection /></div>
       <div className={tab === "users" ? "" : "hidden"}><UsersSection /></div>
       <div className={tab === "roi" ? "" : "hidden"}><RoiSection /></div>
       <div className={tab === "analytics" ? "" : "hidden"}><AnalyticsSection /></div>
@@ -504,62 +503,6 @@ function UsersSection() {
           </table>
         </div>
       )}
-    </section>
-  );
-}
-
-// ── 자동작업 현황 — 수집·생성 파이프라인 전체(신선도 감지) ─────────
-const JOB_ICON: Record<string, string> = { ok: "✅", warn: "⚠️", idle: "⏸" };
-function ago(iso: string | null): string {
-  if (!iso) return "기록 없음";
-  const t = Date.parse(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z");
-  if (!Number.isFinite(t)) return iso;
-  const m = Math.round((Date.now() - t) / 60000);
-  if (m < 60) return `${m}분 전`;
-  const h = Math.round(m / 60);
-  if (h < 48) return `${h}시간 전`;
-  return `${Math.round(h / 24)}일 전`;
-}
-function JobsSection() {
-  const [d, setD] = useState<{ jobs: JobStatus[]; generatedAt: string } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const load = () => getJobs().then(setD).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
-  useEffect(() => { void load(); }, []);
-  if (err) return <p className="text-sm text-red-600">{err}</p>;
-  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
-  const warns = d.jobs.filter((j) => j.status === "warn").length;
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-bold text-brand">⚙️ 자동작업 현황</h2>
-        <div className="flex items-center gap-3 text-xs text-foreground-muted">
-          {warns > 0 ? <span className="font-semibold text-amber-700">⚠️ 지연 {warns}건</span> : <span className="text-green-700">✅ 전체 정상</span>}
-          <button type="button" onClick={load} className="rounded border border-brand/20 px-2.5 py-1 font-semibold text-brand hover:bg-brand/5">새로고침</button>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
-            <th className="py-2 pr-2">상태</th><th className="py-2 pr-3">작업</th><th className="py-2 pr-3">소스·실행 위치</th><th className="py-2 pr-3">주기</th><th className="py-2 pr-3">최근 데이터</th><th className="py-2">최근 결과</th>
-          </tr></thead>
-          <tbody>
-            {d.jobs.map((j) => (
-              <tr key={j.key} className={`border-b border-brand/5 ${j.status === "warn" ? "bg-amber-50/60" : ""}`}>
-                <td className="py-2 pr-2">{JOB_ICON[j.status]}</td>
-                <td className="py-2 pr-3 font-medium text-brand">{j.name}</td>
-                <td className="py-2 pr-3 text-xs text-foreground-muted">{j.source}</td>
-                <td className="py-2 pr-3 text-xs">{j.schedule}</td>
-                <td className="py-2 pr-3 text-xs" title={j.lastRun ?? ""}>{ago(j.lastRun)}</td>
-                <td className="py-2 text-xs">{j.result}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-foreground-muted">
-        기준 {new Date(d.generatedAt).toLocaleString("ko-KR")} · "최근 데이터"는 실제 적재된 데이터의 시각 기준
-        (신규가 없으면 오래돼 보일 수 있음 — ⚠️는 주기×2 초과 시 표시) · VPS 작업은 카페24 서버에서 실행
-      </p>
     </section>
   );
 }
