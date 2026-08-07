@@ -280,9 +280,9 @@ export async function getDataMap(): Promise<DataCatalogItem[]> {
 // 지식그래프 공개 통계 — /data '지식그래프' 섹션.
 export interface KgStatsView {
   available: boolean;
-  nodes: number; edges: number; coappears: number; held: number; verified: number;
-  types: Array<{ name: string; label: string }>;
-  relations: Array<{ name: string; label: string; src: string | null; dst: string | null }>;
+  nodes: number; edges: number; verified: number;
+  types: Array<{ name: string; label: string; n: number }>;
+  relations: Array<{ name: string; label: string; src: string | null; dst: string | null; n: number }>;
 }
 export async function getKgStats(): Promise<KgStatsView | null> {
   try {

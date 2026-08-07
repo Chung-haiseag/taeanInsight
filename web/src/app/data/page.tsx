@@ -186,47 +186,56 @@ function KgStat({ n, label, accent }: { n: string; label: string; accent?: boole
   );
 }
 
-// 지식그래프 — 37년 아카이브 인물 네트워크(온톨로지·규모·2층 구조)
+// 지식그래프 — 37년 아카이브 온톨로지(개체·관계·규모·2층 구조)
+const ENTITY_ICON: Record<string, string> = { person: "👤", office: "🏛️", place: "📍", commodity: "🦀", org: "🏢", event: "🎪", policy: "📜" };
 function KnowledgeGraph({ kg }: { kg: KgStatsView }) {
-  const m = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 10000 ? `${Math.round(n / 1000)}천` : n.toLocaleString());
+  const m = (n: number) => (n == null ? "0" : n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 10000 ? `${Math.round(n / 1000)}천` : n.toLocaleString());
   return (
     <section className="mt-10 overflow-hidden rounded-2xl border border-brand/15 bg-gradient-to-br from-brand/[0.04] to-accent-subtle/20 p-5 sm:p-6">
       <div className="flex items-center gap-2">
         <span className="text-lg" aria-hidden>🕸️</span>
-        <h2 className="text-lg font-bold text-brand">지식그래프 — 37년 아카이브 인물 네트워크</h2>
+        <h2 className="text-lg font-bold text-brand">지식그래프 — 태안 온톨로지</h2>
       </div>
-      <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">태안신문 창간호(1990)부터의 기사에서 인물과 관계를 AI로 엮은 지식그래프. <strong className="text-brand">넓게 연결하되, 검수를 통과한 사실만</strong> AI 답변의 근거로 씁니다.</p>
+      <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">37년 아카이브의 인물부터 위판장·수산물까지를 <strong className="text-brand">개체·관계</strong>로 엮은 지식그래프. 과거(아카이브)·현재(실측)·미래(예측)를 한 그래프로 연결하고, <strong className="text-brand">검수를 통과한 사실만</strong> AI 답변의 근거로 씁니다.</p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KgStat n={m(kg.nodes)} label="인물 노드" />
-        <KgStat n={m(kg.coappears)} label="공동등장 관계" />
-        <KgStat n={kg.held.toLocaleString()} label="역임(직위) 사실" />
-        <KgStat n={kg.verified.toLocaleString()} label="검수 완료 사실" accent />
+        <KgStat n={m(kg.nodes)} label="개체(노드)" />
+        <KgStat n={m(kg.edges)} label="관계(엣지)" />
+        <KgStat n={kg.types.length.toString()} label="개체 종류" />
+        <KgStat n={(kg.verified ?? 0).toLocaleString()} label="검수 완료 사실" accent />
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <div>
           <p className="text-[0.7rem] font-bold uppercase tracking-wide text-foreground-muted">개체 (Entity)</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {kg.types.map((t) => <span key={t.name} className="rounded-full border border-brand/15 bg-background px-2.5 py-1 text-xs"><b className="text-brand">{t.label}</b> <span className="text-foreground-muted">{t.name}</span></span>)}
+            {kg.types.map((t) => (
+              <span key={t.name} className="inline-flex items-center gap-1 rounded-full border border-brand/15 bg-background px-2.5 py-1 text-xs">
+                <span>{ENTITY_ICON[t.name] ?? "•"}</span><b className="text-brand">{t.label}</b><span className="tabular-nums text-foreground-muted">{m(t.n)}</span>
+              </span>
+            ))}
           </div>
         </div>
         <div>
           <p className="text-[0.7rem] font-bold uppercase tracking-wide text-foreground-muted">관계 (Relation)</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {kg.relations.map((r) => <span key={r.name} className="rounded-full border border-brand/15 bg-background px-2.5 py-1 text-xs"><b className="text-brand">{r.label}</b> <span className="text-foreground-muted">{r.src}→{r.dst}</span></span>)}
+            {kg.relations.map((r) => (
+              <span key={r.name} className="rounded-full border border-brand/15 bg-background px-2.5 py-1 text-xs">
+                <b className="text-brand">{r.label}</b> <span className="text-foreground-muted">{r.src}→{r.dst}</span> <span className="tabular-nums text-foreground-muted">{m(r.n)}</span>
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
         <div className="rounded-xl border border-brand/10 bg-background/60 p-3">
-          <p className="text-xs font-bold text-brand">🔍 탐색층 · 공동등장</p>
-          <p className="mt-1 text-[0.72rem] leading-snug text-foreground-muted">같은 기사에 함께 등장한 인물을 관계 강도로 연결 — 인물 관계도·이웃 랭킹. 크고 통계적.</p>
+          <p className="text-xs font-bold text-brand">🔍 탐색층 · 통계 관계</p>
+          <p className="mt-1 text-[0.72rem] leading-snug text-foreground-muted">기사 공동등장 등 AI가 자동 추출한 대규모 관계 — 인물 관계도·이웃 랭킹. 넓고 통계적.</p>
         </div>
         <div className="rounded-xl border border-accent/30 bg-accent-subtle/15 p-3">
           <p className="text-xs font-bold text-brand">✅ 사실층 · 검수 완료</p>
-          <p className="mt-1 text-[0.72rem] leading-snug text-foreground-muted">관리자 검수를 통과한 관계만 &lsquo;확인된 사실&rsquo;로 AI 답변에 인용 — 지어내기 방지.</p>
+          <p className="mt-1 text-[0.72rem] leading-snug text-foreground-muted">검수를 통과한 관계(역임·취급 등)만 &lsquo;확인된 사실&rsquo;로 AI 답변에 인용 — 지어내기 방지.</p>
         </div>
       </div>
 
