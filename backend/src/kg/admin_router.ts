@@ -7,6 +7,7 @@ import { articlePersonGraph, personEgo } from "./graph";
 import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateStatus, getCanonicalId, findCandidateByNode } from "./merge";
 import { searchPersons, buildPersonProfile, buildPersonBrief } from "./people";
 import { listPendingRelations, setRelation, isReltype } from "./relations";
+import { loadAffiliationQueue, rejectAffiliation } from "./affiliation_queue";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -107,6 +108,19 @@ router.post("/relation/set", async (c) => {
   if (b.reltype !== undefined && !isReltype(b.reltype)) return c.json({ error: "reltype 오류" }, 400);
   await setRelation(c.env.ARCHIVE_DB, b.id, { reltype: b.reltype, verified: b.verified });
   return c.json({ ok: true });
+});
+
+// 소속(belongs_to) 검수 큐 — verified=0 후보 신뢰도순. 승인은 /verify(kg_edges) 재사용, 반려는 삭제.
+router.get("/affiliations", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const limit = Math.max(1, Math.min(500, Number(c.req.query("limit")) || 150));
+  return c.json({ candidates: await loadAffiliationQueue(c.env.ARCHIVE_DB, limit) });
+});
+router.post("/affiliations/reject", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ id: string }>().catch(() => ({} as { id: string }));
+  if (!b.id) return c.json({ error: "id 필수" }, 400);
+  return c.json({ ok: await rejectAffiliation(c.env.ARCHIVE_DB, b.id) });
 });
 
 router.get("/merge/candidates", async (c) => {

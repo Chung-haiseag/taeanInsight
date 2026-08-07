@@ -142,3 +142,15 @@ export function getPendingRelations(limit = 100): Promise<{ relations: PendingRe
 export function setRelation(id: string, body: { reltype?: string; verified?: boolean }): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/relation/set`, { method: "POST", body: JSON.stringify({ id, ...body }) });
 }
+
+// 소속(belongs_to) 검수 큐 — verified=0 후보. 승인=verifyKg(kg_edges) 재사용, 반려=삭제.
+export interface AffiliationCandidate {
+  id: string; personId: string; person: string; orgId: string; org: string;
+  role: string; count: number; confidence: number; years: string[]; evidence: string[]; sources: string[];
+}
+export function getAffiliationQueue(limit = 150): Promise<{ candidates: AffiliationCandidate[] }> {
+  return apiFetch(`/api/admin/kg/affiliations?limit=${limit}`);
+}
+export function rejectAffiliation(id: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/affiliations/reject`, { method: "POST", body: JSON.stringify({ id }) });
+}
