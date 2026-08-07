@@ -20,6 +20,7 @@ import {
 import MergeConsole from "./merge-console";
 import PeopleExplorer from "./people-explorer";
 import RelationsReview from "./relations-review";
+import AffiliationReview from "./affiliation-review";
 
 // 서버가 { error } 400을 주면 그 메시지를, 아니면 일반 Error 메시지를 표시
 function errMsg(e: unknown, fallback: string): string {
@@ -95,7 +96,7 @@ function KgGate({ account, onOk }: { account: Account | null; onOk: () => void }
 export default function KgAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
-  const [tab, setTab] = useState<"nodes" | "merge" | "people" | "relations">("nodes");
+  const [tab, setTab] = useState<"nodes" | "merge" | "people" | "relations" | "affiliations">("nodes");
 
   useEffect(() => {
     (async () => {
@@ -181,9 +182,18 @@ export default function KgAdminPage() {
         >
           🔗 관계 검수
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("affiliations")}
+          className={`px-3 py-2 text-sm font-semibold ${
+            tab === "affiliations" ? "border-b-2 border-brand text-brand" : "text-foreground-muted hover:text-brand"
+          }`}
+        >
+          🏢 소속 검수
+        </button>
       </div>
 
-      {tab === "nodes" ? <KgConsole /> : tab === "merge" ? <MergeConsole /> : tab === "people" ? <PeopleExplorer /> : <RelationsReview />}
+      {tab === "nodes" ? <KgConsole /> : tab === "merge" ? <MergeConsole /> : tab === "people" ? <PeopleExplorer /> : tab === "relations" ? <RelationsReview /> : <AffiliationReview />}
     </div>
   );
 }
