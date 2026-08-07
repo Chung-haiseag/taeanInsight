@@ -8,21 +8,19 @@ import Link from "next/link";
 
 import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getUsers, getCostSummary, getRoi, type AdminUser, type MonthlyCostReport, type RoiData } from "@/lib/api/admin";
-import { getReportSummary, getAdminSettings, setAdminSettings, getMembershipFunnel, type ReportSummary, type MembershipFunnel } from "@/lib/api/report";
+import { getUsers, type AdminUser } from "@/lib/api/admin";
+import { getReportSummary, getAdminSettings, setAdminSettings, type ReportSummary } from "@/lib/api/report";
 
-type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "cost" | "funnel" | "changelog" | "health";
+// ※ 비용·성과·전환·구독·시스템 상태(지표)는 관리자 대시보드(/admin)로 일원화. 보고서는 문서·현황.
+type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "changelog";
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "overview", label: "프로젝트 개요" },
   { key: "tech", label: "🧠 AI·기술" },
   { key: "ops", label: "운영 정보" },
   { key: "roadmap", label: "🗺 로드맵" },
   { key: "runbook", label: "🚀 운영 절차" },
-  { key: "data", label: "📦 데이터 현황" },
-  { key: "cost", label: "💰 비용·성과" },
-  { key: "funnel", label: "📈 전환·구독" },
+  { key: "data", label: "📦 데이터 지도" },
   { key: "changelog", label: "🧾 변경 이력" },
-  { key: "health", label: "🩺 시스템 상태" },
 ];
 
 function renderTab(tab: ReportTab) {
@@ -33,10 +31,7 @@ function renderTab(tab: ReportTab) {
     case "roadmap": return <Roadmap />;
     case "runbook": return <Runbook />;
     case "data": return <DataSnapshot />;
-    case "cost": return <CostPerf />;
-    case "funnel": return <MembershipFunnelPanel />;
     case "changelog": return <Changelog />;
-    case "health": return <Health />;
   }
 }
 
@@ -753,209 +748,5 @@ function Changelog() {
       </ol>
       <p className="mt-3 text-xs text-foreground-muted">전체 기능 로그는 RUNBOOK.md §5.</p>
     </Card>
-  );
-}
-
-// ── 🩺 시스템 상태(라이브) ─────────────────────────────────────
-function Dot({ up }: { up: boolean }) {
-  return <span className={`inline-block h-2 w-2 rounded-full ${up ? "bg-green-500" : "bg-red-500"}`} aria-hidden="true" />;
-}
-function Health() {
-  const [s, setS] = useState<ReportSummary | null>(null);
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    getReportSummary().then((r) => { setS(r); setOk(true); }).catch(() => setOk(false));
-  }, []);
-  return (
-    <div className="space-y-4">
-      <Card title="서비스 상태">
-        <ul className="space-y-1.5 text-sm">
-          <li className="flex items-center gap-2"><Dot up={ok !== false} /> 백엔드 API — {ok === null ? "확인 중…" : ok ? "정상" : "응답 없음"}</li>
-          <li className="flex items-center gap-2"><Dot up={true} /> 프론트(현재 화면) — 정상</li>
-          <li className="flex items-center gap-2"><Dot up={!!s?.counts.articles} /> D1 아카이브 — {s?.counts.articles ? "연결됨" : ok === null ? "확인 중…" : "확인 필요"}</li>
-        </ul>
-      </Card>
-      <Card title="데이터 신선도">
-        <KV
-          rows={[
-            ["마지막 수집 실행", s?.freshness.lastCollected ? new Date(s.freshness.lastCollected).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"],
-            ["최신 자사 기사", s?.freshness.latestArticle?.slice(0, 10) ?? "—"],
-            ["최신 지역언론", s?.freshness.latestRegional?.slice(0, 10) ?? "—"],
-            ["최신 환경 스냅샷", s?.freshness.latestEnv?.slice(0, 10) ?? "—"],
-          ]}
-        />
-      </Card>
-
-      <Card title="외부 연동 설정 상태">
-        <p className="mb-2 text-xs text-foreground-muted">시크릿 <strong>설정 여부만</strong> 표시(값은 노출하지 않음).</p>
-        {s ? (
-          <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-2">
-            {([
-              ["태안신문 로그인", s.config.taeanLogin],
-              ["공공데이터(data.go.kr)", s.config.dataGoKr],
-              ["네이버 검색", s.config.naver],
-              ["웹검색 폴백(Tavily)", s.config.webSearch],
-              ["카카오 로그인", s.config.kakao],
-              ["유가(오피넷)", s.config.opinet],
-              ["Web Push(VAPID)", s.config.push],
-              ["Slack 알림", s.config.slack],
-              ["관리자 토큰", s.config.adminToken],
-            ] as [string, boolean][]).map(([label, on]) => (
-              <span key={label} className="flex items-center gap-2">
-                <Dot up={on} /> {label} <span className="text-xs text-foreground-muted">{on ? "설정됨" : "미설정"}</span>
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-foreground-muted">확인 중…</p>
-        )}
-      </Card>
-
-      <Card title="자동화(크론)">
-        <ul className="space-y-1 text-sm text-foreground-muted">
-          <li>· 자정 KST — 뉴스 수집·환경 스냅샷·비용 집계</li>
-          <li>· 그 외 6개 스케줄(지역언론·오디오·리포트 등)</li>
-          <li className="text-xs">상세 실행 로그는 <code className="text-[11px]">/admin</code> ⚙️자동화·📊분석 탭에서.</li>
-        </ul>
-      </Card>
-    </div>
-  );
-}
-
-// ── 💰 비용·성과(라이브 요약) ──────────────────────────────────
-const won = (n: number) => n.toLocaleString() + "원";
-function CostPerf() {
-  const [cost, setCost] = useState<MonthlyCostReport | null>(null);
-  const [roi, setRoi] = useState<RoiData | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    getCostSummary().then(setCost).catch(() => {});
-    getRoi().then(setRoi).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
-  }, []);
-  return (
-    <div className="space-y-4">
-      <Card title={`이번 달 비용${cost ? ` (${cost.month})` : ""}`}>
-        {cost ? (
-          <>
-            <KV
-              rows={[
-                ["지출", won(cost.totalKrw)],
-                ["한도", won(cost.limitKrw)],
-                ["소진율", <span className={cost.ratio >= 0.9 ? "font-semibold text-red-600" : cost.ratio >= 0.7 ? "text-amber-600" : ""}>{Math.round(cost.ratio * 100)}%{cost.thresholdsCrossed.length > 0 ? " ⚠️" : ""}</span>],
-              ]}
-            />
-            {Object.keys(cost.byCategory).length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                {Object.entries(cost.byCategory).map(([k, v]) => (
-                  <span key={k} className="rounded-full border border-brand/15 px-2 py-0.5 text-foreground-muted">{k} {won(v)}</span>
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-foreground-muted">불러오는 중…</p>
-        )}
-      </Card>
-
-      <Card title="자산 & 자동화 창출가치">
-        {roi ? (
-          <KV
-            rows={[
-              ["아카이브 기사", roi.assets.totalArticles.toLocaleString()],
-              ["디지털화", <>{roi.assets.digitized.toLocaleString()} <span className="text-xs text-foreground-muted">({roi.assets.yearRange})</span></>],
-              ["자동화 창출가치(누적)", <strong className="text-brand">{won(roi.totalValueKrw)}</strong>],
-            ]}
-          />
-        ) : err ? (
-          <p className="text-sm text-red-600">{err}</p>
-        ) : (
-          <p className="text-sm text-foreground-muted">불러오는 중…</p>
-        )}
-      </Card>
-
-      {roi && (
-        <Card title="독자·이용">
-          <div className="flex flex-wrap gap-2 text-sm">
-            {([
-              ["열람", roi.audience.reads],
-              ["AI 질의", roi.audience.aiQueries],
-              ["오디오 재생", roi.audience.audioPlays],
-              ["가입", roi.audience.accounts],
-              ["푸시 구독", roi.audience.pushSubs],
-            ] as [string, number][]).map(([k, v]) => (
-              <span key={k} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{k} <strong className="text-brand">{v.toLocaleString()}</strong></span>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <p className="text-xs text-foreground-muted">상세 대시보드는 <code className="text-[11px]">/admin</code> 💰비용·💎성과·📊분석 탭에서.</p>
-    </div>
-  );
-}
-
-// ── 전환·구독: 사전신청 퍼널(방문→CTA→신청) + 유료전환(결제 연동 후) ──
-function MembershipFunnelPanel() {
-  const [d, setD] = useState<MembershipFunnel | null>(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => { getMembershipFunnel().then(setD).catch(() => setErr(true)); }, []);
-  if (err) return <p className="text-sm text-foreground-muted">불러오지 못했습니다.</p>;
-  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
-  const pct = d.conversion != null ? `${(d.conversion * 100).toFixed(1)}%` : "—";
-  const rate = (n: number) => (d.views ? `${((n / d.views) * 100).toFixed(1)}%` : "—");
-  const planLabel: Record<string, string> = { reader: "독자", business: "사장님", org: "기관" };
-  const maxView = Math.max(1, ...d.viewsDaily.map((x) => x.n));
-  return (
-    <div className="space-y-5">
-      <p className="text-sm text-foreground-muted">멤버십 사전신청 전환 퍼널 — <b>방문 → CTA 클릭 → 사전신청</b>. (첫 달 무료 → 유료 유지는 결제 연동 후 측정)</p>
-      <div className="grid gap-3 sm:grid-cols-4">
-        <FunnelStat label="방문" value={d.views} />
-        <FunnelStat label={`CTA 클릭 · ${rate(d.ctaClicks)}`} value={d.ctaClicks} />
-        <FunnelStat label={`사전신청 · ${rate(d.leads)}`} value={d.leads} />
-        <FunnelStat label="방문→신청 전환율" value={pct} accent />
-      </div>
-      <div className="rounded-xl border border-brand/10 p-4">
-        <p className="text-sm font-semibold text-brand">플랜별 사전신청</p>
-        <div className="mt-2 flex flex-wrap gap-2 text-sm">
-          {d.leadsByPlan.length ? d.leadsByPlan.map((p) => (
-            <span key={p.plan} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{planLabel[p.plan] ?? p.plan} <strong className="text-brand">{p.n}</strong></span>
-          )) : <span className="text-foreground-muted">아직 신청 없음</span>}
-        </div>
-      </div>
-      <div className="rounded-xl border border-brand/10 p-4">
-        <p className="text-sm font-semibold text-brand">방문 출처 Top</p>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-          {d.viewsBySource.length ? d.viewsBySource.map((s) => (
-            <span key={s.src} className="rounded-full border border-brand/15 bg-brand/5 px-2.5 py-1">{s.src} <strong className="text-brand">{s.n}</strong></span>
-          )) : <span className="text-foreground-muted">데이터 없음</span>}
-        </div>
-      </div>
-      {d.viewsDaily.length > 0 && (
-        <div className="rounded-xl border border-brand/10 p-4">
-          <p className="text-sm font-semibold text-brand">최근 14일 방문</p>
-          <div className="mt-3 flex items-end gap-1" style={{ height: 64 }}>
-            {d.viewsDaily.map((x) => (
-              <div key={x.day} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${x.day} · ${x.n}`}>
-                <div className="w-full rounded-t bg-accent/70" style={{ height: `${Math.round((x.n / maxView) * 52)}px` }} />
-                <span className="text-[9px] text-foreground-muted">{x.day.slice(5)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="rounded-xl border border-dashed border-brand/20 bg-brand/[0.02] p-4">
-        <p className="text-sm font-semibold text-brand">첫 달 무료 → 유료 전환·유지율</p>
-        <p className="mt-1 text-xs text-foreground-muted">결제(PG) 연동 후 측정 — 현재는 결제가 PoC(실청구 없음)라 데이터가 없습니다. 결제 연동 시 무료체험→유료 전환율·N개월 유지율이 여기 표시됩니다.</p>
-      </div>
-    </div>
-  );
-}
-
-function FunnelStat({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) {
-  return (
-    <div className={`rounded-xl border p-4 text-center ${accent ? "border-accent/40 bg-accent-subtle/20" : "border-brand/10"}`}>
-      <p className="font-display text-2xl font-bold tabular-nums text-brand">{typeof value === "number" ? value.toLocaleString() : value}</p>
-      <p className="mt-0.5 text-xs text-foreground-muted">{label}</p>
-    </div>
   );
 }
