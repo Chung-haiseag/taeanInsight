@@ -171,6 +171,12 @@ envRouter.get("/bloom", async (c) => {
   return c.json(loadBloom());
 });
 
+// 데이터 지도(공개) — 예측·경보·시세에 쓰는 데이터 소스 카탈로그. 공개 '데이터' 메뉴용.
+envRouter.get("/data-map", async (c) => {
+  const { DATA_CATALOG } = await import("../report/catalog");
+  return c.json({ sources: DATA_CATALOG, generatedAt: new Date().toISOString() });
+});
+
 // 산불위험 지수 — 봄·가을 건조기 안전(건조특보·습도·풍속·계절). 위험할 때만 노출.
 envRouter.get("/fire-risk", (c) =>
   edgeCached(c, "fire-risk", 3600_000, () => import("../tour/fire_risk").then((m) => m.loadFireRisk(c.env))));
