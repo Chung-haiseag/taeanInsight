@@ -177,6 +177,10 @@ envRouter.get("/data-map", async (c) => {
   return c.json({ sources: DATA_CATALOG, generatedAt: new Date().toISOString() });
 });
 
+// 지식그래프 공개 통계 — /data '지식그래프' 섹션(규모·검증·온톨로지). KG는 느리게 바뀌어 6h 엣지캐시.
+envRouter.get("/kg-stats", (c) =>
+  edgeCached(c, "kg-stats", 6 * 3600_000, () => import("../kg/public_stats").then((m) => m.loadKgStats(c.env))));
+
 // 산불위험 지수 — 봄·가을 건조기 안전(건조특보·습도·풍속·계절). 위험할 때만 노출.
 envRouter.get("/fire-risk", (c) =>
   edgeCached(c, "fire-risk", 3600_000, () => import("../tour/fire_risk").then((m) => m.loadFireRisk(c.env))));

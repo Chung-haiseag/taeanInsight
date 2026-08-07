@@ -3,7 +3,9 @@
 
 import type { Metadata } from "next";
 
-import { getDataMap, type DataCatalogItem } from "@/lib/api/reports";
+import Link from "next/link";
+
+import { getDataMap, getKgStats, type DataCatalogItem, type KgStatsView } from "@/lib/api/reports";
 import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = {
@@ -46,7 +48,7 @@ const SRC_BUCKETS: Array<{ label: string; kw: string[] }> = [
 ];
 
 export default async function DataMapPage() {
-  const sources = await getDataMap();
+  const [sources, kg] = await Promise.all([getDataMap(), getKgStats()]);
   const live = sources.filter((s) => s.status === "live").length;
   const prog = sources.filter((s) => s.status === "progress").length;
   const typeGroups = TYPE_ORDER.map((t) => ({ type: t, names: sources.filter((s) => s.type === t).map((s) => s.name) })).filter((g) => g.names.length);
@@ -121,6 +123,8 @@ export default async function DataMapPage() {
             </section>
           </div>
 
+          {kg && <KnowledgeGraph kg={kg} />}
+
           <div className="mt-6 flex flex-wrap gap-4 text-xs text-foreground-muted">
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#16a34a" }} />라이브</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#d97706" }} />진행중(임시·업그레이드 대기)</span>
@@ -170,5 +174,63 @@ function ItemCard({ s, color }: { s: DataCatalogItem; color: string }) {
         {s.status === "progress" && <span className="text-[0.7rem] font-semibold text-amber-600">· 업그레이드 예정</span>}
       </div>
     </div>
+  );
+}
+
+function KgStat({ n, label, accent }: { n: string; label: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 text-center ${accent ? "border-accent/40 bg-accent-subtle/25" : "border-brand/12 bg-background"}`}>
+      <p className="text-xl font-extrabold leading-none tabular-nums text-brand sm:text-2xl">{n}</p>
+      <p className="mt-1 text-[0.68rem] text-foreground-muted">{label}</p>
+    </div>
+  );
+}
+
+// 지식그래프 — 37년 아카이브 인물 네트워크(온톨로지·규모·2층 구조)
+function KnowledgeGraph({ kg }: { kg: KgStatsView }) {
+  const m = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 10000 ? `${Math.round(n / 1000)}천` : n.toLocaleString());
+  return (
+    <section className="mt-10 overflow-hidden rounded-2xl border border-brand/15 bg-gradient-to-br from-brand/[0.04] to-accent-subtle/20 p-5 sm:p-6">
+      <div className="flex items-center gap-2">
+        <span className="text-lg" aria-hidden>🕸️</span>
+        <h2 className="text-lg font-bold text-brand">지식그래프 — 37년 아카이브 인물 네트워크</h2>
+      </div>
+      <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">태안신문 창간호(1990)부터의 기사에서 인물과 관계를 AI로 엮은 지식그래프. <strong className="text-brand">넓게 연결하되, 검수를 통과한 사실만</strong> AI 답변의 근거로 씁니다.</p>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <KgStat n={m(kg.nodes)} label="인물 노드" />
+        <KgStat n={m(kg.coappears)} label="공동등장 관계" />
+        <KgStat n={kg.held.toLocaleString()} label="역임(직위) 사실" />
+        <KgStat n={kg.verified.toLocaleString()} label="검수 완료 사실" accent />
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-[0.7rem] font-bold uppercase tracking-wide text-foreground-muted">개체 (Entity)</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {kg.types.map((t) => <span key={t.name} className="rounded-full border border-brand/15 bg-background px-2.5 py-1 text-xs"><b className="text-brand">{t.label}</b> <span className="text-foreground-muted">{t.name}</span></span>)}
+          </div>
+        </div>
+        <div>
+          <p className="text-[0.7rem] font-bold uppercase tracking-wide text-foreground-muted">관계 (Relation)</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {kg.relations.map((r) => <span key={r.name} className="rounded-full border border-brand/15 bg-background px-2.5 py-1 text-xs"><b className="text-brand">{r.label}</b> <span className="text-foreground-muted">{r.src}→{r.dst}</span></span>)}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-brand/10 bg-background/60 p-3">
+          <p className="text-xs font-bold text-brand">🔍 탐색층 · 공동등장</p>
+          <p className="mt-1 text-[0.72rem] leading-snug text-foreground-muted">같은 기사에 함께 등장한 인물을 관계 강도로 연결 — 인물 관계도·이웃 랭킹. 크고 통계적.</p>
+        </div>
+        <div className="rounded-xl border border-accent/30 bg-accent-subtle/15 p-3">
+          <p className="text-xs font-bold text-brand">✅ 사실층 · 검수 완료</p>
+          <p className="mt-1 text-[0.72rem] leading-snug text-foreground-muted">관리자 검수를 통과한 관계만 &lsquo;확인된 사실&rsquo;로 AI 답변에 인용 — 지어내기 방지.</p>
+        </div>
+      </div>
+
+      <Link href="/people" className="mt-4 inline-block text-sm font-semibold text-accent hover:underline">인물 탐색으로 관계 그래프 보기 →</Link>
+    </section>
   );
 }

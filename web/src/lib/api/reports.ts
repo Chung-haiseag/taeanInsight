@@ -277,6 +277,22 @@ export async function getDataMap(): Promise<DataCatalogItem[]> {
   } catch { return []; }
 }
 
+// 지식그래프 공개 통계 — /data '지식그래프' 섹션.
+export interface KgStatsView {
+  available: boolean;
+  nodes: number; edges: number; coappears: number; held: number; verified: number;
+  types: Array<{ name: string; label: string }>;
+  relations: Array<{ name: string; label: string; src: string | null; dst: string | null }>;
+}
+export async function getKgStats(): Promise<KgStatsView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/kg-stats`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as KgStatsView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
 // 낙조(노을) 예보 — 태안 낙조 명소 3일. "오늘 노을 예쁠까".
 export type SunsetGrade = "환상적" | "좋음" | "보통" | "흐림" | "기대난망";
 export interface SunsetDayView { date: string; weekday: string; sunset: string | null; score: number; grade: SunsetGrade; reasons: string[]; sky: string | null }
