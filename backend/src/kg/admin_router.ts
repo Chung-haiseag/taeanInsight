@@ -8,6 +8,7 @@ import { listCandidates, setCanonical, clearCanonical, logMerge, setCandidateSta
 import { searchPersons, buildPersonProfile, buildPersonBrief } from "./people";
 import { listPendingRelations, setRelation, isReltype } from "./relations";
 import { loadAffiliationQueue, rejectAffiliation } from "./affiliation_queue";
+import { loadFestivalQueue, rejectEvent } from "./event_queue";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -121,6 +122,19 @@ router.post("/affiliations/reject", async (c) => {
   const b = await c.req.json<{ id: string }>().catch(() => ({} as { id: string }));
   if (!b.id) return c.json({ error: "id 필수" }, 400);
   return c.json({ ok: await rejectAffiliation(c.env.ARCHIVE_DB, b.id) });
+});
+
+// 축제(event) 검수 큐 — verified=0 후보 언급수순. 승인은 /verify(kg_nodes) 재사용, 반려는 삭제.
+router.get("/events/pending", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const limit = Math.max(1, Math.min(500, Number(c.req.query("limit")) || 200));
+  return c.json({ candidates: await loadFestivalQueue(c.env.ARCHIVE_DB, limit) });
+});
+router.post("/events/reject", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ id: string }>().catch(() => ({} as { id: string }));
+  if (!b.id) return c.json({ error: "id 필수" }, 400);
+  return c.json({ ok: await rejectEvent(c.env.ARCHIVE_DB, b.id) });
 });
 
 router.get("/merge/candidates", async (c) => {
