@@ -18,6 +18,7 @@ import {
   type ReviewItem,
   type ReviewStats,
 } from "@/lib/api/review";
+import { getReportSummary, getMembershipFunnel, type ReportSummary, type MembershipFunnel } from "@/lib/api/report";
 import {
   getReporters,
   paySettlement,
@@ -114,13 +115,15 @@ function AdminGate({ account, onOk }: { account: Account | null; onOk: () => voi
   );
 }
 
-type AdminTab = "users" | "jobs" | "roi" | "analytics" | "cost" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections";
+type AdminTab = "users" | "jobs" | "roi" | "analytics" | "cost" | "funnel" | "health" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
   { key: "jobs", label: "⚙️ 자동화" },
   { key: "users", label: "👥 회원" },
   { key: "roi", label: "💎 성과" },
   { key: "analytics", label: "📊 분석" },
   { key: "cost", label: "💰 비용" },
+  { key: "funnel", label: "📈 전환·구독" },
+  { key: "health", label: "🩺 시스템 상태" },
   { key: "report", label: "📅 주간 리포트" },
   { key: "review", label: "🛡 AI 검수" },
   { key: "citizen", label: "🧑‍💻 시민기자" },
@@ -203,6 +206,8 @@ export default function AdminPage() {
       <div className={tab === "roi" ? "" : "hidden"}><RoiSection /></div>
       <div className={tab === "analytics" ? "" : "hidden"}><AnalyticsSection /></div>
       <div className={tab === "cost" ? "" : "hidden"}><CostMonitorSection /></div>
+      <div className={tab === "funnel" ? "" : "hidden"}><FunnelSection /></div>
+      <div className={tab === "health" ? "" : "hidden"}><HealthSection /></div>
       <div className={tab === "report" ? "" : "hidden"}><ReportPublishSection /></div>
       <div className={tab === "review" ? "" : "hidden"}><ReviewQueueSection /></div>
       <div className={tab === "citizen" ? "" : "hidden"}><CitizenOpsSection /></div>
@@ -214,6 +219,157 @@ export default function AdminPage() {
 }
 
 // ── 회원 관리 — role(기자/관리자)·plan(유료) 수동 부여 ─────────
+// ── 공용 소형 헬퍼(전환·상태 섹션용) ──
+function DashCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-brand/15 bg-background p-4">
+      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-brand">{title}</h2>
+      {children}
+    </section>
+  );
+}
+function DashKV({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-[10rem_1fr] text-sm">
+      {rows.map(([k, v], i) => (
+        <div key={i} className="contents">
+          <dt className="text-foreground-muted">{k}</dt>
+          <dd className="font-medium text-foreground break-words">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+function Dot({ up }: { up: boolean }) {
+  return <span className={`inline-block h-2 w-2 rounded-full ${up ? "bg-green-500" : "bg-red-500"}`} aria-hidden="true" />;
+}
+function FunnelStat({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-4 text-center ${accent ? "border-accent/40 bg-accent-subtle/20" : "border-brand/10"}`}>
+      <p className="font-display text-2xl font-bold tabular-nums text-brand">{typeof value === "number" ? value.toLocaleString() : value}</p>
+      <p className="mt-0.5 text-xs text-foreground-muted">{label}</p>
+    </div>
+  );
+}
+
+// ── 📈 전환·구독: 멤버십 사전신청 퍼널(방문→CTA→신청) ──
+function FunnelSection() {
+  const [d, setD] = useState<MembershipFunnel | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => { getMembershipFunnel().then(setD).catch(() => setErr(true)); }, []);
+  if (err) return <p className="text-sm text-foreground-muted">불러오지 못했습니다.</p>;
+  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  const pct = d.conversion != null ? `${(d.conversion * 100).toFixed(1)}%` : "—";
+  const rate = (n: number) => (d.views ? `${((n / d.views) * 100).toFixed(1)}%` : "—");
+  const planLabel: Record<string, string> = { reader: "독자", business: "사장님", org: "기관" };
+  const maxView = Math.max(1, ...d.viewsDaily.map((x) => x.n));
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-foreground-muted">멤버십 사전신청 전환 퍼널 — <b>방문 → CTA 클릭 → 사전신청</b>. (첫 달 무료 → 유료 유지는 결제 연동 후 측정)</p>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <FunnelStat label="방문" value={d.views} />
+        <FunnelStat label={`CTA 클릭 · ${rate(d.ctaClicks)}`} value={d.ctaClicks} />
+        <FunnelStat label={`사전신청 · ${rate(d.leads)}`} value={d.leads} />
+        <FunnelStat label="방문→신청 전환율" value={pct} accent />
+      </div>
+      <div className="rounded-xl border border-brand/10 p-4">
+        <p className="text-sm font-semibold text-brand">플랜별 사전신청</p>
+        <div className="mt-2 flex flex-wrap gap-2 text-sm">
+          {d.leadsByPlan.length ? d.leadsByPlan.map((p) => (
+            <span key={p.plan} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{planLabel[p.plan] ?? p.plan} <strong className="text-brand">{p.n}</strong></span>
+          )) : <span className="text-foreground-muted">아직 신청 없음</span>}
+        </div>
+      </div>
+      <div className="rounded-xl border border-brand/10 p-4">
+        <p className="text-sm font-semibold text-brand">방문 출처 Top</p>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {d.viewsBySource.length ? d.viewsBySource.map((s) => (
+            <span key={s.src} className="rounded-full border border-brand/15 bg-brand/5 px-2.5 py-1">{s.src} <strong className="text-brand">{s.n}</strong></span>
+          )) : <span className="text-foreground-muted">데이터 없음</span>}
+        </div>
+      </div>
+      {d.viewsDaily.length > 0 && (
+        <div className="rounded-xl border border-brand/10 p-4">
+          <p className="text-sm font-semibold text-brand">최근 14일 방문</p>
+          <div className="mt-3 flex items-end gap-1" style={{ height: 64 }}>
+            {d.viewsDaily.map((x) => (
+              <div key={x.day} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${x.day} · ${x.n}`}>
+                <div className="w-full rounded-t bg-accent/70" style={{ height: `${Math.round((x.n / maxView) * 52)}px` }} />
+                <span className="text-[9px] text-foreground-muted">{x.day.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="rounded-xl border border-dashed border-brand/20 bg-brand/[0.02] p-4">
+        <p className="text-sm font-semibold text-brand">첫 달 무료 → 유료 전환·유지율</p>
+        <p className="mt-1 text-xs text-foreground-muted">결제(PG) 연동 후 측정 — 현재는 결제가 PoC(실청구 없음)라 데이터가 없습니다. 결제 연동 시 무료체험→유료 전환율·N개월 유지율이 여기 표시됩니다.</p>
+      </div>
+    </div>
+  );
+}
+
+// ── 🩺 시스템 상태: 서비스·데이터 신선도·외부연동 설정 ──
+function HealthSection() {
+  const [s, setS] = useState<ReportSummary | null>(null);
+  const [ok, setOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    getReportSummary().then((r) => { setS(r); setOk(true); }).catch(() => setOk(false));
+  }, []);
+  return (
+    <div className="space-y-4">
+      <DashCard title="서비스 상태">
+        <ul className="space-y-1.5 text-sm">
+          <li className="flex items-center gap-2"><Dot up={ok !== false} /> 백엔드 API — {ok === null ? "확인 중…" : ok ? "정상" : "응답 없음"}</li>
+          <li className="flex items-center gap-2"><Dot up={true} /> 프론트(현재 화면) — 정상</li>
+          <li className="flex items-center gap-2"><Dot up={!!s?.counts.articles} /> D1 아카이브 — {s?.counts.articles ? "연결됨" : ok === null ? "확인 중…" : "확인 필요"}</li>
+        </ul>
+      </DashCard>
+      <DashCard title="데이터 신선도">
+        <DashKV
+          rows={[
+            ["마지막 수집 실행", s?.freshness.lastCollected ? new Date(s.freshness.lastCollected).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"],
+            ["최신 자사 기사", s?.freshness.latestArticle?.slice(0, 10) ?? "—"],
+            ["최신 지역언론", s?.freshness.latestRegional?.slice(0, 10) ?? "—"],
+            ["최신 환경 스냅샷", s?.freshness.latestEnv?.slice(0, 10) ?? "—"],
+          ]}
+        />
+      </DashCard>
+      <DashCard title="외부 연동 설정 상태">
+        <p className="mb-2 text-xs text-foreground-muted">시크릿 <strong>설정 여부만</strong> 표시(값은 노출하지 않음).</p>
+        {s ? (
+          <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-2">
+            {([
+              ["태안신문 로그인", s.config.taeanLogin],
+              ["공공데이터(data.go.kr)", s.config.dataGoKr],
+              ["네이버 검색", s.config.naver],
+              ["웹검색 폴백(Tavily)", s.config.webSearch],
+              ["카카오 로그인", s.config.kakao],
+              ["유가(오피넷)", s.config.opinet],
+              ["Web Push(VAPID)", s.config.push],
+              ["Slack 알림", s.config.slack],
+              ["관리자 토큰", s.config.adminToken],
+            ] as [string, boolean][]).map(([label, on]) => (
+              <span key={label} className="flex items-center gap-2">
+                <Dot up={on} /> {label} <span className="text-xs text-foreground-muted">{on ? "설정됨" : "미설정"}</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-foreground-muted">확인 중…</p>
+        )}
+      </DashCard>
+      <DashCard title="자동화(크론)">
+        <ul className="space-y-1 text-sm text-foreground-muted">
+          <li>· 자정 KST — 뉴스 수집·환경 스냅샷·비용 집계</li>
+          <li>· 그 외 6개 스케줄(지역언론·오디오·리포트·아침 브리핑 등)</li>
+          <li className="text-xs">상세 실행 로그는 위 <b>⚙️자동화</b> 탭에서.</li>
+        </ul>
+      </DashCard>
+    </div>
+  );
+}
+
 function UsersSection() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
