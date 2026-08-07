@@ -266,6 +266,17 @@ export async function getFishing(): Promise<FishingBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 데이터 지도(공개) — 예측·경보·시세 데이터 소스 카탈로그.
+export interface DataCatalogItem { key: string; name: string; cat: string; type: string; status: "live" | "progress"; source: string; desc: string }
+export async function getDataMap(): Promise<DataCatalogItem[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/data-map`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const d = (await res.json()) as { sources?: DataCatalogItem[] };
+    return d.sources ?? [];
+  } catch { return []; }
+}
+
 // 낙조(노을) 예보 — 태안 낙조 명소 3일. "오늘 노을 예쁠까".
 export type SunsetGrade = "환상적" | "좋음" | "보통" | "흐림" | "기대난망";
 export interface SunsetDayView { date: string; weekday: string; sunset: string | null; score: number; grade: SunsetGrade; reasons: string[]; sky: string | null }
