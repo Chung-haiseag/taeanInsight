@@ -8,17 +8,18 @@ import Link from "next/link";
 
 import { getSession, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
-import { getUsers, type AdminUser } from "@/lib/api/admin";
+import { getUsers, getJobs, type AdminUser, type JobStatus } from "@/lib/api/admin";
 import { getReportSummary, getAdminSettings, setAdminSettings, type ReportSummary } from "@/lib/api/report";
 
-// ※ 비용·성과·전환·구독·시스템 상태(지표)는 관리자 대시보드(/admin)로 일원화. 보고서는 문서·현황.
-type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "data" | "changelog";
+// ※ 비용·성과·전환·구독·시스템 상태(지표)는 관리자 대시보드(/admin)로 일원화. 보고서는 문서·운영 현황.
+type ReportTab = "overview" | "tech" | "ops" | "roadmap" | "runbook" | "jobs" | "data" | "changelog";
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "overview", label: "프로젝트 개요" },
   { key: "tech", label: "🧠 AI·기술" },
   { key: "ops", label: "운영 정보" },
   { key: "roadmap", label: "🗺 로드맵" },
   { key: "runbook", label: "🚀 운영 절차" },
+  { key: "jobs", label: "⚙️ 자동화" },
   { key: "data", label: "📦 데이터 지도" },
   { key: "changelog", label: "🧾 변경 이력" },
 ];
@@ -30,6 +31,7 @@ function renderTab(tab: ReportTab) {
     case "ops": return <OperationsInfo />;
     case "roadmap": return <Roadmap />;
     case "runbook": return <Runbook />;
+    case "jobs": return <JobsSection />;
     case "data": return <DataSnapshot />;
     case "changelog": return <Changelog />;
   }
@@ -624,6 +626,15 @@ const CAT_ORDER = ["관광", "바다", "수산", "농업", "날씨·안전", "�
 const CAT_COLOR: Record<string, string> = {
   "관광": "#f97316", "바다": "#0ea5e9", "수산": "#2563eb", "농업": "#16a34a", "날씨·안전": "#f59e0b", "지역경제": "#8b5cf6", "기타": "#94a3b8",
 };
+const STATUS_DOT: Record<string, string> = { live: "#16a34a", progress: "#d97706", check: "#d97706", parked: "#94a3b8", rejected: "#dc2626" };
+function StatTile({ n, label, color }: { n: number; label: string; color?: string }) {
+  return (
+    <div className="rounded-xl border border-brand/12 bg-background px-3.5 py-2 shadow-sm">
+      <p className="text-xl font-extrabold leading-none tabular-nums" style={{ color }}>{n}</p>
+      <p className="mt-1 text-[0.68rem] text-foreground-muted">{label}</p>
+    </div>
+  );
+}
 function DataMap({ sources }: { sources: NonNullable<ReportSummary["dataSources"]> }) {
   const byCat: Record<string, typeof sources> = {};
   for (const d of sources) { const c = d.cat ?? "기타"; (byCat[c] ??= []).push(d); }
@@ -634,39 +645,47 @@ function DataMap({ sources }: { sources: NonNullable<ReportSummary["dataSources"
   for (const d of sources) { const t = d.type ?? "-"; typeCounts[t] = (typeCounts[t] ?? 0) + 1; }
   return (
     <Card title="데이터 지도 — 예측 소스 분류">
-      <p className="mb-2 text-xs text-foreground-muted">예측·경보·시세에 쓰는 데이터를 영역·유형·상태로 분류. 전부 무료 공공데이터·큐레이션.</p>
-      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-        <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-800">라이브 {live}</span>
-        <span className="rounded-full bg-blue-100 px-2 py-0.5 font-bold text-blue-800">진행중 {prog}</span>
-        <span className="rounded-full bg-gray-200 px-2 py-0.5 font-bold text-gray-700">보류·미채택 {off}</span>
-        <span className="ml-auto text-foreground-muted">유형 {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(" · ")}</span>
+      <p className="mb-3 text-xs text-foreground-muted">예측·경보·시세에 쓰는 데이터를 영역·유형·상태로 분류. 전부 무료 공공데이터·큐레이션.</p>
+      <div className="mb-1 flex flex-wrap gap-2">
+        <StatTile n={sources.length} label="데이터 소스" />
+        <StatTile n={live} label="라이브" color="#16a34a" />
+        <StatTile n={prog} label="진행중" color="#d97706" />
+        <StatTile n={off} label="보류·미채택" color="#94a3b8" />
       </div>
       {CAT_ORDER.filter((cat) => byCat[cat]?.length).map((cat) => (
-        <div key={cat} className="mt-3">
-          <div className="mb-1.5 flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded" style={{ background: CAT_COLOR[cat] }} />
+        <div key={cat} className="mt-5">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded" style={{ background: CAT_COLOR[cat] }} aria-hidden />
             <span className="text-sm font-bold text-brand">{cat}</span>
-            <span className="text-[11px] text-foreground-muted">{byCat[cat].length}</span>
+            <span className="text-[11px] text-foreground-muted tabular-nums">{byCat[cat].length}</span>
           </div>
-          <ul className="space-y-2">
+          <div className="grid gap-2.5 sm:grid-cols-2">
             {byCat[cat].map((d) => {
               const st = DS_STATUS[d.status] ?? DS_STATUS.parked;
               return (
-                <li key={d.key} className="border-b border-brand/10 pb-2 last:border-0 last:pb-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
-                    {d.type && <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{d.type}</span>}
-                    <span className="text-sm font-semibold text-foreground">{d.name}</span>
-                    {d.granularity && <span className="text-[11px] text-foreground-muted">· {d.granularity}</span>}
-                    {d.metric && <span className="ml-auto text-xs font-semibold text-foreground">{d.metric}</span>}
+                <div key={d.key} className="relative rounded-xl border border-brand/12 bg-background p-3 shadow-sm" style={{ borderLeft: `3px solid ${CAT_COLOR[cat]}` }}>
+                  <span className="absolute right-2.5 top-3 h-2 w-2 rounded-full" style={{ background: STATUS_DOT[d.status] ?? "#94a3b8" }} title={st.label} aria-hidden />
+                  <div className="flex flex-wrap items-center gap-1.5 pr-4">
+                    <span className="text-sm font-bold text-brand">{d.name}</span>
+                    {d.type && <span className="rounded-full bg-accent-subtle/50 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{d.type}</span>}
                   </div>
-                  <p className="mt-0.5 text-xs text-foreground-muted">{d.note}</p>
-                </li>
+                  {d.note && <p className="mt-1 text-[11px] leading-snug text-foreground-muted">{d.note}</p>}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-foreground-muted">
+                    {d.granularity && <span>{d.granularity}</span>}
+                    {d.metric && <span className="ml-auto font-semibold text-foreground">{d.metric}</span>}
+                  </div>
+                </div>
               );
             })}
-          </ul>
+          </div>
         </div>
       ))}
+      <div className="mt-6 rounded-xl border border-brand/10 bg-brand/[0.02] p-3">
+        <p className="text-xs font-bold text-brand">유형별</p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-foreground-muted">
+          {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([t, n]) => <span key={t}>{t} <b className="text-brand">{n}</b></span>)}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -748,5 +767,61 @@ function Changelog() {
       </ol>
       <p className="mt-3 text-xs text-foreground-muted">전체 기능 로그는 RUNBOOK.md §5.</p>
     </Card>
+  );
+}
+
+// ── ⚙️ 자동화(자동작업 현황) — 대시보드에서 이동(운영 현황 문서화) ──
+const JOB_ICON: Record<string, string> = { ok: "✅", warn: "⚠️", idle: "⏸" };
+function ago(iso: string | null): string {
+  if (!iso) return "기록 없음";
+  const t = Date.parse(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z");
+  if (!Number.isFinite(t)) return iso;
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 60) return `${m}분 전`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}시간 전`;
+  return `${Math.round(h / 24)}일 전`;
+}
+function JobsSection() {
+  const [d, setD] = useState<{ jobs: JobStatus[]; generatedAt: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => getJobs().then(setD).catch((e) => setErr(e instanceof Error ? e.message : "불러오기 실패"));
+  useEffect(() => { void load(); }, []);
+  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  const warns = d.jobs.filter((j) => j.status === "warn").length;
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl font-bold text-brand">⚙️ 자동작업 현황</h2>
+        <div className="flex items-center gap-3 text-xs text-foreground-muted">
+          {warns > 0 ? <span className="font-semibold text-amber-700">⚠️ 지연 {warns}건</span> : <span className="text-green-700">✅ 전체 정상</span>}
+          <button type="button" onClick={load} className="rounded border border-brand/20 px-2.5 py-1 font-semibold text-brand hover:bg-brand/5">새로고침</button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
+            <th className="py-2 pr-2">상태</th><th className="py-2 pr-3">작업</th><th className="py-2 pr-3">소스·실행 위치</th><th className="py-2 pr-3">주기</th><th className="py-2 pr-3">최근 데이터</th><th className="py-2">최근 결과</th>
+          </tr></thead>
+          <tbody>
+            {d.jobs.map((j) => (
+              <tr key={j.key} className={`border-b border-brand/5 ${j.status === "warn" ? "bg-amber-50/60" : ""}`}>
+                <td className="py-2 pr-2">{JOB_ICON[j.status]}</td>
+                <td className="py-2 pr-3 font-medium text-brand">{j.name}</td>
+                <td className="py-2 pr-3 text-xs text-foreground-muted">{j.source}</td>
+                <td className="py-2 pr-3 text-xs">{j.schedule}</td>
+                <td className="py-2 pr-3 text-xs" title={j.lastRun ?? ""}>{ago(j.lastRun)}</td>
+                <td className="py-2 text-xs">{j.result}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-foreground-muted">
+        기준 {new Date(d.generatedAt).toLocaleString("ko-KR")} · &quot;최근 데이터&quot;는 실제 적재된 데이터의 시각 기준
+        (신규가 없으면 오래돼 보일 수 있음 — ⚠️는 주기×2 초과 시 표시) · VPS 작업은 카페24 서버에서 실행
+      </p>
+    </section>
   );
 }
