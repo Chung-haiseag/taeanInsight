@@ -85,8 +85,24 @@ reportRouter.get("/summary", async (c) => {
     scalar(db, "SELECT COUNT(*) n FROM traffic_daily"),
   ]);
   const ymd = (s: string | null) => (s ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : "?");
+  // 데이터 지도 분류 — 영역(cat)·유형(type). 새 소스 추가 시 여기도 등록.
+  const DS_CLASS: Record<string, { cat: string; type: string }> = {
+    visitors: { cat: "관광", type: "실측" }, demandActuals: { cat: "지역경제", type: "검증" },
+    beaches: { cat: "바다", type: "예측" }, festivals: { cat: "관광", type: "달력" },
+    weather: { cat: "날씨·안전", type: "예측" }, alert: { cat: "날씨·안전", type: "경보" },
+    search: { cat: "관광", type: "예측" }, holiday: { cat: "지역경제", type: "요인" },
+    traffic: { cat: "관광", type: "실측" }, mudflat: { cat: "바다", type: "예측" },
+    fishing: { cat: "바다", type: "예측" }, fireRisk: { cat: "날씨·안전", type: "경보" },
+    farm: { cat: "농업", type: "경보" }, dust: { cat: "날씨·안전", type: "예측" },
+    bloom: { cat: "관광", type: "예측" }, fog: { cat: "바다", type: "예측" },
+    auctionForecast: { cat: "수산", type: "예측" }, seasonal: { cat: "수산", type: "달력" },
+    sunset: { cat: "관광", type: "예측" }, agri: { cat: "농업", type: "시세" },
+    industry: { cat: "지역경제", type: "구조" }, seafood: { cat: "수산", type: "시세" },
+    auction: { cat: "수산", type: "시세" }, aqua: { cat: "수산", type: "경보" },
+    consumption: { cat: "관광", type: "실측" }, attractions: { cat: "관광", type: "실측" },
+  };
   // status: live(가동) | progress(진행중) | check(확인필요) | parked(보류) | rejected(미채택)
-  const dataSources = [
+  const dataSourcesRaw = [
     { key: "visitors", name: "관광 방문자 실측 (KTO 빅데이터)", status: "live", granularity: "태안군·일별·외지인/현지인/외국인",
       metric: visitorRows != null ? `${visitorRows.toLocaleString()}행 · ${ymd(visitorFrom)}~${ymd(visitorTo)}` : null,
       note: "수요지수 정답(백테스트) + seasonBase 데이터 재보정" },
@@ -143,6 +159,8 @@ reportRouter.get("/summary", async (c) => {
     { key: "attractions", name: "관광지점 입장객 (문화관광연구원)", status: "rejected", granularity: "지점별·월별",
       metric: null, note: "태안 등록 5개 시설뿐·해수욕장 누락 → 반쪽이라 미채택" },
   ];
+  // 분류(cat/type) 병합 — 관리자 '데이터 지도'용
+  const dataSources = dataSourcesRaw.map((d) => ({ ...d, ...(DS_CLASS[d.key] ?? { cat: "기타", type: "-" }) }));
 
   // 외부 연동 설정 여부(값 아님). env를 레코드로 보고 존재만 확인.
   const e = c.env as unknown as Record<string, unknown>;

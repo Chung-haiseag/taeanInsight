@@ -624,6 +624,58 @@ const DS_STATUS: Record<string, { label: string; cls: string }> = {
   rejected: { label: "미채택", cls: "bg-red-100 text-red-700" },
 };
 
+// 데이터 지도 — 예측 소스를 영역(cat)·유형(type)·상태로 분류 표시
+const CAT_ORDER = ["관광", "바다", "수산", "농업", "날씨·안전", "지역경제", "기타"];
+const CAT_COLOR: Record<string, string> = {
+  "관광": "#f97316", "바다": "#0ea5e9", "수산": "#2563eb", "농업": "#16a34a", "날씨·안전": "#f59e0b", "지역경제": "#8b5cf6", "기타": "#94a3b8",
+};
+function DataMap({ sources }: { sources: NonNullable<ReportSummary["dataSources"]> }) {
+  const byCat: Record<string, typeof sources> = {};
+  for (const d of sources) { const c = d.cat ?? "기타"; (byCat[c] ??= []).push(d); }
+  const live = sources.filter((d) => d.status === "live").length;
+  const prog = sources.filter((d) => d.status === "progress").length;
+  const off = sources.filter((d) => d.status === "parked" || d.status === "rejected" || d.status === "check").length;
+  const typeCounts: Record<string, number> = {};
+  for (const d of sources) { const t = d.type ?? "-"; typeCounts[t] = (typeCounts[t] ?? 0) + 1; }
+  return (
+    <Card title="데이터 지도 — 예측 소스 분류">
+      <p className="mb-2 text-xs text-foreground-muted">예측·경보·시세에 쓰는 데이터를 영역·유형·상태로 분류. 전부 무료 공공데이터·큐레이션.</p>
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-800">라이브 {live}</span>
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 font-bold text-blue-800">진행중 {prog}</span>
+        <span className="rounded-full bg-gray-200 px-2 py-0.5 font-bold text-gray-700">보류·미채택 {off}</span>
+        <span className="ml-auto text-foreground-muted">유형 {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(" · ")}</span>
+      </div>
+      {CAT_ORDER.filter((cat) => byCat[cat]?.length).map((cat) => (
+        <div key={cat} className="mt-3">
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded" style={{ background: CAT_COLOR[cat] }} />
+            <span className="text-sm font-bold text-brand">{cat}</span>
+            <span className="text-[11px] text-foreground-muted">{byCat[cat].length}</span>
+          </div>
+          <ul className="space-y-2">
+            {byCat[cat].map((d) => {
+              const st = DS_STATUS[d.status] ?? DS_STATUS.parked;
+              return (
+                <li key={d.key} className="border-b border-brand/10 pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
+                    {d.type && <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{d.type}</span>}
+                    <span className="text-sm font-semibold text-foreground">{d.name}</span>
+                    {d.granularity && <span className="text-[11px] text-foreground-muted">· {d.granularity}</span>}
+                    {d.metric && <span className="ml-auto text-xs font-semibold text-foreground">{d.metric}</span>}
+                  </div>
+                  <p className="mt-0.5 text-xs text-foreground-muted">{d.note}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 function DataSnapshot() {
   const [s, setS] = useState<ReportSummary | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -669,27 +721,7 @@ function DataSnapshot() {
           ]}
         />
       </Card>
-      {s.dataSources && s.dataSources.length > 0 && (
-        <Card title="관광 분석 데이터 소스 현황">
-          <p className="mb-3 text-xs text-foreground-muted">수요 예측·해변 보드에 쓰는 데이터의 상태 기록(라이브 지표 + 채택/보류 판정).</p>
-          <ul className="space-y-2.5">
-            {s.dataSources.map((d) => {
-              const st = DS_STATUS[d.status] ?? DS_STATUS.parked;
-              return (
-                <li key={d.key} className="border-b border-brand/10 pb-2.5 last:border-0 last:pb-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
-                    <span className="text-sm font-semibold text-brand">{d.name}</span>
-                    {d.granularity && <span className="text-[11px] text-foreground-muted">· {d.granularity}</span>}
-                    {d.metric && <span className="ml-auto text-xs font-semibold text-foreground">{d.metric}</span>}
-                  </div>
-                  <p className="mt-0.5 text-xs text-foreground-muted">{d.note}</p>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
+      {s.dataSources && s.dataSources.length > 0 && <DataMap sources={s.dataSources} />}
       <p className="text-xs text-foreground-muted">기준 {s.generatedAt.slice(0, 16).replace("T", " ")} · 라이브 집계</p>
     </div>
   );

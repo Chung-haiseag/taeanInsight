@@ -36,6 +36,8 @@ export interface ReportSummary {
     granularity?: string;
     metric: string | null;
     note: string;
+    cat?: string;   // 영역: 관광·바다·수산·농업·날씨·안전·지역경제
+    type?: string;  // 유형: 예측·경보·시세·실측·달력·구조·검증·요인
   }>;
   generatedAt: string;
 }
