@@ -154,3 +154,14 @@ export function getAffiliationQueue(limit = 150): Promise<{ candidates: Affiliat
 export function rejectAffiliation(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/affiliations/reject`, { method: "POST", body: JSON.stringify({ id }) });
 }
+
+// 축제(event) 검수 큐 — verified=0 후보. 승인=verifyKg(kg_nodes) 재사용, 반려=삭제.
+export interface FestivalCandidate {
+  id: string; name: string; count: number; years: string[]; evidence: string[]; sources: string[];
+}
+export function getFestivalQueue(limit = 200): Promise<{ candidates: FestivalCandidate[] }> {
+  return apiFetch(`/api/admin/kg/events/pending?limit=${limit}`);
+}
+export function rejectEvent(id: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/admin/kg/events/reject`, { method: "POST", body: JSON.stringify({ id }) });
+}
