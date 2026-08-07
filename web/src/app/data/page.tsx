@@ -29,16 +29,29 @@ const EMOJI: Record<string, string> = {
   industry: "🏭", holiday: "📅", demandActuals: "📊", brief: "📣", realestate: "🏘️",
 };
 
-const TYPE_DESC: Array<{ t: string; label: string }> = [
-  { t: "예측", label: "🔮 예측" }, { t: "경보", label: "🚨 경보" }, { t: "시세", label: "💰 시세" },
-  { t: "실측", label: "📏 실측" }, { t: "달력", label: "🗓️ 달력·적기" }, { t: "배달", label: "📣 배달" },
+const TYPE_ORDER = ["예측", "경보", "시세", "실측", "달력", "구조", "검증", "요인", "배달"];
+const TYPE_ICON: Record<string, string> = {
+  "예측": "🔮", "경보": "🚨", "시세": "💰", "실측": "📏", "달력": "🗓️", "구조": "🏗️", "검증": "📊", "요인": "🧩", "배달": "📣",
+};
+// 데이터 소스별 버킷(출처 키워드로 집계)
+const SRC_BUCKETS: Array<{ label: string; kw: string[] }> = [
+  { label: "기상청 (단기예보·특보·특일)", kw: ["기상청", "특일"] },
+  { label: "국립해양조사원 (수온·파고·조석)", kw: ["해양조사원"] },
+  { label: "해양수산부 위판 (경매가·물량)", kw: ["위판"] },
+  { label: "한국관광공사 (방문자)", kw: ["관광공사"] },
+  { label: "에어코리아 (미세먼지)", kw: ["에어코리아"] },
+  { label: "KAMIS · 공영도매시장 (시세)", kw: ["KAMIS", "도매시장"] },
+  { label: "도로공사 · 국토부", kw: ["도로공사", "국토"] },
+  { label: "큐레이션 (축제·개화·제철·산업)", kw: ["큐레이션"] },
 ];
 
 export default async function DataMapPage() {
   const sources = await getDataMap();
   const live = sources.filter((s) => s.status === "live").length;
-  const typeCounts: Record<string, number> = {};
-  for (const s of sources) typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
+  const prog = sources.filter((s) => s.status === "progress").length;
+  const typeGroups = TYPE_ORDER.map((t) => ({ type: t, names: sources.filter((s) => s.type === t).map((s) => s.name) })).filter((g) => g.names.length);
+  const sourceBuckets = SRC_BUCKETS.map((b) => ({ label: b.label, n: sources.filter((s) => b.kw.some((k) => s.source.includes(k))).length })).filter((b) => b.n > 0);
+  const maxBucket = Math.max(1, ...sourceBuckets.map((b) => b.n));
 
   return (
     <div className="mx-auto max-w-[1080px]">
@@ -54,7 +67,8 @@ export default async function DataMapPage() {
         <>
           <div className="mt-6 flex flex-wrap gap-2.5">
             <Stat n={sources.length} label="데이터 소스" />
-            <Stat n={live} label="라이브" color="var(--color-accent, #0f9aa8)" />
+            <Stat n={live} label="라이브" color="#16a34a" />
+            <Stat n={prog} label="진행중" color="#d97706" />
             <Stat n={CATS.length} label="영역" />
             <Stat n={0} label="새 유료 API · 전부 무료" accent />
           </div>
@@ -76,21 +90,48 @@ export default async function DataMapPage() {
             );
           })}
 
-          <section className="mt-10 card p-5">
-            <h3 className="text-sm font-bold text-brand">유형별</h3>
-            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
-              {TYPE_DESC.map(({ t, label }) => (
-                <div key={t} className="flex items-center justify-between border-b border-brand/10 pb-1.5 text-sm">
-                  <span className="text-foreground">{label}</span>
-                  <span className="font-bold tabular-nums text-brand">{typeCounts[t] ?? 0}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2">
+            <section className="card p-5">
+              <h3 className="text-sm font-bold text-brand">데이터 소스별</h3>
+              <div className="mt-3 space-y-2.5">
+                {sourceBuckets.map((b) => (
+                  <div key={b.label} className="flex items-center gap-3 text-[0.82rem]">
+                    <span className="flex-1 text-foreground">{b.label}</span>
+                    <span className="hidden h-1.5 w-[120px] overflow-hidden rounded-full bg-brand/10 sm:block">
+                      <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.round((b.n / maxBucket) * 100)}%` }} />
+                    </span>
+                    <span className="w-5 text-right font-semibold tabular-nums text-brand">{b.n}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="card p-5">
+              <h3 className="text-sm font-bold text-brand">유형별</h3>
+              <div className="mt-3 space-y-2">
+                {typeGroups.map((g) => (
+                  <div key={g.type} className="border-b border-brand/10 pb-2 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-foreground">{TYPE_ICON[g.type] ?? "•"} {g.type}</span>
+                      <span className="font-bold tabular-nums text-brand">{g.names.length}</span>
+                    </div>
+                    <p className="mt-0.5 text-[0.7rem] leading-snug text-foreground-muted">{g.names.join(" · ")}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
 
-          <p className="hairline mt-8 pt-5 text-center text-xs text-foreground-muted">
-            출처 기상청·국립해양조사원·한국관광공사·해양수산부·에어코리아·KAMIS·한국도로공사·국토교통부·통계청 등 무료 공공데이터 · 아카이브 RAG + 실시간 근거로 출처 표기 · Cloudflare 전용
-          </p>
+          <div className="mt-6 flex flex-wrap gap-4 text-xs text-foreground-muted">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#16a34a" }} />라이브</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#d97706" }} />진행중(임시·업그레이드 대기)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#94a3b8" }} />보류·미채택</span>
+          </div>
+
+          <div className="hairline mt-6 space-y-1.5 pt-5 text-xs leading-relaxed text-foreground-muted">
+            <p><b className="text-foreground">진행중</b> — 양식 수온 경보는 현재 표층 수온 근사(임시). 실시간어장정보(용존산소·양식장 실측) 활용신청 승인 후 정식화 예정.</p>
+            <p><b className="text-foreground">보류·미채택</b> — 검색 관심도·숙박(네이버 데이터랩 신규등록 중단) · 관광소비·수요강도(KTO 카드 빈 응답) · 관광지점 입장객(태안 등록 반쪽).</p>
+            <p><b className="text-foreground">핵심 원칙</b> — 전부 무료 공공데이터·큐레이션(새 유료 API 0), 아카이브 RAG + 실시간 근거로 출처 표기, Cloudflare 전용(Workers·D1·R2).</p>
+          </div>
         </>
       )}
     </div>
