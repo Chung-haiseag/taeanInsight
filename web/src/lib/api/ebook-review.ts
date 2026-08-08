@@ -2,7 +2,7 @@
 
 import { apiFetch } from "./client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.insight.taeannews.co.kr";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 /** 백엔드가 주는 상대경로(/api/...)를 절대 URL로 */
 export function absUrl(path: string | null): string | null {
   if (!path) return null;

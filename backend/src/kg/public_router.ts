@@ -19,7 +19,7 @@ async function fetchWikiSummary(title: string): Promise<WikiSummary | null> {
   const timer = setTimeout(() => ctrl.abort(), 4000);
   try {
     const res = await fetch(`https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}?redirect=true`, {
-      headers: { "User-Agent": "TaeanInsightBot/1.0 (https://insight.taeannews.co.kr; taeannews@taeannews.co.kr)", Accept: "application/json" },
+      headers: { "User-Agent": "TaeanInsightBot/1.0 (https://axtaeannews.co.kr; taeannews@taeannews.co.kr)", Accept: "application/json" },
       signal: ctrl.signal,
     });
     if (!res.ok) return null;

@@ -50,7 +50,7 @@ const LOW_FAITH = 0.75;
 // (특히 1990은 Gemini 멀티모달 전사라 원문 대조 가드가 없어 신뢰성 고지 필요)
 const OLD_PRINT_UNTIL = 1994;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.insight.taeannews.co.kr";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
 // 전자북 기사(90000001~)면 원본 지면 스캔 URL 유도 (R2: ebook/<ymd>/page_<NN>.jpg)
 function ebookPageImage(idxno: number, section?: string | null, publishedAt?: string | null) {

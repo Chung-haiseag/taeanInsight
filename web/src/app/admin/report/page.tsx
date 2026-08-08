@@ -339,7 +339,7 @@ function OperationsInfo() {
             ["공개 앱", <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="text-accent underline">{APP_URL}</a>],
             ["백엔드 API", <a href={API_URL} target="_blank" rel="noopener noreferrer" className="text-accent underline">{API_URL}</a>],
             ["관리자 콘솔", <>{code("/admin")} · {code("/admin/kg")} · {code("/admin/report")}</>],
-            ["운영 도메인", <span className="text-foreground-muted">insight.taeannews.co.kr (미연결) · tamemory.com 이전 검토 중</span>],
+            ["운영 도메인", <span className="text-foreground-muted">axtaeannews.co.kr (라이브·Cloudflare) · API taean-insight-api.chs9182.workers.dev</span>],
           ]}
         />
       </Card>

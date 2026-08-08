@@ -38,7 +38,7 @@ emailRouter.post("/subscribe", async (c) => {
 emailRouter.get("/unsubscribe", async (c) => {
   const t = c.req.query("token");
   const html = (msg: string) =>
-    c.html(`<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><div style="font-family:system-ui;max-width:28rem;margin:4rem auto;padding:0 1rem;text-align:center;color:#2a2118"><h2>태안 인사이트</h2><p>${msg}</p><a href="https://insight.taeannews.co.kr" style="color:#b8860b">홈으로</a></div>`);
+    c.html(`<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><div style="font-family:system-ui;max-width:28rem;margin:4rem auto;padding:0 1rem;text-align:center;color:#2a2118"><h2>태안 인사이트</h2><p>${msg}</p><a href="https://axtaeannews.co.kr" style="color:#b8860b">홈으로</a></div>`);
   if (!t || !c.env.ARCHIVE_DB) return html("잘못된 요청입니다.");
   const r = await c.env.ARCHIVE_DB
     .prepare(`UPDATE email_subscribers SET status='unsubscribed', updated_at=?2 WHERE token=?1`)

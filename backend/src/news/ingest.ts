@@ -8,7 +8,7 @@ const RSS_URL = "https://www.taeannews.co.kr/rss/allArticle.xml";
 const LIST_URL = "https://www.taeannews.co.kr/news/articleList.html?view_type=sm";
 const ARTICLE_BASE = "https://www.taeannews.co.kr/news/articleView.html?idxno=";
 const TTL_MS = 10 * 60 * 1000;
-const UA = "TaeanInsightBot/0.1 (+https://insight.taeannews.co.kr; 자사 RSS 수집)";
+const UA = "TaeanInsightBot/0.1 (+https://axtaeannews.co.kr; 자사 RSS 수집)";
 
 export type NewsCategory =
   | "tourism"

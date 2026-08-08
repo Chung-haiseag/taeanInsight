@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE = "https://insight.taeannews.co.kr";
+const SITE = "https://axtaeannews.co.kr";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
 export const revalidate = 3600;
