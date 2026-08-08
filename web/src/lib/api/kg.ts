@@ -174,3 +174,6 @@ export interface EntityCoverage {
 export function getCoverage(): Promise<{ entities: EntityCoverage[]; cachedAt?: number }> {
   return apiFetch(`/api/admin/kg/coverage`);
 }
+export function assignCoverage(entityId: string, note?: string): Promise<{ ok: boolean; sent: number; skipped?: string }> {
+  return apiFetch(`/api/admin/kg/coverage/assign`, { method: "POST", body: JSON.stringify({ entityId, note }) });
+}
