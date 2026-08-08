@@ -21,7 +21,7 @@ const TABS: { key: ReportTab; label: string }[] = [
   { key: "runbook", label: "🚀 운영 절차" },
   { key: "jobs", label: "⚙️ 자동화" },
   { key: "data", label: "📦 데이터 지도" },
-  { key: "changelog", label: "🧾 변경 이력" },
+  { key: "changelog", label: "🧾 개발 연혁" },
 ];
 
 function renderTab(tab: ReportTab) {
@@ -741,7 +741,7 @@ function DataSnapshot() {
   );
 }
 
-// ── 🧾 변경 이력 ──────────────────────────────────────────────
+// ── 🧾 개발 연혁 ──────────────────────────────────────────────
 const CHANGELOG: [string, string][] = [
   ["2026-08-08", "지식그래프 온톨로지 Phase 3 — AI 답변 근거 통합(개체·검증관계로 지어내기 방지), 인물 소속 grounding·개체 사실 인용"],
   ["2026-08-08", "온톨로지 액션층·후속 — 취재 레이더(개체별 보도공백)+기자 Web Push 배정, /people 관계망 조직 노드, 승격 축제 주관·개최지 자동연결"],
@@ -776,7 +776,7 @@ const CHANGELOG: [string, string][] = [
 ];
 function Changelog() {
   return (
-    <Card title="최근 변경 이력">
+    <Card title="개발 연혁">
       <ol className="space-y-2 text-sm">
         {CHANGELOG.map(([d, t], i) => (
           <li key={i} className="flex gap-3">
