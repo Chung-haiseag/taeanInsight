@@ -165,3 +165,12 @@ export function getFestivalQueue(limit = 200): Promise<{ candidates: FestivalCan
 export function rejectEvent(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/events/reject`, { method: "POST", body: JSON.stringify({ id }) });
 }
+
+// 취재 레이더 — 온톨로지 개체별 최근 보도 커버리지(공백=취재 후보).
+export interface EntityCoverage {
+  id: string; type: string; name: string; cat: string;
+  lastMention: string | null; total: number; recent: number; gapDays: number | null; stale: boolean;
+}
+export function getCoverage(): Promise<{ entities: EntityCoverage[]; cachedAt?: number }> {
+  return apiFetch(`/api/admin/kg/coverage`);
+}
