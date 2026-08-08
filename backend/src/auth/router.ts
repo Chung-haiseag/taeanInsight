@@ -195,7 +195,8 @@ authRouter.get("/kakao/start", async (c) => {
   const redirect = safeRedirect(c.req.query("redirect"));
   const uid = c.req.query("uid") || "";
   const state = btoa(JSON.stringify({ redirect, uid })).replace(/=+$/, "");
-  const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${key}&redirect_uri=${encodeURIComponent(KAKAO_CB)}&state=${encodeURIComponent(state)}&scope=profile_nickname,account_email`;
+  // 이메일(account_email)은 비즈앱 전환 후에만 요청 가능 — 미전환 상태에선 닉네임만 요청(KOE009 방지). 이메일은 콜백에서 선택 처리.
+  const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${key}&redirect_uri=${encodeURIComponent(KAKAO_CB)}&state=${encodeURIComponent(state)}&scope=profile_nickname`;
   return c.redirect(url, 302);
 });
 
