@@ -9,17 +9,19 @@ ENV_FILE=/etc/taean.env
 
 echo "▸ 저장소: $REPO"
 
-echo "▸ 1) 필수 패키지(node18+, poppler-utils)"
+echo "▸ 1) 필수 패키지(node20+, poppler-utils, ffmpeg)"
 if command -v apt-get >/dev/null; then
-  apt-get update -y && apt-get install -y curl ca-certificates poppler-utils
+  apt-get update -y && apt-get install -y curl ca-certificates poppler-utils ffmpeg
   command -v node >/dev/null || { curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs; }
 elif command -v dnf >/dev/null || command -v yum >/dev/null; then
   (command -v dnf >/dev/null && dnf install -y poppler-utils) || yum install -y poppler-utils
+  # ffmpeg: RHEL 계열은 기본 저장소에 없을 수 있음(EPEL/RPMFusion 필요) — 실패해도 계속(WAV 폴백 동작)
+  (command -v dnf >/dev/null && dnf install -y ffmpeg) || yum install -y ffmpeg || echo "  ⚠ ffmpeg 미설치 — 기사낭독은 WAV로 업로드됨(용량↑). EPEL/RPMFusion 후 재시도 권장"
   command -v node >/dev/null || { curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && (dnf install -y nodejs || yum install -y nodejs); }
 else
-  echo "  ⚠ 패키지 매니저 미확인 — node 20+ 와 poppler-utils 수동 설치 후 재실행"; exit 1
+  echo "  ⚠ 패키지 매니저 미확인 — node 20+·poppler-utils·ffmpeg 수동 설치 후 재실행"; exit 1
 fi
-echo "  node $(node -v) · pdftotext $(command -v pdftotext || echo 없음)"
+echo "  node $(node -v) · pdftotext $(command -v pdftotext || echo 없음) · ffmpeg $(command -v ffmpeg || echo '없음(WAV 폴백)')"
 # 팟캐스트·기사낭독의 D1/R2 접근용 wrangler(헤드리스는 CLOUDFLARE_API_TOKEN 환경변수로 인증)
 command -v wrangler >/dev/null || npm install -g wrangler
 echo "  wrangler $(wrangler --version 2>/dev/null | head -1 || echo 없음)"
