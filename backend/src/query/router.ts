@@ -334,6 +334,16 @@ async function buildRelationEvidence(env: Env, query: string): Promise<SourcePar
   } catch { return []; }
 }
 
+// KG 온톨로지 근거(Phase 3) — 질의에서 조직·사건·정책 감지 시 verified=1 사실·관계를 근거로. 메인·그래프 공용.
+async function buildOntologyEvidence(env: Env, query: string): Promise<SourcePart[]> {
+  if (!env.ARCHIVE_DB) return [];
+  try {
+    const { buildOntologyFacts } = await import("../kg/ontology_evidence");
+    const f = await buildOntologyFacts(env.ARCHIVE_DB, query);
+    return f ? [{ text: f.text, source: { title: f.title, url: null } }] : [];
+  } catch { return []; }
+}
+
 // 지역언론(최신 태안 소식) 근거 — 질의 키워드 매칭 상위 3건(최신순). 메인·그래프 공용.
 async function buildRegionalNewsEvidence(env: Env, query: string): Promise<SourcePart[]> {
   if (!env.ARCHIVE_DB) return [];
@@ -627,6 +637,7 @@ queryRouter.post("/", async (c) => {
       parts.push(...(await buildFactsEvidence(c.env, query)));
       parts.push(...(await buildGunsuFactEvidence(c.env, query)));
       parts.push(...(await buildRelationEvidence(c.env, query)));
+      parts.push(...(await buildOntologyEvidence(c.env, query)));
     }
 
     // (b) 아카이브·태안뉴스 근거 검색 — 단, 순수 날씨 질문이면 기사 출처는 생략
@@ -831,6 +842,7 @@ queryRouter.post("/graph", async (c) => {
           ...(await buildFactsEvidence(c.env, query)),
           ...(await buildGunsuFactEvidence(c.env, query)),
           ...(await buildRelationEvidence(c.env, query)),
+          ...(await buildOntologyEvidence(c.env, query)),
         ],
       }),
     },
