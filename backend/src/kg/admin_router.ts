@@ -154,6 +154,15 @@ router.get("/coverage", async (c) => {
   }
 });
 
+// 취재 배정 — 공백 개체를 기자에게 Web Push + reporter_alerts 적재(하루 1회 멱등).
+router.post("/coverage/assign", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ entityId: string; note?: string }>().catch(() => ({} as { entityId: string; note?: string }));
+  if (!b.entityId) return c.json({ error: "entityId 필수" }, 400);
+  const { assignEntityCoverage } = await import("../reporter/assign");
+  return c.json(await assignEntityCoverage(c.env, b.entityId, b.note));
+});
+
 router.get("/merge/candidates", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const limit = Math.max(1, Math.min(200, Number(c.req.query("limit")) || 50));

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getCoverage, type EntityCoverage } from "@/lib/api/kg";
+import { getCoverage, assignCoverage, type EntityCoverage } from "@/lib/api/kg";
 
 // 취재 레이더 — 온톨로지 개체(조직·사건·정책)별 최근 보도 커버리지. 오래 무보도(공백)면 취재 후보로 표시.
 // 지식그래프를 편집 레이더로: 정체 심한 순으로 "후속취재 필요?"를 한눈에.
@@ -10,6 +10,16 @@ export default function CoverageRadar() {
   const [rows, setRows] = useState<EntityCoverage[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "stale">("all");
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [assigned, setAssigned] = useState<Record<string, string>>({});
+
+  async function assign(r: EntityCoverage) {
+    setAssigning(r.id);
+    try {
+      const res = await assignCoverage(r.id);
+      setAssigned((m) => ({ ...m, [r.id]: res.skipped === "already_assigned_today" ? "오늘 배정됨" : res.skipped === "no_reporters" || res.skipped === "no_vapid" ? "기자 미등록" : res.sent > 0 ? `푸시 ${res.sent}건` : "적재됨" }));
+    } catch { setAssigned((m) => ({ ...m, [r.id]: "실패" })); } finally { setAssigning(null); }
+  }
 
   async function load() {
     setErr(null); setRows(null);
@@ -53,7 +63,8 @@ export default function CoverageRadar() {
                 <th className="py-2 pr-3">최근 보도</th>
                 <th className="py-2 pr-3">공백</th>
                 <th className="py-2 pr-3">최근 1년</th>
-                <th className="py-2">누적</th>
+                <th className="py-2 pr-3">누적</th>
+                <th className="py-2">취재</th>
               </tr>
             </thead>
             <tbody>
@@ -64,7 +75,17 @@ export default function CoverageRadar() {
                   <td className="py-2 pr-3 text-xs text-foreground-muted">{r.lastMention ? String(r.lastMention).slice(0, 10) : "—"}</td>
                   <td className={`py-2 pr-3 font-semibold tabular-nums ${r.stale ? "text-amber-700" : "text-foreground-muted"}`}>{gapText(r.gapDays)}</td>
                   <td className="py-2 pr-3 tabular-nums text-foreground-muted">{r.recent}건</td>
-                  <td className="py-2 tabular-nums text-foreground-muted">{r.total}건</td>
+                  <td className="py-2 pr-3 tabular-nums text-foreground-muted">{r.total}건</td>
+                  <td className="py-2">
+                    {assigned[r.id] ? (
+                      <span className="text-xs text-emerald-700">✓ {assigned[r.id]}</span>
+                    ) : (
+                      <button type="button" disabled={assigning === r.id} onClick={() => assign(r)}
+                        className="rounded border border-brand/30 px-2 py-1 text-xs font-semibold text-brand hover:bg-brand/5 disabled:opacity-50">
+                        {assigning === r.id ? "…" : "기자 배정"}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
