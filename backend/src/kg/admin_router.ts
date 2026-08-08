@@ -57,7 +57,12 @@ router.post("/verify", async (c) => {
   if (!b.id) return c.json({ error: "id 필수" }, 400);
   if (b.table !== "kg_nodes" && b.table !== "kg_edges") return c.json({ error: "table 오류" }, 400);
   await setVerified(c.env.ARCHIVE_DB, b.table, b.id, b.verified ? 1 : 0);
-  return c.json({ ok: true });
+  // 축제 event 승격 시 이름 기반 주관·개최지·품목 자동연결(있으면).
+  let linked = 0;
+  if (b.table === "kg_nodes" && b.verified) {
+    try { const { autoConnectFestival } = await import("./festival_links"); linked = await autoConnectFestival(c.env.ARCHIVE_DB, b.id); } catch { /* 무시 */ }
+  }
+  return c.json({ ok: true, linked });
 });
 
 router.get("/article/:idxno/graph", async (c) => {
