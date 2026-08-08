@@ -211,11 +211,14 @@ authRouter.get("/kakao/callback", async (c) => {
   if (!code) return c.redirect(`${redirect}?error=kakao_denied`, 302);
 
   try {
-    // 1) code → access token
+    // 1) code → access token. 카카오는 새 REST 키에 Client Secret을 기본 활성화 → 활성 시 토큰요청에 client_secret 필수.
+    const secret = (c.env as Env & { KAKAO_CLIENT_SECRET?: string }).KAKAO_CLIENT_SECRET;
+    const tokenBody: Record<string, string> = { grant_type: "authorization_code", client_id: key, redirect_uri: KAKAO_CB, code };
+    if (secret) tokenBody.client_secret = secret;
     const tokRes = await fetch("https://kauth.kakao.com/oauth/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "authorization_code", client_id: key, redirect_uri: KAKAO_CB, code }),
+      body: new URLSearchParams(tokenBody),
     });
     const tok = await tokRes.json() as { access_token?: string };
     if (!tok.access_token) return c.redirect(`${redirect}?error=kakao_token`, 302);
