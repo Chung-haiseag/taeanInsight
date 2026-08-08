@@ -65,7 +65,7 @@ export function verifyKg(table: "kg_nodes" | "kg_edges", id: string, verified: b
 }
 
 // KG 그래프 시각화 (Task 3: 기사 관계도, 인물 Ego 네트워크)
-export interface KgGraphNode { id: string; name: string; mentions: number }
+export interface KgGraphNode { id: string; name: string; mentions: number; kind?: string }
 export interface KgGraphEdge { a: string; b: string; weight: number; reltype?: string }
 export interface KgGraphResp { nodes: KgGraphNode[]; edges: KgGraphEdge[] }
 export interface KgEgoResp { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] }

@@ -4,7 +4,7 @@ import { resolveCanonical, loadCanonicalMap, getMembers } from "./merge";
 
 export interface Edge { a: string; b: string; weight: number; reltype?: string }
 export interface Neighbor { id: string; weight: number }
-export interface GraphNode { id: string; name: string; mentions: number }
+export interface GraphNode { id: string; name: string; mentions: number; kind?: string }
 
 // 순수: centerId 인접 엣지에서 상대 id·weight 추출 → weight 내림차순(동률 id) → limit. self 제외, 중복은 최대 weight.
 export function rankNeighbors(edges: Edge[], centerId: string, limit: number): Neighbor[] {
@@ -95,6 +95,18 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
     const meshKept = resolveCanonical([], meshRaw, map).edges.filter((e) => keep.has(e.a) && keep.has(e.b) && e.a !== center && e.b !== center);
     outEdges.push(...meshKept);
   }
+  // 중심 인물의 검수된(verified=1) 소속 조직을 노드로 추가 — 인물–기관 층(Phase 3 후속).
+  try {
+    const aff = await db.prepare(
+      `SELECT e.dst_id AS id, o.name AS name FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id ` +
+      `WHERE e.rel='belongs_to' AND e.verified=1 AND e.src_id=? LIMIT 5`,
+    ).bind(center).all<{ id: string; name: string }>();
+    for (const a of aff.results ?? []) {
+      if (!keep.has(a.id)) { nodes.push({ id: a.id, name: a.name, mentions: 60, kind: "org" }); keep.add(a.id); }
+      outEdges.push({ a: center, b: a.id, weight: 30, reltype: "소속" });
+    }
+  } catch { /* 무시 */ }
+
   return {
     center: { id: center, name: centerNode.name },
     nodes,
