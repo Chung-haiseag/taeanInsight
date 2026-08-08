@@ -9,7 +9,7 @@ export interface SsoConfig {
   taeanUserInfoUrl: string;         // https://taeannews.co.kr/oauth/userinfo
   clientId: string;
   clientSecret: string;
-  redirectUri: string;              // https://api.insight.taeannews.co.kr/api/auth/sso/callback
+  redirectUri: string;              // https://taean-insight-api.chs9182.workers.dev/api/auth/sso/callback
   jwtSecret: string;
 }
 

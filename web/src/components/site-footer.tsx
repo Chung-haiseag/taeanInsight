@@ -16,7 +16,7 @@ export function SiteFooter() {
           <p className="text-background/70 leading-relaxed">
             태안의 관광·환경·부동산 예측 인사이트를 AI로.
             <br />
-            insight.taeannews.co.kr
+            axtaeannews.co.kr
           </p>
         </div>
         <div>

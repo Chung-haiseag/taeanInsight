@@ -182,9 +182,9 @@ authRouter.post("/delete", async (c) => {
 // ── 카카오 로그인(OAuth) ────────────────────────────────
 const KAKAO_CB = "https://taean-insight-api.chs9182.workers.dev/api/auth/kakao/callback";
 // 세션 토큰이 리다이렉트로 전달되므로 신뢰 호스트로만 — 오픈 리다이렉트(계정 탈취) 방지
-const REDIRECT_HOSTS = new Set(["insight.taeannews.co.kr", "taean-insight.chs9182.workers.dev"]);
+const REDIRECT_HOSTS = new Set(["axtaeannews.co.kr", "www.axtaeannews.co.kr", "insight.taeannews.co.kr", "taean-insight.chs9182.workers.dev"]);
 function safeRedirect(url: string | undefined): string {
-  const fallback = "https://insight.taeannews.co.kr/login";
+  const fallback = "https://axtaeannews.co.kr/login";
   try { return REDIRECT_HOSTS.has(new URL(url ?? "").hostname) ? url! : fallback; } catch { return fallback; }
 }
 
@@ -205,7 +205,7 @@ authRouter.get("/kakao/callback", async (c) => {
   const key = (c.env as Env & { KAKAO_REST_KEY?: string }).KAKAO_REST_KEY;
   if (!db || !key) return c.text("unconfigured", 503);
   const code = c.req.query("code");
-  let redirect = "https://insight.taeannews.co.kr/login", uid = "";
+  let redirect = "https://axtaeannews.co.kr/login", uid = "";
   try { const st = JSON.parse(atob(c.req.query("state") || "")); redirect = safeRedirect(st.redirect); uid = st.uid || ""; } catch { /* */ }
   if (!code) return c.redirect(`${redirect}?error=kakao_denied`, 302);
 

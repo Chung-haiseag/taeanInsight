@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         <div style={{ display: "flex", fontSize: 30, color: "#4FB3BD", letterSpacing: 2, fontWeight: 700 }}>{tag}</div>
         <div style={{ display: "flex", fontSize: 66, lineHeight: 1.25 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 28, color: "#4FB3BD" }}>
-          <div style={{ width: 48, height: 8, background: "#4FB3BD" }} /> insight.taeannews.co.kr
+          <div style={{ width: 48, height: 8, background: "#4FB3BD" }} /> axtaeannews.co.kr
         </div>
       </div>
     ),

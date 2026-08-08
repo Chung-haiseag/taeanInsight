@@ -1,8 +1,8 @@
 // 백엔드 API 클라이언트 — fetch 기반, JWT Bearer 자동 부착
 // PRD v1.8 §6 REQ-PRODUCT-005
 
-// 운영 도메인(api.insight.taeannews.co.kr) 미연결 상태 — 폴백은 실존하는 workers.dev로.
-// env 누락 시에도 동작하도록. 운영 도메인 연결 후 교체.
+// 공개 도메인 axtaeannews.co.kr(웹). API는 taean-insight-api.chs9182.workers.dev.
+// env(NEXT_PUBLIC_API_BASE_URL) 누락 시에도 동작하도록 workers.dev API로 폴백.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
 // 로그인 세션 토큰 키 — auth.ts(AUTH_KEY="taean-auth-token")와 동일해야 apiFetch가 세션 Bearer를 보낸다.
