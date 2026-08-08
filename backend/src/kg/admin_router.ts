@@ -9,6 +9,7 @@ import { searchPersons, buildPersonProfile, buildPersonBrief } from "./people";
 import { listPendingRelations, setRelation, isReltype } from "./relations";
 import { loadAffiliationQueue, rejectAffiliation } from "./affiliation_queue";
 import { loadFestivalQueue, rejectEvent } from "./event_queue";
+import { loadEntityCoverage } from "./coverage";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -135,6 +136,22 @@ router.post("/events/reject", async (c) => {
   const b = await c.req.json<{ id: string }>().catch(() => ({} as { id: string }));
   if (!b.id) return c.json({ error: "id 필수" }, 400);
   return c.json({ ok: await rejectEvent(c.env.ARCHIVE_DB, b.id) });
+});
+
+// 취재 레이더 — 온톨로지 개체별 최근 보도 커버리지(공백=취재 후보). D1 12h 캐시(계산 비용).
+router.get("/coverage", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const db = c.env.ARCHIVE_DB;
+  const now = new Date().toISOString();
+  try {
+    const cached = await db.prepare(`SELECT v, ts FROM kv_cache WHERE k='kg-coverage'`).first<{ v: string; ts: number }>();
+    if (cached && Date.now() - cached.ts < 12 * 3600 * 1000) return c.json({ entities: JSON.parse(cached.v), cachedAt: cached.ts });
+    const entities = await loadEntityCoverage(db, now);
+    await db.prepare(`INSERT INTO kv_cache(k,v,ts) VALUES('kg-coverage',?1,?2) ON CONFLICT(k) DO UPDATE SET v=?1, ts=?2`).bind(JSON.stringify(entities), Date.now()).run();
+    return c.json({ entities });
+  } catch (e) {
+    return c.json({ error: "coverage_failed", detail: String(e) }, 500);
+  }
 });
 
 router.get("/merge/candidates", async (c) => {

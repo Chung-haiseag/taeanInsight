@@ -338,9 +338,15 @@ async function buildRelationEvidence(env: Env, query: string): Promise<SourcePar
 async function buildOntologyEvidence(env: Env, query: string): Promise<SourcePart[]> {
   if (!env.ARCHIVE_DB) return [];
   try {
-    const { buildOntologyFacts } = await import("../kg/ontology_evidence");
-    const f = await buildOntologyFacts(env.ARCHIVE_DB, query);
-    return f ? [{ text: f.text, source: { title: f.title, url: null } }] : [];
+    const { buildOntologyFacts, buildAffiliationFacts } = await import("../kg/ontology_evidence");
+    const [entity, person] = await Promise.all([
+      buildOntologyFacts(env.ARCHIVE_DB, query),
+      buildAffiliationFacts(env.ARCHIVE_DB, query),
+    ]);
+    const out: SourcePart[] = [];
+    if (entity) out.push({ text: entity.text, source: { title: entity.title, url: null } });
+    if (person) out.push({ text: person.text, source: { title: person.title, url: null } });
+    return out;
   } catch { return []; }
 }
 

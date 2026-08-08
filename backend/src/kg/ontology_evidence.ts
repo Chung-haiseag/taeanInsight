@@ -65,6 +65,29 @@ export function formatOntologyFacts(entity: OntoNode, edges: OntoEdge[]): string
   return `[확인된 사실 · 지식그래프] ${lead} — ${body}`;
 }
 
+/** 질의에 등장하는 인물의 verified=1 소속 사실(Phase 3 후속). 승격된 belongs_to만(201건 규모). */
+export async function buildAffiliationFacts(db: D1Database, query: string): Promise<{ text: string; title: string } | null> {
+  const r = await db
+    .prepare(
+      `SELECT p.name AS person, o.name AS org, json_extract(e.attrs_json,'$.role') AS role
+       FROM kg_edges e JOIN kg_nodes p ON p.id=e.src_id JOIN kg_nodes o ON o.id=e.dst_id
+       WHERE e.rel='belongs_to' AND e.verified=1`,
+    )
+    .all<{ person: string; org: string; role: string | null }>();
+  const q = String(query || "");
+  const byPerson = new Map<string, string[]>();
+  for (const row of r.results ?? []) {
+    if (!row.person || row.person.length < 2 || !q.includes(row.person)) continue;
+    const label = row.role ? `${row.org}(${row.role})` : row.org;
+    if (!byPerson.has(row.person)) byPerson.set(row.person, []);
+    const arr = byPerson.get(row.person)!;
+    if (!arr.includes(label)) arr.push(label);
+  }
+  if (byPerson.size === 0) return null;
+  const parts = [...byPerson.entries()].slice(0, 3).map(([person, orgs]) => `${person} — 소속: ${orgs.slice(0, 4).join("·")}`);
+  return { text: `[확인된 사실 · 지식그래프] ${parts.join(" / ")}`, title: `${[...byPerson.keys()].slice(0, 3).join("·")} 소속 · 지식그래프(검증된 사실)` };
+}
+
 /** 로더: verified=1 개체 후보 로드 → 감지 → verified=1 엣지 조회 → 근거 블록. */
 export async function buildOntologyFacts(db: D1Database, query: string): Promise<{ text: string; title: string } | null> {
   const nres = await db
