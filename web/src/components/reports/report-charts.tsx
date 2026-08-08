@@ -556,7 +556,7 @@ export function FestivalCalendar({ festivals }: { festivals: FestivalView[] }) {
       <ul className="mt-3 space-y-2">
         {festivals.slice(0, 6).map((f) => (
           <li key={f.key} className="flex items-center gap-2.5">
-            <span className="w-14 shrink-0 text-xs font-semibold tabular-nums text-foreground-muted">{mmdd(f.nextStart)}~{mmdd(`2026-${String(f.to[0]).padStart(2, "0")}-${String(f.to[1]).padStart(2, "0")}`)}</span>
+            <span className="min-w-[3.6rem] shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-foreground-muted">{mmdd(f.nextStart)}~{mmdd(`2026-${String(f.to[0]).padStart(2, "0")}-${String(f.to[1]).padStart(2, "0")}`)}</span>
             <span className="flex-1 text-sm font-medium text-brand">{f.name}<span className="ml-1.5 text-[0.7rem] text-foreground-muted">{f.area}</span></span>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${FEST_STYLE[f.impact]}`}>{f.impact}</span>
           </li>
