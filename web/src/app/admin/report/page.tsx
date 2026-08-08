@@ -142,7 +142,7 @@ function ProjectOverview() {
         <KV
           rows={[
             ["주 대상", <>태안 주민·관광객 · 기자/시민기자 · 지역 기관</>],
-            ["차별점", <>전국 범용 AI가 아닌 <strong>태안 특화 근거</strong>(아카이브+공공데이터)에 출처 표기·지어내기 방지</>],
+            ["차별점", <>전국 범용 AI가 아닌 <strong>태안 특화 근거</strong>(아카이브+공공데이터+<strong>지식그래프 온톨로지</strong>)에 출처 표기·지어내기 방지</>],
             ["비용 구조", <>Cloudflare 종량(무료 티어 중심)·Workers AI로 <strong>저비용 운영</strong>, 고가 API 지양</>],
             ["운영 주체", <>주간태안신문</>],
           ]}
@@ -163,22 +163,26 @@ function ProjectOverview() {
 
       <Card title="핵심 기능">
         <ul className="space-y-1.5 text-sm">
-          <li>🔎 <strong>AI 질의응답</strong> — 아카이브 RAG(FTS5+의미검색) + 실시간 근거(날씨·대기질·관광)로 출처 표기</li>
-          <li>📰 <strong>뉴스 아카이브</strong> — 자사·지역언론 수집, 전문 검색, 인물 지식그래프</li>
+          <li>🔎 <strong>AI 질의응답</strong> — 아카이브 RAG(FTS5+의미검색) + 실시간 근거(날씨·대기질·관광) + <strong>지식그래프 검증 사실</strong>로 출처 표기</li>
+          <li>🕸 <strong>지식그래프 온톨로지</strong> — 인물·조직·사건·정책·장소·품목 6종 개체 + 관계, <strong>검증(verified) 사실만</strong> 답변 근거(지어내기 방지)</li>
+          <li>📊 <strong>예측 인사이트</strong> — 낚시 출조·낙조·제철·해무·미세먼지·개화·위판 시세/추세·산불·영농·양식 등 조건부 경보·예보</li>
+          <li>📍 <strong>실시간 현황(/live)</strong> · 🗺 <strong>공개 데이터 지도(/data)</strong> — 지금 태안 한눈에 + 데이터 소스·온톨로지 투명 공개</li>
+          <li>📰 <strong>뉴스 아카이브 · 인물 탐색(/people)</strong> — 자사·지역언론 수집, 전문 검색, 관계망·AI 전기</li>
           <li>🖨 <strong>지면 디지털화</strong> — 1990~2001 옛 지면 OCR→기사화(Google Vision + Gemini)</li>
           <li>👥 <strong>회원 등급 시스템</strong> — 비로그인·회원·시민기자·기자·관리자·최종관리자 6계층</li>
           <li>🖊 <strong>시민기자 투고</strong> — 신청·승인 후 <code className="text-xs">/write</code>에서 AI 보조 작성→검수 큐</li>
           <li>📅 <strong>주간 리포트·오디오</strong> — 자동 생성 리포트 + 나레이션(Gemini)</li>
-          <li>🔔 <strong>취재 알림</strong> — 군청공지·특보·데이터 급변·키워드 트리거 Web Push</li>
+          <li>📡 <strong>취재 레이더·알림</strong> — 개체별 보도공백·군청공지·특보·데이터 급변·키워드 → 기자 Web Push</li>
         </ul>
       </Card>
 
-      <Card title="현황(2026-07)">
+      <Card title="현황(2026-08)">
         <ul className="space-y-1 text-sm text-foreground-muted">
-          <li>· 회원 등급·접근 계층 시스템(Plan 1~4) 완결·라이브.</li>
-          <li>· 지면 디지털화 1990~2001 전량 라이브.</li>
-          <li>· 최종관리자 부트스트랩 완료(소유자 1인).</li>
-          <li>· 검토 중: 도메인 이전(tamemory.com, 보류).</li>
+          <li>· 공개 도메인 <strong>axtaeannews.co.kr</strong> 라이브(Cloudflare).</li>
+          <li>· 지식그래프 <strong>온톨로지 Phase 1~3 완결</strong> — 개체 6종·관계 8종, 검증 사실을 AI 답변 근거로 통합.</li>
+          <li>· 예측 인사이트 대량 라이브(날씨·바다·수산·농업·안전) + 관광 수요지수 실측 보정.</li>
+          <li>· 회원 등급 시스템(Plan 1~4)·지면 디지털화 1990~2001 전량 라이브.</li>
+          <li>· 검수 대기: 소속·축제 후보(관리자 승인 시 AI 근거 자동 확대).</li>
         </ul>
       </Card>
     </div>
@@ -193,7 +197,8 @@ const GLOSSARY: [string, string][] = [
   ["임베딩 / bge-m3", "문장을 1024차원 벡터로 바꿔 '의미가 가까운' 글을 찾게 하는 다국어 모델."],
   ["RRF", "Reciprocal Rank Fusion — 키워드 순위와 의미 순위를 순위 기반으로 합치는 융합법."],
   ["GraphRAG", "지식그래프(인물·관계)를 RAG에 얹어, 검색만으로 안 잡히는 '관계·맥락' 근거까지 답변에 넣는 접근."],
-  ["verified", "사람이 검수해 사실로 확정한 데이터. 답변에는 verified만 신뢰해 주입한다."],
+  ["온톨로지", "개체 종류(인물·조직·사건·정책…)와 관계(소속·주관·추진…)를 정의한 지식 스키마. 흩어진 데이터를 사람이 이해하는 개념으로 묶어 AI 답변·행동의 뼈대로 쓴다(팔란티어 Foundry와 같은 접근)."],
+  ["verified(2층)", "사람이 검수해 사실로 확정한 데이터(사실층). 자동추출분(탐색층, verified=0)은 통계·탐색에만, 답변 근거·라벨에는 verified만 신뢰해 주입한다."],
 ];
 
 function Flow({ steps }: { steps: string[] }) {
@@ -231,12 +236,13 @@ function TechOverview() {
         </ul>
       </Card>
 
-      <Card title="② 지식그래프 증강 (GraphRAG 접근)">
+      <Card title="② 지식그래프 온톨로지 (GraphRAG + Foundry식 온톨로지)">
         <ul className="space-y-1.5 text-sm">
-          <li>· <strong>구축</strong>: 전 코퍼스 기사에서 인물 NER(Gemini Flash-Lite)→본문충실 필터→{code("kg_nodes")}(인물 ~3.4만)·{code("kg_mentions")}, 공유쌍 집계로 <strong>공동등장 엣지 ~127만</strong></li>
-          <li>· <strong>관계 라벨</strong>: 협력·동료 / 대립·갈등 / 소속·상하 / 전임·후임 / 가족·인척 / 기타 6종(Gemini, 제목 근거 불명확은 보수적 기타)</li>
-          <li>· <strong>정제</strong>: 동명이인 병합(canonical·맥락 겹침 검수), 초허브(기자 바이라인) 제외로 노이즈 억제</li>
-          <li>· <strong>답변 주입</strong>: 질의에 인물이 감지되면 그래프 기반 <strong>인물 브리핑</strong> + <strong>관계 근거</strong>를 결합. 자동추출분은 미검증(verified=0)이라 관리자 <code className="text-xs">/admin/kg</code> 탐색·검수용으로 구분</li>
+          <li>· <strong>개체 6종·관계 8종</strong>({code("kg_ontology")} 데이터 주도): 인물(~3.4만)·조직·사건·정책·장소·품목 + 공동등장(~127만)·소속·주관·추진·개최지·역임·취급·관련</li>
+          <li>· <strong>구축</strong>: 인물 NER(Gemini)·공동등장 집계 + 소속(인물→조직)·축제(사건)를 <strong>결정론 규칙으로 아카이브에서 자동추출</strong>(직함 큐·성씨 사전·근거 문장)</li>
+          <li>· <strong>2층 구조(지어내기 방지)</strong>: 탐색층(verified=0, 통계·관계망만) vs 사실층(verified=1, 검수 통과). <strong>AI 답변 근거·라벨은 verified=1만</strong></li>
+          <li>· <strong>검수·승격</strong>: 관리자 <code className="text-xs">/admin/kg</code>(소속·축제·관계 검수, 취재 레이더). 승격할수록 근거 확대 — 예: 승격된 소속 "가세로 → 태안군청(군수)"이 답변에 인용</li>
+          <li>· <strong>답변 주입</strong>: 질의에서 인물·조직·사건·정책 감지 → 검증된 사실·관계를 근거로("튤립축제 주관 태안군청·개최지 코리아플라워파크", "가로림만 조력발전 무산")</li>
         </ul>
       </Card>
 
@@ -513,23 +519,25 @@ function Roadmap() {
     <div className="space-y-4">
       <Card title="완료">
         <ul className="space-y-1.5">
-          <RoadItem s="done">회원 등급·접근 계층 시스템(비로그인~최종관리자 6계층) — Plan 1~4 라이브</RoadItem>
-          <RoadItem s="done">시민기자 신청·승인 + <code className="text-xs">/write</code> 통합 투고 에디터</RoadItem>
-          <RoadItem s="done">지면 디지털화 1990~2001 전량</RoadItem>
-          <RoadItem s="done">지식그래프(인물·관계) 구축·검수 콘솔</RoadItem>
-          <RoadItem s="done">하이브리드 검색(FTS5+Vectorize RRF)·임베딩 백필</RoadItem>
-          <RoadItem s="done">주간 리포트·오디오 나레이션 · 취재 알림(Web Push)</RoadItem>
-          <RoadItem s="done">관리자 보고서 허브(이 화면)</RoadItem>
+          <RoadItem s="done">공개 도메인 axtaeannews.co.kr 라이브(Cloudflare)</RoadItem>
+          <RoadItem s="done">지식그래프 온톨로지 Phase 1~3 — 개체 6종·관계 8종, 소속·축제 자동추출·검수, <strong>검증 사실 AI 답변 근거 통합</strong></RoadItem>
+          <RoadItem s="done">예측 인사이트 — 낚시·낙조·제철·해무·미세먼지·개화·위판 시세/추세·산불·영농·양식(조건부)</RoadItem>
+          <RoadItem s="done">공개 데이터 지도(/data)·실시간 현황(/live)·인물 탐색(/people)</RoadItem>
+          <RoadItem s="done">관광 수요지수 실측 보정(KTO 방문자) · 취재 레이더 → 기자 Web Push 배정</RoadItem>
+          <RoadItem s="done">회원 등급 시스템(6계층 Plan 1~4) · 시민기자 신청·<code className="text-xs">/write</code> 투고 에디터</RoadItem>
+          <RoadItem s="done">지면 디지털화 1990~2001 · 하이브리드 검색(FTS5+Vectorize RRF)·임베딩 백필</RoadItem>
+          <RoadItem s="done">주간 리포트·오디오 나레이션 · 관리자 보고서·대시보드</RoadItem>
         </ul>
       </Card>
       <Card title="진행/검토">
         <ul className="space-y-1.5">
-          <RoadItem s="wip">보고서 탭 확장(현재 문서)</RoadItem>
-          <RoadItem s="wait">도메인 tamemory.com 이전 — 보류(Cloudflare 커스텀도메인·Kakao 콜백 갱신 필요)</RoadItem>
+          <RoadItem s="wip">소속·축제 후보 검수 승격(관리자 <code className="text-xs">/admin/kg</code>) — 승인할수록 AI 근거 자동 확대</RoadItem>
+          <RoadItem s="wip">온톨로지 Phase 2b 사건·정책 확장 · Phase 3 액션층(취재 배정) 심화</RoadItem>
         </ul>
       </Card>
       <Card title="대기 (사용자 액션 필요)">
         <ul className="space-y-1.5">
+          <RoadItem s="wait">양식 수온경보 정식화 — 실시간어장정보 data.go.kr 15058376 활용신청</RoadItem>
           <RoadItem s="wait">인구 추이 — data.go.kr 15108065 활용신청</RoadItem>
           <RoadItem s="wait">해상 데이터(밀물·수온·파고) — KHOA 바다누리 전용키</RoadItem>
           <RoadItem s="wait">오디오 나레이션 커버리지 — Gemini 무료키 추가</RoadItem>
@@ -538,8 +546,8 @@ function Roadmap() {
       </Card>
       <Card title="후속 정리(minor)">
         <ul className="space-y-1 text-sm text-foreground-muted">
-          <li>· 시민기자 반려 후 role=citizen 잔존(멱등성) — admin 회수 가능</li>
-          <li>· 현직 의원 사진·회의록/조례 검색 연동</li>
+          <li>· 예측 적중률 공개(백테스트 ~5주말 축적 후)</li>
+          <li>· 회의록/조례 검색 연동 · 시민기자 반려 후 role 잔존(멱등성) 정리</li>
         </ul>
       </Card>
     </div>
