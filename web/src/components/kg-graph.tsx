@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 
-interface N { id: string; name: string; mentions: number }
+interface N { id: string; name: string; mentions: number; kind?: string }
 interface E { a: string; b: string; weight: number; reltype?: string; estimated?: boolean }
 
 // 관계 유형별 색(검수된 관계만 프런트에서 reltype을 실어 보냄). light/dark 공용은 아래 pal()에서 톤 조정.
@@ -11,7 +11,9 @@ const REL_COLOR: Record<string, string> = {
   "전임·후임": "#7c3aed",
   "소속·상하": "#2563eb",
   "가족·인척": "#d97706",
+  "소속": "#0891b2",
 };
+const ORG_COLOR = "#0891b2"; // 조직 노드(인물과 구분)
 
 export default function KgGraph({
   nodes, edges, onNodeClick, centerId, height = 420,
@@ -118,14 +120,16 @@ export default function KgGraph({
       for (const n of ns) { const dim = selected && !(eg && eg.has(n.id)); ctx!.globalAlpha = dim ? 0.16 : 1; const nx = PX(n), ny = PY(n);
         if (n.center) { ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 6, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 3; ctx!.stroke(); }
         else if (n.id === selected) { ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 5, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2.5; ctx!.stroke(); }
-        ctx!.beginPath(); ctx!.arc(nx, ny, n.r, 0, Math.PI * 2); ctx!.fillStyle = n.center ? P.nodeC : P.node; ctx!.fill();
+        if (n.kind === "org") { ctx!.beginPath(); roundRect(ctx!, nx - n.r, ny - n.r, n.r * 2, n.r * 2, 4); ctx!.fillStyle = ORG_COLOR; ctx!.fill(); }
+        else { ctx!.beginPath(); ctx!.arc(nx, ny, n.r, 0, Math.PI * 2); ctx!.fillStyle = n.center ? P.nodeC : P.node; ctx!.fill(); }
         if (n.id === hovered && !dim) { ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2; ctx!.stroke(); }
       }
       // 라벨
       ctx!.globalAlpha = 1; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
-      for (const n of ns) { const show = n.center || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
+      for (const n of ns) { const show = n.center || n.kind === "org" || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
         ctx!.font = (n.center ? "800 13px " : n.id === selected ? "700 12px " : "600 12px ") + FONT; const ly = PY(n) + n.r + 11;
-        ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(n.name, PX(n), ly); ctx!.fillStyle = P.label; ctx!.fillText(n.name, PX(n), ly);
+        const label = n.kind === "org" ? `🏢 ${n.name}` : n.name;
+        ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(label, PX(n), ly); ctx!.fillStyle = n.kind === "org" ? ORG_COLOR : P.label; ctx!.fillText(label, PX(n), ly);
       }
     }
     function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
@@ -169,7 +173,7 @@ export default function KgGraph({
       return best;
     }
     function rel(ev: PointerEvent) { const r = cv!.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
-    const onDown = (ev: PointerEvent) => { const p = rel(ev); const n = pick(p.x, p.y); selected = n && n === selected ? null : n; draw(); if (n && clickRef.current) clickRef.current(n); };
+    const onDown = (ev: PointerEvent) => { const p = rel(ev); const n = pick(p.x, p.y); selected = n && n === selected ? null : n; draw(); if (n && clickRef.current && byId[n]?.kind !== "org") clickRef.current(n); };
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerType === "touch") return;
       const p = rel(ev); const n = pick(p.x, p.y); cv!.style.cursor = n ? "pointer" : "default";
