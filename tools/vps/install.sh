@@ -33,20 +33,20 @@ if [ ! -f "$ENV_FILE" ]; then
 else echo "  이미 존재 — 유지"; fi
 
 echo "▸ 3) systemd 유닛 설치(taean- 네임스페이스, WorkingDirectory=$REPO)"
-for u in taean-gov taean-cctv taean-podcast taean-newsaudio taean-briefing; do
+for u in taean-gov taean-cctv taean-podcast taean-newsaudio taean-briefing taean-transcode; do
   sed "s#__REPO__#$REPO#g" "$REPO/tools/vps/$u.service" > "/etc/systemd/system/$u.service"
   cp "$REPO/tools/vps/$u.timer" "/etc/systemd/system/$u.timer"
 done
 systemctl daemon-reload
 
 echo "▸ 4) 타이머 활성화"
-systemctl enable --now taean-gov.timer taean-cctv.timer taean-podcast.timer taean-newsaudio.timer taean-briefing.timer
+systemctl enable --now taean-gov.timer taean-cctv.timer taean-podcast.timer taean-newsaudio.timer taean-briefing.timer taean-transcode.timer
 systemctl list-timers --no-pager | grep taean || true
 
 cat <<MSG
 
 ✅ 완료(echotwin과 공존, taean- 네임스페이스)
-  · 군청 6h · CCTV 30분 · 팟캐스트 금 18:00 · 기사낭독 매일 07:00
+  · 군청 6h · CCTV 30분 · 팟캐스트 금 18:00 · 기사낭독 매일 07:00 · MP3변환 매일 08:00
 즉시 1회 실행/검증:
   sudo systemctl start taean-gov.service   && journalctl -u taean-gov.service   -n 20 --no-pager
   sudo systemctl start taean-cctv.service  && journalctl -u taean-cctv.service  -n 20 --no-pager
