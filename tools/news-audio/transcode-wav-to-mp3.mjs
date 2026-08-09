@@ -18,6 +18,13 @@ const DRY = process.argv.includes("--dry");
 function wrangler(args, opts = {}) {
   return execFileSync("npx", ["wrangler", ...args], { maxBuffer: 128 << 20, ...opts });
 }
+function d1(sql) { const out = wrangler(["d1", "execute", "taean-archive", "--remote", "--json", "--command", sql], { encoding: "utf8" }); return JSON.parse(out.slice(out.indexOf("[")))[0]?.results ?? []; }
+function r2Has(key) { try { wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "ignore", "ignore"] }); return true; } catch { return false; } }
+// ADMIN_TOKEN(manifest) 없을 때(VPS) — 최신 뉴스 idxno로 -gem2.wav 존재분만 대상(팟캐스트/브리핑 제외).
+function newsWavsFromD1(limit = 80) {
+  const rows = d1(`SELECT idxno FROM archive_articles WHERE length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT ${limit}`);
+  return rows.map((r) => `audio/news/${r.idxno}-gem2.wav`).filter((k) => r2Has(k));
+}
 function loadToken() {
   if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN;
   try {
@@ -36,13 +43,18 @@ async function manifest(prefix) {
 const onlyWav = (arr) => (arr || []).filter((k) => k.endsWith(".wav"));
 
 async function main() {
-  const n = await manifest("audio/news/");
-  const p = await manifest("audio/podcast/");
-  const b = await manifest("audio/briefing/");
-  // 트랜스코딩 대상 = 현행 서빙 WAV
-  const transcode = [...onlyWav(n.gem2), ...onlyWav(p.gem), ...onlyWav(b.gem)];
-  // 삭제만 = news 구본(-gem.wav, 서빙 안 됨)
-  const del = onlyWav(n.gem);
+  let transcode, del;
+  if (loadToken()) {
+    const n = await manifest("audio/news/");
+    const p = await manifest("audio/podcast/");
+    const b = await manifest("audio/briefing/");
+    transcode = [...onlyWav(n.gem2), ...onlyWav(p.gem), ...onlyWav(b.gem)]; // 현행 서빙 WAV
+    del = onlyWav(n.gem); // 삭제만 = news 구본(-gem.wav, 서빙 안 됨)
+  } else {
+    console.log("ADMIN_TOKEN 없음 → 뉴스 wav만 D1 기반으로 변환(팟캐스트/브리핑 제외)");
+    transcode = newsWavsFromD1();
+    del = [];
+  }
 
   console.log(`트랜스코딩 대상 ${transcode.length}건 · 구본 삭제 ${del.length}건`);
   if (DRY) {

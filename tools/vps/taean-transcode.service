@@ -1,0 +1,11 @@
+[Unit]
+Description=Taean 오디오 WAV→MP3 변환 (용량 회수, 한국 IP)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/taean.env
+WorkingDirectory=__REPO__
+ExecStart=/usr/bin/node tools/news-audio/transcode-wav-to-mp3.mjs
+Nice=15
+TimeoutStartSec=1800
