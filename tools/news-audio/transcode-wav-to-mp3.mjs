@@ -64,11 +64,14 @@ async function main() {
     return;
   }
 
-  let ok = 0, fail = 0, saved = 0;
+  let ok = 0, fail = 0, skip = 0, saved = 0;
   for (const key of transcode) {
     const mp3Key = key.replace(/\.wav$/, ".mp3");
+    // get 실패 = wav 없음(이미 mp3) → 조용히 스킵. get 성공 후 변환/업로드 실패만 fail로.
+    let wavBuf;
+    try { wavBuf = wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "pipe", "ignore"] }); }
+    catch { skip++; continue; }
     try {
-      const wavBuf = wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "pipe", "ignore"] });
       const mp3 = wavToMp3(wavBuf);
       const tmp = join(tmpdir(), `tc-${process.pid}-${ok}.mp3`);
       writeFileSync(tmp, mp3);
@@ -77,17 +80,13 @@ async function main() {
       wrangler(["r2", "object", "delete", `${BUCKET}/${key}`, "--remote"], { stdio: "ignore" });
       ok++; saved += wavBuf.length - mp3.length;
       console.log(`  ✓ ${key} → mp3 (${(wavBuf.length / 1048576).toFixed(1)}→${(mp3.length / 1048576).toFixed(2)}MB)`);
-    } catch (e) {
-      const msg = String(e.message || e);
-      if (/not found|does not exist|404|specified key|No such/i.test(msg)) continue; // wav 없음(이미 mp3) — 조용히 스킵
-      fail++; console.log(`  ✗ ${key}: ${msg.slice(0, 100)}`);
-    }
+    } catch (e) { fail++; console.log(`  ✗ ${key}: ${String(e.message || e).slice(0, 100)}`); }
   }
   let delOk = 0;
   for (const key of del) {
     try { wrangler(["r2", "object", "delete", `${BUCKET}/${key}`, "--remote"], { stdio: "ignore" }); delOk++; }
     catch (e) { console.log(`  ✗ 삭제 ${key}: ${String(e.message || e).slice(0, 80)}`); }
   }
-  console.log(`완료 — 변환 ${ok} · 실패 ${fail} · 구본삭제 ${delOk} · 절감 ${(saved / 1048576).toFixed(0)}MB`);
+  console.log(`완료 — 변환 ${ok} · 스킵(이미 mp3) ${skip} · 실패 ${fail} · 구본삭제 ${delOk} · 절감 ${(saved / 1048576).toFixed(0)}MB`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
