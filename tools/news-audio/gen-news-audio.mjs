@@ -12,7 +12,6 @@ import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
-import { wavToMp3 } from "../lib/wav-to-mp3.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
@@ -120,7 +119,7 @@ async function loadGem2Set() {
     const res = await fetch(`${API_BASE}/api/audio/manifest?keys=1`, { headers: { "X-Admin-Token": token } });
     if (!res.ok) return null;
     const j = await res.json();
-    return new Set((j.keysByFormat?.gem2 || []).map((k) => k.match(/\/(\d+)-gem2\.wav$/)?.[1]).filter(Boolean));
+    return new Set((j.keysByFormat?.gem2 || []).map((k) => k.match(/\/(\d+)-gem2\.(?:wav|mp3)$/)?.[1]).filter(Boolean));
   } catch { return null; }
 }
 
@@ -136,7 +135,7 @@ async function main() {
   const picked = [];
   for (const r of idRows) {
     const id = String(r.idxno);
-    if (!FORCE && (gem2 ? gem2.has(id) : r2Has(`audio/news/${id}-gem2.wav`))) continue;
+    if (!FORCE && (gem2 ? gem2.has(id) : (r2Has(`audio/news/${id}-gem2.wav`) || r2Has(`audio/news/${id}-gem2.mp3`)))) continue;
     picked.push(r);
     if (picked.length >= MAX) break;
   }
@@ -152,21 +151,18 @@ async function main() {
 
   let done = 0, fail = 0, exhaustedRun = false;
   for (const a of rows) {
-    const key = `audio/news/${a.idxno}-gem2.mp3`;
     const script = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     const r = await geminiTts(script);
     if (r.exhausted) { exhaustedRun = true; console.log(`  ⚠ 무료 한도 소진 — 나머지 ${picked.length - done - fail}건은 음성 없음(다음 실행 재시도). (생성 ${done})`); break; }
     if (r.skip) { fail++; console.log(`  ⤼ ${a.idxno} 건너뜀(TTS 반복 오류) — 음성 없음`); continue; }
-    // ffmpeg로 MP3 변환(용량↓). ffmpeg 없거나 깨지면 원본 WAV로 업로드(라우터가 -gem2.wav도 서빙) — 중단 방지.
-    let body, putKey, ct, ext;
-    try { body = wavToMp3(r.audio); putKey = key; ct = "audio/mpeg"; ext = "mp3"; }
-    catch (e) { body = r.audio; putKey = `audio/news/${a.idxno}-gem2.wav`; ct = "audio/wav"; ext = "wav"; console.log(`  ⚠ ffmpeg 실패 → WAV로 업로드(${a.idxno}): ${e.message.split("\n")[0]}`); }
-    const tmp = join(tmpdir(), `news-${a.idxno}.${ext}`);
-    writeFileSync(tmp, body);
-    try { wrangler(["r2", "object", "put", `${BUCKET}/${putKey}`, "--file", tmp, "--content-type", ct, "--remote"]); }
+    // WAV로 바로 업로드(ffmpeg 의존 제거·안정). MP3 변환(용량↓)은 나중에 transcode-wav-to-mp3.mjs로 일괄.
+    const putKey = `audio/news/${a.idxno}-gem2.wav`;
+    const tmp = join(tmpdir(), `news-${a.idxno}.wav`);
+    writeFileSync(tmp, r.audio);
+    try { wrangler(["r2", "object", "put", `${BUCKET}/${putKey}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]); }
     finally { rmSync(tmp, { force: true }); }
     done++;
-    console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(body.length / 1024).toFixed(0)}KB ${ext})`);
+    console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(r.audio.length / 1024).toFixed(0)}KB wav)`);
     await sleep(1500); // rate 여유
   }
   console.log(`완료 — 생성 ${done} · 건너뜀 ${fail} · 키사용 ${used.join("/")}`);
