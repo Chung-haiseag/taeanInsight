@@ -72,7 +72,7 @@ async function recentEnv(db: D1Database): Promise<string> {
     const rows = res.results ?? [];
     if (!rows.length) return "";
     return rows
-      .map((r) => `${r.date}: 기온 ${r.temp ?? "?"}℃, 습도 ${r.humidity ?? "?"}%, PM10 ${r.pm10 ?? "?"}, PM2.5 ${r.pm25 ?? "?"}, 하늘 ${r.sky ?? "?"}`)
+      .map((r) => `${r.date}: 기온 ${r.temp ?? "?"}℃, 습도 ${r.humidity ?? "?"}%, 미세먼지 ${r.pm10 ?? "?"}, 초미세먼지 ${r.pm25 ?? "?"}, 하늘 ${r.sky ?? "?"}`)
       .join("\n");
   } catch {
     return "";
@@ -88,7 +88,7 @@ async function liveConditions(env: Env): Promise<string> {
     const w = cond.weather, a = cond.air;
     return (
       `[실시간 관측] 기온 ${w.temp ?? "?"}℃, 습도 ${w.humidity ?? "?"}%, 하늘 ${w.sky ?? "?"}, ` +
-      `PM10 ${a.pm10 ?? "?"}, PM2.5 ${a.pm25 ?? "?"}, 통합대기 '${a.grade ?? "?"}'`
+      `미세먼지 ${a.pm10 ?? "?"}, 초미세먼지 ${a.pm25 ?? "?"}, 통합대기 '${a.grade ?? "?"}'`
     );
   } catch {
     return "";
