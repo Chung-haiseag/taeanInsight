@@ -304,6 +304,33 @@ adminReportsRouter.post("/:weekId/sanitize", async (c) => {
   return c.json({ ok: true, weekId, changedSections: changed });
 });
 
+// 단일 섹션 재생성 — 발행본의 한 섹션만 최신 프롬프트·사실로 다시 생성해 교체(발행 상태·타 섹션 보존).
+//   예: 대기질 표기 규칙 변경 후 이미 발행된 회차의 '환경 모니터링'만 갱신.
+const regenSectionSchema = z.object({ key: z.enum(["summary", "tourism_weather", "environment", "realestate", "events"]) });
+
+adminReportsRouter.post("/:weekId/regenerate-section", async (c) => {
+  if (!c.env.AI) return c.json({ error: "ai_unbound", message: "Workers AI 바인딩 없음" }, 503);
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const weekId = c.req.param("weekId");
+  const parsed = regenSectionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
+
+  const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
+  const report = await repo.get(weekId);
+  if (!report) return c.json({ error: "not_found" }, 404);
+
+  const regen = await buildPipeline(c.env).regenerateSection(weekId, parsed.data.key);
+  if (!regen) return c.json({ error: "no_plan" }, 400);
+
+  const sections = report.sections.map((s) => (s.key === parsed.data.key ? { ...s, content: regen.content } : s));
+  const summary = sections.find((s) => s.key === "summary")?.content ?? report.summary;
+  await c.env.ARCHIVE_DB
+    .prepare(`UPDATE weekly_reports SET sections=?2, summary=?3, updated_at=datetime('now') WHERE week_id=?1`)
+    .bind(weekId, JSON.stringify(sections), summary)
+    .run();
+  return c.json({ ok: true, weekId, key: parsed.data.key, status: report.status, content: regen.content });
+});
+
 const generateSchema = z.object({ weekId: z.string().regex(/^\d{4}-W\d{2}$/).optional() });
 
 adminReportsRouter.post("/generate", async (c) => {

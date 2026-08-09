@@ -79,40 +79,45 @@ export class WeeklyReportPipeline {
    * 5개 섹션을 순차 생성. 각 LLM 호출은 batch 채널(유휴시간 사전생성) — 라우터가
    * Workers AI 무료 모델로 처리(REQ-AI-003 "유휴 시간대에 일괄 생성").
    */
+  // 한 섹션 생성(붕괴·외국문자 방어 포함). generate()와 단일 섹션 재생성(regenerateSection)이 공유.
+  private async genSection(weekId: string, plan: (typeof SECTION_PLAN)[number]): Promise<ReportSection> {
+    const facts = await this.deps.factsLoader?.(weekId, plan.key);
+    const userContent = facts ? `${plan.prompt}\n\n[참고 자료]\n${facts}` : plan.prompt;
+
+    // 붕괴·외국문자 누수(한자 "化"·"里的" 등) 방어 — 붕괴 감지 시 재생성(배치라 지연 무관),
+    // 그래도 남으면 최후로 외국문자만 제거. 질의응답과 동일 정책(answer_quality).
+    let content = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const response = await this.deps.llm.route(
+        {
+          intent: "prediction",
+          channel: "batch",
+          messages: buildMessages(SYSTEM_PROMPT, userContent),
+          maxTokens: plan.maxTokens ?? 900,
+          temperature: 0.2,
+        },
+        "best_effort",
+      );
+      content = response.content;
+      if (!isGarbledAnswer(content)) break;
+    }
+    if (isGarbledAnswer(content)) {
+      const cleaned = stripForeignLetters(content);
+      if (cleaned && !isGarbledAnswer(cleaned)) content = cleaned;
+    }
+    return { key: plan.key, title: plan.title, content, sources: [] };
+  }
+
+  /** 단일 섹션만 재생성(발행본 부분 수정용). 다른 섹션·발행 상태는 호출부에서 보존. 알 수 없는 키면 null. */
+  async regenerateSection(weekId: string, key: ReportSectionKey): Promise<ReportSection | null> {
+    const plan = SECTION_PLAN.find((p) => p.key === key);
+    return plan ? this.genSection(weekId, plan) : null;
+  }
+
   async generate(weekId: string = getIsoWeekId(), now: Date = new Date()): Promise<WeeklyReport> {
     const sections: ReportSection[] = [];
     for (const plan of SECTION_PLAN) {
-      const facts = await this.deps.factsLoader?.(weekId, plan.key);
-      const userContent = facts ? `${plan.prompt}\n\n[참고 자료]\n${facts}` : plan.prompt;
-
-      // 붕괴·외국문자 누수(한자 "化"·"里的" 등) 방어 — 붕괴 감지 시 재생성(배치라 지연 무관),
-      // 그래도 남으면 최후로 외국문자만 제거. 질의응답과 동일 정책(answer_quality).
-      let content = "";
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const response = await this.deps.llm.route(
-          {
-            intent: "prediction",
-            channel: "batch",
-            messages: buildMessages(SYSTEM_PROMPT, userContent),
-            maxTokens: plan.maxTokens ?? 900,
-            temperature: 0.2,
-          },
-          "best_effort",
-        );
-        content = response.content;
-        if (!isGarbledAnswer(content)) break;
-      }
-      if (isGarbledAnswer(content)) {
-        const cleaned = stripForeignLetters(content);
-        if (cleaned && !isGarbledAnswer(cleaned)) content = cleaned;
-      }
-
-      sections.push({
-        key: plan.key,
-        title: plan.title,
-        content,
-        sources: [],     // facts에서 추출한 출처는 별도 채울 수 있음
-      });
+      sections.push(await this.genSection(weekId, plan));
     }
 
     const summary = sections.find((s) => s.key === "summary")?.content ?? "";
