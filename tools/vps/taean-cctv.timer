@@ -1,8 +1,8 @@
 [Unit]
-Description=태안 CCTV 30분마다
+Description=태안 CCTV 90분마다(ITS 한도 여유)
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=30min
+OnUnitActiveSec=90min
 Persistent=true
 [Install]
 WantedBy=timers.target
