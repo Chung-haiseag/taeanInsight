@@ -72,9 +72,14 @@ kgPublicRouter.get("/persons/search", async (c) => {
 });
 
 // 인물 프로필 — 관계망(바이라인 제외)·함께등장·나온 기사·시기별 등장·직위(verified).
+//   6개 병렬 D1 + 에고그래프라 매 요청 ~1s → 엣지캐시(15분)로 인기·재조회는 즉시. 새 기사(일 크론)는 15분 내 반영.
 kgPublicRouter.get("/person/:id/profile", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
   const prof = await buildPersonProfile(c.env.ARCHIVE_DB, c.req.param("id"), 12);
   if (!prof) return c.json({ error: "not_found" }, 404);
   // R2 공식 사진(군수·의원)이 없으면, 위키백과에 인물 사진이 있을 때 아바타로 사용(도지사·국회의원 등).
@@ -83,7 +88,10 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
     const w = await getWikiCached(c.env.ARCHIVE_DB, prof.person.name);
     if (w.summary?.thumbnail) prof.photo = w.summary.thumbnail; // 절대 URL(upload.wikimedia.org)
   }
-  return c.json(prof);
+  const res = c.json(prof);
+  res.headers.set("Cache-Control", "public, s-maxage=900");
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
 });
 
 // 인물 AI 전기(기사 근거 5~7문장, 미검증) — 프런트가 프로필 표시 후 지연 로드.
