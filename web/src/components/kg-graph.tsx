@@ -105,8 +105,8 @@ export default function KgGraph({
         if (relC && e.estimated) ctx!.setLineDash([6, 4]);     // 미검수(AI 추정) 관계는 점선
         ctx!.stroke(); ctx!.setLineDash([]);
       }
-      // 관계 라벨(색 배경 pill) — 검수된 reltype만
-      for (const e of es) { if (!e.reltype) continue; const a = byId[e.a], b = byId[e.b]; if (selected && !(e.a === selected || e.b === selected)) continue;
+      // 관계 라벨(색 배경 pill) — 검수된 reltype만. '기타'(미분류 동시등장)는 의미가 없어 라벨 생략(관계선은 회색 유지).
+      for (const e of es) { if (!e.reltype || e.reltype === "기타") continue; const a = byId[e.a], b = byId[e.b]; if (selected && !(e.a === selected || e.b === selected)) continue;
         const relC = REL_COLOR[e.reltype] ?? P.label; const mx = (PX(a) + PX(b)) / 2, my = (PY(a) + PY(b)) / 2;
         ctx!.font = "700 10px " + FONT; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
         const tw = ctx!.measureText(e.reltype).width; ctx!.fillStyle = P.halo; ctx!.globalAlpha = e.estimated ? 0.8 : 0.92;
