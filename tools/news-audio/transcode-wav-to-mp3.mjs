@@ -19,11 +19,10 @@ function wrangler(args, opts = {}) {
   return execFileSync("npx", ["wrangler", ...args], { maxBuffer: 128 << 20, ...opts });
 }
 function d1(sql) { const out = wrangler(["d1", "execute", "taean-archive", "--remote", "--json", "--command", sql], { encoding: "utf8" }); return JSON.parse(out.slice(out.indexOf("[")))[0]?.results ?? []; }
-function r2Has(key) { try { wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "ignore", "ignore"] }); return true; } catch { return false; } }
-// ADMIN_TOKEN(manifest) 없을 때(VPS) — 최신 뉴스 idxno로 -gem2.wav 존재분만 대상(팟캐스트/브리핑 제외).
-function newsWavsFromD1(limit = 80) {
+// ADMIN_TOKEN(manifest) 없을 때(VPS) — 최신 뉴스 idxno의 -gem2.wav 후보(존재 여부는 변환 루프에서 판정, 없으면 스킵).
+function newsWavsFromD1(limit = 60) {
   const rows = d1(`SELECT idxno FROM archive_articles WHERE length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%' ORDER BY published_at DESC, idxno DESC LIMIT ${limit}`);
-  return rows.map((r) => `audio/news/${r.idxno}-gem2.wav`).filter((k) => r2Has(k));
+  return rows.map((r) => `audio/news/${r.idxno}-gem2.wav`);
 }
 function loadToken() {
   if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN;
@@ -78,7 +77,11 @@ async function main() {
       wrangler(["r2", "object", "delete", `${BUCKET}/${key}`, "--remote"], { stdio: "ignore" });
       ok++; saved += wavBuf.length - mp3.length;
       console.log(`  ✓ ${key} → mp3 (${(wavBuf.length / 1048576).toFixed(1)}→${(mp3.length / 1048576).toFixed(2)}MB)`);
-    } catch (e) { fail++; console.log(`  ✗ ${key}: ${String(e.message || e).slice(0, 100)}`); }
+    } catch (e) {
+      const msg = String(e.message || e);
+      if (/not found|does not exist|404|specified key|No such/i.test(msg)) continue; // wav 없음(이미 mp3) — 조용히 스킵
+      fail++; console.log(`  ✗ ${key}: ${msg.slice(0, 100)}`);
+    }
   }
   let delOk = 0;
   for (const key of del) {
