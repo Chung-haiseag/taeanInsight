@@ -33,12 +33,18 @@ import { extractKeywords, UBIQUITOUS } from "../query/keywords";
 import { mayorPhotoFor } from "./mayors";
 import { councilPhotoFor } from "./council_members";
 
-// 바이라인 id 집합 — 등장 기사 수 >= HUB_MENTIONS 인 person(현재 김동이·신문웅). 소수라 매 요청 조회해도 저렴.
+// 바이라인 id 집합 — 등장 기사 수 >= HUB_MENTIONS 인 person(현재 김동이·신문웅).
+//   상관 서브쿼리(person마다 COUNT)는 296K행·115ms → kg_mentions 단일 GROUP BY HAVING(227K행·23ms)로 5× 단축.
+//   허브는 하루 단위로만 바뀌므로 아이솔레이트 모듈 캐시(5분)로 웜 요청은 D1 왕복 자체를 생략.
+let _hubCache: { at: number; ids: Set<string> } | null = null;
 export async function loadHubIds(db: D1Database): Promise<Set<string>> {
+  if (_hubCache && Date.now() - _hubCache.at < 300_000) return _hubCache.ids;
   const r = await db.prepare(
-    "SELECT n.id AS id FROM kg_nodes n WHERE n.type='person' AND (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) >= ?",
+    "SELECT node_id AS id FROM kg_mentions GROUP BY node_id HAVING COUNT(*) >= ?",
   ).bind(HUB_MENTIONS).all<{ id: string }>();
-  return new Set((r.results ?? []).map((x) => x.id));
+  const ids = new Set((r.results ?? []).map((x) => x.id));
+  _hubCache = { at: Date.now(), ids };
+  return ids;
 }
 
 function likeEscape(q: string): string { return String(q).replace(/[\\%_]/g, (ch) => "\\" + ch); }
