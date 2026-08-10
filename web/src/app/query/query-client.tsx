@@ -14,6 +14,7 @@ import { trackEvent } from "@/lib/api/reading";
 
 import { AnswerView } from "./answer-view";
 import { AnswerChart } from "./answer-chart";
+import { MembershipNudge } from "@/components/membership-nudge";
 import { decodeEntities } from "@/lib/decode-entities";
 import { paragraphize } from "@/lib/paragraphize";
 import { extractChartData } from "@/lib/chart-extract";
@@ -291,6 +292,11 @@ export function QueryClient() {
           <p className="text-xs text-foreground-muted">
             ⚠️ AI 생성 답변입니다. 중요한 결정 전에는 출처와 원문을 확인하세요.
           </p>
+          <MembershipNudge
+            source="query"
+            title="답을 찾으셨나요?"
+            subtitle="더 깊은 분석과 내 관심사·내 가게 맞춤 정보는 멤버십에서. 사전 신청자는 첫 달 무료."
+          />
         </section>
       )}
 
