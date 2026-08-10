@@ -105,7 +105,7 @@ export function GenericHome() {
         <div aria-hidden className="pointer-events-none absolute -bottom-16 -right-16 h-64 w-64 rounded-full" style={{ background: "radial-gradient(circle, rgba(234,106,23,.12), transparent 70%)" }} />
         <div className="relative">
           <p className="eyebrow">우리의 약속</p>
-          <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-brand md:text-3xl">기계가 모으고, 사람이 확인합니다</h2>
+          <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-brand md:text-3xl">AI가 거들고, 사람이 확인합니다</h2>
           <p className="mt-3 max-w-[58ch] text-foreground-muted">
             예측과 요약은 발행 전 편집부의 손을 거칩니다. AI 답변에는 언제나 출처를 표기하고, 검증된 사실만 근거로 씁니다 — <strong className="text-brand">지어내지 않는 지역 저널리즘</strong>.
           </p>
