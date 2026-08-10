@@ -25,6 +25,7 @@ import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
 import ArticleGraph from "./article-graph";
+import { MembershipNudge } from "@/components/membership-nudge";
 
 interface Reader {
   title: string;
@@ -186,6 +187,12 @@ export default function ArticleClient() {
           )}
         </>
       )}
+
+      <MembershipNudge
+        source="article"
+        title="37년 태안이 여기 다 있습니다"
+        subtitle="1990년부터의 기사 무제한 검색·기사 낭독·주간 인사이트 리포트 — 멤버십으로. 사전 신청자는 첫 달 무료."
+      />
 
       <ArticleGraph idxno={Number(params.id)} />
 

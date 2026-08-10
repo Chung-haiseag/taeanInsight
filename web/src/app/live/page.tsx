@@ -12,6 +12,7 @@ import { CctvPlayer } from "@/components/reports/cctv-player";
 import { TvVideoTheater } from "@/components/tv-video-grid";
 import { PageHeader } from "@/components/page-header";
 import { LiveClock } from "@/components/live-clock";
+import { MembershipNudge } from "@/components/membership-nudge";
 
 export const metadata: Metadata = {
   title: "지금 태안",
@@ -204,6 +205,12 @@ export default async function LivePage() {
               <Link href="/news" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">아카이브 전체 보기 →</Link>
             </section>
           )}
+
+          <MembershipNudge
+            source="live"
+            title="낙조·물때·수요를 매일 맞춤으로"
+            subtitle="관심 지점·업종에 맞춘 아침 브리핑과 우선 알림 — 멤버십으로. 사전 신청자는 첫 달 무료."
+          />
 
           <p className="hairline pt-6 text-center text-xs text-foreground-muted">
             출처 기상청·에어코리아·국립해양조사원·국토교통부·오피넷·태안신문·태안군TV(유튜브) · 무료 공공데이터
