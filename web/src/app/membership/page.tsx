@@ -24,6 +24,19 @@ const PLANS: {
     ],
   },
   {
+    id: "family",
+    name: "효도 구독 (가족)",
+    price: "월 9,900원",
+    tagline: "부모님껜 고향 소식, 결제는 자녀가",
+    noteLabel: "부모님 성함(선택)",
+    features: [
+      "부모님 계정에 독자 혜택 전부 — 큰 글씨·기사 낭독·주간 리포트",
+      "자녀가 결제, 부모님은 설치·결제 없이 바로 열람",
+      "부고·행사·군정 소식을 부모님께 맞춤 알림",
+      "명절·생신에 선물하기 — 원하는 달부터 시작",
+    ],
+  },
+  {
     id: "business",
     name: "비즈니스 (사장님)",
     price: "월 9,900원",
@@ -94,7 +107,7 @@ export default function MembershipPage() {
         <div className="mt-5"><ForecastTrust /></div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((p) => (
           <section key={p.id}
             className={`flex flex-col rounded-2xl border p-6 shadow-card ${p.highlight ? "border-accent bg-accent-subtle/20" : "border-brand/15 bg-background"}`}>

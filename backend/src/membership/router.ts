@@ -9,7 +9,7 @@ export const membershipRouter = new Hono<{ Bindings: Env }>();
 
 const leadSchema = z.object({
   email: z.string().email().max(120),
-  plan: z.enum(["reader", "business", "org"]),
+  plan: z.enum(["reader", "family", "business", "org"]),
   name: z.string().max(60).optional(),
   note: z.string().max(200).optional(),
 });
