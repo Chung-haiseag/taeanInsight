@@ -129,7 +129,7 @@ export function ReportReader({
       </div>
 
       <div className="mt-6 space-y-4">
-        <PodcastAudio />
+        <PodcastAudio weekId={report.weekId} />
         <PodcastEpisodes excludeWeekId={report.weekId} />
       </div>
 
