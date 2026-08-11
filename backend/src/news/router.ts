@@ -217,31 +217,43 @@ newsRouter.get("/sitemap-ids", async (c) => {
   return c.json({ year, ids: (r.results ?? []).map((x) => ({ id: x.idxno, publishedAt: x.published_at })) });
 });
 
-// 기사 1건 (자체 리더용). 현재 본문은 RSS 발췌 기준 — 아카이브 백필(D1) 연동 시 전문으로 교체.
+// 발행일 ISO8601 정규화 — 공백형("YYYY-MM-DD HH:MM:SS")을 schema.org DateTime 유효 형식으로(KST 가정).
+function toIso8601(s: string | null | undefined): string | null {
+  if (!s) return null;
+  if (s.includes("T")) return s;   // 이미 ISO
+  const m = /^(\d{4}-\d{2}-\d{2})[ ](\d{2}:\d{2}(?::\d{2})?)$/.exec(s.trim());
+  return m ? `${m[1]}T${m[2]}+09:00` : s;
+}
+
+// 기사 1건 (자체 리더용). 아카이브(D1) 우선 조회 — 20년 전 기사 메타/JSON-LD가 라이브 RSS 가용성에
+//   종속되지 않게. 실제 category로 섹션 라벨 매핑(하드코딩 "지역사회" 제거), 발행일은 ISO8601로 정규화.
 newsRouter.get("/:id", async (c) => {
-  let items;
+  const idParam = c.req.param("id");
+  const idxno = Number(idParam);
+  // 아카이브 우선(라이브 RSS 장애와 무관하게 20만 아카이브 메타가 살아있게)
+  let a: { title: string; lead_image: string | null; published_at: string | null; category: string | null; ex: string | null } | null = null;
+  if (c.env.ARCHIVE_DB && Number.isFinite(idxno)) {
+    a = await c.env.ARCHIVE_DB
+      .prepare("SELECT title, lead_image, published_at, category, substr(COALESCE(excerpt, body, ''),1,160) AS ex FROM archive_articles WHERE idxno=?")
+      .bind(idxno).first<{ title: string; lead_image: string | null; published_at: string | null; category: string | null; ex: string | null }>();
+  }
+  // 라이브 RSS 목록 보강(최신 발췌·대표사진) — 실패해도 아카이브가 있으면 계속 진행.
+  let item: Awaited<ReturnType<typeof getNews>>[number] | undefined;
   try {
-    items = await getNews();
+    item = (await getNews()).find((it) => it.id === idParam);
   } catch (e) {
-    return c.json({ error: "rss_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
+    if (!a) return c.json({ error: "rss_unavailable", message: e instanceof Error ? e.message : "수집 실패" }, 502);
   }
-  const item = items.find((it) => it.id === c.req.param("id"));
-  // 목록에 없어도 아카이브(D1)에 있으면 그걸로 — 발췌·대표사진 보강(공유 카드용)
-  let excerpt = item?.excerpt ?? "", leadImage: string | null = null, title = item?.title ?? "", publishedAt: string | null = item?.publishedAt ?? null;
-  if (c.env.ARCHIVE_DB) {
-    const idxno = Number(c.req.param("id"));
-    if (Number.isFinite(idxno)) {
-      const a = await c.env.ARCHIVE_DB
-        .prepare("SELECT title, lead_image, published_at, substr(COALESCE(excerpt, body, ''),1,160) AS ex FROM archive_articles WHERE idxno=?")
-        .bind(idxno).first<{ title: string; lead_image: string | null; published_at: string | null; ex: string | null }>();
-      if (a) { title = title || a.title; excerpt = excerpt || (a.ex ?? ""); leadImage = a.lead_image; publishedAt = publishedAt || a.published_at; }
-    }
-  }
-  if (!item && !title) return c.json({ error: "not_found" }, 404);
+  if (!item && !a) return c.json({ error: "not_found" }, 404);
+
+  const category = ((item?.category || a?.category || "society") as NewsCategory);
   return c.json({
-    ...(item ?? { id: c.req.param("id"), category: "society" as const }),
-    title, excerpt, leadImage, publishedAt,
-    categoryLabel: item ? NEWS_CATEGORY_LABELS[item.category] : "지역사회",
+    ...(item ?? { id: idParam, category }),
+    title: item?.title || a?.title || "",
+    excerpt: item?.excerpt || (a?.ex ?? ""),
+    leadImage: a?.lead_image ?? null,
+    publishedAt: toIso8601(item?.publishedAt || a?.published_at),
+    categoryLabel: NEWS_CATEGORY_LABELS[category] ?? "지역사회",
     bodySource: "rss_excerpt",
   });
 });

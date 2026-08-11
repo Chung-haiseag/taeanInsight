@@ -125,8 +125,10 @@ export default function MembershipPage() {
             ) : open === p.id ? (
               <div className="mt-5 space-y-2">
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일"
+                  aria-label="이메일" autoComplete="email"
                   className="w-full rounded-lg border border-brand/20 px-3 py-2 text-sm" />
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={p.noteLabel ?? "이름(선택)"}
+                  aria-label={p.noteLabel ?? "이름(선택)"}
                   className="w-full rounded-lg border border-brand/20 px-3 py-2 text-sm" />
                 {err && <p className="text-xs text-red-600">{err}</p>}
                 <button type="button" disabled={busy} onClick={() => apply(p.id)}

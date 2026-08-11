@@ -37,7 +37,8 @@ export function SiteHeader() {
   // 관리자 영역은 공개 사이트와 완전히 다른 운영 콘솔 크롬 사용
   if (pathname.startsWith("/admin")) return <AdminHeader />;
 
-  const A11y = ({ className = "" }: { className?: string }) => (
+  // 고령 독자 핵심 도구 — 버튼은 44px 터치 타깃(min-h-11), 텍스트 text-sm. fontSizeOnly면 모바일 상단바용(고대비 제외).
+  const A11y = ({ className = "", fontSizeOnly = false }: { className?: string; fontSizeOnly?: boolean }) => (
     <div className={`flex items-center gap-2 ${className}`} role="toolbar" aria-label="접근성 옵션">
       <fieldset className="flex items-center gap-1 border border-brand/20 rounded p-1">
         <legend className="sr-only">글자 크기</legend>
@@ -48,21 +49,23 @@ export function SiteHeader() {
             onClick={() => setFontSize(size)}
             aria-pressed={fontSize === size}
             aria-label={`글자 크기 ${size === "base" ? "기본" : size === "large" ? "크게" : "매우 크게"}`}
-            className={`px-2 py-0.5 text-xs rounded ${fontSize === size ? "bg-brand text-background" : "text-foreground-muted"}`}
+            className={`min-h-11 min-w-10 px-2.5 text-sm rounded inline-flex items-center justify-center ${fontSize === size ? "bg-brand text-background" : "text-foreground-muted"}`}
           >
             {size === "base" ? "가" : size === "large" ? "가+" : "가++"}
           </button>
         ))}
       </fieldset>
-      <button
-        type="button"
-        onClick={() => setTheme(theme === "default" ? "highcontrast" : "default")}
-        aria-pressed={theme === "highcontrast"}
-        aria-label="고대비 모드"
-        className="px-2 py-1 text-xs border border-brand/20 rounded text-foreground-muted hover:text-brand"
-      >
-        고대비
-      </button>
+      {!fontSizeOnly && (
+        <button
+          type="button"
+          onClick={() => setTheme(theme === "default" ? "highcontrast" : "default")}
+          aria-pressed={theme === "highcontrast"}
+          aria-label="고대비 모드"
+          className="min-h-11 px-3 text-sm border border-brand/20 rounded text-foreground-muted hover:text-brand"
+        >
+          고대비
+        </button>
+      )}
     </div>
   );
 
@@ -80,8 +83,10 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <A11y className="hidden md:flex" />
+          {/* 모바일: 글자크기 컨트롤을 상단바에 상시 노출(햄버거 속에 숨기지 않음 — 고령 독자 발견성) */}
+          <A11y className="flex md:hidden" fontSizeOnly />
           <AccountNav />
           {/* 모바일 햄버거 */}
           <button

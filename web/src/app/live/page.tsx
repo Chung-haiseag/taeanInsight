@@ -28,14 +28,14 @@ function decodeEntities(s: string): string {
 }
 
 export default async function LivePage() {
-  // 최신 리포트 먼저(주차 필요) → 나머지는 주요뉴스까지 모두 병렬(순차 대기 제거)
-  const latest = await fetchLatestReport();
+  // 전부 즉시 병렬 시작(순차 대기 제거) — 주간뉴스만 최신 리포트 주차에 의존하므로 그 안에서 체이닝.
+  //   이전엔 fetchLatestReport()를 단독으로 먼저 await해 20개 무관 fetch가 그 뒤에야 시작되던 워터폴(~2.9s).
   const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, auctionForecast, seasonal, sunset, fog, dust, bloom, fireRisk, farm, aqua, todayBrief, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
     fetchSeafog(),
-    latest ? fetchWeeklyNews(latest.weekId) : Promise.resolve([]),
+    fetchLatestReport().then((r) => (r ? fetchWeeklyNews(r.weekId) : [])),
     fetchTvNews(8),
     getAgriPrices(),
     getSeafood(),
