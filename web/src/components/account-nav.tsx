@@ -27,7 +27,7 @@ export function AccountNav() {
     <div className="hidden md:flex items-center gap-2 text-xs">
       <Link href="/account" className="font-semibold text-brand hover:underline" title={acct.email}><Icon name="user" /> {label}</Link>
       {grade && (
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${GRADE_STYLE[acct.role ?? ""] ?? "bg-brand/10 text-brand"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[0.625rem] font-semibold ${GRADE_STYLE[acct.role ?? ""] ?? "bg-brand/10 text-brand"}`}>
           {grade}
         </span>
       )}

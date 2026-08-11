@@ -111,7 +111,7 @@ export default function MembershipPage() {
         {PLANS.map((p) => (
           <section key={p.id}
             className={`flex flex-col rounded-2xl border p-6 shadow-card ${p.highlight ? "border-accent bg-accent-subtle/20" : "border-brand/15 bg-background"}`}>
-            {p.highlight && <span className="mb-2 self-start rounded-full bg-accent px-2.5 py-0.5 text-[11px] font-bold text-background">추천</span>}
+            {p.highlight && <span className="mb-2 self-start rounded-full bg-accent px-2.5 py-0.5 text-[0.6875rem] font-bold text-background">추천</span>}
             <h2 className="text-lg font-bold text-brand">{p.name}</h2>
             <p className="mt-0.5 text-xs text-foreground-muted">{p.tagline}</p>
             <p className="mt-3 text-2xl font-bold text-brand">{p.price}</p>

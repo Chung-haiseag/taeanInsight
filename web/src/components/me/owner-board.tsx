@@ -113,12 +113,12 @@ function TripPlanner({ brief }: { brief: OwnerBrief }) {
         <div className="rounded-xl bg-background/70 p-3">
           <p className="text-xs font-semibold text-brand">🌅 일출·일몰</p>
           <p className="mt-1 text-sm text-foreground">일출 {brief.sun?.sunrise ?? "—"} · 일몰 {brief.sun?.sunset ?? "—"}</p>
-          <p className="text-[11px] text-foreground-muted">꽃지·만리포 노을 명소</p>
+          <p className="text-[0.6875rem] text-foreground-muted">꽃지·만리포 노을 명소</p>
         </div>
         <div className="rounded-xl bg-background/70 p-3">
           <p className="text-xs font-semibold text-brand">🦪 갯벌체험 적기(간조)</p>
           <p className="mt-1 text-sm text-foreground">{lowTide ? `${lowTide.time?.slice(0, 5)} 전후` : "오늘 정보 없음"}</p>
-          <p className="text-[11px] text-foreground-muted">물 빠지는 시간 기준</p>
+          <p className="text-[0.6875rem] text-foreground-muted">물 빠지는 시간 기준</p>
         </div>
       </div>
       {fest && (

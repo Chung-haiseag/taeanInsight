@@ -450,7 +450,7 @@ function OperationsInfo() {
                 ))}
               </div>
             </div>
-            <p className="text-xs text-foreground-muted">전체 회원 관리·등급 부여는 <code className="text-[11px]">/admin</code> 👥회원 탭에서.</p>
+            <p className="text-xs text-foreground-muted">전체 회원 관리·등급 부여는 <code className="text-[0.6875rem]">/admin</code> 👥회원 탭에서.</p>
           </div>
         )}
       </Card>
@@ -665,7 +665,7 @@ function DataMap({ sources }: { sources: NonNullable<ReportSummary["dataSources"
           <div className="mb-2 flex items-center gap-2">
             <span className="inline-block h-3 w-3 rounded" style={{ background: CAT_COLOR[cat] }} aria-hidden />
             <span className="text-sm font-bold text-brand">{cat}</span>
-            <span className="text-[11px] text-foreground-muted tabular-nums">{byCat[cat].length}</span>
+            <span className="text-[0.6875rem] text-foreground-muted tabular-nums">{byCat[cat].length}</span>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2">
             {byCat[cat].map((d) => {
@@ -675,10 +675,10 @@ function DataMap({ sources }: { sources: NonNullable<ReportSummary["dataSources"
                   <span className="absolute right-2.5 top-3 h-2 w-2 rounded-full" style={{ background: STATUS_DOT[d.status] ?? "#94a3b8" }} title={st.label} aria-hidden />
                   <div className="flex flex-wrap items-center gap-1.5 pr-4">
                     <span className="text-sm font-bold text-brand">{d.name}</span>
-                    {d.type && <span className="rounded-full bg-accent-subtle/50 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{d.type}</span>}
+                    {d.type && <span className="rounded-full bg-accent-subtle/50 px-1.5 py-0.5 text-[0.625rem] font-semibold text-brand">{d.type}</span>}
                   </div>
-                  {d.note && <p className="mt-1 text-[11px] leading-snug text-foreground-muted">{d.note}</p>}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-foreground-muted">
+                  {d.note && <p className="mt-1 text-[0.6875rem] leading-snug text-foreground-muted">{d.note}</p>}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.625rem] text-foreground-muted">
                     {d.granularity && <span>{d.granularity}</span>}
                     {d.metric && <span className="ml-auto font-semibold text-foreground">{d.metric}</span>}
                   </div>
@@ -690,7 +690,7 @@ function DataMap({ sources }: { sources: NonNullable<ReportSummary["dataSources"
       ))}
       <div className="mt-6 rounded-xl border border-brand/10 bg-brand/[0.02] p-3">
         <p className="text-xs font-bold text-brand">유형별</p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-foreground-muted">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-foreground-muted">
           {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([t, n]) => <span key={t}>{t} <b className="text-brand">{n}</b></span>)}
         </div>
       </div>

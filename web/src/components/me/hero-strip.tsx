@@ -52,7 +52,7 @@ export function MeHeroStrip({ preferences }: { preferences: UserPreferences }) {
               <p className="text-xl" aria-hidden>{t.emoji}</p>
               <p className={`mt-1 font-display text-2xl font-bold ${t.tone}`}>{t.value}</p>
               <p className="text-xs text-foreground-muted">{t.label}</p>
-              {t.sub && <p className="text-[11px] text-foreground-muted/80">{t.sub}</p>}
+              {t.sub && <p className="text-[0.6875rem] text-foreground-muted/80">{t.sub}</p>}
             </div>
           ))}
         </div>

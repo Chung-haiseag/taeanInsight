@@ -120,7 +120,7 @@ function ReporterPageContent() {
             {alerts.map((a, i) => (
               <li key={i} className="py-2.5">
                 <a href={a.url || "#"} className="group block">
-                  <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
+                  <div className="flex items-center gap-2 text-[0.6875rem] text-foreground-muted">
                     <span className="rounded-full bg-accent/15 px-1.5 py-0.5 font-semibold text-accent">{KIND_LABEL[a.kind] ?? a.kind}</span>
                     <span>{(a.created_at ?? "").slice(0, 16).replace("T", " ")}</span>
                   </div>
@@ -153,7 +153,7 @@ function NewsClips() {
         {clips.map((c, i) => (
           <li key={i} className="py-2.5">
             <a href={c.url} target="_blank" rel="noopener noreferrer" className="group block">
-              <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
+              <div className="flex items-center gap-2 text-[0.6875rem] text-foreground-muted">
                 <span className="rounded-full bg-brand/10 px-1.5 py-0.5 font-semibold">{c.source}</span>
                 <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-accent">{c.keyword}</span>
                 <span>{(c.pub_date ?? "").slice(0, 10)}</span>

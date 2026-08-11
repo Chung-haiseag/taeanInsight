@@ -43,7 +43,7 @@ export default async function BeachesPage() {
         <>
           {board.top && (
             <section className={`rounded-2xl border-2 p-6 shadow-card ${LEVEL_STYLE[board.top.level].ring}`}>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-accent">오늘의 추천 해변</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-accent">오늘의 추천 해변</p>
               <div className="mt-2 flex items-end justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-extrabold text-brand">🏖️ {board.top.name}</h2>
@@ -66,7 +66,7 @@ export default async function BeachesPage() {
                   </h3>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-extrabold text-brand">{b.score}</span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${LEVEL_STYLE[b.level].badge}`}>{b.level}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-bold ${LEVEL_STYLE[b.level].badge}`}>{b.level}</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -101,7 +101,7 @@ export default async function BeachesPage() {
 
           {mudflat.best && (
             <div className="rounded-2xl border-2 border-accent bg-accent-subtle/25 p-5 shadow-card">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-accent">갯벌 체험 추천</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-accent">갯벌 체험 추천</p>
               <p className="mt-1 text-lg font-bold text-brand">
                 {fmtMd(mudflat.best.date)}({mudflat.best.weekday}) · {mudflat.best.tideLabel}
               </p>
@@ -116,11 +116,11 @@ export default async function BeachesPage() {
             {mudflat.days.map((d: MudflatDayView) => (
               <div key={d.date} className={`rounded-xl border p-3 text-center ${d.good ? "border-accent/40 bg-accent-subtle/10" : "border-brand/12 bg-background"}`}>
                 <p className="text-sm font-bold text-brand">{fmtMd(d.date)}<span className="text-foreground-muted">({d.weekday})</span></p>
-                <p className="mt-1 text-[11px] text-foreground-muted">{d.tideLabel}{d.range != null && <> · {d.range}m</>}</p>
+                <p className="mt-1 text-[0.6875rem] text-foreground-muted">{d.tideLabel}{d.range != null && <> · {d.range}m</>}</p>
                 <p className="mt-1.5 text-xs">
                   {d.best ? <>낮 간조<br /><strong className="text-brand">{d.best.time}</strong></> : <span className="text-foreground-muted">낮 간조 없음</span>}
                 </p>
-                <p className="mt-1 text-[11px]">{d.good ? <span className="text-accent font-semibold">✅ 적기</span> : <span className="text-foreground-muted">—</span>}</p>
+                <p className="mt-1 text-[0.6875rem]">{d.good ? <span className="text-accent font-semibold">✅ 적기</span> : <span className="text-foreground-muted">—</span>}</p>
               </div>
             ))}
           </div>
@@ -141,7 +141,7 @@ export default async function BeachesPage() {
 
           {fishing.best && (
             <div className="rounded-2xl border-2 border-accent bg-accent-subtle/25 p-5 shadow-card">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-accent">출조 추천일</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-accent">출조 추천일</p>
               <div className="mt-1 flex items-end justify-between gap-4">
                 <p className="text-lg font-bold text-brand">{fmtMd(fishing.best.date)}({fishing.best.weekday}) · {fishing.best.reasons.join(" · ")}</p>
                 <p className="text-right text-3xl font-extrabold leading-none text-brand">{fishing.best.score}<span className="text-base font-bold text-foreground-muted">/100</span></p>
@@ -156,7 +156,7 @@ export default async function BeachesPage() {
                   <p className="font-bold text-brand">{fmtMd(d.date)}<span className="text-foreground-muted">({d.weekday})</span></p>
                   <div className="flex items-center gap-2">
                     <span className="text-xl font-extrabold text-brand">{d.score}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${FISHING_STYLE[d.grade].badge}`}>{d.grade}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[0.6875rem] font-bold ${FISHING_STYLE[d.grade].badge}`}>{d.grade}</span>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -165,9 +165,9 @@ export default async function BeachesPage() {
                   {d.tideRange != null && <Chip label="조차" value={`${d.tideRange.toFixed(1)}m`} />}
                 </div>
                 {d.highTides.length > 0 && (
-                  <p className="mt-2 text-[11px] text-foreground-muted">만조 {d.highTides.join(" · ")}{d.lowTides.length > 0 && <> · 간조 {d.lowTides.join(" · ")}</>}</p>
+                  <p className="mt-2 text-[0.6875rem] text-foreground-muted">만조 {d.highTides.join(" · ")}{d.lowTides.length > 0 && <> · 간조 {d.lowTides.join(" · ")}</>}</p>
                 )}
-                {d.reasons.length > 0 && <p className="mt-1 text-[11px] text-foreground-muted">{d.reasons.join(" · ")}</p>}
+                {d.reasons.length > 0 && <p className="mt-1 text-[0.6875rem] text-foreground-muted">{d.reasons.join(" · ")}</p>}
               </div>
             ))}
           </div>

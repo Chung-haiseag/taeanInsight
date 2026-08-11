@@ -28,7 +28,7 @@ export function NewsPromo({
       <ul className="space-y-2.5">
         {items.slice(0, 4).map((n) => (
           <li key={n.id} className="flex items-baseline gap-2">
-            <span className="shrink-0 rounded bg-accent/12 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+            <span className="shrink-0 rounded bg-accent/12 px-1.5 py-0.5 text-[0.625rem] font-semibold text-accent">
               {labels?.[n.category] ?? n.category}
             </span>
             <Link

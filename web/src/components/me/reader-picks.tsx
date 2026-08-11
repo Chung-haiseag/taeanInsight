@@ -43,7 +43,7 @@ function PickRow({ it, showExcerpt, offerSummary }: { it: Pick; showExcerpt: boo
   return (
     <li>
       <Link href={`/news/${it.id}`} className="group block py-2.5">
-        <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
+        <div className="flex items-center gap-2 text-[0.6875rem] text-foreground-muted">
           <span className="rounded-full bg-accent/15 px-1.5 py-0.5 font-semibold text-accent">{(CATEGORY_LABELS as Record<string, string>)[it.category] ?? it.category}</span>
           <span>{(it.publishedAt ?? "").slice(0, 10)}</span>
         </div>
@@ -116,7 +116,7 @@ export function ReaderPicks() {
           <PickRow key={it.id} it={it} showExcerpt={!scanner} offerSummary={offerSummary} />
         ))}
       </ul>
-      <p className="mt-1 text-[11px] text-foreground-muted">읽을수록 정확해집니다 · {vector ? "맥락 기반(AI 임베딩)" : "행동 기반(관심 분야)"}</p>
+      <p className="mt-1 text-[0.6875rem] text-foreground-muted">읽을수록 정확해집니다 · {vector ? "맥락 기반(AI 임베딩)" : "행동 기반(관심 분야)"}</p>
     </section>
   );
 }

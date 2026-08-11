@@ -78,7 +78,7 @@ export function SiteHeader() {
         <Link href="/" className="flex items-center gap-2.5 text-brand" aria-label="태안 인사이트 홈">
           <span className="inline-block w-2 h-7 bg-accent rounded-sm" aria-hidden="true" />
           <span className="flex flex-col leading-none">
-            <span className="text-[10px] uppercase tracking-kicker text-foreground-muted">Taean Insight</span>
+            <span className="text-[0.625rem] uppercase tracking-kicker text-foreground-muted">Taean Insight</span>
             <span className="font-bold tracking-tight">태안 인사이트</span>
           </span>
         </Link>

@@ -146,16 +146,16 @@ export default function PeopleExplorer() {
                       <>
                         <select value={c.reltype} onChange={(e) => relabelRel(c.edgeId!, c.id, e.target.value, !!c.verified)}
                           title={c.reason || "관계 종류(틀리면 수정)"}
-                          className="ml-1.5 rounded border border-accent/30 bg-accent/10 px-1 py-0.5 text-[10px] font-medium text-accent">
+                          className="ml-1.5 rounded border border-accent/30 bg-accent/10 px-1 py-0.5 text-[0.625rem] font-medium text-accent">
                           {RELTYPES.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
                         </select>
                         {c.verified
                           ? <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, false)} title="검증 취소"
-                              className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-200">✓ 검증됨</button>
+                              className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[0.625rem] font-medium text-emerald-700 hover:bg-emerald-200">✓ 검증됨</button>
                           : <button type="button" onClick={() => verifyRel(c.edgeId!, c.id, true)} title="이 관계를 검증하면 공개 답변에 반영됩니다"
-                              className="ml-1 rounded border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand hover:bg-brand/5">검증</button>}
+                              className="ml-1 rounded border border-brand/30 px-1.5 py-0.5 text-[0.625rem] text-brand hover:bg-brand/5">검증</button>}
                       </>
-                    ) : c.reltype && <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">{c.reltype}</span>}
+                    ) : c.reltype && <span className="ml-1.5 rounded bg-accent/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-accent">{c.reltype}</span>}
                   </li>
                 ))}
                 {!prof.coappear.length && <li className="text-foreground-muted">없음</li>}

@@ -210,7 +210,7 @@ export default function NewsArchivePage() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={h.lead_image}
-                            alt=""
+                            alt={decodeEntities(h.title)}
                             className="h-20 w-28 shrink-0 rounded object-cover bg-brand/5"
                             loading="lazy"
                             onError={(e) => { e.currentTarget.style.display = "none"; }}

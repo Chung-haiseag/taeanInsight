@@ -63,7 +63,7 @@ export function ZoomPanImage({
         <span className="w-12 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
         <button onClick={() => setZoom((z) => Math.min(4, z + 0.25))} className="rounded bg-foreground-muted/15 px-2.5 py-1 text-sm font-bold hover:bg-foreground-muted/25" aria-label="확대">＋</button>
         <button onClick={() => setZoom((z) => (z === 1 ? 2 : 1))} className="rounded bg-foreground-muted/15 px-2 py-1 text-xs hover:bg-foreground-muted/25">{zoom === 1 ? "200%" : "폭맞춤"}</button>
-        <span className="ml-auto text-[11px] text-foreground-muted">＋− 확대 · 드래그 이동</span>
+        <span className="ml-auto text-[0.6875rem] text-foreground-muted">＋− 확대 · 드래그 이동</span>
       </div>
       <div
         ref={scrollRef}
