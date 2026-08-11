@@ -150,7 +150,7 @@ export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
               <img src={v.thumbnail} alt="" className="aspect-video w-full object-cover" loading="lazy" />
               <span className="block px-2.5 py-2">
                 {v.publishedAt && (
-                  <span className="block text-[11px] text-foreground-muted">{formatTvDay(v.publishedAt)}</span>
+                  <span className="block text-[0.6875rem] text-foreground-muted">{formatTvDay(v.publishedAt)}</span>
                 )}
                 <span className={`block text-xs font-semibold leading-snug ${active ? "text-accent" : "text-brand"} line-clamp-2`}>
                   {v.title}

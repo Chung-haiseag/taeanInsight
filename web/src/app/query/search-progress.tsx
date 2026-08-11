@@ -63,7 +63,7 @@ export function SearchProgress({ livePct, liveLabel }: { livePct?: number; liveL
         </span>
         {live ? (liveLabel ? `${liveLabel}…` : "진행 중…") : composing ? "답변 작성 중…" : "검색 중…"}
         {live && (
-          <span className="rounded bg-accent/12 px-1.5 py-0.5 text-[10px] font-semibold text-accent" title="경량 그래프 실행기의 실제 단계 진행">
+          <span className="rounded bg-accent/12 px-1.5 py-0.5 text-[0.625rem] font-semibold text-accent" title="경량 그래프 실행기의 실제 단계 진행">
             실시간
           </span>
         )}

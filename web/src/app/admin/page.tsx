@@ -442,7 +442,7 @@ function UsersSection() {
       {/* 기자 계정 직접 생성 — 임시 비밀번호는 여기서만 1회 표시(서버 생성·해시 저장) */}
       <div className="rounded-lg border border-brand/20 bg-background p-3">
         <p className="mb-1 text-sm font-semibold text-brand">📰 태안신문 기자 계정 만들기</p>
-        <p className="mb-2 text-[11px] text-foreground-muted">아이디(영문·숫자 3~30자, 예: <code>kija01</code>)로 로그인합니다. 비밀번호를 직접 정하거나(8자 이상) <strong>비우면 자동 생성</strong>됩니다. 생성된 비밀번호는 아래에 <strong>딱 한 번</strong> 표시되니 기자에게 안전하게 전달하고, 첫 로그인 후 변경하도록 안내하세요.</p>
+        <p className="mb-2 text-[0.6875rem] text-foreground-muted">아이디(영문·숫자 3~30자, 예: <code>kija01</code>)로 로그인합니다. 비밀번호를 직접 정하거나(8자 이상) <strong>비우면 자동 생성</strong>됩니다. 생성된 비밀번호는 아래에 <strong>딱 한 번</strong> 표시되니 기자에게 안전하게 전달하고, 첫 로그인 후 변경하도록 안내하세요.</p>
         <div className="flex flex-wrap items-center gap-2">
           <input type="text" value={rEmail} onChange={(e) => setREmail(e.target.value)} placeholder="아이디(영문·숫자)"
             className="min-w-[200px] flex-1 rounded border border-brand/20 px-2.5 py-1.5 text-sm" />
@@ -475,7 +475,7 @@ function UsersSection() {
             <tbody>
               {users.map((u) => (
                 <tr key={u.id} className="border-b border-brand/5">
-                  <td className="py-2 pr-3">{u.username ?? u.email}<span className="ml-1 text-[10px] text-foreground-muted">{u.username ? "아이디" : u.provider === "kakao" ? "카카오" : ""}</span></td>
+                  <td className="py-2 pr-3">{u.username ?? u.email}<span className="ml-1 text-[0.625rem] text-foreground-muted">{u.username ? "아이디" : u.provider === "kakao" ? "카카오" : ""}</span></td>
                   <td className="py-2 pr-3">{u.display_name ?? "-"}</td>
                   <td className="py-2 pr-3 text-xs text-foreground-muted">{u.created_at.slice(0, 10)}</td>
                   <td className="py-2 pr-3">
@@ -551,7 +551,7 @@ function RoiSection() {
           {[["온보딩", d.audience.onboarded], ["푸시 구독", d.audience.pushSubs], ["계정", d.audience.accounts], ["기사 조회", d.audience.reads], ["오디오 재생", d.audience.audioPlays], ["AI 질의", d.audience.aiQueries]].map(([l, v]) => (
             <div key={String(l)} className="rounded-lg border border-brand/10 p-3">
               <div className="text-xl font-bold text-brand">{v as number}</div>
-              <div className="text-[11px] text-foreground-muted">{l}</div>
+              <div className="text-[0.6875rem] text-foreground-muted">{l}</div>
             </div>
           ))}
         </div>

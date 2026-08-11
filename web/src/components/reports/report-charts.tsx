@@ -95,8 +95,8 @@ export function SummaryInfographic({ metrics, govCount = 0 }: { metrics: ReportM
             <span className="font-display text-lg font-bold tabular-nums leading-none" style={{ color: t.color ?? "var(--brand, #2a2118)" }}>
               {t.value}
             </span>
-            <span className="text-[11px] font-medium text-foreground">{t.label}</span>
-            {t.sub && <span className="text-[10px] leading-tight text-foreground-muted">{t.sub}</span>}
+            <span className="text-[0.6875rem] font-medium text-foreground">{t.label}</span>
+            {t.sub && <span className="text-[0.625rem] leading-tight text-foreground-muted">{t.sub}</span>}
           </div>
         ))}
       </div>
@@ -179,7 +179,7 @@ export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) 
         <AirMetric label="초미세먼지" sub="PM2.5" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
       </div>
 
-      <p className="mt-3 border-t border-brand/10 pt-3 text-[11px] leading-relaxed text-foreground-muted">
+      <p className="mt-3 border-t border-brand/10 pt-3 text-[0.6875rem] leading-relaxed text-foreground-muted">
         <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
       </p>
     </figure>
@@ -191,7 +191,7 @@ function AirMetric({ label, sub, v, g }: { label: string; sub: string; v: number
   return (
     <div className="rounded-xl border p-3" style={{ borderColor: `${g.color}40`, background: `${g.color}0d` }}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-foreground-muted">{label} <span className="text-[10px]">({sub})</span></span>
+        <span className="text-xs font-medium text-foreground-muted">{label} <span className="text-[0.625rem]">({sub})</span></span>
         <span className="inline-flex items-center gap-1 text-xs font-bold" style={{ color: g.color }}>
           <i className="inline-block h-2 w-2 rounded-full" style={{ background: g.color }} />{g.label}
         </span>
@@ -227,7 +227,7 @@ export function WeatherAirCard({ env }: { env: ReportMetrics["environment"] }) {
         <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${weather.length}, minmax(0, 1fr))` }}>
           {weather.map((w) => (
             <div key={w.label} className="rounded-lg border border-brand/10 bg-white/60 px-3 py-2 text-center">
-              <p className="text-[11px] font-medium text-foreground-muted">{w.label}</p>
+              <p className="text-[0.6875rem] font-medium text-foreground-muted">{w.label}</p>
               <p className="mt-0.5 text-lg font-bold text-brand">{w.value}</p>
             </div>
           ))}
@@ -240,7 +240,7 @@ export function WeatherAirCard({ env }: { env: ReportMetrics["environment"] }) {
             <AirMetric label="미세먼지" sub="PM10" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
             <AirMetric label="초미세먼지" sub="PM2.5" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
           </div>
-          <p className="mt-3 border-t border-brand/10 pt-3 text-[11px] leading-relaxed text-foreground-muted">
+          <p className="mt-3 border-t border-brand/10 pt-3 text-[0.6875rem] leading-relaxed text-foreground-muted">
             <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
           </p>
         </>
@@ -424,26 +424,26 @@ export function MarineCard({ marine }: { marine: MarineInfo | null }) {
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <div>
-                  <p className="text-[11px] text-foreground-muted">수온</p>
+                  <p className="text-[0.6875rem] text-foreground-muted">수온</p>
                   <p className="text-base font-bold tabular-nums text-brand">{b.waterTemp != null ? `${b.waterTemp}℃` : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-foreground-muted">파고</p>
+                  <p className="text-[0.6875rem] text-foreground-muted">파고</p>
                   <p className="text-base font-bold tabular-nums" style={{ color: w.color }}>
                     {b.waveHeight != null ? `${b.waveHeight}m` : "—"}
-                    <span className="ml-1 text-[11px] font-medium">{w.label}</span>
+                    <span className="ml-1 text-[0.6875rem] font-medium">{w.label}</span>
                   </p>
                 </div>
                 {b.airTemp != null && (
                   <div>
-                    <p className="text-[11px] text-foreground-muted">기온</p>
+                    <p className="text-[0.6875rem] text-foreground-muted">기온</p>
                     <p className="text-base font-bold tabular-nums text-brand">{b.airTemp}℃</p>
                   </div>
                 )}
                 {b.wind != null && (
                   <div>
-                    <p className="text-[11px] text-foreground-muted">바람</p>
-                    <p className="text-base font-bold tabular-nums text-brand">{b.wind}<span className="text-[11px]">m/s</span></p>
+                    <p className="text-[0.6875rem] text-foreground-muted">바람</p>
+                    <p className="text-base font-bold tabular-nums text-brand">{b.wind}<span className="text-[0.6875rem]">m/s</span></p>
                   </div>
                 )}
               </div>
@@ -480,7 +480,7 @@ export function WeatherCards({ env }: { env: ReportMetrics["environment"] }) {
     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
       {cards.map((c) => (
         <div key={c.label} className="rounded-xl border border-brand/10 bg-white/60 p-3 text-center shadow-soft">
-          <p className="text-[11px] font-medium text-foreground-muted">{c.label}</p>
+          <p className="text-[0.6875rem] font-medium text-foreground-muted">{c.label}</p>
           <p className="mt-0.5 text-lg font-bold text-brand">{c.value}</p>
         </div>
       ))}
@@ -558,7 +558,7 @@ export function FestivalCalendar({ festivals }: { festivals: FestivalView[] }) {
           <li key={f.key} className="flex items-center gap-2.5">
             <span className="min-w-[3.6rem] shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-foreground-muted">{mmdd(f.nextStart)}~{mmdd(`2026-${String(f.to[0]).padStart(2, "0")}-${String(f.to[1]).padStart(2, "0")}`)}</span>
             <span className="flex-1 text-sm font-medium text-brand">{f.name}<span className="ml-1.5 text-[0.7rem] text-foreground-muted">{f.area}</span></span>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${FEST_STYLE[f.impact]}`}>{f.impact}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.625rem] font-bold ${FEST_STYLE[f.impact]}`}>{f.impact}</span>
           </li>
         ))}
       </ul>

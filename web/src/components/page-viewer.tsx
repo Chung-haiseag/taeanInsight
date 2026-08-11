@@ -69,7 +69,7 @@ export function PageViewer({ src, label, onClose }: { src: string; label: string
           <img src={src} alt={`원본 지면 (${label})`} className="w-full select-none" draggable={false} />
         </div>
       </div>
-      <p className="bg-black/60 px-4 py-1.5 text-center text-[11px] text-white/70">
+      <p className="bg-black/60 px-4 py-1.5 text-center text-[0.6875rem] text-white/70">
         ＋− 확대 · 드래그 이동 · ESC 닫기
       </p>
     </div>

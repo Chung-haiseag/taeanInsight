@@ -105,7 +105,7 @@ function OwnerLive() {
                 {a.quant && (
                   <div className="shrink-0 text-center">
                     <p className="font-display text-2xl font-bold leading-none tabular-nums text-accent">{a.quant}</p>
-                    <p className="mt-0.5 text-[10px] text-foreground-muted">수요지수</p>
+                    <p className="mt-0.5 text-[0.625rem] text-foreground-muted">수요지수</p>
                   </div>
                 )}
               </article>
@@ -183,17 +183,17 @@ export function LodgingBoardCard({ board, nearby }: { board: LodgingBoard; nearb
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 가동률</p>
           <p className={`mt-1 font-display text-3xl font-bold ${occColor}`}>{board.occRate}%</p>
-          {board.rooms != null && <p className="text-[11px] text-foreground-muted">객실 {board.rooms}실 기준</p>}
+          {board.rooms != null && <p className="text-[0.6875rem] text-foreground-muted">객실 {board.rooms}실 기준</p>}
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">권장 주말 요금</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.recommendedPrice != null ? `${(board.recommendedPrice / 10000).toFixed(1)}만` : "—"}</p>
-          <p className="text-[11px] text-accent">{board.priceMultiplier !== 1 ? `기본가 ${board.priceMultiplier > 1 ? "+" : ""}${Math.round((board.priceMultiplier - 1) * 100)}%` : "기본가 유지"}</p>
+          <p className="text-[0.6875rem] text-accent">{board.priceMultiplier !== 1 ? `기본가 ${board.priceMultiplier > 1 ? "+" : ""}${Math.round((board.priceMultiplier - 1) * 100)}%` : "기본가 유지"}</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 1박 매출</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "가동률×권장가" : "객실수·요금 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? "가동률×권장가" : "객실수·요금 입력 시"}</p>
         </article>
       </div>
       {board.notes.length > 0 && (
@@ -222,7 +222,7 @@ export function LodgingBoardCard({ board, nearby }: { board: LodgingBoard; nearb
           </p>
         </div>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 실제 예약은 채널·이벤트에 따라 달라집니다.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 실제 예약은 채널·이벤트에 따라 달라집니다.</p>
     </section>
   );
 }
@@ -244,12 +244,12 @@ export function FoodBoardCard({ board }: { board: FoodBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 손님(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.expectedCovers != null ? `${board.expectedCovers}명` : "—"}</p>
-          {board.seats != null && <p className="text-[11px] text-foreground-muted">좌석 {board.seats}석 기준</p>}
+          {board.seats != null && <p className="text-[0.6875rem] text-foreground-muted">좌석 {board.seats}석 기준</p>}
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 매출(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "손님×객단가" : "좌석·객단가 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? "손님×객단가" : "좌석·객단가 입력 시"}</p>
         </article>
       </div>
       {board.notes.length > 0 && (
@@ -260,7 +260,7 @@ export function FoodBoardCard({ board }: { board: FoodBoard }) {
       {board.expectedCovers == null && (
         <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">좌석 수·객단가</strong>를 입력하면 예상 손님·매출이 계산됩니다.</p>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 위치·메뉴·단골에 따라 차이가 큽니다.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 위치·메뉴·단골에 따라 차이가 큽니다.</p>
     </section>
   );
 }
@@ -282,12 +282,12 @@ export function LeisureBoardCard({ board }: { board: LeisureBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 참가자(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.expectedGuests != null ? `${board.expectedGuests}명` : "—"}</p>
-          {board.capacity != null && <p className="text-[11px] text-foreground-muted">정원 {board.capacity}명 기준</p>}
+          {board.capacity != null && <p className="text-[0.6875rem] text-foreground-muted">정원 {board.capacity}명 기준</p>}
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 매출(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "참가자×체험료" : "정원·체험료 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? "참가자×체험료" : "정원·체험료 입력 시"}</p>
         </article>
       </div>
       {board.notes.length > 0 && (
@@ -298,7 +298,7 @@ export function LeisureBoardCard({ board }: { board: LeisureBoard }) {
       {board.expectedGuests == null && (
         <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">정원·체험료</strong>를 입력하면 예상 참가자·매출이 계산됩니다.</p>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요·날씨·파고 기반 추정치 — 야외 활동은 기상에 크게 좌우됩니다.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 태안 관광 수요·날씨·파고 기반 추정치 — 야외 활동은 기상에 크게 좌우됩니다.</p>
     </section>
   );
 }
@@ -316,17 +316,17 @@ export function RetailBoardCard({ board }: { board: RetailBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 혼잡도</p>
           <p className={`mt-1 font-display text-2xl font-bold ${busyColor}`}>{board.busyLabel}</p>
-          <p className="text-[11px] text-foreground-muted">평일 대비 ×{board.multiplier}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">평일 대비 ×{board.multiplier}</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 방문(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.expectedVisitors != null ? `${board.expectedVisitors}명` : "—"}</p>
-          {board.baselineVisitors != null && <p className="text-[11px] text-foreground-muted">평일 {board.baselineVisitors}명 기준</p>}
+          {board.baselineVisitors != null && <p className="text-[0.6875rem] text-foreground-muted">평일 {board.baselineVisitors}명 기준</p>}
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 매출(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "방문×객단가" : "방문객·객단가 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? "방문×객단가" : "방문객·객단가 입력 시"}</p>
         </article>
       </div>
       {board.notes.length > 0 && (
@@ -337,7 +337,7 @@ export function RetailBoardCard({ board }: { board: RetailBoard }) {
       {board.expectedVisitors == null && (
         <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">평일 평균 방문객·객단가</strong>를 입력하면 예상 방문·매출이 계산됩니다.</p>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 입지·업태에 따라 차이가 큽니다.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 태안 관광 수요예측 기반 추정치 — 입지·업태에 따라 차이가 큽니다.</p>
     </section>
   );
 }
@@ -355,24 +355,24 @@ export function FishingBoardCard({ board }: { board: FishingBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">출항 가부</p>
           <p className={`mt-1 font-display text-3xl font-bold ${goColor}`}>{board.goLabel}</p>
-          <p className="text-[11px] text-foreground-muted">파고 {board.waveHeight?.toFixed(1) ?? "—"}m · 풍속 {board.windSpeed?.toFixed(0) ?? "—"}m/s</p>
+          <p className="text-[0.6875rem] text-foreground-muted">파고 {board.waveHeight?.toFixed(1) ?? "—"}m · 풍속 {board.windSpeed?.toFixed(0) ?? "—"}m/s</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">다음 물때</p>
           <p className="mt-1 font-display text-2xl font-bold text-brand">{board.nextTide ? `${board.nextTide.type} ${board.nextTide.time}` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">수온 {board.waterTemp != null ? `${board.waterTemp}℃` : "—"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">수온 {board.waterTemp != null ? `${board.waterTemp}℃` : "—"}</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">선상낚시 예상(일)</p>
           <p className="mt-1 font-display text-2xl font-bold text-brand">{board.expectedGuests != null ? `${board.expectedGuests}명` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? `매출 ${Math.round(board.estRevenue / 10000)}만` : "정원·요금 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? `매출 ${Math.round(board.estRevenue / 10000)}만` : "정원·요금 입력 시"}</p>
         </article>
       </div>
-      <p className="mt-2 text-[11px] text-foreground-muted">일출 {board.sunrise ?? "—"} · 일몰 {board.sunset ?? "—"}</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">일출 {board.sunrise ?? "—"} · 일몰 {board.sunset ?? "—"}</p>
       {board.notes.length > 0 && (
         <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 파고·풍속(국립해양조사원) 기반 안전 참고 — 최종 출항은 관할 해경·기상특보 확인.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 파고·풍속(국립해양조사원) 기반 안전 참고 — 최종 출항은 관할 해경·기상특보 확인.</p>
     </section>
   );
 }
@@ -390,7 +390,7 @@ export function SaltBoardCard({ board }: { board: SaltBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">채염 적합도</p>
           <p className={`mt-1 font-display text-3xl font-bold ${c}`}>{board.harvestLabel}</p>
-          <p className="text-[11px] text-foreground-muted">하늘 {board.sky ?? "—"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">하늘 {board.sky ?? "—"}</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">바람(증발)</p>
@@ -400,7 +400,7 @@ export function SaltBoardCard({ board }: { board: SaltBoard }) {
       {board.notes.length > 0 && (
         <ul className="mt-3 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 실시간 날씨·바람 기반 추정 — 결정지 상태는 현장 확인.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 실시간 날씨·바람 기반 추정 — 결정지 상태는 현장 확인.</p>
     </section>
   );
 }
@@ -440,7 +440,7 @@ export function FarmingBoardCard({ board }: { board: FarmingBoard }) {
       {board.notes.length > 0 && (
         <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 기상청 단기·주말 예보 기반 — 정밀 방제는 농업기술센터 안내 확인.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 기상청 단기·주말 예보 기반 — 정밀 방제는 농업기술센터 안내 확인.</p>
     </section>
   );
 }
@@ -462,12 +462,12 @@ export function TravelBoardCard({ board }: { board: TravelBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 예약(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.expectedBookings != null ? `${board.expectedBookings}명` : "—"}</p>
-          {board.capacity != null && <p className="text-[11px] text-foreground-muted">정원 {board.capacity}명 기준</p>}
+          {board.capacity != null && <p className="text-[0.6875rem] text-foreground-muted">정원 {board.capacity}명 기준</p>}
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 매출(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "예약×상품가" : "정원·상품가 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? "예약×상품가" : "정원·상품가 입력 시"}</p>
         </article>
       </div>
       {board.notes.length > 0 && (
@@ -476,7 +476,7 @@ export function TravelBoardCard({ board }: { board: TravelBoard }) {
       {board.expectedBookings == null && (
         <p className="mt-3 text-xs text-foreground-muted"><Icon name="idea" /> 가게 정보에 <strong className="text-brand">일 투어 정원·1인 상품가</strong>를 입력하면 예상 예약·매출이 계산됩니다.</p>
       )}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 태안 관광 수요·날씨·파고 기반 추정치 — 섬·해상 투어는 기상 영향 큼.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 태안 관광 수요·날씨·파고 기반 추정치 — 섬·해상 투어는 기상 영향 큼.</p>
     </section>
   );
 }
@@ -493,17 +493,17 @@ export function RealtorBoardCard({ board }: { board: RealtorBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">아파트 평균가</p>
           <p className="mt-1 font-display text-2xl font-bold text-brand">{board.aptAvgManwon ? `${(board.aptAvgManwon / 10000).toFixed(2)}억` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">거래 {board.aptCount}건</p>
+          <p className="text-[0.6875rem] text-foreground-muted">거래 {board.aptCount}건</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">평당가(전용)</p>
           <p className="mt-1 font-display text-2xl font-bold text-brand">{board.aptPerPyeongManwon != null ? `${board.aptPerPyeongManwon}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">㎡당 {board.aptPerM2Manwon ?? "—"}만</p>
+          <p className="text-[0.6875rem] text-foreground-muted">㎡당 {board.aptPerM2Manwon ?? "—"}만</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">{board.eupLabel ?? "내 읍·면"} 거래</p>
           <p className="mt-1 font-display text-2xl font-bold text-brand">{board.eupAptCount != null ? `${board.eupAptCount}건` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">토지 {board.landCount}건</p>
+          <p className="text-[0.6875rem] text-foreground-muted">토지 {board.landCount}건</p>
         </article>
       </div>
       {board.recent.length > 0 && (
@@ -517,7 +517,7 @@ export function RealtorBoardCard({ board }: { board: RealtorBoard }) {
         </div>
       )}
       {board.notes.length > 0 && <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 국토부 실거래가 — 상세 추이·CSV는 <Link href="/reports#data" className="text-accent hover:underline">주간 리포트 · 데이터 부록</Link>.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 국토부 실거래가 — 상세 추이·CSV는 <Link href="/reports#data" className="text-accent hover:underline">주간 리포트 · 데이터 부록</Link>.</p>
     </section>
   );
 }
@@ -535,21 +535,21 @@ export function GolfBoardCard({ board }: { board: GolfBoard }) {
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">라운딩 적합도</p>
           <p className={`mt-1 font-display text-2xl font-bold ${fitColor}`}>{board.fitLabel}</p>
-          <p className="text-[11px] text-foreground-muted">{board.weekendMaxTemp != null ? `주말 최고 ${board.weekendMaxTemp}°` : ""}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.weekendMaxTemp != null ? `주말 최고 ${board.weekendMaxTemp}°` : ""}</p>
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 내장(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.expectedRounds != null ? `${board.expectedRounds}명` : "—"}</p>
-          {board.capacity != null && <p className="text-[11px] text-foreground-muted">정원 {board.capacity}명</p>}
+          {board.capacity != null && <p className="text-[0.6875rem] text-foreground-muted">정원 {board.capacity}명</p>}
         </article>
         <article className="rounded-xl bg-background p-4 text-center shadow-card">
           <p className="text-xs text-foreground-muted">예상 매출(일)</p>
           <p className="mt-1 font-display text-3xl font-bold text-brand">{board.estRevenue != null ? `${Math.round(board.estRevenue / 10000)}만` : "—"}</p>
-          <p className="text-[11px] text-foreground-muted">{board.estRevenue != null ? "내장×그린피" : "정원·그린피 입력 시"}</p>
+          <p className="text-[0.6875rem] text-foreground-muted">{board.estRevenue != null ? "내장×그린피" : "정원·그린피 입력 시"}</p>
         </article>
       </div>
       {board.notes.length > 0 && <ul className="mt-3 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-sm text-foreground">· {n}</li>)}</ul>}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 주말 예보·풍속 기반 추정 — 코스 상태는 현장 확인.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 주말 예보·풍속 기반 추정 — 코스 상태는 현장 확인.</p>
     </section>
   );
 }
@@ -585,7 +585,7 @@ export function AquaBoardCard({ board }: { board: AquaBoard }) {
         </ul>
       )}
       {board.notes.length > 0 && <ul className="mt-2 space-y-1">{board.notes.map((n, i) => <li key={i} className="text-[12px] text-foreground-muted">· {n}</li>)}</ul>}
-      <p className="mt-2 text-[11px] text-foreground-muted">※ 국립해양조사원 수온·파고 기반 — 적조 속보는 국립수산과학원 확인.</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 국립해양조사원 수온·파고 기반 — 적조 속보는 국립수산과학원 확인.</p>
     </section>
   );
 }

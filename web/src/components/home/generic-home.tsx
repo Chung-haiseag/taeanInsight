@@ -200,7 +200,7 @@ function MembershipSection() {
             <ul className="mt-6 grid gap-4">
               {MEMBER_FEATURES.map((f) => (
                 <li key={f.title} className="flex items-start gap-3">
-                  <span className="mt-0.5 grid h-5.5 w-5.5 shrink-0 place-items-center rounded-full bg-accent-subtle/60 text-[11px] font-black text-accent-ink" style={{ width: "1.4rem", height: "1.4rem" }}>✓</span>
+                  <span className="mt-0.5 grid h-5.5 w-5.5 shrink-0 place-items-center rounded-full bg-accent-subtle/60 text-[0.6875rem] font-black text-accent-ink" style={{ width: "1.4rem", height: "1.4rem" }}>✓</span>
                   <span><b className="block text-[0.98rem] font-semibold text-brand">{f.title}</b><span className="text-sm text-foreground-muted">{f.desc}</span></span>
                 </li>
               ))}
@@ -293,7 +293,7 @@ function WeekendDemandCard() {
           <p className="text-sm text-foreground-muted">우리 가게는 이번 주말 어떻게 준비할까요? <strong className="text-brand">업종별 상세 예측 · 준비 체크리스트</strong></p>
           <Link href="/membership" className="shrink-0 rounded-full bg-accent px-4 py-2 text-sm font-bold text-background hover:opacity-90">사장님 멤버십 →</Link>
         </div>
-        <p className="relative mt-2.5 text-[11px] text-foreground-muted">규칙기반 예측(날씨·물때·축제·연휴·계절). 예측과 실제를 대조해 적중률을 공개합니다.</p>
+        <p className="relative mt-2.5 text-[0.6875rem] text-foreground-muted">규칙기반 예측(날씨·물때·축제·연휴·계절). 예측과 실제를 대조해 적중률을 공개합니다.</p>
       </div>
     </section>
   );

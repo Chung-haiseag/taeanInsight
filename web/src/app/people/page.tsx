@@ -144,12 +144,12 @@ export default function PeoplePage() {
                   <li key={c.id}>
                     <button type="button" onClick={() => void open(c.id)} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1 hover:bg-brand/10">
                       {c.name} <span className="text-xs text-foreground-muted">{c.count}회</span>
-                      {c.verified === 1 && c.reltype ? <span className="ml-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{c.reltype}</span> : null}
+                      {c.verified === 1 && c.reltype ? <span className="ml-1 rounded bg-accent/15 px-1.5 py-0.5 text-[0.625rem] font-semibold text-accent">{c.reltype}</span> : null}
                     </button>
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-[11px] text-foreground-muted">‘회’는 같은 기사 공동 등장 빈도(관계 아님). 라벨은 검수된 관계만.</p>
+              <p className="mt-2 text-[0.6875rem] text-foreground-muted">‘회’는 같은 기사 공동 등장 빈도(관계 아님). 라벨은 검수된 관계만.</p>
             </section>
           )}
 
@@ -176,7 +176,7 @@ export default function PeoplePage() {
               <ul className="space-y-1.5 text-sm">
                 {prof.articles.map((a) => (
                   <li key={a.idxno} className="flex items-baseline gap-2">
-                    <span className="shrink-0 text-[11px] text-foreground-muted">{a.published_at?.slice(0, 10)}</span>
+                    <span className="shrink-0 text-[0.6875rem] text-foreground-muted">{a.published_at?.slice(0, 10)}</span>
                     <Link href={`/news/${a.idxno}`} className="text-accent hover:underline">{a.title}</Link>
                   </li>
                 ))}
@@ -231,8 +231,8 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-bold text-brand">인물 소개</h3>
         {suppressed
-          ? (wiki && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">위키백과 요약</span>)
-          : <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">AI 요약 · 기사 근거</span>}
+          ? (wiki && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[0.625rem] font-semibold text-brand">위키백과 요약</span>)
+          : <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[0.625rem] font-semibold text-brand">AI 요약 · 기사 근거</span>}
       </div>
       {/* AI 전기 — 지연 로드. 전국 인물 등 억제 대상은 로컬 AI 소개 대신 위키백과 요약(있으면)·안내. 팩트·관계망은 유지. */}
       {suppressed ? (
@@ -243,7 +243,7 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
         ) : wiki ? (
           <div className="space-y-2">
             <p className="text-sm leading-relaxed text-foreground">{wiki.extract}</p>
-            <p className="text-[11px] text-foreground-muted">
+            <p className="text-[0.6875rem] text-foreground-muted">
               전국 인물이라 지역 AI 소개 대신 위키백과 요약을 제공합니다. 출처:{" "}
               <a href={wiki.url} target="_blank" rel="noopener noreferrer" className="underline">위키백과</a>
             </p>
@@ -258,7 +258,7 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
           <div className="h-3 w-11/12 animate-pulse rounded bg-brand/10" />
           <div className="h-3 w-full animate-pulse rounded bg-brand/10" />
           <div className="h-3 w-10/12 animate-pulse rounded bg-brand/10" />
-          <p className="pt-1 text-[11px] text-foreground-muted">기사에서 인물 소개를 작성하는 중…</p>
+          <p className="pt-1 text-[0.6875rem] text-foreground-muted">기사에서 인물 소개를 작성하는 중…</p>
         </div>
       ) : brief ? (
         <div className="space-y-2.5 text-sm leading-relaxed text-foreground">
@@ -273,7 +273,7 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
         </p>
       )}
       {/* 확정 팩트 스트립 — AI 요약과 별개의 집계 수치(항상 표시) */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-brand/10 pt-2.5 text-[11px] text-foreground-muted">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-brand/10 pt-2.5 text-[0.6875rem] text-foreground-muted">
         <span>아카이브 <strong className="text-foreground">{prof.person.mentions.toLocaleString()}건</strong></span>
         {years && <span>활동 <strong className="text-foreground">{years}</strong></span>}
         {desc && <span>직위 <strong className="text-foreground">{desc}</strong></span>}
@@ -282,11 +282,11 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
       </div>
       {topics.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-foreground-muted">주요 주제</span>
-          {topics.map((t) => <span key={t} className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] text-brand">{t}</span>)}
+          <span className="text-[0.6875rem] text-foreground-muted">주요 주제</span>
+          {topics.map((t) => <span key={t} className="rounded-full bg-brand/10 px-2 py-0.5 text-[0.6875rem] text-brand">{t}</span>)}
         </div>
       )}
-      {!suppressed && <p className="mt-2 text-[11px] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>}
+      {!suppressed && <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>}
     </section>
   );
 }
@@ -324,7 +324,7 @@ function RelationGraph({ prof, onOpen }: { prof: PersonProfile; onOpen: (id: str
       <p className="px-2 pt-1 text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(<strong>원·이름 클릭 시 그 사람으로 이동</strong>). 바이라인 제외.</p>
       <KgGraph nodes={prof.graph.nodes} edges={edges} centerId={centerId} onNodeClick={onOpen} height={640} />
       {usedRels.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 pb-1 pt-1 text-[11px]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 pb-1 pt-1 text-[0.6875rem]">
           {usedRels.map((r) => (
             <span key={r} className="inline-flex items-center gap-1">
               <span className="inline-block h-2.5 w-4 rounded-sm" style={{ background: REL_LEGEND[r] ?? "#888" }} />

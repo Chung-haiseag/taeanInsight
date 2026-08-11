@@ -23,11 +23,11 @@ export function AdminHeader() {
       />
       <div className="container mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="rounded bg-red-600 px-2 py-0.5 text-[11px] font-bold tracking-wider text-white">
+          <span className="rounded bg-red-600 px-2 py-0.5 text-[0.6875rem] font-bold tracking-wider text-white">
             ADMIN
           </span>
           <span className="flex flex-col leading-none min-w-0">
-            <span className="text-[10px] uppercase tracking-widest text-slate-400">Taean Insight</span>
+            <span className="text-[0.625rem] uppercase tracking-widest text-slate-400">Taean Insight</span>
             <span className="truncate font-bold text-white">운영 콘솔</span>
           </span>
         </div>
@@ -49,7 +49,7 @@ export function AdminHeader() {
       </div>
       {/* 내부용 고지 스트립 */}
       <div className="border-t border-white/10 bg-black/20">
-        <p className="container mx-auto max-w-[1200px] px-4 py-1 text-[11px] text-slate-400">
+        <p className="container mx-auto max-w-[1200px] px-4 py-1 text-[0.6875rem] text-slate-400">
           🔒 내부 운영 도구 — 이 화면은 태안신문사 관리자 전용이며 외부 공유·노출을 금지합니다.
         </p>
       </div>

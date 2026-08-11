@@ -77,7 +77,7 @@ export function AnswerChart({ spec }: { spec: ChartSpec }) {
           </g>
         </svg>
       </div>
-      <p className="mt-1 text-[11px] text-foreground-muted">
+      <p className="mt-1 text-[0.6875rem] text-foreground-muted">
         본문·근거의 수치로 자동 생성{spec.unit ? ` · 단위 ${spec.unit}` : ""} · 정확한 값은 본문 참고
       </p>
     </figure>

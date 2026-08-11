@@ -143,7 +143,7 @@ function DemandBars({ data }: { data: DashDemandPoint[] }) {
           <div className="flex w-full items-end justify-center" style={{ height: 110 }}>
             <div className="w-6 rounded-t bg-accent" style={{ height: `${((d.idx ?? 0) / max) * 100}%` }} title={`${d.idx}점 · ${d.level}`} />
           </div>
-          <span className="text-[10px] tabular-nums text-foreground-muted">{d.date?.slice(5)}</span>
+          <span className="text-[0.625rem] tabular-nums text-foreground-muted">{d.date?.slice(5)}</span>
         </div>
       ))}
     </div>

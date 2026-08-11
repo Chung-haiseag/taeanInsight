@@ -232,7 +232,7 @@ export function QueryClient() {
                       className="w-24 rounded border border-brand/15 bg-foreground-muted/5"
                       loading="lazy"
                     />
-                    <figcaption className="mt-1 text-[10px] text-foreground-muted">태안군청 공식</figcaption>
+                    <figcaption className="mt-1 text-[0.625rem] text-foreground-muted">태안군청 공식</figcaption>
                   </figure>
                 )}
                 <p className="flex-1 whitespace-pre-wrap">{decodeEntities(result.personBrief.text)}</p>
@@ -247,7 +247,7 @@ export function QueryClient() {
                 {result.sources.map((s, i) => (
                   <li key={i} className="flex items-center gap-2">
                     {s.kind === "web" && (
-                      <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                      <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[0.625rem] font-semibold text-accent">
                         웹{(() => { try { return " · " + new URL(s.url ?? "").hostname.replace(/^www\./, ""); } catch { return ""; } })()}
                       </span>
                     )}
@@ -284,7 +284,7 @@ export function QueryClient() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-[11px] text-foreground-muted">
+              <p className="mt-3 text-[0.6875rem] text-foreground-muted">
                 AI는 위 실시간·아카이브 근거를 바탕으로 답합니다(없으면 “찾지 못함”). 사실은 공공데이터·기록, 문장은 AI.
               </p>
             </details>

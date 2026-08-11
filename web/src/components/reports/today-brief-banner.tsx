@@ -11,7 +11,7 @@ export function TodayBriefBanner({ brief, vapidPublicKey }: { brief: TodayBriefV
       <div className="flex items-start gap-2.5">
         <span className="text-xl leading-none" aria-hidden>📣</span>
         <div className="flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-accent">{brief.title}</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-accent">{brief.title}</p>
           <p className="mt-1 text-[0.95rem] font-medium leading-relaxed text-foreground">{brief.body}</p>
         </div>
       </div>

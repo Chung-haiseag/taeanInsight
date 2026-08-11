@@ -344,7 +344,7 @@ function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
       {leadImg && (
         <figure className="space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={leadImg} alt="" className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 720px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          <img src={leadImg} alt={hasCaption ? allParas[0] : article.title} className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 720px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           {hasCaption && <figcaption className="text-center text-sm text-foreground-muted">{allParas[0]}</figcaption>}
         </figure>
       )}
@@ -362,7 +362,7 @@ function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
           {restImages.map((src) => (
             // 자연 크기 표시(작으면 작게), 단 본문 폭·높이 상한만 둠 — 작은 사진이 흐릿하게 늘어나지 않게
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img key={src} src={src} alt={`${article.title} 본문 사진`} className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
       )}

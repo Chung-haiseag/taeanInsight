@@ -168,7 +168,7 @@ export function TodayConditions({ preferences }: { preferences: UserPreferences 
             <p className="text-xl" aria-hidden>{m.emoji}</p>
             <p className="mt-1 text-2xl font-bold text-brand">{m.value}</p>
             <p className="text-xs font-medium text-foreground-muted">{m.label}</p>
-            <p className="text-[11px] text-foreground-muted/80">{m.sub}</p>
+            <p className="text-[0.6875rem] text-foreground-muted/80">{m.sub}</p>
           </article>
         ))}
       </div>

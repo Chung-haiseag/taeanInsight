@@ -291,7 +291,7 @@ export function CopilotEditor() {
               aria-label="기사 제목"
               className="w-full border-b-2 border-brand/15 bg-transparent pb-2 text-2xl font-bold text-brand outline-none focus:border-accent"
             />
-            <p className={`mt-1 text-right text-[11px] ${title.length >= TITLE_MAX ? "text-red-600" : "text-foreground-muted"}`}>{title.length}/{TITLE_MAX}</p>
+            <p className={`mt-1 text-right text-[0.6875rem] ${title.length >= TITLE_MAX ? "text-red-600" : "text-foreground-muted"}`}>{title.length}/{TITLE_MAX}</p>
           </div>
           <div>
             <textarea
@@ -309,9 +309,9 @@ export function CopilotEditor() {
                   {uploading ? "업로드 중…" : <><Icon name="image" /> 사진 추가</>}
                 </button>
                 <DataInsertButton onInsert={(text) => setBody((b) => `${b}${b && !b.endsWith("\n") ? "\n\n" : ""}${text}\n\n`)} />
-                {uploadErr && <span className="text-[11px] text-red-600">{uploadErr}</span>}
+                {uploadErr && <span className="text-[0.6875rem] text-red-600">{uploadErr}</span>}
               </div>
-              <p className="text-[11px] text-foreground-muted">
+              <p className="text-[0.6875rem] text-foreground-muted">
                 {body.length.toLocaleString()}자{body.length > 0 && body.length < 300 && " · 권장 300자↑"}
               </p>
             </div>
@@ -422,7 +422,7 @@ function GovernancePanel({ check }: { check: CheckResult | null }) {
                 <ul className="mt-1.5 space-y-1">
                   {check.pii.samples.map((s, i) => (
                     <li key={`${s.matched}-${i}`} className="flex items-center gap-1.5">
-                      <span className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-[11px] text-amber-900">{s.matched}</span>
+                      <span className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-[0.6875rem] text-amber-900">{s.matched}</span>
                       <span className="text-amber-700">{PII_LABELS[s.kind] ?? s.kind}</span>
                     </li>
                   ))}
@@ -444,7 +444,7 @@ function GovernancePanel({ check }: { check: CheckResult | null }) {
           )}
         </div>
       )}
-      {check && <p className="text-[11px] text-foreground-muted">{check.chars}자 · 규칙 기반(무LLM)</p>}
+      {check && <p className="text-[0.6875rem] text-foreground-muted">{check.chars}자 · 규칙 기반(무LLM)</p>}
     </section>
   );
 }
@@ -516,7 +516,7 @@ function AssistPanel({ body, onApply }: { body: string; onApply: (text: string) 
           )}
         </div>
       )}
-      <p className="text-[11px] text-foreground-muted">Workers AI (Llama 3.3) · 무료 할당 내 종량 0 · 사실 점검은 본문에서 확인 대상만 추출(새 사실 창작 안 함)</p>
+      <p className="text-[0.6875rem] text-foreground-muted">Workers AI (Llama 3.3) · 무료 할당 내 종량 0 · 사실 점검은 본문에서 확인 대상만 추출(새 사실 창작 안 함)</p>
     </section>
   );
 }
@@ -554,7 +554,7 @@ function PreSubmitChecklist() {
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[11px] text-foreground-muted">자가점검용 안내입니다 · 체크하지 않아도 제출할 수 있어요(편집부가 최종 검토).</p>
+      <p className="mt-2 text-[0.6875rem] text-foreground-muted">자가점검용 안내입니다 · 체크하지 않아도 제출할 수 있어요(편집부가 최종 검토).</p>
     </details>
   );
 }
@@ -625,7 +625,7 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
                   aria-expanded={open}
                   className={`block w-full text-left rounded-lg border p-2.5 transition-colors ${open ? "border-accent bg-accent-subtle/20" : "border-brand/10 hover:border-accent/40 hover:bg-accent-subtle/10"}`}>
                   <p className="text-sm font-semibold text-brand leading-snug">{a.title}</p>
-                  <p className="mt-0.5 text-[11px] text-foreground-muted">
+                  <p className="mt-0.5 text-[0.6875rem] text-foreground-muted">
                     {a.publishedAt ? a.publishedAt.slice(0, 10) : ""}{a.category ? ` · ${a.category}` : ""}
                     <span className="ml-1 text-accent">{open ? "▲ 접기" : "▼ 본문 보기"}</span>
                   </p>
@@ -638,14 +638,14 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
                     {reading && (
                       <>
                         {reading.faithfulness != null && reading.faithfulness < 0.7 && (
-                          <p className="mb-2 rounded bg-amber-50 p-1.5 text-[11px] text-amber-700">※ 옛 신문 OCR 본문이라 오탈자가 있을 수 있습니다.</p>
+                          <p className="mb-2 rounded bg-amber-50 p-1.5 text-[0.6875rem] text-amber-700">※ 옛 신문 OCR 본문이라 오탈자가 있을 수 있습니다.</p>
                         )}
                         <div className="max-h-80 space-y-2.5 overflow-y-auto text-xs leading-relaxed text-foreground">
                           {paragraphize(reading.body || reading.excerpt || "(본문 없음)").map((p, i) => (
                             <p key={i}>{p}</p>
                           ))}
                         </div>
-                        <Link href={`/news/${reading.idxno}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[11px] font-semibold text-accent hover:underline">원문 페이지 새 탭으로 →</Link>
+                        <Link href={`/news/${reading.idxno}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[0.6875rem] font-semibold text-accent hover:underline">원문 페이지 새 탭으로 →</Link>
                       </>
                     )}
                     {!readLoading && !reading && <p className="text-xs text-foreground-muted">본문을 불러오지 못했습니다.</p>}
@@ -656,7 +656,7 @@ function RelatedPanel({ title, body }: { title: string; body: string }) {
           })}
         </ul>
       )}
-      {items.length > 0 && <p className="text-[11px] text-foreground-muted">제목을 누르면 본문이 아래로 펼쳐집니다 · 규칙 기반 검색(무LLM)</p>}
+      {items.length > 0 && <p className="text-[0.6875rem] text-foreground-muted">제목을 누르면 본문이 아래로 펼쳐집니다 · 규칙 기반 검색(무LLM)</p>}
     </section>
   );
 }
@@ -697,7 +697,7 @@ function DataInsertButton({ onInsert }: { onInsert: (text: string) => void }) {
               onClick={() => { onInsert(b.markdown); setOpen(false); }}
               className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-brand/5">
               <span className="text-xs font-semibold text-brand">{b.label}</span>
-              <span className="mt-0.5 block text-[11px] text-foreground-muted line-clamp-2">{b.markdown}</span>
+              <span className="mt-0.5 block text-[0.6875rem] text-foreground-muted line-clamp-2">{b.markdown}</span>
             </button>
           ))}
           {blocks && blocks.length === 0 && !err && (
