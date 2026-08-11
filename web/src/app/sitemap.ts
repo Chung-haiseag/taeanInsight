@@ -24,11 +24,19 @@ export async function generateSitemaps(): Promise<{ id: number }[]> {
 
 export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
   if (Number(id) === 0) {   // Next가 id를 문자열로 넘길 수 있어 Number()로 정규화
-    return STATIC.map((p) => ({
+    const staticEntries = STATIC.map((p) => ({
       url: `${SITE}${p}`,
       changeFrequency: "daily" as const,
       priority: p === "" ? 1 : 0.7,
     }));
+    // 연도별 아카이브 브라우즈 허브(/archive/<year>) — 크롤러가 내부 링크로 아카이브에 도달.
+    let years: number[] = [];
+    try {
+      const res = await fetch(`${API_BASE}/api/news/sitemap-years`, { next: { revalidate: 86400 } });
+      if (res.ok) years = ((await res.json()).years ?? []) as number[];
+    } catch { /* 정적만 */ }
+    const yearHubs = years.map((y) => ({ url: `${SITE}/archive/${y}`, changeFrequency: "monthly" as const, priority: 0.5 }));
+    return [...staticEntries, ...yearHubs];
   }
   try {
     const res = await fetch(`${API_BASE}/api/news/sitemap-ids?year=${id}`, { next: { revalidate: 86400 } });
