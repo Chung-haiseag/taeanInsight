@@ -195,6 +195,28 @@ newsRouter.get("/tv", async (c) => {
   return res;
 });
 
+// SEO 사이트맵용 — 아카이브 전 기사를 검색엔진이 발견하게(연도별 청크). 가벼운 id+발행일만.
+//   연도별로 나누는 이유: idxno가 불연속(전자북 9천만대)이라 OFFSET은 고오프셋서 느림(5.7s);
+//   year 인덱스로 한 해(≤5.5k건)만 읽어 빠름(~30ms). 웹 sitemap.ts의 generateSitemaps가 소비.
+newsRouter.get("/sitemap-years", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ years: [] });
+  const r = await db.prepare("SELECT DISTINCT year FROM archive_articles WHERE year IS NOT NULL ORDER BY year").all<{ year: number }>();
+  c.header("Cache-Control", "public, s-maxage=86400");
+  return c.json({ years: (r.results ?? []).map((x) => x.year) });
+});
+
+newsRouter.get("/sitemap-ids", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ year: null, ids: [] });
+  const year = Number(c.req.query("year"));
+  if (!Number.isInteger(year) || year < 1980 || year > 2100) return c.json({ error: "invalid_year" }, 400);
+  const r = await db.prepare("SELECT idxno, published_at FROM archive_articles WHERE year = ? ORDER BY idxno").bind(year)
+    .all<{ idxno: number; published_at: string | null }>();
+  c.header("Cache-Control", "public, s-maxage=86400");
+  return c.json({ year, ids: (r.results ?? []).map((x) => ({ id: x.idxno, publishedAt: x.published_at })) });
+});
+
 // 기사 1건 (자체 리더용). 현재 본문은 RSS 발췌 기준 — 아카이브 백필(D1) 연동 시 전문으로 교체.
 newsRouter.get("/:id", async (c) => {
   let items;
@@ -205,20 +227,20 @@ newsRouter.get("/:id", async (c) => {
   }
   const item = items.find((it) => it.id === c.req.param("id"));
   // 목록에 없어도 아카이브(D1)에 있으면 그걸로 — 발췌·대표사진 보강(공유 카드용)
-  let excerpt = item?.excerpt ?? "", leadImage: string | null = null, title = item?.title ?? "";
+  let excerpt = item?.excerpt ?? "", leadImage: string | null = null, title = item?.title ?? "", publishedAt: string | null = item?.publishedAt ?? null;
   if (c.env.ARCHIVE_DB) {
     const idxno = Number(c.req.param("id"));
     if (Number.isFinite(idxno)) {
       const a = await c.env.ARCHIVE_DB
-        .prepare("SELECT title, lead_image, substr(COALESCE(excerpt, body, ''),1,160) AS ex FROM archive_articles WHERE idxno=?")
-        .bind(idxno).first<{ title: string; lead_image: string | null; ex: string | null }>();
-      if (a) { title = title || a.title; excerpt = excerpt || (a.ex ?? ""); leadImage = a.lead_image; }
+        .prepare("SELECT title, lead_image, published_at, substr(COALESCE(excerpt, body, ''),1,160) AS ex FROM archive_articles WHERE idxno=?")
+        .bind(idxno).first<{ title: string; lead_image: string | null; published_at: string | null; ex: string | null }>();
+      if (a) { title = title || a.title; excerpt = excerpt || (a.ex ?? ""); leadImage = a.lead_image; publishedAt = publishedAt || a.published_at; }
     }
   }
   if (!item && !title) return c.json({ error: "not_found" }, 404);
   return c.json({
     ...(item ?? { id: c.req.param("id"), category: "society" as const }),
-    title, excerpt, leadImage,
+    title, excerpt, leadImage, publishedAt,
     categoryLabel: item ? NEWS_CATEGORY_LABELS[item.category] : "지역사회",
     bodySource: "rss_excerpt",
   });
