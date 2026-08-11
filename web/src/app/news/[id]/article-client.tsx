@@ -11,9 +11,9 @@ import { getNewsItem } from "@/lib/api/news";
 import {
   getArchiveArticle,
   getRelatedArchive,
-  ARCHIVE_CATEGORY_LABELS,
   type ArchiveHit,
 } from "@/lib/api/archive";
+import { archiveToReader, formatDate, LOW_FAITH, OLD_PRINT_UNTIL, type Reader } from "./reader";
 import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
 import { decodeEntities } from "@/lib/html";
 import { segmentQuotes } from "@/lib/quote-highlight";
@@ -27,77 +27,20 @@ import { CorrectionRequest } from "./correction-request";
 import ArticleGraph from "./article-graph";
 import { MembershipNudge } from "@/components/membership-nudge";
 
-interface Reader {
-  title: string;
-  publishedAt: string;
-  author?: string;
-  category?: string;
-  categoryLabel: string;
-  excerpt: string;
-  body?: string; // 전문 (D1)
-  images: string[]; // 본문 사진
-  url?: string;
-  source: "archive" | "rss";
-  hasFullText: boolean;
-  pageImage?: string | null; // 전자북(과거지면): 원본 지면 스캔
-  pageLabel?: string | null; // 예: "1990.5.14 · 지면 03면"
-  faithfulness?: number | null; // 전자북 OCR 충실도
-}
-
-// 이 값 미만이면 "OCR 불완전 — 원본 지면 확인" 안내를 본문 하단에 표시
-// (검수 '경고' 임계값과 동일 — 약 14.6%, 7건 중 1건)
-const LOW_FAITH = 0.75;
-// 1990~1994 옛 신문(세로쓰기·저품질 인쇄)은 충실도 수치와 무관하게 항상 안내 표시.
-// (특히 1990은 Gemini 멀티모달 전사라 원문 대조 가드가 없어 신뢰성 고지 필요)
-const OLD_PRINT_UNTIL = 1994;
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
-
-// 전자북 기사(90000001~)면 원본 지면 스캔 URL 유도 (R2: ebook/<ymd>/page_<NN>.jpg)
-function ebookPageImage(idxno: number, section?: string | null, publishedAt?: string | null) {
-  if (!(idxno >= 90000001 && idxno <= 90099999)) return { pageImage: null, pageLabel: null };
-  const m = /지면\s*(\d{2})면/.exec(section ?? "");
-  const ymd = (publishedAt ?? "").slice(0, 10).replace(/-/g, "");
-  if (!m || ymd.length !== 8) return { pageImage: null, pageLabel: null };
-  return {
-    pageImage: `${API_BASE}/api/archive/photo/ebook/${ymd}/page_${m[1]}.jpg`,
-    pageLabel: `${ymd.slice(0, 4)}.${Number(ymd.slice(4, 6))}.${Number(ymd.slice(6, 8))} · 지면 ${m[1]}면`,
-  };
-}
-
-function formatDate(s: string): string {
-  const m = (s || "").match(/(\d{4})[-.](\d{2})[-.](\d{2})[T ](\d{2}:\d{2})/);
-  return m ? `${m[1]}. ${Number(m[2])}. ${Number(m[3])} ${m[4]}` : s;
-}
-
-export default function ArticleClient() {
+export default function ArticleClient({ initialArticle }: { initialArticle?: Reader }) {
   const params = useParams<{ id: string }>();
-  const [article, setArticle] = useState<Reader | null>(null);
+  const [article, setArticle] = useState<Reader | null>(initialArticle ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialArticle);
   const [member, setMember] = useState(false);
 
   useEffect(() => {
     setMember(getDemoHomeState() === "entitled");
+    if (initialArticle) return; // 서버가 이미 제공(SSR) → 클라 fetch 불필요(이중 fetch 제거)
     (async () => {
       try {
-        // 1) D1 아카이브(전문) 우선
-        const a = await getArchiveArticle(Number(params.id));
-        setArticle({
-          title: decodeEntities(a.title),
-          publishedAt: a.published_at,
-          author: a.author,
-          category: a.category,
-          categoryLabel: ARCHIVE_CATEGORY_LABELS[a.category] ?? a.category,
-          excerpt: decodeEntities(a.excerpt ?? ""),
-          body: decodeEntities(a.body),
-          images: Array.isArray(a.images) ? a.images : [],
-          url: a.url,
-          source: "archive",
-          hasFullText: !!(a.body && a.body.length > 0),
-          faithfulness: typeof a.faithfulness === "number" ? a.faithfulness : null,
-          ...ebookPageImage(Number(params.id), a.section, a.published_at),
-        });
+        // 1) D1 아카이브(전문) 우선 — 서버·클라 공통 매핑(archiveToReader)
+        setArticle(archiveToReader(await getArchiveArticle(Number(params.id)), Number(params.id)));
       } catch {
         // 2) 아카이브에 없으면 RSS 발췌
         try {
@@ -121,7 +64,7 @@ export default function ArticleClient() {
         setLoading(false);
       }
     })();
-  }, [params.id]);
+  }, [params.id, initialArticle]);
 
   if (loading) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
   if (error || !article)
