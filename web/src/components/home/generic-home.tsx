@@ -291,7 +291,7 @@ function WeekendDemandCard() {
         )}
         <div className="relative mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand/[0.04] px-4 py-3.5">
           <p className="text-sm text-foreground-muted">우리 가게는 이번 주말 어떻게 준비할까요? <strong className="text-brand">업종별 상세 예측 · 준비 체크리스트</strong></p>
-          <Link href="/membership" className="shrink-0 rounded-full bg-accent px-4 py-2 text-sm font-bold text-background hover:opacity-90">사장님 멤버십 →</Link>
+          <Link href="/membership?utm_source=demand" className="shrink-0 rounded-full bg-accent px-4 py-2 text-sm font-bold text-background hover:opacity-90">사장님 멤버십 →</Link>
         </div>
         <p className="relative mt-2.5 text-[0.6875rem] text-foreground-muted">규칙기반 예측(날씨·물때·축제·연휴·계절). 예측과 실제를 대조해 적중률을 공개합니다.</p>
       </div>
