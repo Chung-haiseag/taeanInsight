@@ -94,16 +94,18 @@ async function planTier(c: { env: Env; req: { header: (k: string) => string | un
   } catch { return null; }
 }
 
-// 구독 게이팅 — 전체 열람권이 없으면 요약 + 둘째 섹션 일부만, 나머지는 잠금
+// 프리미엄(결정에 쓰는 정보) 섹션 — 비구독/익명은 미리보기+업셀. 요약·환경·이벤트는 무료(공익·유입·SEO).
+//   전략: 아카이브·기사는 무료 유지, 미래지향 AI 판단정보(부동산·지역경제, 관광·기상 전망)가 유료 쐐기.
+const PREMIUM_SECTIONS = new Set<string>(["realestate", "tourism_weather"]);
+
+// 구독 게이팅 — 프리미엄 섹션만 앞부분 미리보기(teaser)+'이어 보기(구독)'로. 결제 전엔 소프트(미리보기)라
+//   유입을 막지 않고 수요를 검증(업셀 클릭→/membership 리드). 실결제 붙으면 서버에서 전문 withhold로 강화.
 function gate(report: StoredReport, tier?: string | null): GatedReport {
-  const full = !report.premiumOnly || isPremium(tier);
-  const sections: GatedSection[] = report.sections.map((s, i) => {
-    if (full || s.key === "summary") return { ...s, locked: false };
-    if (i === 1) {
-      const teaser = s.content.length > 180 ? `${s.content.slice(0, 180)}…` : s.content;
-      return { ...s, content: teaser, locked: false, truncated: s.content.length > 180 };
-    }
-    return { key: s.key, title: s.title, content: "", sources: [], locked: true };
+  const entitled = isPremium(tier);
+  const sections: GatedSection[] = report.sections.map((s) => {
+    if (entitled || !PREMIUM_SECTIONS.has(s.key)) return { ...s, locked: false };
+    const teaser = s.content.length > 220 ? `${s.content.slice(0, 220)}…` : s.content;
+    return { ...s, content: teaser, locked: false, truncated: s.content.length > 220 };
   });
   return {
     weekId: report.weekId,
@@ -112,7 +114,7 @@ function gate(report: StoredReport, tier?: string | null): GatedReport {
     visibilityTier: report.visibilityTier,
     premiumOnly: report.premiumOnly,
     summary: report.summary,
-    gated: !full,
+    gated: sections.some((s) => s.truncated || s.locked),
     sections,
   };
 }
