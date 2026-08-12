@@ -172,8 +172,8 @@ export function ReportReader({
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/60">
                   <span className="text-2xl" aria-hidden><Icon name="lock" /></span>
                   <span className="text-sm font-medium text-brand">구독자 전용 섹션</span>
-                  <Link href="/me" className="btn-accent no-print px-5 py-2 text-xs">
-                    구독하고 전체 보기
+                  <Link href="/membership?utm_source=report" className="btn-accent no-print px-5 py-2 text-xs">
+                    멤버십으로 전체 보기
                   </Link>
                 </div>
               </div>
@@ -190,8 +190,8 @@ export function ReportReader({
                 <p className={`whitespace-pre-line text-[1.05rem] leading-[1.85] text-foreground ${s.key === "summary" ? "mt-6" : ""}`}>{s.content}</p>
                 {!s.truncated && <SectionVisual sectionKey={s.key} metrics={metrics} />}
                 {s.truncated && (
-                  <Link href="/me" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
-                    … 이어 보기 (구독)
+                  <Link href="/membership?utm_source=report" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
+                    … 이어 보기 (멤버십)
                   </Link>
                 )}
                 {s.sources.length > 0 && (
