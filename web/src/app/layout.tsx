@@ -24,6 +24,11 @@ import { AccessibilityProvider } from "@/components/accessibility-provider";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://axtaeannews.co.kr"),
+  // 사이트 전 페이지 canonical = apex https 고정. www.axtaeannews.co.kr 도 같은 Worker에 붙어 있어
+  // 리다이렉트 없이 동일 내용을 200으로 내므로(http:80도 마찬가지), canonical이 없으면 중복 주소로
+  // 색인 신호가 갈린다. 기사 페이지는 이미 alternates.canonical을 직접 지정하고 있고, './'는
+  // 현재 경로를 metadataBase에 대해 해석해 나머지 전 페이지를 덮는다.
+  alternates: { canonical: "./" },
   title: {
     default: "태안 인사이트 | 태안신문",
     template: "%s | 태안 인사이트",
