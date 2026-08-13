@@ -2,9 +2,23 @@
 //   공개 페이지. 데이터: GET /api/conditions/beaches (loadMarine + rankBeaches).
 //   실시간 해양 관측/예보 기반 — 태안 관광의 본체인 '해변'을 지점 단위로 보여준다.
 
+import type { Metadata } from "next";
+
 import { getBeaches, getMudflat, getFishing, getSunset, getFog, fetchSeafog, type BeachScoreView, type MudflatDayView, type FishingDayView, type FishingGrade } from "@/lib/api/reports";
 import { SunsetCard, FogCard } from "@/components/reports/report-charts";
 import { PageHeader } from "@/components/page-header";
+
+// 검색 유입 핵심 페이지 — '태안 해수욕장 수온'·'안면도 낙조 시간'·'태안 물때' 같은 지역 롱테일 질의를 받는다.
+// (제목 템플릿 '%s | 태안 인사이트'가 붙으므로 여기선 키워드만.)
+export const metadata: Metadata = {
+  title: "태안 해수욕장·물때·낙조",
+  description: "태안 해수욕장별 해수욕 적합도(수온·파고)와 갯벌 물때, 낚시 출조 지수, 오늘의 낙조 시각, 해안 해무까지 — 태안 바다를 한 화면에.",
+  openGraph: {
+    title: "태안 해수욕장·물때·낙조 — 오늘 바다는 어떤가",
+    description: "해수욕 적합도·갯벌 물때·낚시·낙조·해무를 실시간 관측으로",
+    type: "website", locale: "ko_KR", siteName: "태안 인사이트",
+  },
+};
 
 export const revalidate = 900;
 

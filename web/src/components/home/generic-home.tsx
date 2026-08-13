@@ -77,10 +77,10 @@ export function GenericHome() {
       <section aria-labelledby="showcase-heading">
         <div className="max-w-2xl">
           <p className="eyebrow">둘러보기</p>
-          <h2 id="showcase-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-brand md:text-3xl">태안을 읽는 네 가지 길</h2>
+          <h2 id="showcase-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-brand md:text-3xl">태안을 읽는 여섯 가지 길</h2>
           <p className="mt-2.5 text-foreground-muted">검색을 넘어, 근거로 답하는 지역 지식 플랫폼. 무엇을 궁금해하든 출처와 함께.</p>
         </div>
-        <div className="mt-7 grid gap-4 sm:grid-cols-2">
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FeatureCard href="/query" icon="chat" kicker="질의응답 · RAG" title="무엇이든 물어보세요"
             desc="자연어로 묻고, 근거 기사와 실시간 데이터를 함께 답으로 받습니다. 없는 사실은 지어내지 않습니다."
             stat="출처 표기" statLabel="모든 답변에 근거" />
@@ -90,9 +90,16 @@ export function GenericHome() {
           <FeatureCard href="/people" icon="link" kicker="지식그래프 온톨로지" title="인물·조직·사건의 관계망"
             desc="기사 속 인물이 누구와 함께, 무엇을 주관했는지 검증된 사실로 연결합니다."
             stat="3.4만+" statLabel="인물 관계망" />
-          <FeatureCard href="/live" icon="chart" kicker="예측 · 실시간" title="날씨부터 위판 시세까지"
-            desc="낚시·낙조·제철·해무·미세먼지·산불·수산 경락가 — 태안의 지금과 다음을 한눈에."
-            stat="12+" statLabel="실시간·예측 지표" />
+          {/* 아래 3장은 상단 메뉴(지금 태안·해변·지역경제)와 1:1 — 각 페이지의 실제 내용만 약속한다. */}
+          <FeatureCard href="/live" icon="signal" kicker="실시간 · 지금 태안" title="지금 태안은 어떤가"
+            desc="날씨·대기질·산불 위험·관광 수요·도로 CCTV — 오늘 움직이는 태안을 한 화면에."
+            stat="실시간" statLabel="날씨·대기질·도로 CCTV" />
+          <FeatureCard href="/beaches" icon="compass" kicker="바다 · 해변" title="이번 주말, 어느 해변?"
+            desc="해수욕장별 적합도(수온·파고)와 갯벌 물때, 낚시 출조, 낙조 시각과 해무까지."
+            stat="5가지" statLabel="바다 정보 한 화면" />
+          <FeatureCard href="/data" icon="won" kicker="지역경제 · 실측" title="아파트값부터 위판 시세까지"
+            desc="부동산 실거래가·수산물 위판 경매가·장바구니 물가·주유소 유가 — 태안 경제의 실측값."
+            stat="26종" statLabel="공개 데이터 출처" />
         </div>
         <p className="mt-4 text-sm text-foreground-muted">
           예측·요약 콘텐츠는 자동 생성 후 <span className="font-semibold text-accent-ink">편집부 검토</span>를 거쳐 발행됩니다.
@@ -119,7 +126,7 @@ export function GenericHome() {
           <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-brand/10 pt-5 text-sm font-semibold text-accent-ink">
             <Link href="/reports" className="hover:underline">주간 리포트 →</Link>
             <Link href="/citizen" className="hover:underline">시민기자단 →</Link>
-            <Link href="/data" className="hover:underline">데이터 지도 →</Link>
+            <Link href="/data" className="hover:underline">지역경제·데이터 출처 →</Link>
             <span className="ml-auto text-xs font-normal text-foreground-muted">발행: 태안신문 · 2026 지역신문발전위원회 지원 사업</span>
           </div>
         </div>

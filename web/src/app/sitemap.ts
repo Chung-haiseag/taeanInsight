@@ -9,7 +9,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-
 
 export const revalidate = 86400; // 하루 1회 재생성(당해 연도 청크가 새 기사 반영)
 
-const STATIC = ["", "/news", "/reports", "/query", "/live", "/people", "/data", "/citizen", "/membership"];
+const STATIC = ["", "/news", "/reports", "/query", "/live", "/beaches", "/data", "/people", "/citizen", "/membership"];
 
 // id=0 → 정적 페이지, id=연도(1990~2026) → 그 해 기사. Next가 이 목록으로 사이트맵 인덱스를 만든다.
 export async function generateSitemaps(): Promise<{ id: number }[]> {
