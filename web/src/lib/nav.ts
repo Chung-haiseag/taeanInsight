@@ -10,7 +10,6 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/live", label: "지금 태안", minRole: null },
   { href: "/beaches", label: "해변", minRole: null },
-  { href: "/data", label: "데이터 지도", minRole: null },
   { href: "/news", label: "뉴스아카이브", minRole: null },
   { href: "/membership", label: "멤버십", minRole: null },
   { href: "/query", label: "질의응답", minRole: "user" },
