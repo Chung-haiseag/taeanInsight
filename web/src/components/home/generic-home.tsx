@@ -58,7 +58,7 @@ export function GenericHome() {
           </div>
           <dl className="mt-9 flex flex-wrap gap-x-10 gap-y-4 border-t border-brand/10 pt-6">
             {total && <HeroStat value={totalKo!} unit="건" label="지역 기사 아카이브" />}
-            {minY && maxY && <HeroStat value={`${minY}–${String(maxY).slice(2)}`} unit="" label={span ? `${span}년치 기록` : "수록 기간"} />}
+            {minY && maxY && <HeroStat value={`${minY}–${maxY}`} unit="" label={span ? `${span}년치 기록` : "수록 기간"} />}
             <HeroStat value="100" unit="%" label="편집부 검토 후 발행" />
             <HeroStat value="출처 표기" unit="" label="모든 AI 답변에 근거" />
           </dl>
@@ -233,7 +233,7 @@ function MembershipSection() {
           <div className="mt-4 grid gap-2.5">
             {WHO.map((w) => (
               <div key={w.title} className="flex items-start gap-3 rounded-2xl border border-brand/10 bg-background p-4">
-                <span className="text-2xl leading-none" aria-hidden>{w.emo}</span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-subtle/40 text-xl leading-none" aria-hidden>{w.emo}</span>
                 <span><b className="block text-brand">{w.title}</b><span className="text-sm text-foreground-muted">{w.desc}</span></span>
               </div>
             ))}
@@ -256,7 +256,7 @@ function WeekendDemandCard() {
   if (!d) return null;
   const high = d.level === "매우높음" || d.level === "높음";
   const low = d.level === "낮음" || d.level === "매우낮음";
-  const badgeCls = high ? "bg-[#FCEEE1] text-[#EA6A17]" : low ? "bg-blue-100 text-blue-700" : "bg-accent-subtle/50 text-accent-ink";
+  const badgeCls = high ? "bg-[#FBE4CF] text-[#B4480A]" : low ? "bg-blue-100 text-blue-800" : "bg-accent-subtle/50 text-accent-ink";
   const top = d.factors.filter((f) => Math.abs(f.effect) >= 1).sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect)).slice(0, 3);
   const wx = (w: DemandForecast["weather"]["sat"], day: string) => w
     ? <span>{day} {w.tmax != null ? `${w.tmax}°` : ""}{w.pop != null ? ` · 강수 ${w.pop}%` : ""}</span> : null;
