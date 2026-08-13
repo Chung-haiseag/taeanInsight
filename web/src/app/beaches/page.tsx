@@ -2,7 +2,8 @@
 //   공개 페이지. 데이터: GET /api/conditions/beaches (loadMarine + rankBeaches).
 //   실시간 해양 관측/예보 기반 — 태안 관광의 본체인 '해변'을 지점 단위로 보여준다.
 
-import { getBeaches, getMudflat, getFishing, type BeachScoreView, type MudflatDayView, type FishingDayView, type FishingGrade } from "@/lib/api/reports";
+import { getBeaches, getMudflat, getFishing, getSunset, getFog, fetchSeafog, type BeachScoreView, type MudflatDayView, type FishingDayView, type FishingGrade } from "@/lib/api/reports";
+import { SunsetCard, FogCard } from "@/components/reports/report-charts";
 import { PageHeader } from "@/components/page-header";
 
 export const revalidate = 900;
@@ -24,7 +25,7 @@ const LEVEL_STYLE: Record<BeachScoreView["level"], { ring: string; badge: string
 };
 
 export default async function BeachesPage() {
-  const [board, mudflat, fishing] = await Promise.all([getBeaches(), getMudflat(), getFishing()]);
+  const [board, mudflat, fishing, sunset, fog, seafog] = await Promise.all([getBeaches(), getMudflat(), getFishing(), getSunset(), getFog(), fetchSeafog()]);
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-8">
@@ -32,7 +33,7 @@ export default async function BeachesPage() {
         align="center"
         eyebrow="BEACH BOARD"
         title="이번 주말, 태안 어느 해변?"
-        description={<><strong className="text-brand">해변별 해수욕 적합도</strong> + <strong className="text-brand">갯벌 물때</strong> + <strong className="text-brand">낚시 출조 지수</strong> — 실시간 해양 데이터 기반.</>}
+        description={<><strong className="text-brand">해수욕 적합도</strong> · <strong className="text-brand">낙조</strong> · <strong className="text-brand">갯벌 물때</strong> · <strong className="text-brand">낚시 출조</strong> · <strong className="text-brand">해무</strong> — 태안 바다·해변을 한 화면에.</>}
       />
 
       {!board ? (
@@ -90,6 +91,14 @@ export default async function BeachesPage() {
             적합도는 <strong className="text-brand">해수욕지수·파고(안전)·수온</strong>을 종합한 규칙 점수입니다. 물놀이 전 현장 안전정보·기상특보를 반드시 확인하세요.
           </p>
         </>
+      )}
+
+      {sunset && (
+        <section className="space-y-4 pt-2">
+          <h2 className="text-xl font-bold text-brand">🌅 오늘의 낙조</h2>
+          <span className="accent-rule mt-1" aria-hidden />
+          <SunsetCard sunset={sunset} />
+        </section>
       )}
 
       {mudflat && mudflat.days.length > 0 && (
@@ -174,6 +183,29 @@ export default async function BeachesPage() {
           <p className="rounded-xl border border-brand/10 bg-accent-subtle/15 px-4 py-3 text-center text-xs text-foreground-muted">
             파고·풍속·물때·수온·제철어종을 종합한 규칙 점수(선상 기준)입니다. <strong className="text-brand">출항 전 풍랑특보·선장 안내</strong>를 반드시 확인하세요. 안전이 최우선입니다.
           </p>
+        </section>
+      )}
+
+      {(fog || seafog?.available) && (
+        <section className="space-y-4 pt-2">
+          <h2 className="text-xl font-bold text-brand">🌫️ 해안 해무·시정</h2>
+          <span className="accent-rule mt-1" aria-hidden />
+          <FogCard fog={fog} />
+          {seafog?.available && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {seafog.stills.map((s) => (
+                <figure key={s.station} className="overflow-hidden rounded-2xl border border-brand/15 bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.url} alt={`${s.station} 해무 CCTV`} className="aspect-video w-full object-cover" loading="lazy" />
+                  <figcaption className="flex items-center justify-between bg-background px-3 py-2 text-xs">
+                    <span className="font-semibold text-brand">{s.station}</span>
+                    <span className="text-foreground-muted">{s.imgDt.slice(5)} 기준</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-foreground-muted">국립해양조사원 해무관측소 · 10분 단위 · 태안 인근 서해</p>
         </section>
       )}
     </div>
