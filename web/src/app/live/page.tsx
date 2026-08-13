@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchSeafog, fetchTvNews, getAgriPrices, getSeafood, getAuction, getAuctionForecast, getSeasonal, getSunset, getFog, getDust, getBloom, getFireRisk, getFarm, getAqua, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchTvNews, getAgriPrices, getSeafood, getAuction, getAuctionForecast, getSeasonal, getDust, getBloom, getFireRisk, getFarm, getAqua, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
-  SummaryInfographic, WeatherAirCard, MarineCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, AuctionForecastCard, SeasonalCard, SunsetCard, FogCard, DustCard, BloomCard, FireRiskCard, FarmCard, AquaCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
+  SummaryInfographic, WeatherAirCard,
+  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, AuctionForecastCard, SeasonalCard, DustCard, BloomCard, FireRiskCard, FarmCard, AquaCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
 import { TodayBriefBanner } from "@/components/reports/today-brief-banner";
 import { CctvPlayer } from "@/components/reports/cctv-player";
@@ -16,7 +16,7 @@ import { MembershipNudge } from "@/components/membership-nudge";
 
 export const metadata: Metadata = {
   title: "지금 태안",
-  description: "태안의 실시간 날씨·대기질·바다(수온·파고·물때)·자외선·관광 수요를 한 화면에.",
+  description: "태안의 실시간 날씨·대기질·도로 CCTV·관광 수요·지역경제를 한 화면에. (바다·해변·낙조·물때는 해변 페이지)",
   openGraph: { title: "지금 태안 — 실시간 현황", description: "날씨·대기질·바다·물때·관광 수요를 한눈에", type: "website", locale: "ko_KR", siteName: "태안 인사이트" },
 };
 
@@ -30,11 +30,11 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 전부 즉시 병렬 시작(순차 대기 제거) — 주간뉴스만 최신 리포트 주차에 의존하므로 그 안에서 체이닝.
   //   이전엔 fetchLatestReport()를 단독으로 먼저 await해 20개 무관 fetch가 그 뒤에야 시작되던 워터폴(~2.9s).
-  const [metrics, onThisDay, cctv, seafog, news, tvNews, agri, seafood, auction, auctionForecast, seasonal, sunset, fog, dust, bloom, fireRisk, farm, aqua, todayBrief, festivals, weatherAlert] = await Promise.all([
+  // 바다·해변·해무·낙조는 /beaches(바다 종합 허브)로 이관 — 겹침 제거 + /live 페치 축소(성능).
+  const [metrics, onThisDay, cctv, news, tvNews, agri, seafood, auction, auctionForecast, seasonal, dust, bloom, fireRisk, farm, aqua, todayBrief, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
-    fetchSeafog(),
     fetchLatestReport().then((r) => (r ? fetchWeeklyNews(r.weekId) : [])),
     fetchTvNews(8),
     getAgriPrices(),
@@ -42,8 +42,6 @@ export default async function LivePage() {
     getAuction(),
     getAuctionForecast(),
     getSeasonal(),
-    getSunset(),
-    getFog(),
     getDust(),
     getBloom(),
     getFireRisk(),
@@ -59,7 +57,7 @@ export default async function LivePage() {
       <PageHeader
         eyebrow="LIVE · 지금 태안"
         title="지금 태안"
-        description="실시간 날씨·대기질·바다·물때·관광 수요를 한 화면에."
+        description="실시간 날씨·대기질·도로·관광 수요·지역경제를 한 화면에."
         actions={<LiveClock />}
       />
 
@@ -88,15 +86,6 @@ export default async function LivePage() {
             <WeatherAirCard env={metrics.environment} />
             <DustCard dust={dust} />
             <FireRiskCard fire={fireRisk} />
-          </section>
-
-          {/* 바다 */}
-          <section>
-            <h2 className="text-xl font-bold text-brand">바다·해변</h2>
-            <span className="accent-rule mt-3" aria-hidden />
-            <MarineCard marine={metrics.tourism.marine} />
-            <FogCard fog={fog} />
-            <SunsetCard sunset={sunset} />
           </section>
 
           {/* 관광 */}
@@ -131,27 +120,6 @@ export default async function LivePage() {
               <h2 className="text-xl font-bold text-brand">도로 실시간 CCTV</h2>
               <span className="accent-rule mt-3" aria-hidden />
               <div className="mt-4"><CctvPlayer cameras={cctv.cameras} updatedAt={cctv.updatedAt} /></div>
-            </section>
-          )}
-
-          {/* 해무 관측 스틸컷 */}
-          {seafog.available && (
-            <section>
-              <h2 className="text-xl font-bold text-brand">해안 해무 관측</h2>
-              <span className="accent-rule mt-3" aria-hidden />
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {seafog.stills.map((s) => (
-                  <figure key={s.station} className="overflow-hidden rounded-2xl border border-brand/15 bg-black">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.url} alt={`${s.station} 해무 CCTV`} className="aspect-video w-full object-cover" loading="lazy" />
-                    <figcaption className="flex items-center justify-between bg-background px-3 py-2 text-xs">
-                      <span className="font-semibold text-brand">{s.station}</span>
-                      <span className="text-foreground-muted">{s.imgDt.slice(5)} 기준</span>
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-foreground-muted">국립해양조사원 해무관측소 · 10분 단위 · 태안 인근 서해</p>
             </section>
           )}
 
