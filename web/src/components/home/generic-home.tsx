@@ -15,10 +15,11 @@ import { getArchiveStats, type ArchiveStats } from "@/lib/api/archive";
 import { getWeekendDemand, type DemandForecast } from "@/lib/api/reports";
 
 // 히어로 배경(라이트 프리미엄) — 딥틸·낙조 은은한 글로우 + 쿨페이퍼 그라디언트
+// 태안 낙조(golden-hour) 분위기 — 우하단 수평선의 지는 해 글로우 + 좌상단 바다 틸, 라이트 베이스는 노을쪽으로 따뜻하게.
 const HERO_BG =
-  "radial-gradient(46% 60% at 82% 6%, rgba(17,110,122,.13), transparent 66%)," +
-  "radial-gradient(38% 46% at 8% 98%, rgba(234,106,23,.10), transparent 70%)," +
-  "linear-gradient(180deg, #E7F1F1, #F5F7F7 60%)";
+  "radial-gradient(58% 62% at 86% 104%, rgba(234,106,23,.17), rgba(240,140,60,.06) 44%, transparent 70%)," +
+  "radial-gradient(40% 48% at 9% 7%, rgba(17,110,122,.11), transparent 64%)," +
+  "linear-gradient(168deg, #EDF4F3 0%, #F5F7F7 54%, #FBF1E8 100%)";
 const GRAD_TEXT = { backgroundImage: "linear-gradient(100deg,#116E7A,#0E5860 55%,#EA6A17)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } as const;
 
 export function GenericHome() {
@@ -39,7 +40,8 @@ export function GenericHome() {
     <div className="space-y-12">
       {/* ── Hero 패널 ── */}
       <section className="relative overflow-hidden rounded-[28px] border border-brand/10 px-6 py-12 shadow-card md:px-11 md:py-16" style={{ background: HERO_BG }}>
-        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(31,42,68,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(31,42,68,.05)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(85%_70%_at_60%_8%,#000,transparent_78%)]" />
+        {/* 낙조 태양 글로우 — 우하단 수평선에 지는 해(테크 그리드 대신 태안 정체성). */}
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 right-2 h-72 w-72 rounded-full opacity-70 blur-3xl md:right-16 md:h-80 md:w-80" style={{ background: "radial-gradient(circle, rgba(255,176,102,.55), rgba(234,106,23,.20) 46%, transparent 72%)" }} />
         <div className="relative max-w-3xl">
           <span className="mb-5 inline-flex items-center gap-2.5 rounded-full border border-brand/15 bg-background px-3.5 py-1.5 text-sm font-medium text-foreground-muted shadow-card">
             <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" /></span>
