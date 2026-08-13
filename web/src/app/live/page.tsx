@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchTvNews, getAgriPrices, getSeafood, getAuction, getAuctionForecast, getSeasonal, getDust, getBloom, getFireRisk, getFarm, getAqua, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestReport, fetchWeeklyNews, fetchOnThisDay, fetchCctv, fetchTvNews, getDust, getBloom, getFireRisk, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
 import {
   SummaryInfographic, WeatherAirCard,
-  DemandGauge, FestivalList, OilCard, RealEstatePanel, AgriCard, SeafoodCard, AuctionCard, AuctionForecastCard, SeasonalCard, DustCard, BloomCard, FireRiskCard, FarmCard, AquaCard, IndustryStructure, FestivalCalendar, WeatherAlertBanner,
+  DemandGauge, FestivalList, DustCard, BloomCard, FireRiskCard, FestivalCalendar, WeatherAlertBanner,
 } from "@/components/reports/report-charts";
 import { TodayBriefBanner } from "@/components/reports/today-brief-banner";
 import { CctvPlayer } from "@/components/reports/cctv-player";
@@ -16,7 +16,7 @@ import { MembershipNudge } from "@/components/membership-nudge";
 
 export const metadata: Metadata = {
   title: "지금 태안",
-  description: "태안의 실시간 날씨·대기질·도로 CCTV·관광 수요·지역경제를 한 화면에. (바다·해변·낙조·물때는 해변 페이지)",
+  description: "태안의 실시간 날씨·대기질·도로 CCTV·관광 수요·행사를 한 화면에. (바다·해변은 해변, 부동산·시세는 지역경제 페이지)",
   openGraph: { title: "지금 태안 — 실시간 현황", description: "날씨·대기질·바다·물때·관광 수요를 한눈에", type: "website", locale: "ko_KR", siteName: "태안 인사이트" },
 };
 
@@ -30,23 +30,16 @@ function decodeEntities(s: string): string {
 export default async function LivePage() {
   // 전부 즉시 병렬 시작(순차 대기 제거) — 주간뉴스만 최신 리포트 주차에 의존하므로 그 안에서 체이닝.
   //   이전엔 fetchLatestReport()를 단독으로 먼저 await해 20개 무관 fetch가 그 뒤에야 시작되던 워터폴(~2.9s).
-  // 바다·해변·해무·낙조는 /beaches(바다 종합 허브)로 이관 — 겹침 제거 + /live 페치 축소(성능).
-  const [metrics, onThisDay, cctv, news, tvNews, agri, seafood, auction, auctionForecast, seasonal, dust, bloom, fireRisk, farm, aqua, todayBrief, festivals, weatherAlert] = await Promise.all([
+  // 바다·해변·해무·낙조는 /beaches, 지역경제(부동산·수산·물가)는 /data(지역경제)로 이관 — 겹침 제거 + /live 페치 축소.
+  const [metrics, onThisDay, cctv, news, tvNews, dust, bloom, fireRisk, todayBrief, festivals, weatherAlert] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
     fetchLatestReport().then((r) => (r ? fetchWeeklyNews(r.weekId) : [])),
     fetchTvNews(8),
-    getAgriPrices(),
-    getSeafood(),
-    getAuction(),
-    getAuctionForecast(),
-    getSeasonal(),
     getDust(),
     getBloom(),
     getFireRisk(),
-    getFarm(),
-    getAqua(),
     getTodayBrief(),
     getFestivals(),
     getWeatherAlert(),
@@ -57,7 +50,7 @@ export default async function LivePage() {
       <PageHeader
         eyebrow="LIVE · 지금 태안"
         title="지금 태안"
-        description="실시간 날씨·대기질·도로·관광 수요·지역경제를 한 화면에."
+        description="실시간 날씨·대기질·도로 CCTV·관광 수요·행사를 한 화면에."
         actions={<LiveClock />}
       />
 
@@ -96,22 +89,6 @@ export default async function LivePage() {
             <BloomCard bloom={bloom} />
             <FestivalCalendar festivals={festivals} />
             <FestivalList tour={metrics.tourism} />
-          </section>
-
-          {/* 지역경제 */}
-          <section>
-            <h2 className="text-xl font-bold text-brand">지역경제</h2>
-            <span className="accent-rule mt-3" aria-hidden />
-            <RealEstatePanel re={metrics.realestate} compact />
-            <AgriCard agri={agri} />
-            <FarmCard farm={farm} />
-            <AquaCard aqua={aqua} />
-            <SeafoodCard seafood={seafood} />
-            <AuctionCard auction={auction} />
-            <AuctionForecastCard forecast={auctionForecast} />
-            <SeasonalCard seasonal={seasonal} />
-            <OilCard oil={metrics.oil} />
-            <IndustryStructure />
           </section>
 
           {/* 도로 실시간 CCTV */}
