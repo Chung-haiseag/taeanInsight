@@ -5,12 +5,13 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { getDataMap, getKgStats, type DataCatalogItem, type KgStatsView } from "@/lib/api/reports";
+import { getDataMap, getKgStats, fetchReportMetrics, getAgriPrices, getSeafood, getAuction, getAuctionForecast, getSeasonal, getFarm, getAqua, type DataCatalogItem, type KgStatsView } from "@/lib/api/reports";
+import { RealEstatePanel, AgriCard, FarmCard, AquaCard, SeafoodCard, AuctionCard, AuctionForecastCard, SeasonalCard, OilCard, IndustryStructure } from "@/components/reports/report-charts";
 import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = {
-  title: "데이터 지도",
-  description: "태안 인사이트가 관광·바다·수산·농업·날씨·지역경제 예측에 쓰는 데이터 소스를 한눈에.",
+  title: "태안 지역경제 — 부동산·수산 시세·물가",
+  description: "태안 부동산 실거래·수산 시세·위판 경매·물가·유가·산업구조 — 지역 경제 데이터와 우리가 쓰는 전체 데이터 출처를 한눈에.",
 };
 export const revalidate = 3600;
 
@@ -48,7 +49,9 @@ const SRC_BUCKETS: Array<{ label: string; kw: string[] }> = [
 ];
 
 export default async function DataMapPage() {
-  const [sources, kg] = await Promise.all([getDataMap(), getKgStats()]);
+  const [sources, kg, metrics, agri, seafood, auction, auctionForecast, seasonal, farm, aqua] = await Promise.all([
+    getDataMap(), getKgStats(), fetchReportMetrics(), getAgriPrices(), getSeafood(), getAuction(), getAuctionForecast(), getSeasonal(), getFarm(), getAqua(),
+  ]);
   const live = sources.filter((s) => s.status === "live").length;
   const prog = sources.filter((s) => s.status === "progress").length;
   const typeGroups = TYPE_ORDER.map((t) => ({ type: t, names: sources.filter((s) => s.type === t).map((s) => s.name) })).filter((g) => g.names.length);
@@ -58,10 +61,31 @@ export default async function DataMapPage() {
   return (
     <div className="mx-auto max-w-[1080px]">
       <PageHeader
-        eyebrow="DATA MAP · 데이터 지도"
-        title="태안 인사이트가 보는 데이터"
-        description={<>관광·바다·수산·농업·날씨·지역경제 예측에 쓰는 <strong className="text-brand">모든 데이터 소스</strong>를 한눈에. 전부 <strong className="text-brand">무료 공공데이터·큐레이션</strong>.</>}
+        eyebrow="LOCAL ECONOMY · 지역경제"
+        title="태안 지역경제"
+        description={<>부동산 실거래·수산 시세·위판 경매·물가·유가·산업구조 — <strong className="text-brand">결정에 쓰는 지역 경제 데이터</strong>.</>}
       />
+
+      {/* ① 지역경제 — /live에서 이관, 이 페이지 전면에 세움 */}
+      <section className="mt-6 space-y-6">
+        {metrics && <RealEstatePanel re={metrics.realestate} compact />}
+        <AgriCard agri={agri} />
+        <FarmCard farm={farm} />
+        <AquaCard aqua={aqua} />
+        <SeafoodCard seafood={seafood} />
+        <AuctionCard auction={auction} />
+        <AuctionForecastCard forecast={auctionForecast} />
+        <SeasonalCard seasonal={seasonal} />
+        {metrics && <OilCard oil={metrics.oil} />}
+        <IndustryStructure />
+      </section>
+
+      {/* ② 데이터 지도 — 우리가 쓰는 전체 데이터 출처(투명성·신뢰) */}
+      <div className="mt-16 border-t border-brand/10 pt-10">
+        <p className="eyebrow">DATA MAP · 데이터 지도</p>
+        <h2 className="mt-2 text-2xl font-extrabold text-brand md:text-3xl">우리가 쓰는 데이터 출처</h2>
+        <p className="mt-2.5 max-w-[62ch] text-foreground-muted">위 지역경제를 포함해 관광·바다·수산·농업·날씨까지, 태안 인사이트의 모든 예측·시세는 <strong className="text-brand">공개된 공공데이터</strong>에 근거합니다 — 지어내지 않는다는 증거입니다.</p>
+      </div>
 
       {sources.length === 0 ? (
         <p className="mt-8 card p-8 text-center text-sm text-foreground-muted">데이터 지도를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.</p>
