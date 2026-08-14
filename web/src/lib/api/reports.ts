@@ -332,13 +332,23 @@ export async function getFog(): Promise<FogBoardView | null> {
 // 여객선 운항상태 — 안흥(신진도) ↔ 가의도. 태안 유일 여객선 항로.
 //   출처: 한국해양교통안전공단. 결항·통제는 가의도 주민·방문객에게 그날의 핵심 정보다.
 export interface FerrySailingView { time: string; ship: string; route: string; status: string; normal: boolean; reason?: string }
-export interface FerryView { available: boolean; date: string; route: string; sailings: FerrySailingView[]; allNormal: boolean; updatedAt?: string; note?: string }
+export interface FerryView {
+  available: boolean; date: string; route: string; sailings: FerrySailingView[]; allNormal: boolean;
+  season?: "하계" | "동계";
+  timetable?: { out: string[]; back: string[] };
+  next?: { when: "오늘" | "내일"; time: string };
+  operator?: { name: string; phone: string };
+  distanceKm?: number;
+  updatedAt?: string; note?: string;
+}
+// ※ available=false(밤·결항·API 장애)라도 null로 버리지 않는다 — 시간표·연락처는 그때가 더 필요하다.
+//   운항상태만 없을 뿐 '다음 배 08:30'은 여전히 유효한 답이기 때문.
 export async function getFerry(): Promise<FerryView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/ferry`, { next: { revalidate: 900 } });
     if (!res.ok) return null;
     const d = (await res.json()) as FerryView;
-    return d.available ? d : null;
+    return d.timetable || d.available ? d : null;
   } catch { return null; }
 }
 

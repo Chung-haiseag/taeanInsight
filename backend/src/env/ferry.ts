@@ -25,6 +25,31 @@ const ROUTE_TERMS = ["가의", "안흥", "태안", "신진"];
 //   개발계정 일 100건 한도가 넉넉해진다. 배가 바뀌면 필터가 비고, 그때 전국 스캔으로 자동 폴백한다.
 const SHIP_NAME = "해랑5호";
 
+// 정기 시간표(태안군청 공식) — 운항상태 API는 '오늘 실제로 뜬 편'만 주므로, 밤·이른 아침이나 결항일에
+//   화면이 텅 비거나 '전부 완료'만 남는다. 섬에 가려는 사람이 실제로 원하는 건 '다음 배가 언제인가'라서
+//   시간표를 상시 제공한다. 군청 표의 '도착시간'은 API 실측 결과 가의도에서 되돌아 나오는 출항시각이었다
+//   (2026-08-14: 09:05·14:05·17:35가 모두 '가의도 → 안흥' 편) → 나가는 배/들어오는 배로 나눠 표기.
+const SCHEDULE = {
+  하계: { months: [4, 5, 6, 7, 8, 9], out: ["08:30", "13:30", "17:00"], back: ["09:05", "14:05", "17:35"] },
+  동계: { months: [10, 11, 12, 1, 2, 3], out: ["08:30", "13:30", "16:30"], back: ["09:05", "14:05", "17:05"] },
+} as const;
+const OPERATOR = { name: "신한해운", phone: "041-934-8772" };
+const DISTANCE_KM = 8;
+
+export type FerrySeason = "하계" | "동계";
+export const seasonOf = (month: number): FerrySeason => (SCHEDULE.하계.months as readonly number[]).includes(month) ? "하계" : "동계";
+
+// 지금(KST) 기준 다음 '안흥 출발' 편. 오늘 남은 편이 없으면 내일 첫 배.
+//   ※ 카운트다운(N분 뒤)은 두지 않는다 — 페이지가 ISR 캐시라 분 단위 표기는 어긋날 수 있다.
+export function nextDeparture(nowHm: string, month: number): { when: "오늘" | "내일"; time: string } {
+  const season = seasonOf(month);
+  const today = SCHEDULE[season].out;
+  const upcoming = today.find((t) => t > nowHm);
+  if (upcoming) return { when: "오늘", time: upcoming };
+  // 내일이 계절 경계를 넘을 수도 있으나(월말) 첫 배는 두 계절 모두 08:30이라 영향 없음.
+  return { when: "내일", time: today[0] };
+}
+
 export interface FerrySailing {
   time: string;        // 출항시각 "08:30"
   ship: string;        // 여객선명
@@ -39,6 +64,11 @@ export interface FerryResult {
   route: string;             // 대표 항로명
   sailings: FerrySailing[];
   allNormal: boolean;        // 전편 정상
+  season: FerrySeason;       // 하계(4~9월)/동계(10~3월)
+  timetable: { out: string[]; back: string[] };  // 정기 시간표(안흥 출발 / 가의도 출발)
+  next: { when: "오늘" | "내일"; time: string }; // 다음 안흥 출발
+  operator: { name: string; phone: string };
+  distanceKm: number;
   updatedAt: string;         // 이 결과를 만든 시각(ISO). 화면 '기준 시각' + 갱신이 도는지 확인용.
   note?: string;
 }
@@ -60,10 +90,23 @@ function fmtTime(raw: string): string {
   return raw;
 }
 
-function kstDate(): { ymd: string; iso: string } {
+function kstDate(): { ymd: string; iso: string; month: number; hm: string } {
   const d = new Date(Date.now() + 9 * 3600 * 1000);
-  const y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, "0"), day = String(d.getUTCDate()).padStart(2, "0");
-  return { ymd: `${y}${m}${day}`, iso: `${y}-${m}-${day}` };
+  const y = d.getUTCFullYear(), mo = d.getUTCMonth() + 1, m = String(mo).padStart(2, "0"), day = String(d.getUTCDate()).padStart(2, "0");
+  const hm = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  return { ymd: `${y}${m}${day}`, iso: `${y}-${m}-${day}`, month: mo, hm };
+}
+
+// 시간표·운항사 등 '항상 제공해야 하는' 정보. 운항상태 API가 비어도(밤·장애·결항일) 이건 나온다.
+function scheduleBase(month: number, hm: string) {
+  const season = seasonOf(month);
+  return {
+    season,
+    timetable: { out: [...SCHEDULE[season].out], back: [...SCHEDULE[season].back] },
+    next: nextDeparture(hm, month),
+    operator: OPERATOR,
+    distanceKm: DISTANCE_KM,
+  };
 }
 
 async function fetchPage(key: string, ymd: string, p: number, ship?: string): Promise<{ rows: Row[]; total: number | null }> {
@@ -88,8 +131,8 @@ const isTaeanRow = (r: Row) => {
 };
 
 async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryResult> {
-  const { ymd, iso } = kstDate();
-  const empty: FerryResult = { available: false, date: iso, route: "안흥 ↔ 가의도", sailings: [], allNormal: true, updatedAt: new Date().toISOString() };
+  const { ymd, iso, month, hm } = kstDate();
+  const empty: FerryResult = { available: false, date: iso, route: "안흥(신진도) ↔ 가의도", sailings: [], allNormal: true, ...scheduleBase(month, hm), updatedAt: new Date().toISOString() };
   const key = env.DATA_GO_KR_KEY;
   if (!key) return empty;
   try {
@@ -140,6 +183,7 @@ async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryRe
       route: "안흥(신진도) ↔ 가의도",
       sailings,
       allNormal: sailings.every((x) => x.normal),
+      ...scheduleBase(month, hm),
       updatedAt: new Date().toISOString(),
     };
   } catch {

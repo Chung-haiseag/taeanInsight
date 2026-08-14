@@ -229,10 +229,14 @@ envRouter.get("/seafog", async (c) => {
 // 여객선 운항상태 — 안흥(신진도) ↔ 가의도. 태안 유일 여객선 항로.
 //   개발계정 일 100건이라 D1 캐시(60분)+stale-while-revalidate로 호출을 묶는다.
 envRouter.get("/ferry", async (c) => {
-  const { loadFerryFast, refreshFerryCache } = await import("./ferry");
+  const { loadFerryFast, refreshFerryCache, nextDeparture, seasonOf } = await import("./ferry");
   const { result, stale } = await loadFerryFast(c.env);
   if (stale) c.executionCtx.waitUntil(refreshFerryCache(c.env).then(() => {}));
-  return c.json(result);
+  // '다음 배'는 캐시에 얼어붙으면 안 된다(30분 캐시 = 최대 30분 어긋남) → 응답 시점 KST로 다시 계산.
+  const now = new Date(Date.now() + 9 * 3600 * 1000);
+  const month = now.getUTCMonth() + 1;
+  const hm = `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}`;
+  return c.json({ ...result, season: seasonOf(month), next: nextDeparture(hm, month) });
 });
 
 // 도로 실시간 CCTV — D1 미러 서빙(로컬 크롤러가 ITS에서 적재)

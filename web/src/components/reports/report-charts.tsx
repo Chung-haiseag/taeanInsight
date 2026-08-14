@@ -1134,32 +1134,78 @@ export function FestivalList({ tour }: { tour: ReportMetrics["tourism"] }) {
   );
 }
 
-// ── 여객선 운항상태 ── 안흥(신진도) ↔ 가의도. 태안 유일 여객선 항로라, 결항 여부가 그날 섬 접근의 전부다.
-//   상태 용어는 출처(한국해양교통안전공단) 값을 그대로 쓰되 '정방향' 같은 내부 용어는 방향으로 풀어 표기한다.
+// ── 가의도 뱃길 ── 안흥(신진도)↔가의도는 태안 유일 여객선 항로.
+//   운항상태 API는 '오늘 실제로 뜬 편'만 주므로 밤이면 '전부 완료'만 남아 쓸모가 없다.
+//   섬에 가려는 사람이 원하는 순서대로 — ①다음 배 ②정기 시간표 ③오늘 현황 ④연락처.
 export function FerryCard({ ferry }: { ferry: FerryView | null }) {
-  if (!ferry || !ferry.sailings.length) return null;
+  if (!ferry) return null;
   const bad = ferry.sailings.filter((s) => !s.normal);
+  const tt = ferry.timetable;
   return (
     <div className={`mt-4 rounded-2xl border p-4 ${bad.length ? "border-red-300 bg-red-50" : "border-brand/15 bg-background"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">⛴ 오늘 가의도 배 — {ferry.route}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[0.7rem] font-bold ${bad.length ? "bg-red-500 text-background" : "bg-brand/10 text-brand"}`}>
-          {bad.length ? `${bad.length}편 결항·통제` : "정상 운항"}
+        <span className="text-sm font-semibold text-brand">⛴ 가의도 뱃길 — {ferry.route}</span>
+        {bad.length > 0 && (
+          <span className="rounded-full bg-red-500 px-2 py-0.5 text-[0.7rem] font-bold text-background">{bad.length}편 결항·통제</span>
+        )}
+      </div>
+
+      {/* ① 다음 배 — 이 카드에서 가장 자주 찾는 정보라 제일 크게. */}
+      {ferry.next && (
+        <div className="mt-3 flex items-baseline gap-2 rounded-xl bg-accent-subtle/25 px-4 py-3">
+          <span className="text-xs font-semibold text-accent-ink">다음 배</span>
+          <span className="text-2xl font-extrabold tabular-nums text-brand">{ferry.next.time}</span>
+          <span className="text-sm font-semibold text-foreground-muted">{ferry.next.when} · 안흥 출발</span>
+        </div>
+      )}
+
+      {/* ② 정기 시간표 — 결항일·밤에도 항상 제공. 군청 표의 '도착시간'은 실은 가의도發 출항시각이라 방향별로 표기. */}
+      {tt && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-brand/10 bg-background/60 p-3">
+            <p className="text-[0.7rem] font-bold text-accent-ink">안흥 → 가의도</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-brand">{tt.out.join(" · ")}</p>
+          </div>
+          <div className="rounded-lg border border-brand/10 bg-background/60 p-3">
+            <p className="text-[0.7rem] font-bold text-accent-ink">가의도 → 안흥</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-brand">{tt.back.join(" · ")}</p>
+          </div>
+        </div>
+      )}
+      <p className="mt-2 text-[0.7rem] text-foreground-muted">
+        {ferry.season && <>{ferry.season}({ferry.season === "하계" ? "4~9월" : "10~3월"}) 시간표 · </>}1일 3회
+        {ferry.distanceKm ? ` · 약 ${ferry.distanceKm}km` : ""} · 기상에 따라 변동
+      </p>
+
+      {/* ③ 오늘 운항 현황 — 실제 API 상태. 없는 날(밤·장애)엔 접어두지 않고 조용히 생략. */}
+      {ferry.sailings.length > 0 && (
+        <>
+          <p className="mt-4 text-xs font-bold text-brand">오늘 운항 현황</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {ferry.sailings.map((s, i) => (
+              <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                <span className="w-12 shrink-0 font-bold tabular-nums text-brand">{s.time}</span>
+                <span className="text-foreground-muted">{s.route}</span>
+                <span className={`ml-auto rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${s.normal ? "bg-brand/8 text-brand" : "bg-red-500 text-background"}`}>{s.status}</span>
+                {s.reason && <span className="w-full text-[0.7rem] text-red-700">사유: {s.reason}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {/* ④ 연락처 — 섬 가는 사람에겐 결항 확인·문의처가 필수. 전화는 바로 걸리게. */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-brand/10 pt-3 text-[0.7rem] text-foreground-muted">
+        {ferry.operator && (
+          <span>
+            문의 {ferry.operator.name} <a href={`tel:${ferry.operator.phone.replace(/-/g, "")}`} className="font-bold text-accent hover:underline">{ferry.operator.phone}</a>
+          </span>
+        )}
+        <span>
+          한국해양교통안전공단·태안군
+          {ferry.updatedAt ? ` · 기준 ${new Date(ferry.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}` : ""}
         </span>
       </div>
-      <ul className="mt-3 space-y-1.5">
-        {ferry.sailings.map((s, i) => (
-          <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-            <span className="w-12 shrink-0 font-bold tabular-nums text-brand">{s.time}</span>
-            <span className="text-foreground-muted">{s.route}</span>
-            <span className={`ml-auto rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${s.normal ? "bg-brand/8 text-brand" : "bg-red-500 text-background"}`}>{s.status}</span>
-            {s.reason && <span className="w-full text-[0.7rem] text-red-700">사유: {s.reason}</span>}
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 text-right text-[0.7rem] text-foreground-muted">
-        {ferry.sailings[0]?.ship} · 한국해양교통안전공단{ferry.updatedAt ? ` · 기준 ${new Date(ferry.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}` : ""} · 기상에 따라 변동되니 출발 전 확인하세요
-      </p>
     </div>
   );
 }
