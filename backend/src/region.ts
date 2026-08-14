@@ -32,7 +32,10 @@ export const REGION: RegionConfig = {
   airStationMatch: "태안",
   lawdCd: "44825",
   center: { lat: 36.745, lon: 126.298 },
-  box: { latMin: 36.55, latMax: 37.1, lonMin: 126.05, lonMax: 126.5 },
+  // 해수욕지수(KHOA)는 전국 목록을 받아 이 박스로 태안만 걸러낸다. 기존 latMin 36.55는 안면도를 통째로
+  // 잘라내고 있었다(기지포 36.53·삼봉 36.52·꽃지 36.48·방포 36.47·바람아래 36.39) → 남쪽을 36.36까지 확장.
+  // 아래 경계는 보령 대천(36.31)이 섞이지 않는 선, 위 경계는 당진 왜목(37.00)을 배제하는 선.
+  box: { latMin: 36.36, latMax: 36.99, lonMin: 126.05, lonMax: 126.5 },
   beaches: [
     { num: "70", name: "만리포" },
     { num: "44", name: "꽃지" },
