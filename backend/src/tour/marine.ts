@@ -130,22 +130,50 @@ async function fetchKmaBeach(key: string, beach: { num: string; name: string }):
   return out;
 }
 
-// ── ② 국립해양조사원 해수욕지수(신두리·학암포 등 태안 위경도 박스) ──
+// 해수욕지수 수집 진단(왜 태안 해변이 N곳뿐인지 확인용) — /api/conditions/beaches?debug=1 로 노출.
+export interface KhoaDiag { totalCount: number | null; pages: number; rows: number; inBox: number; names: string[] }
+let lastKhoaDiag: KhoaDiag = { totalCount: null, pages: 0, rows: 0, inBox: 0, names: [] };
+export const getKhoaDiag = (): KhoaDiag => lastKhoaDiag;
+
+// ── ② 국립해양조사원 해수욕지수(태안 위경도 박스) ──
 async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
   const { iso } = kst();
+  const diag: KhoaDiag = { totalCount: null, pages: 0, rows: 0, inBox: 0, names: [] };
   try {
-    // 전국 목록을 받아 태안 박스로 거른다. 태안에서 잡히는 건 신두리·학암포 2곳뿐인데,
-    //   행 수 한계('해변 × 날짜 × 오전/오후'로 행이 나옴)를 의심해 2000으로 올려봤더니 응답이 아예 실패해
-    //   두 곳이 사라졌다(2026-08-14 실측: 4곳→2곳). 300이 이 API가 실제로 받아주는 상한으로 보인다.
-    //   ⚠ 올리지 말 것. 커버리지를 넓히려면 numOfRows가 아니라 pageNo 페이징으로 접근해야 한다.
-    const sp = new URLSearchParams({ serviceKey: key, type: "json", numOfRows: "300" });
-    const res = await fetch(`${KHOA_BEACHIDX}?${sp}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const j = (await res.json()) as { body?: { items?: { item?: Item[] } } };
-    const all = j.body?.items?.item ?? [];
+    // 전국 목록을 받아 태안 박스로 거른다. 이 API는 '해변 × 날짜 × 오전/오후'로 행이 나와 전국 기준 행 수가 크다.
+    //   numOfRows를 2000으로 올리는 접근은 실패했다(2026-08-14 실측: 응답 자체가 깨져 4곳→2곳). 300이 상한이므로
+    //   ⚠ numOfRows는 올리지 말고 pageNo로 페이징한다. 1페이지로 totalCount를 얻고 나머지는 병렬 수집(왕복 2회).
+    //   loadMarine이 20분 TTL 캐시라 이 비용은 상각된다.
+    const PAGE = 300, MAX_PAGES = 12;
+    const fetchPage = async (p: number): Promise<{ rows: Item[]; total: number | null }> => {
+      const sp = new URLSearchParams({ serviceKey: key, type: "json", numOfRows: String(PAGE), pageNo: String(p) });
+      const res = await fetch(`${KHOA_BEACHIDX}?${sp}`, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return { rows: [], total: null };
+      const j = (await res.json()) as { body?: { items?: { item?: Item[] }; totalCount?: number | string } };
+      return { rows: j.body?.items?.item ?? [], total: num(j.body?.totalCount as string | number | undefined) };
+    };
+
+    const first = await fetchPage(1);
+    const all: Item[] = [...first.rows];
+    diag.totalCount = first.total;
+    diag.pages = 1;
+    // totalCount를 주면 그만큼만, 안 주면 첫 페이지가 꽉 찼을 때 MAX_PAGES까지 시도.
+    const need = first.total != null ? Math.ceil(first.total / PAGE) : (first.rows.length >= PAGE ? MAX_PAGES : 1);
+    const lastPage = Math.min(need, MAX_PAGES);
+    if (lastPage > 1) {
+      const rest = await Promise.all(
+        Array.from({ length: lastPage - 1 }, (_, i) => fetchPage(i + 2).catch(() => ({ rows: [] as Item[], total: null }))),
+      );
+      for (const r of rest) all.push(...r.rows);
+      diag.pages = lastPage;
+    }
+    diag.rows = all.length;
     // 지역 위경도 박스
     const b = REGION.box;
     const taean = all.filter((x) => { const la = num(x.lat), lo = num(x.lot); return la != null && lo != null && la >= b.latMin && la <= b.latMax && lo >= b.lonMin && lo <= b.lonMax; });
+    diag.inBox = taean.length;
+    diag.names = [...new Set(taean.map((x) => String(x.bbchNm)))];
+    lastKhoaDiag = diag;
     const byBeach = new Map<string, Item>();
     for (const r of taean) {
       // 오늘 예보 중 오후 우선, 없으면 오전/최신
@@ -168,6 +196,7 @@ async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
       source: "해양조사원" as const,
     }));
   } catch {
+    lastKhoaDiag = diag;
     return [];
   }
 }
@@ -240,8 +269,22 @@ async function loadMarineImpl(env: { DATA_GO_KR_KEY?: string }): Promise<MarineI
     fetchSurf(key),
     ...KMA_BEACHES.map((b) => fetchKmaBeach(key, b)),
   ]);
-  // 해수욕지수(신두리·학암포) 먼저, 그다음 기상청(만리포·꽃지)
-  const beaches = [...khoa, ...kma];
+  // 두 소스 병합. 페이징 이후 KHOA가 태안 7곳(신두리·학암포·꽃지·만리포·몽산포·연포·어은돌)을 주면서
+  //   기상청 지점(만리포·꽃지)과 겹쳐 같은 해변이 두 번 나오던 것을 이름 기준으로 합친다.
+  //   원칙: 수온·파고는 실측(기상청 부이) 우선, 해수욕지수·기온·풍속·개장상태는 KHOA만 제공하므로 그대로 채택.
+  const byName = new Map<string, BeachMarine>();
+  for (const b of khoa) byName.set(b.name, b);
+  for (const b of kma) {
+    const prev = byName.get(b.name);
+    if (!prev) { byName.set(b.name, b); continue; }
+    byName.set(b.name, {
+      ...prev,
+      waterTemp: b.waterTemp ?? prev.waterTemp,     // 실측 우선
+      waveHeight: b.waveHeight ?? prev.waveHeight,  // 실측 우선
+      observedAt: b.observedAt ?? prev.observedAt,
+    });
+  }
+  const beaches = [...byName.values()];
   const sun = computeSun();
   // 갯벌체험 추천 — 간조(저조) 시각 ±1.5시간이 적기
   const mudflat = (tide?.events ?? []).filter((e) => e.type === "저조").map((e) => `${e.time} 전후`);
