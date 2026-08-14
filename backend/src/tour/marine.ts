@@ -134,6 +134,10 @@ async function fetchKmaBeach(key: string, beach: { num: string; name: string }):
 async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
   const { iso } = kst();
   try {
+    // 전국 목록을 받아 태안 박스로 거른다. 태안에서 잡히는 건 신두리·학암포 2곳뿐인데,
+    //   행 수 한계('해변 × 날짜 × 오전/오후'로 행이 나옴)를 의심해 2000으로 올려봤더니 응답이 아예 실패해
+    //   두 곳이 사라졌다(2026-08-14 실측: 4곳→2곳). 300이 이 API가 실제로 받아주는 상한으로 보인다.
+    //   ⚠ 올리지 말 것. 커버리지를 넓히려면 numOfRows가 아니라 pageNo 페이징으로 접근해야 한다.
     const sp = new URLSearchParams({ serviceKey: key, type: "json", numOfRows: "300" });
     const res = await fetch(`${KHOA_BEACHIDX}?${sp}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
@@ -198,6 +202,7 @@ async function fetchTide(key: string): Promise<TideInfo | null> {
 async function fetchSurf(key: string): Promise<SurfInfo | null> {
   const { iso } = kst();
   try {
+    // 위 해수욕지수와 같은 API 계열 — numOfRows 상한이 300으로 보이니 올리지 말 것(2000은 응답 실패).
     const sp = new URLSearchParams({ serviceKey: key, type: "json", numOfRows: "300" });
     const res = await fetch(`${KHOA_SURF}?${sp}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
