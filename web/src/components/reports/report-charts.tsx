@@ -1176,6 +1176,11 @@ export function FerryCard({ ferry }: { ferry: FerryView | null }) {
         {ferry.season && <>{ferry.season}({ferry.season === "하계" ? "4~9월" : "10~3월"}) 시간표 · </>}1일 3회
         {ferry.distanceKm ? ` · 약 ${ferry.distanceKm}km` : ""} · 기상에 따라 변동
       </p>
+      {/* 관광 유람선(옹도 등)은 여객선과 다른 제도(유선사업법)라 운항상태 API에 잡히지 않고, 군청에도 공식
+          시간표가 없다. 검증 못 한 시간표·연락처를 실으면 헛걸음을 만들므로 '존재와 출발지'만 알린다. */}
+      <p className="mt-1 text-[0.7rem] text-foreground-muted">
+        ※ 옹도 등 <strong className="font-semibold text-brand">관광 유람선</strong>은 안흥외항에서 별도 운항합니다(21세기유람선·안흥유람선). 위 시간표는 정기 여객선 기준입니다.
+      </p>
 
       {/* ③ 오늘 운항 현황 — 실제 API 상태. 없는 날(밤·장애)엔 접어두지 않고 조용히 생략. */}
       {ferry.sailings.length > 0 && (
