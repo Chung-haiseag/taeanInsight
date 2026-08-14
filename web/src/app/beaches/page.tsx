@@ -4,8 +4,8 @@
 
 import type { Metadata } from "next";
 
-import { getBeaches, getMudflat, getFishing, getSunset, getFog, fetchSeafog, type BeachScoreView, type MudflatDayView, type FishingDayView, type FishingGrade } from "@/lib/api/reports";
-import { SunsetCard, FogCard } from "@/components/reports/report-charts";
+import { getBeaches, getMudflat, getFishing, getSunset, getFog, getFerry, fetchSeafog, type BeachScoreView, type MudflatDayView, type FishingDayView, type FishingGrade } from "@/lib/api/reports";
+import { SunsetCard, FogCard, FerryCard } from "@/components/reports/report-charts";
 import { PageHeader } from "@/components/page-header";
 
 // 검색 유입 핵심 페이지 — '태안 해수욕장 수온'·'안면도 낙조 시간'·'태안 물때' 같은 지역 롱테일 질의를 받는다.
@@ -39,7 +39,7 @@ const LEVEL_STYLE: Record<BeachScoreView["level"], { ring: string; badge: string
 };
 
 export default async function BeachesPage() {
-  const [board, mudflat, fishing, sunset, fog, seafog] = await Promise.all([getBeaches(), getMudflat(), getFishing(), getSunset(), getFog(), fetchSeafog()]);
+  const [board, mudflat, fishing, sunset, fog, ferry, seafog] = await Promise.all([getBeaches(), getMudflat(), getFishing(), getSunset(), getFog(), getFerry(), fetchSeafog()]);
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-8">
@@ -105,6 +105,15 @@ export default async function BeachesPage() {
             적합도는 <strong className="text-brand">해수욕지수·파고(안전)·수온</strong>을 종합한 규칙 점수입니다. 물놀이 전 현장 안전정보·기상특보를 반드시 확인하세요.
           </p>
         </>
+      )}
+
+      {/* 여객선 — 태안 유일 항로(안흥↔가의도). 섬 접근 가능 여부라 해변 정보와 성격이 같아 바다 허브에 둔다. */}
+      {ferry && (
+        <section>
+          <h2 className="text-xl font-bold text-brand">⛴ 가의도 뱃길</h2>
+          <span className="accent-rule mt-3" aria-hidden />
+          <FerryCard ferry={ferry} />
+        </section>
       )}
 
       {sunset && (

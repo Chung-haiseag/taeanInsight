@@ -1,7 +1,7 @@
 // 주간 리포트 섹션 시각화 — 라이브러리 없이 CSS/SVG로 그린 차트·표·카드.
 // 산문 섹션 아래에 붙어 수치를 직관적으로 보여준다. 데이터 없으면 아무것도 렌더하지 않음.
 
-import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, AquaBoardView, AquaLevel, FestivalView, WeatherAlertView } from "@/lib/api/reports";
+import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, AquaBoardView, AquaLevel, FestivalView, WeatherAlertView, FerryView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 
 // 만원 → "2.1억" / "8,500만원"
@@ -1130,6 +1130,36 @@ export function FestivalList({ tour }: { tour: ReportMetrics["tourism"] }) {
         ))}
       </ul>
       <p className="mt-3 text-right text-[0.7rem] text-foreground-muted">한국관광공사 TourAPI</p>
+    </div>
+  );
+}
+
+// ── 여객선 운항상태 ── 안흥(신진도) ↔ 가의도. 태안 유일 여객선 항로라, 결항 여부가 그날 섬 접근의 전부다.
+//   상태 용어는 출처(한국해양교통안전공단) 값을 그대로 쓰되 '정방향' 같은 내부 용어는 방향으로 풀어 표기한다.
+export function FerryCard({ ferry }: { ferry: FerryView | null }) {
+  if (!ferry || !ferry.sailings.length) return null;
+  const bad = ferry.sailings.filter((s) => !s.normal);
+  return (
+    <div className={`mt-4 rounded-2xl border p-4 ${bad.length ? "border-red-300 bg-red-50" : "border-brand/15 bg-background"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand">⛴ 오늘 가의도 배 — {ferry.route}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[0.7rem] font-bold ${bad.length ? "bg-red-500 text-background" : "bg-brand/10 text-brand"}`}>
+          {bad.length ? `${bad.length}편 결항·통제` : "정상 운항"}
+        </span>
+      </div>
+      <ul className="mt-3 space-y-1.5">
+        {ferry.sailings.map((s, i) => (
+          <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+            <span className="w-12 shrink-0 font-bold tabular-nums text-brand">{s.time}</span>
+            <span className="text-foreground-muted">{s.route}</span>
+            <span className={`ml-auto rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${s.normal ? "bg-brand/8 text-brand" : "bg-red-500 text-background"}`}>{s.status}</span>
+            {s.reason && <span className="w-full text-[0.7rem] text-red-700">사유: {s.reason}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-right text-[0.7rem] text-foreground-muted">
+        {ferry.sailings[0]?.ship} · 한국해양교통안전공단 · 기상에 따라 변동되니 출발 전 확인하세요
+      </p>
     </div>
   );
 }
