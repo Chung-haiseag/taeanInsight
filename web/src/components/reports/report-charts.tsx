@@ -1158,7 +1158,7 @@ export function FerryCard({ ferry }: { ferry: FerryView | null }) {
         ))}
       </ul>
       <p className="mt-3 text-right text-[0.7rem] text-foreground-muted">
-        {ferry.sailings[0]?.ship} · 한국해양교통안전공단 · 기상에 따라 변동되니 출발 전 확인하세요
+        {ferry.sailings[0]?.ship} · 한국해양교통안전공단{ferry.updatedAt ? ` · 기준 ${new Date(ferry.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}` : ""} · 기상에 따라 변동되니 출발 전 확인하세요
       </p>
     </div>
   );

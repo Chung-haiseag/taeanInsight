@@ -11,8 +11,8 @@ import { readCache, writeCache } from "../lib/api_cache";
 // 서비스 URL 뒤에 상세기능(오퍼레이션) 경로가 한 번 더 붙는 형태. 빼면 NO_OPENAPI_SERVICE_ERROR(코드 12).
 const URL_BASE = "https://apis.data.go.kr/B554035/ferry-route-info-v4/get-ferry-route-info-v4";
 // 캐시 키에 스키마 버전(v2)을 붙인다 — 결과 구조가 바뀌면 키를 올려 옛 캐시를 즉시 무효화한다.
-//   (v1 시절 필드명을 잘못 읽어 빈 값이 채워진 결과가 30분간 그대로 서빙된 적이 있다.)
-const CACHE_KEY = "ferry_gauido_v2";
+//   (v1 시절 필드명을 잘못 읽어 빈 값이 채워진 결과가 30분간 그대로 서빙된 적이 있다. v3=updatedAt 추가.)
+const CACHE_KEY = "ferry_gauido_v3";
 const STALE_MS = 30 * 60_000; // 30분 — 취항선명 필터로 갱신 1회 호출이라 여유(최악 48건/일 < 100건 한도)
 const PAGE = 1000;
 const MAX_PAGES = 6; // 전국 1일 운항 5,122행(2026-08-14 실측) → 6,000행까지 커버.
@@ -39,6 +39,7 @@ export interface FerryResult {
   route: string;             // 대표 항로명
   sailings: FerrySailing[];
   allNormal: boolean;        // 전편 정상
+  updatedAt: string;         // 이 결과를 만든 시각(ISO). 화면 '기준 시각' + 갱신이 도는지 확인용.
   note?: string;
 }
 
@@ -88,7 +89,7 @@ const isTaeanRow = (r: Row) => {
 
 async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryResult> {
   const { ymd, iso } = kstDate();
-  const empty: FerryResult = { available: false, date: iso, route: "안흥 ↔ 가의도", sailings: [], allNormal: true };
+  const empty: FerryResult = { available: false, date: iso, route: "안흥 ↔ 가의도", sailings: [], allNormal: true, updatedAt: new Date().toISOString() };
   const key = env.DATA_GO_KR_KEY;
   if (!key) return empty;
   try {
@@ -139,6 +140,7 @@ async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryRe
       route: "안흥(신진도) ↔ 가의도",
       sailings,
       allNormal: sailings.every((x) => x.normal),
+      updatedAt: new Date().toISOString(),
     };
   } catch {
     return empty;

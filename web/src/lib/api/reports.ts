@@ -332,7 +332,7 @@ export async function getFog(): Promise<FogBoardView | null> {
 // 여객선 운항상태 — 안흥(신진도) ↔ 가의도. 태안 유일 여객선 항로.
 //   출처: 한국해양교통안전공단. 결항·통제는 가의도 주민·방문객에게 그날의 핵심 정보다.
 export interface FerrySailingView { time: string; ship: string; route: string; status: string; normal: boolean; reason?: string }
-export interface FerryView { available: boolean; date: string; route: string; sailings: FerrySailingView[]; allNormal: boolean; note?: string }
+export interface FerryView { available: boolean; date: string; route: string; sailings: FerrySailingView[]; allNormal: boolean; updatedAt?: string; note?: string }
 export async function getFerry(): Promise<FerryView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/ferry`, { next: { revalidate: 900 } });
