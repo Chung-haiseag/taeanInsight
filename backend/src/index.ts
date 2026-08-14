@@ -163,6 +163,18 @@ export default {
       return;
     }
 
+    // ── 3시간마다 :30 — 뉴스 수집 전용(신선도) ──
+    // 주간지 발행(목·금 오전)을 12시간 주기로는 반나절 놓쳤다. 수집만 떼어 자주 돌린다.
+    // 무거운 배치(임베딩·클리핑·지역언론·군청목록)는 아래 12시간 크론에 그대로 둔다 — 비용 증가 없음.
+    if (_event.cron === "30 */3 * * *") {
+      try {
+        const { ingestToArchive } = await import("./news/ingest");
+        const r = await ingestToArchive(env);
+        if (r.inserted || r.upgraded) console.log(`[cron3h] 뉴스: 신규 ${r.inserted}·전문화 ${r.upgraded}/${r.fetched}`);
+      } catch (e) { console.warn("[cron3h] 뉴스 실패:", e instanceof Error ? e.message : e); }
+      return;
+    }
+
     // ── 12시간마다 — 뉴스 수집 + 군청 목록 갱신(하루 2회) ──
     if (_event.cron === "0 */12 * * *") {
       try {

@@ -475,6 +475,23 @@ export async function fetchWeeklyNews(weekId: string): Promise<WeeklyNewsItem[]>
   }
 }
 
+// 진짜 최신 기사(발행 즉시). /api/news 는 RSS + 기사목록 병합이라 아카이브 수집(크론) 전에도 당일 발행분을 준다.
+//   ※ fetchWeeklyNews(주차 뉴스)와 혼동 주의 — 그쪽은 '리포트가 다룬 주차'라 최대 일주일 묵은 목록이다.
+//     '지금 태안'처럼 최신을 표방하는 자리에는 이 함수를 쓴다.
+export async function fetchLatestNews(limit = 12): Promise<WeeklyNewsItem[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/news?limit=${limit}`, { next: { revalidate: 180 } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { items?: { id?: string | number; title?: string; publishedAt?: string; category?: string }[] };
+    return (data.items ?? [])
+      .map((i) => ({ idxno: Number(i.id), title: i.title ?? "", publishedAt: i.publishedAt ?? "", category: i.category }))
+      .filter((i) => Number.isFinite(i.idxno) && i.idxno > 0 && i.title && i.publishedAt)
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 // "N년 전 오늘 태안" — 아카이브 회고(같은 MM-DD 과거 기사)
 export interface OnThisDayItem { idxno: number; title: string; year: number; yearsAgo: number; category?: string; leadImage?: string | null; date?: string }
 export async function fetchOnThisDay(limit = 30): Promise<OnThisDayItem[]> {
