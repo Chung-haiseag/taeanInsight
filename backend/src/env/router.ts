@@ -83,11 +83,6 @@ envRouter.get("/beaches", async (c) => {
   const ranked = rankBeaches(
     (m.beaches ?? []).map((b) => ({ name: b.name, beachIndex: b.beachIndex, waveHeight: b.waveHeight, waterTemp: b.waterTemp })),
   );
-  // ?debug=1 — 해수욕지수(KHOA) 수집 진단(전국 totalCount·페이지수·박스 통과 행·해변명).
-  //   태안 해변이 몇 곳 잡히는지는 상류 커버리지에 달려 있어, 키 없이 원인을 보려면 이게 필요하다.
-  const debug = c.req.query("debug") === "1"
-    ? await import("../tour/marine").then((m2) => m2.getKhoaDiag())
-    : undefined;
   return c.json({
     available: !!m.available && ranked.length > 0,
     updatedAt: m.beaches?.[0]?.observedAt ?? null,
@@ -95,7 +90,6 @@ envRouter.get("/beaches", async (c) => {
     beaches: ranked,
     tide: m.tide ?? null,
     sun: m.sun ?? null,
-    ...(debug ? { debug } : {}),
   });
 });
 

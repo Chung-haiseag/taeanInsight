@@ -130,19 +130,14 @@ async function fetchKmaBeach(key: string, beach: { num: string; name: string }):
   return out;
 }
 
-// 해수욕지수 수집 진단(왜 태안 해변이 N곳뿐인지 확인용) — /api/conditions/beaches?debug=1 로 노출.
-export interface KhoaDiag { totalCount: number | null; pages: number; rows: number; inBox: number; names: string[] }
-let lastKhoaDiag: KhoaDiag = { totalCount: null, pages: 0, rows: 0, inBox: 0, names: [] };
-export const getKhoaDiag = (): KhoaDiag => lastKhoaDiag;
-
 // ── ② 국립해양조사원 해수욕지수(태안 위경도 박스) ──
 async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
   const { iso } = kst();
-  const diag: KhoaDiag = { totalCount: null, pages: 0, rows: 0, inBox: 0, names: [] };
   try {
-    // 전국 목록을 받아 태안 박스로 거른다. 이 API는 '해변 × 날짜 × 오전/오후'로 행이 나와 전국 기준 행 수가 크다.
-    //   numOfRows를 2000으로 올리는 접근은 실패했다(2026-08-14 실측: 응답 자체가 깨져 4곳→2곳). 300이 상한이므로
-    //   ⚠ numOfRows는 올리지 말고 pageNo로 페이징한다. 1페이지로 totalCount를 얻고 나머지는 병렬 수집(왕복 2회).
+    // 전국 목록을 받아 태안 박스로 거른다. 이 API는 '해변 × 날짜 × 오전/오후'로 행이 나와 전국 기준 행 수가 크다
+    //   (2026-08-14 실측 totalCount=500). 1페이지만 받던 때는 태안이 2곳(신두리·학암포)만 잡혔다.
+    //   ⚠ numOfRows를 올려 해결하려 하지 말 것 — 2000으로 시도했더니 응답 자체가 깨져 해변이 4곳→2곳으로 줄었다.
+    //   300이 상한이므로 pageNo로 페이징한다. 1페이지로 totalCount를 얻고 나머지는 병렬(왕복 2회).
     //   loadMarine이 20분 TTL 캐시라 이 비용은 상각된다.
     const PAGE = 300, MAX_PAGES = 12;
     const fetchPage = async (p: number): Promise<{ rows: Item[]; total: number | null }> => {
@@ -155,8 +150,6 @@ async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
 
     const first = await fetchPage(1);
     const all: Item[] = [...first.rows];
-    diag.totalCount = first.total;
-    diag.pages = 1;
     // totalCount를 주면 그만큼만, 안 주면 첫 페이지가 꽉 찼을 때 MAX_PAGES까지 시도.
     const need = first.total != null ? Math.ceil(first.total / PAGE) : (first.rows.length >= PAGE ? MAX_PAGES : 1);
     const lastPage = Math.min(need, MAX_PAGES);
@@ -165,15 +158,10 @@ async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
         Array.from({ length: lastPage - 1 }, (_, i) => fetchPage(i + 2).catch(() => ({ rows: [] as Item[], total: null }))),
       );
       for (const r of rest) all.push(...r.rows);
-      diag.pages = lastPage;
     }
-    diag.rows = all.length;
     // 지역 위경도 박스
     const b = REGION.box;
     const taean = all.filter((x) => { const la = num(x.lat), lo = num(x.lot); return la != null && lo != null && la >= b.latMin && la <= b.latMax && lo >= b.lonMin && lo <= b.lonMax; });
-    diag.inBox = taean.length;
-    diag.names = [...new Set(taean.map((x) => String(x.bbchNm)))];
-    lastKhoaDiag = diag;
     const byBeach = new Map<string, Item>();
     for (const r of taean) {
       // 오늘 예보 중 오후 우선, 없으면 오전/최신
@@ -196,7 +184,7 @@ async function fetchKhoaBeachIndex(key: string): Promise<BeachMarine[]> {
       source: "해양조사원" as const,
     }));
   } catch {
-    lastKhoaDiag = diag;
+
     return [];
   }
 }
