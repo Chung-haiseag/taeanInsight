@@ -234,6 +234,14 @@ export default {
       } catch (e) {
         console.warn("[cron] 해무 캐시 워밍 실패:", e instanceof Error ? e.message : e);
       }
+      // 여객선 캐시 워밍 — 결항 트리거가 신선한 상태를 보게 한다(아래 취재 알림보다 먼저).
+      //   호출 예산: 취항선명 서버측 필터로 1회 = 1건. 30분 크론이라 48건/일(개발계정 100건 한도 내).
+      try {
+        const { refreshFerryCache } = await import("./env/ferry");
+        await refreshFerryCache(env);
+      } catch (e) {
+        console.warn("[cron] 여객선 캐시 워밍 실패:", e instanceof Error ? e.message : e);
+      }
       // 기자 취재 알림 — 트리거 점검(멱등, 신규분만 발송)
       try {
         const { runReporterAlerts } = await import("./reporter/alerts");

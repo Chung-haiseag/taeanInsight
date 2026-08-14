@@ -1,5 +1,5 @@
-// 기자 취재 알림 — 4종 트리거 감지 → 멱등 적재 → 기자 Web Push.
-//   gov(군청 새 공지) · env(기상·환경 특보) · spike(데이터 급변) · keyword(기자 키워드 감시)
+// 기자 취재 알림 — 5종 트리거 감지 → 멱등 적재 → 기자 Web Push.
+//   gov(군청 새 공지) · env(기상·환경 특보) · spike(데이터 급변) · ferry(가의도 여객선 결항) · keyword(기자 키워드 감시)
 // 추가형: 기존 기능 변경 없음. 발송은 push_subscriptions(reporters 등록 uid) 재사용.
 
 import type { Env } from "../types";
@@ -65,6 +65,25 @@ async function detectSpike(env: Env): Promise<NewAlert[]> {
   return out;
 }
 
+// 여객선 결항·통제 — 안흥↔가의도는 태안 유일 여객선 항로라 결항이 곧 '섬 고립'이다.
+//   기상악화로 배가 끊기면 주민 생활·응급이송·관광객 발이 묶이는 지역뉴스거리라 취재 트리거로 쓴다.
+//   refKey에 편(날짜·시각·방향)을 넣어 같은 편이 반복 알림되지 않게 한다(상태가 여러 번 바뀌어도 1회).
+async function detectFerry(env: Env): Promise<NewAlert[]> {
+  const { loadFerryFast } = await import("../env/ferry");
+  const r = await loadFerryFast(env).then((x) => x.result).catch(() => null);
+  if (!r || !r.available) return [];
+  return r.sailings
+    .filter((s) => !s.normal)
+    .map((s) => ({
+      kind: "ferry",
+      refKey: `ferry:${r.date}:${s.time}:${s.route}`,
+      targetUid: null,
+      title: "⛴ 가의도 여객선 결항·통제",
+      body: `${s.time} ${s.route} — ${s.status}${s.reason ? ` (${s.reason})` : ""}\n태안 유일 여객선 항로 · 섬 주민 발이 묶입니다`,
+      url: "/beaches",
+    }));
+}
+
 async function detectKeywords(env: Env): Promise<NewAlert[]> {
   if (!env.ARCHIVE_DB) return [];
   const kw = await env.ARCHIVE_DB.prepare("SELECT uid, keyword FROM reporter_keywords").all<{ uid: string; keyword: string }>();
@@ -102,7 +121,7 @@ export interface ReporterAlertResult { detected: number; fresh: number; sent: nu
 export async function runReporterAlerts(env: Env): Promise<ReporterAlertResult> {
   if (!env.ARCHIVE_DB) return { detected: 0, fresh: 0, sent: 0, skipped: "no_db" };
 
-  const all = (await Promise.all([detectGov(env), detectEnv(env), detectSpike(env), detectKeywords(env)]))
+  const all = (await Promise.all([detectGov(env), detectEnv(env), detectSpike(env), detectFerry(env), detectKeywords(env)]))
     .flat();
   if (!all.length) return { detected: 0, fresh: 0, sent: 0 };
 
@@ -132,7 +151,7 @@ export async function runReporterAlerts(env: Env): Promise<ReporterAlertResult> 
   if (!reporterUids.size) return { detected: all.length, fresh: fresh.length, sent: 0, skipped: "no_reporters" };
 
   // 기자별로 적용 알림을 모아 "한 묶음(다이제스트)"으로 1건만 발송 — 13건을 13번 보내지 않음.
-  const KIND_LABEL: Record<string, string> = { gov: "군청 공지", env: "기상특보", spike: "데이터 급변", keyword: "키워드" };
+  const KIND_LABEL: Record<string, string> = { gov: "군청 공지", env: "기상특보", spike: "데이터 급변", ferry: "여객선 결항", keyword: "키워드" };
   const digestTag = `digest:${new Date(now).toISOString().slice(0, 16)}`;
   let sent = 0;
   for (const uid of reporterUids) {

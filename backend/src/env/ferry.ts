@@ -2,11 +2,9 @@
 //   출처: 한국해양교통안전공단(data.go.kr 15142304) https://apis.data.go.kr/B554035/ferry-route-info-v4
 //   API에 항로/항구 필터 파라미터가 없어 '운항일자(rlvtYmd)'로 전국을 받아 항로명으로 걸러낸다.
 //
-//   ⚠ 호출 예산: 개발계정 일 100건. 전국 1일 운항편이 수백 건이라 페이지가 2~3장 필요하므로
-//     '요청 때마다 호출'하면 금방 한도를 넘는다. → D1 캐시(60분) + stale-while-revalidate로
-//     방문이 있을 때만, 그것도 시간당 1회만 갱신되게 묶는다(최악 24회/일 × 3페이지 = 72건).
-//     실측: 전국 1일 5,122행(6페이지). 취항선명(psnshpNm=해랑5호) 서버측 필터로 1페이지로 줄여
-//     갱신 1회당 1건만 쓴다. 30분 캐시 기준 최악 48건/일.
+//   ⚠ 호출 예산: 개발계정 일 100건. 전국 1일 운항이 5,122행(6페이지)이라 '요청 때마다 호출'은 불가.
+//     → ①취항선명(psnshpNm) 서버측 필터로 6페이지 → 1페이지 ②D1 캐시 30분 + stale-while-revalidate
+//     ③30분 크론에서 선워밍(index.ts). 갱신 1회당 1건이라 48건/일로 한도의 절반 이하.
 
 import { readCache, writeCache } from "../lib/api_cache";
 
@@ -47,6 +45,11 @@ export interface FerryResult {
 interface Row { [k: string]: unknown }
 
 const s = (v: unknown): string => (v == null ? "" : String(v).trim());
+
+// 운항상태 → 정상 여부. 이 판정 하나에 화면 강조와 기자 결항 알림이 전부 달려 있다.
+//   실측 상태값(2026-08-14): 완료·출항중·운항중. 결항 계열은 아직 관측되지 않아 화이트리스트가 아닌
+//   '이상 신호 블랙리스트'로 둔다 — 새 정상 상태값이 생겨도 오탐(가짜 결항 알림)이 나지 않게.
+export const isNormalStatus = (status: string): boolean => !/결항|통제|중단|취소|欠航/.test(status);
 
 // "830" / "0830" / "08:30" → "08:30"
 function fmtTime(raw: string): string {
@@ -124,8 +127,7 @@ async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryRe
           ship: s(r.psnshp_nm),
           route: forward ? "안흥 → 가의도" : "가의도 → 안흥",
           status,
-          // 결항·통제만 비정상으로 본다(출항중·운항중·입항 등은 정상). 새 상태값이 생겨도 정상으로 취급.
-          normal: !/결항|통제|중단|취소/.test(status),
+          normal: isNormalStatus(status),
           reason: s(r.nvg_stts_rsn) || undefined,
         };
       })
