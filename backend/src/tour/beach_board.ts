@@ -17,6 +17,7 @@ export interface BeachScore {
   beachIndex: string | null;
   waveHeight: number | null;
   waterTemp: number | null;
+  estimated: boolean;          // 등급이 실측 해수욕지수가 아니라 수온·파고 추정인지
 }
 
 const IDX_SCORE: Record<string, number> = { "매우좋음": 35, "좋음": 25, "보통": 5, "나쁨": -20, "매우나쁨": -35 };
@@ -77,7 +78,8 @@ export function scoreBeach(b: BeachInput): BeachScore {
     if (b.waveHeight >= 2.5) level = "비추천";
     else if (b.waveHeight >= 1.5) level = downgrade(level);
   }
-  return { name: b.name, score, level, reasons, beachIndex: b.beachIndex, waveHeight: b.waveHeight, waterTemp: b.waterTemp };
+  // 추정 등급은 배지만 보면 실측과 구분되지 않는다 → 화면이 표시할 수 있도록 데이터로 내보낸다.
+  return { name: b.name, score, level, reasons, beachIndex: b.beachIndex, waveHeight: b.waveHeight, waterTemp: b.waterTemp, estimated: !b.beachIndex && !!grade };
 }
 
 const IDX_LEVEL: Record<string, BeachScore["level"]> = {

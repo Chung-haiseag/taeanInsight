@@ -147,6 +147,7 @@ export interface BeachScoreView {
   beachIndex: string | null;
   waveHeight: number | null;
   waterTemp: number | null;
+  estimated?: boolean;   // 실측 해수욕지수가 아니라 수온·파고 추정 등급인지
 }
 export interface BeachBoardView {
   available: boolean;
@@ -331,9 +332,10 @@ export async function getFog(): Promise<FogBoardView | null> {
 }
 // 여객선 운항상태 — 안흥(신진도) ↔ 가의도. 태안 유일 여객선 항로.
 //   출처: 한국해양교통안전공단. 결항·통제는 가의도 주민·방문객에게 그날의 핵심 정보다.
-export interface FerrySailingView { time: string; ship: string; route: string; status: string; normal: boolean; reason?: string }
+// state: 출처 문구를 정상/결항/모름으로 분류한 것. 'unknown'은 '정상'이라 단정하지 않는다.
+export interface FerrySailingView { time: string; ship: string; route: string; status: string; state: "normal" | "disrupted" | "unknown"; reason?: string }
 export interface FerryView {
-  available: boolean; date: string; route: string; sailings: FerrySailingView[]; allNormal: boolean;
+  available: boolean; date: string; route: string; sailings: FerrySailingView[];
   season?: "하계" | "동계";
   timetable?: { out: string[]; back: string[] };
   next?: { when: "오늘" | "내일"; time: string };

@@ -30,7 +30,9 @@ describe("scoreBeach", () => {
     const 꽃지 = scoreBeach({ name: "꽃지", beachIndex: null, waveHeight: 0.0, waterTemp: 28.5 });
     expect(꽃지.level).toBe("최고");
     expect(꽃지.reasons.join(" ")).toMatch(/추정/); // 실측 지수와 구분 표기
+    expect(꽃지.estimated).toBe(true);              // 화면이 배지 옆에 '추정'을 붙일 수 있도록
     const 학암포 = scoreBeach({ name: "학암포", beachIndex: "매우좋음", waveHeight: 0.1, waterTemp: 24 });
+    expect(학암포.estimated).toBe(false);           // 실측 지수는 추정 아님
     expect(꽃지.score).toBeGreaterThanOrEqual(학암포.score - 2); // 더 따뜻한데 크게 밀리지 않아야
   });
 

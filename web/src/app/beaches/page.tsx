@@ -84,6 +84,8 @@ export default async function BeachesPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-extrabold text-brand">{b.score}</span>
                     <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-bold ${LEVEL_STYLE[b.level].badge}`}>{b.level}</span>
+                    {/* 실측 해수욕지수가 없는 지점은 수온·파고로 추정한 등급 — 배지만 보면 실측과 구분이 안 되므로 명시. */}
+                    {b.estimated && <span className="rounded-full border border-brand/20 px-1.5 py-0.5 text-[0.625rem] font-semibold text-foreground-muted" title="실측 해수욕지수가 없어 수온·파고로 추정한 등급">추정</span>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

@@ -72,8 +72,9 @@ async function detectFerry(env: Env): Promise<NewAlert[]> {
   const { loadFerryFast } = await import("../env/ferry");
   const r = await loadFerryFast(env).then((x) => x.result).catch(() => null);
   if (!r || !r.available) return [];
+  // 'unknown'(우리가 모르는 상태 문구)은 알리지 않는다 — 오탐(가짜 결항 알림)이 신뢰를 더 크게 깎는다.
   return r.sailings
-    .filter((s) => !s.normal)
+    .filter((s) => s.state === "disrupted")
     .map((s) => ({
       kind: "ferry",
       refKey: `ferry:${r.date}:${s.time}:${s.route}`,

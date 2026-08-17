@@ -16,8 +16,8 @@ import { readCache, writeCache } from "../lib/api_cache";
 // 서비스 URL 뒤에 상세기능(오퍼레이션) 경로가 한 번 더 붙는 형태. 빼면 NO_OPENAPI_SERVICE_ERROR(코드 12).
 const URL_BASE = "https://apis.data.go.kr/B554035/ferry-route-info-v4/get-ferry-route-info-v4";
 // 캐시 키에 스키마 버전(v2)을 붙인다 — 결과 구조가 바뀌면 키를 올려 옛 캐시를 즉시 무효화한다.
-//   (v1 시절 필드명을 잘못 읽어 빈 값이 채워진 결과가 30분간 그대로 서빙된 적이 있다. v3=updatedAt, v4=scannedAt·shipFilter 추가.)
-const CACHE_KEY = "ferry_gauido_v4";
+//   (v1 시절 필드명을 잘못 읽어 빈 값이 채워진 결과가 30분간 그대로 서빙된 적이 있다. v3=updatedAt, v4=scannedAt·shipFilter, v5=normal→state 3상태·allNormal 제거.)
+const CACHE_KEY = "ferry_gauido_v5";
 const STALE_MS = 30 * 60_000; // 30분 — 취항선명 필터로 갱신 1회 호출이라 여유(최악 48건/일 < 100건 한도)
 const PAGE = 1000;
 const MAX_PAGES = 6; // 전국 1일 운항 5,122행(2026-08-14 실측) → 6,000행까지 커버.
@@ -59,8 +59,8 @@ export interface FerrySailing {
   time: string;        // 출항시각 "08:30"
   ship: string;        // 여객선명
   route: string;       // 운항항로명
-  status: string;      // 운항상태(정상운항/운항통제/비운항 등)
-  normal: boolean;     // 정상 출항 여부
+  status: string;      // 운항상태 원문(완료/출항중/운항중/결항 등) — 출처 값을 그대로 보여준다
+  state: SailState;    // 위 원문을 정상/결항/모름으로 분류한 것
   reason?: string;     // 결항·통제 사유
 }
 export interface FerryResult {
@@ -68,7 +68,6 @@ export interface FerryResult {
   date: string;              // YYYY-MM-DD
   route: string;             // 대표 항로명
   sailings: FerrySailing[];
-  allNormal: boolean;        // 전편 정상
   season: FerrySeason;       // 하계(4~9월)/동계(10~3월)
   timetable: { out: string[]; back: string[] };  // 정기 시간표(안흥 출발 / 가의도 출발)
   next: { when: "오늘" | "내일"; time: string }; // 다음 안흥 출발
@@ -84,10 +83,20 @@ interface Row { [k: string]: unknown }
 
 const s = (v: unknown): string => (v == null ? "" : String(v).trim());
 
-// 운항상태 → 정상 여부. 이 판정 하나에 화면 강조와 기자 결항 알림이 전부 달려 있다.
-//   실측 상태값(2026-08-14): 완료·출항중·운항중. 결항 계열은 아직 관측되지 않아 화이트리스트가 아닌
-//   '이상 신호 블랙리스트'로 둔다 — 새 정상 상태값이 생겨도 오탐(가짜 결항 알림)이 나지 않게.
-export const isNormalStatus = (status: string): boolean => !/결항|통제|중단|취소|欠航/.test(status);
+// 운항상태 3상태 분류. 이 판정 하나에 화면 강조와 기자 결항 알림이 걸려 있다.
+//   이전엔 이진(normal/아님)이라 모르는 문구를 전부 '정상'으로 단정했다 — 결항인데 우리가 모르는
+//   표기면 독자에게 '정상'이라 거짓말하는 셈이었다. 그래서 '모름'을 별도 상태로 분리한다.
+//   · disrupted: 결항 계열(확실히 잡는다) → 붉게 강조 + 기자 알림
+//   · normal   : 실측·예상 가능한 정상 어휘만 인정(2026-08-14 실측: 완료·출항중·운항중)
+//   · unknown  : 둘 다 아님 → 독자에겐 '정상'이라 하지 않고, 기자 알림도 보내지 않는다(오탐 방지 유지)
+export type SailState = "normal" | "disrupted" | "unknown";
+const DISRUPTED_RE = /결항|통제|중단|취소|欠航/;   // '운항통제'·'운항중단'도 여기서 먼저 걸린다
+const NORMAL_RE = /완료|출항|운항|입항|접안|정상|예정|대기/;
+export function classifyStatus(status: string): SailState {
+  if (DISRUPTED_RE.test(status)) return "disrupted";
+  if (NORMAL_RE.test(status)) return "normal";
+  return "unknown";
+}
 
 // "830" / "0830" / "08:30" → "08:30"
 function fmtTime(raw: string): string {
@@ -145,7 +154,7 @@ async function fetchFerryImpl(
   opts: { allowScan: boolean; prevScannedAt?: string; ship?: string } = { allowScan: true },
 ): Promise<FerryResult> {
   const { ymd, iso, month, hm } = kstDate();
-  const base = { available: false, date: iso, route: "안흥(신진도) ↔ 가의도", sailings: [], allNormal: true, ...scheduleBase(month, hm) };
+  const base = { available: false, date: iso, route: "안흥(신진도) ↔ 가의도", sailings: [], ...scheduleBase(month, hm) };
   const carry = { scannedAt: opts.prevScannedAt, shipFilter: opts.ship ?? SHIP_NAME };
   const empty: FerryResult = { ...base, ...carry, updatedAt: new Date().toISOString() };
   const key = env.DATA_GO_KR_KEY;
@@ -195,7 +204,7 @@ async function fetchFerryImpl(
           ship: s(r.psnshp_nm),
           route: forward ? "안흥 → 가의도" : "가의도 → 안흥",
           status,
-          normal: isNormalStatus(status),
+          state: classifyStatus(status),
           reason: s(r.nvg_stts_rsn) || undefined,
         };
       })
@@ -206,7 +215,6 @@ async function fetchFerryImpl(
       date: iso,
       route: "안흥(신진도) ↔ 가의도",
       sailings,
-      allNormal: sailings.every((x) => x.normal),
       ...scheduleBase(month, hm),
       scannedAt,
       shipFilter,

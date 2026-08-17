@@ -1139,7 +1139,7 @@ export function FestivalList({ tour }: { tour: ReportMetrics["tourism"] }) {
 //   섬에 가려는 사람이 원하는 순서대로 — ①다음 배 ②정기 시간표 ③오늘 현황 ④연락처.
 export function FerryCard({ ferry }: { ferry: FerryView | null }) {
   if (!ferry) return null;
-  const bad = ferry.sailings.filter((s) => !s.normal);
+  const bad = ferry.sailings.filter((s) => s.state === "disrupted");
   const tt = ferry.timetable;
   return (
     <div className={`mt-4 rounded-2xl border p-4 ${bad.length ? "border-red-300 bg-red-50" : "border-brand/15 bg-background"}`}>
@@ -1191,7 +1191,11 @@ export function FerryCard({ ferry }: { ferry: FerryView | null }) {
               <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
                 <span className="w-12 shrink-0 font-bold tabular-nums text-brand">{s.time}</span>
                 <span className="text-foreground-muted">{s.route}</span>
-                <span className={`ml-auto rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${s.normal ? "bg-brand/8 text-brand" : "bg-red-500 text-background"}`}>{s.status}</span>
+                {/* 결항만 붉게. '모름'은 정상으로 위장하지 않고 회색+물음표로 둔다(단정 회피). */}
+                <span className={`ml-auto rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${
+                  s.state === "disrupted" ? "bg-red-500 text-background"
+                  : s.state === "unknown" ? "bg-foreground-muted/15 text-foreground-muted"
+                  : "bg-brand/8 text-brand"}`}>{s.status}{s.state === "unknown" ? " ?" : ""}</span>
                 {s.reason && <span className="w-full text-[0.7rem] text-red-700">사유: {s.reason}</span>}
               </li>
             ))}
