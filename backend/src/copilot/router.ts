@@ -234,7 +234,8 @@ copilotRouter.get("/context-data", async (c) => {
 });
 
 // ── 이미지 업로드 → R2 (시민기자 기사 사진). 서빙은 /api/archive/photo/<key> ──
-// PoC: 무인증(에디터와 동일). 타입·용량 가드만. 운영 시 reporter 인증 추가.
+// 인증은 라우터 상단 use("*") 세션 가드가 담당(무인증 아님). 여기선 타입·용량 가드만.
+//   ⚠ 프런트는 buildApiHeaders로 Authorization을 붙여야 한다 — 손으로 헤더를 만들면 401.
 copilotRouter.post("/upload", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "photos_unbound" }, 503);
   const ct = c.req.header("content-type") || "";

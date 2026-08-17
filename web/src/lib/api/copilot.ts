@@ -1,6 +1,6 @@
 // 시민 코파일럿 API 클라이언트 — backend/src/copilot/router.ts 매핑
 
-import { apiFetch } from "./client";
+import { apiFetch, buildApiHeaders, API_BASE_URL } from "./client";
 
 export type AiLabel = "human" | "ai_assisted" | "ai_generated";
 
@@ -68,12 +68,16 @@ export async function copilotDraft(keywords: string): Promise<{ ok: boolean; tit
   return apiFetch("/api/copilot/draft", { method: "POST", body: JSON.stringify({ keywords }) });
 }
 
-// 이미지 업로드(R2) → 서빙 URL. apiFetch는 JSON 전용이라 바이너리는 직접 fetch.
-const COPILOT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
+// 이미지 업로드(R2) → 서빙 URL. apiFetch는 JSON 전용이라 바이너리는 직접 fetch한다.
+//   ⚠ 단, 헤더는 buildApiHeaders를 반드시 재사용할 것 — copilot 라우터는 전 경로에 세션 인증이
+//     걸려 있어(`use("*")`), 손으로 헤더를 만들면 Authorization이 빠져 **항상 401**이 난다.
+//     실제로 그 상태로 배포돼 시민기자 사진 업로드가 동작하지 않았다(2026-08-17 발견).
 export async function copilotUploadImage(file: File): Promise<{ url: string; key: string }> {
-  const res = await fetch(`${COPILOT_API_BASE}/api/copilot/upload`, {
+  const headers = await buildApiHeaders();
+  headers.set("content-type", file.type || "image/jpeg"); // JSON 기본값을 바이너리 타입으로 교체
+  const res = await fetch(`${API_BASE_URL}/api/copilot/upload`, {
     method: "POST",
-    headers: { "content-type": file.type || "image/jpeg" },
+    headers,
     body: file,
   });
   if (!res.ok) {
