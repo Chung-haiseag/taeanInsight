@@ -55,6 +55,10 @@ const NON_NAME = new Set([
   "발표", "지원", "마련", "계획", "오전", "오후", "이상", "이하", "각각", "모두", "서로", "국내",
   "전국", "안전", "신규", "고령", "성인", "인구", "주변", "마을", "문화", "안내", "홍보", "명예",
   "남도", "도의", "국비", "예산", "복지", "보건", "명단", "기자", "위원", "의원",
+  // 실제 오추출로 확인된 것들(2026-08-18 검수 화면) — 성씨로 시작하는 일반명사·기관 약어.
+  "전경", "의경", "해경", "소방", "경찰", "직원", "회원", "임원", "간사", "총무", "감사",
+  "고문", "자문", "본부", "지회", "지부", "분회", "협회", "연합", "총회", "선수", "학생",
+  "군민", "주최", "주관", "후원", "성금", "성품", "표창", "방문", "간담", "협약", "체결",
 ]);
 
 /** 성씨 시작·2~4자 한글·직함/불용어 아님이면 인명으로 간주. */
@@ -67,11 +71,54 @@ export function isLikelyName(s: string): boolean {
   return true;
 }
 
-/** 별칭 → 조직 id 역인덱스(긴 별칭 우선 매칭용으로 길이 내림차순). */
+/** 별칭 → 조직 id 역인덱스. 길이 내림차순 — 짧은 별칭('군청')이 긴 이름보다 먼저 걸리면 오귀속된다.
+ *   ※ 이전 구현은 주석만 '길이 내림차순'이고 실제로는 정렬하지 않았다. */
 export function orgAliasIndex(): Map<string, string> {
+  const pairs: Array<[string, string]> = [];
+  for (const o of ORGS) for (const a of o.aliases) pairs.push([a, o.id]);
+  pairs.sort((x, y) => y[0].length - x[0].length);
   const idx = new Map<string, string>();
-  for (const o of ORGS) for (const a of o.aliases) if (!idx.has(a)) idx.set(a, o.id);
+  for (const [a, id] of pairs) if (!idx.has(a)) idx.set(a, id);
   return idx;
+}
+
+// ── 오귀속 차단 규칙 ── 실제 검수 화면(2026-08-18)에서 확인된 유형만 정확히 겨냥한다.
+
+/** 별칭 뒤에 조사·구두점이 아닌 한글이 붙으면 더 긴 기관명의 일부다.
+ *   예: '태안군청'+'소년상담센터' → 태안군청소년상담센터(별개 기관). */
+const PARTICLE_AFTER = /^[은는이이가을를의에와과도로으만부까보처나라및·,)\]}"'\s]|^$/;
+export function hasBoundaryAfter(body: string, at: number): boolean {
+  const rest = body.slice(at, at + 1);
+  if (rest === "") return true;
+  if (!/[가-힣]/.test(rest)) return true;
+  return PARTICLE_AFTER.test(rest);
+}
+
+/** 별칭 앞이 읍·면이면 하위 지역 조직이다. 예: '고남면 체육회' ≠ 태안군체육회.
+ *   ※'동·리'는 제외한다 — 인명 끝글자와 겹쳐('홍길동 서산수협') 정상 추출을 죽인다.
+ *     태안군은 1읍 7면 체계라 읍·면만으로 충분하다. */
+export function hasSubRegionPrefix(body: string, at: number): boolean {
+  const before = body.slice(Math.max(0, at - 6), at);
+  return /[가-힣]{1,3}(읍|면)\s*[(（]?\s*$/.test(before);
+}
+
+/** 별칭 뒤가 장소어면 소속이 아니라 '장소 언급'이다. 예: '군청 대강당에서', '태안발전본부 테니스장'. */
+const VENUE_WORDS = ["대강당", "강당", "상황실", "회의실", "대회의", "소회의", "체육관", "운동장", "테니스장",
+  "축구장", "야구장", "광장", "주차장", "청사", "일원", "앞", "정문", "로비", "食堂", "식당", "다목적"];
+export function isVenueMention(body: string, afterAt: number): boolean {
+  const nxt = body.slice(afterAt, afterAt + 8).replace(/^[\s(（]+/, "");
+  return VENUE_WORDS.some((w) => nxt.startsWith(w));
+}
+
+/** '조직명(직함 인명)' — 한국 기사에서 가장 신뢰도 높은 소속 표기. 창 안의 모든 쌍을 뽑는다. */
+export function parenTitleOwners(text: string): Array<{ org: string; title: string; name: string }> {
+  const out: Array<{ org: string; title: string; name: string }> = [];
+  const re = /([가-힣A-Za-z0-9]{2,20})\s*[(（]\s*([가-힣]{2,5})\s+([가-힣]{2,4})\s*[)）]/g;
+  for (const m of text.matchAll(re)) {
+    if (!(TITLE_CUES as readonly string[]).includes(m[2])) continue;
+    out.push({ org: m[1], title: m[2], name: m[3] });
+  }
+  return out;
 }
 
 export interface Candidate { personName: string; orgId: string; role: string; evidence: string }
@@ -118,19 +165,44 @@ export function extractAffiliations(body: string): Candidate[] {
       from = pos + title.length;
       const w0 = Math.max(0, pos - 20), w1 = Math.min(body.length, pos + title.length + 12);
       const window = body.slice(w0, w1);
-      for (const n of namesNear(window, title, 3)) add(n, orgId, title, window);
+      // (a) 이름 → (지역) → 직함 순서: 사이에 낀 지역명이 '태안'이 아니면 그 지역의 직함이다.
+      //     '이종건 홍성군수'는 태안군청이 아니고, '가세로 태안군수'·'진태구 군수'는 맞다.
+      const beforeRe = new RegExp(`([가-힣]{2,4})\\s?([가-힣]{0,3}?)${escapeRe(title)}`, "g");
+      for (const m of window.matchAll(beforeRe)) {
+        if (m[2] && m[2] !== "태안") continue;
+        add(m[1], orgId, title, window);
+      }
+      // (b) 직함 → 이름 순서('군의원 김영인'): 지역이 낄 자리가 없으므로 그대로 채택.
+      const afterRe = new RegExp(`${escapeRe(title)}\\s?([가-힣]{2,4})`, "g");
+      for (const m of window.matchAll(afterRe)) add(m[1], orgId, title, window);
     }
   }
 
-  // (2) 조직 별칭 앵커 — 창에 직함이 있을 때만
+  // (2) 조직 별칭 앵커 — 창에 직함이 있을 때만. 별칭은 긴 것부터(orgAliasIndex 정렬).
   for (const [alias, orgId] of idx) {
     let from = 0, pos: number;
     while ((pos = body.indexOf(alias, from)) !== -1) {
-      from = pos + alias.length;
-      const w0 = Math.max(0, pos - 30), w1 = Math.min(body.length, pos + alias.length + 30);
+      const end = pos + alias.length;
+      from = end;
+      // ── 오귀속 차단 3종(실제 검수에서 확인된 유형) ──
+      if (!hasBoundaryAfter(body, end)) continue;      // 태안군청 ⊂ 태안군청소년상담센터
+      if (hasSubRegionPrefix(body, pos)) continue;     // 고남면 체육회 ≠ 태안군체육회
+      if (isVenueMention(body, end)) continue;         // '군청 대강당에서' = 장소 언급
+      const w0 = Math.max(0, pos - 30), w1 = Math.min(body.length, end + 30);
       const window = body.slice(w0, w1);
       const titles = TITLE_CUES.filter((t) => window.includes(t));
       if (titles.length === 0) continue;
+
+      // ── 괄호 직함이 있으면 그것만 믿는다 ──
+      //   '조직명(직함 인명)'은 한국 기사에서 소속을 가장 확실히 밝히는 표기다. 창 안에 이 표기가 있으면
+      //   그 인물의 소속은 괄호 앞 조직이 확정이므로, 우리 별칭과 일치할 때만 채택하고 나머지는 버린다.
+      //   이것이 '태안해양경찰서(서장 이수찬) … 전경 내무반' 같은 근접 오귀속을 막는 핵심이다.
+      const parens = parenTitleOwners(window);
+      if (parens.length) {
+        for (const p of parens) if (p.org.endsWith(alias)) add(p.name, orgId, p.title, window);
+        continue;
+      }
+
       const role = titles[0];
       for (const t of titles) for (const n of namesNear(window, t, 0)) add(n, orgId, t, window);
       for (const n of namesNear(window, alias, 0)) add(n, orgId, role, window);
