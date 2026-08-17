@@ -190,9 +190,10 @@ envRouter.get("/farm", (c) =>
   edgeCached(c, "farm", 3600_000, () => import("../tour/farm").then((m) => m.loadFarm(c.env))));
 
 // 양식 수온 경보(고수온·저수온) — 양식 어가 폐사 조기경보. 위험할 때만 노출.
-//   ※임시(표층 수온). 용존산소·양식장 수온은 실시간어장정보(15058376) 활용신청 후 정식화.
+//   수온은 국립수산과학원 실시간어장정보(양식장 인근 관측소) 우선, 실패 시 해변 표층 평균으로 폴백.
+//   캐시 이름에 버전을 붙인다 — 응답 구조가 바뀌면 올려야 옛 형태가 1시간 서빙되지 않는다(aqua→aqua_v2).
 envRouter.get("/aqua", (c) =>
-  edgeCached(c, "aqua", 3600_000, () => import("../tour/aqua").then((m) => m.loadAquaAlert(c.env))));
+  edgeCached(c, "aqua_v2", 3600_000, () => import("../tour/aqua").then((m) => m.loadAquaAlert(c.env))));
 
 // "오늘의 태안" 한 줄 브리핑 — 매일 아침 Web Push로도 발송(cron). 미리보기 겸 공개 표시용.
 envRouter.get("/today-brief", (c) =>
