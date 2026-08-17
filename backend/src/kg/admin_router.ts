@@ -123,6 +123,18 @@ router.get("/affiliations", async (c) => {
   const limit = Math.max(1, Math.min(500, Number(c.req.query("limit")) || 150));
   return c.json({ candidates: await loadAffiliationQueue(c.env.ARCHIVE_DB, limit) });
 });
+// 소속 후보 일괄 승격 — 조건(신뢰도·근거 기사수)에 맞는 미검수 엣지를 UPDATE 한 번으로 처리.
+//   ⚠ 대량 변경이라 기본은 시험 실행(dry-run): apply=true를 명시해야만 실제로 쓴다.
+//   히스토그램을 함께 돌려줘 임계값을 감이 아니라 분포를 보고 정하게 한다.
+router.post("/affiliations/bulk-verify", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ minConfidence?: number; minCount?: number; apply?: boolean }>().catch(() => ({}));
+  const { bulkVerifyAffiliations, affiliationConfidenceHistogram } = await import("./affiliation_queue");
+  const result = await bulkVerifyAffiliations(c.env.ARCHIVE_DB, b);
+  const histogram = await affiliationConfidenceHistogram(c.env.ARCHIVE_DB);
+  return c.json({ ...result, histogram });
+});
+
 router.post("/affiliations/reject", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const b = await c.req.json<{ id: string }>().catch(() => ({} as { id: string }));

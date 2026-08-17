@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getAffiliationQueue, rejectAffiliation, verifyKg, type AffiliationCandidate } from "@/lib/api/kg";
+import { getAffiliationQueue, rejectAffiliation, verifyKg, bulkVerifyAffiliations, type AffiliationCandidate, type BulkVerifyResult } from "@/lib/api/kg";
 
 // 소속(belongs_to) 검수 — 아카이브에서 추출한 (인물·조직·직함) 후보를 신뢰도순으로 훑어
 // 승인(verified=1=사실층·AI 근거) 또는 반려(삭제)한다. 지어내기 방지: 승인된 소속만 공개 답변·관계망에 인용.
@@ -35,14 +35,28 @@ export default function AffiliationReview() {
       setRejected((n) => n + 1);
     } catch { /* 유지 */ } finally { setBusy(null); }
   }
-  async function approveHighConfidence() {
-    if (!rows) return;
+  // 일괄 승격 — 서버에서 UPDATE 한 번. 예전엔 후보 1건당 HTTP 1회를 순차로 보내(화면에 로드된 300건만,
+  //   회당 1분) 2,394건 처리가 사실상 불가능했다. 먼저 시험 실행으로 건수·분포를 보이고, 확인 후 적용한다.
+  const [minConf, setMinConf] = useState(0.8);
+  const [dry, setDry] = useState<BulkVerifyResult | null>(null);
+
+  async function previewBulk() {
     setBulk(true);
-    const targets = rows.filter((r) => r.confidence >= 0.8);
-    for (const r of targets) {
-      try { await verifyKg("kg_edges", r.id, true); setApproved((n) => n + 1); setRows((rs) => rs?.filter((x) => x.id !== r.id) ?? rs); }
-      catch { /* 계속 */ }
-    }
+    try { setDry(await bulkVerifyAffiliations({ minConfidence: minConf, minCount: 1 })); }
+    catch { setDry(null); }
+    setBulk(false);
+  }
+
+  async function applyBulk() {
+    if (!dry?.matched) return;
+    if (!window.confirm(`신뢰도 ${minConf} 이상 ${dry.matched}건을 검증 완료(사실층)로 승격합니다.\n승격된 관계는 AI 답변에 근거로 인용됩니다. 진행할까요?`)) return;
+    setBulk(true);
+    try {
+      const r = await bulkVerifyAffiliations({ minConfidence: minConf, minCount: 1, apply: true });
+      setApproved((n) => n + r.updated);
+      setDry(r);
+      setRows((rs) => rs?.filter((x) => x.confidence < minConf) ?? rs);
+    } catch { /* 무시 */ }
     setBulk(false);
   }
 
@@ -57,10 +71,31 @@ export default function AffiliationReview() {
           승인 전까지는 통계(탐색층)로만 쓰이고 답변 근거로는 안 씁니다 — <span className="font-semibold">지어내기 방지</span>.
         </p>
         <div className="flex shrink-0 gap-2">
-          <button type="button" onClick={approveHighConfidence} disabled={bulk || !rows?.some((r) => r.confidence >= 0.8)}
-            className="rounded border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
-            {bulk ? "일괄 승인 중…" : "고신뢰(≥0.8) 일괄 승인"}
-          </button>
+          <span className="flex flex-wrap items-center gap-2">
+            <label className="text-xs text-foreground-muted">
+              신뢰도 ≥
+              <select value={minConf} onChange={(e) => { setMinConf(Number(e.target.value)); setDry(null); }}
+                className="ml-1 rounded border border-brand/20 px-1.5 py-1 text-xs">
+                {[0.9, 0.8, 0.7, 0.6].map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={previewBulk} disabled={bulk}
+              className="rounded border border-brand/25 px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand/5 disabled:opacity-50">
+              {bulk ? "확인 중…" : "대상 건수 확인"}
+            </button>
+            {dry && (
+              <button type="button" onClick={applyBulk} disabled={bulk || !dry.matched}
+                className="rounded border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+                {dry.matched.toLocaleString()}건 일괄 승격
+              </button>
+            )}
+          </span>
+          {dry && (
+            <span className="w-full text-xs text-foreground-muted">
+              미검수 신뢰도 분포: {dry.histogram.map((h) => `${h.bucket} ${h.n.toLocaleString()}건`).join(" · ")}
+              {dry.applied && <strong className="ml-2 text-emerald-700">→ {dry.updated.toLocaleString()}건 승격 완료</strong>}
+            </span>
+          )}
           <button type="button" onClick={load} className="rounded border border-brand/30 px-3 py-1.5 text-sm text-brand hover:bg-brand/5">새로고침</button>
         </div>
       </div>

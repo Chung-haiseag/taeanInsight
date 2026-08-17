@@ -151,6 +151,17 @@ export interface AffiliationCandidate {
 export function getAffiliationQueue(limit = 150): Promise<{ candidates: AffiliationCandidate[] }> {
   return apiFetch(`/api/admin/kg/affiliations?limit=${limit}`);
 }
+// 소속 후보 일괄 승격 — 조건에 맞는 미검수 엣지를 서버에서 UPDATE 한 번으로 처리.
+//   apply 생략 = 시험 실행(건수만). 예전엔 후보 1건당 HTTP 1회를 순차로 보내 2,394건 처리가 불가능했다.
+export interface BulkVerifyResult {
+  minConfidence: number; minCount: number;
+  matched: number; updated: number; applied: boolean;
+  histogram: Array<{ bucket: string; n: number }>;
+}
+export function bulkVerifyAffiliations(input: { minConfidence: number; minCount: number; apply?: boolean }): Promise<BulkVerifyResult> {
+  return apiFetch("/api/admin/kg/affiliations/bulk-verify", { method: "POST", body: JSON.stringify(input) });
+}
+
 export function rejectAffiliation(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/affiliations/reject`, { method: "POST", body: JSON.stringify({ id }) });
 }
