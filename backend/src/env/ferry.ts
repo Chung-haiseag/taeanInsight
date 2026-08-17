@@ -3,16 +3,21 @@
 //   API에 항로/항구 필터 파라미터가 없어 '운항일자(rlvtYmd)'로 전국을 받아 항로명으로 걸러낸다.
 //
 //   ⚠ 호출 예산: 개발계정 일 100건. 전국 1일 운항이 5,122행(6페이지)이라 '요청 때마다 호출'은 불가.
-//     → ①취항선명(psnshpNm) 서버측 필터로 6페이지 → 1페이지 ②D1 캐시 30분 + stale-while-revalidate
-//     ③30분 크론에서 선워밍(index.ts). 갱신 1회당 1건이라 48건/일로 한도의 절반 이하.
+//     → ①**첫 배 출항 전에는 아예 호출하지 않는다** — 이 API는 운항이 실제로 일어난 뒤에야 행을 만든다
+//        (실측 2026-08-17: 07:48 0행 → 10:33 2행, 첫 배 08:30). 그 전엔 조회해봐야 빈 결과라 낭비다.
+//       ②취항선명(psnshpNm) 서버측 필터로 6페이지 → 1페이지 ③D1 캐시 30분 + stale-while-revalidate
+//       ④30분 크론 선워밍(index.ts) ⑤**빈 결과도 캐시에 기록**(안 하면 캐시 미스가 반복돼 매 요청이 API행)
+//       ⑥전국 스캔 폴백은 **하루 1회로 제한**하고, 성공 시 실제 취항선명을 학습해 다음부터 1페이지로 돌아온다.
+//     실측 기준 하루 약 37건(08:30 이후 31틱 × 1 + 스캔 1회 6건)으로 한도의 40% 미만.
+//     ※ 이전 구현은 빈 결과를 캐시하지 않고 매번 폴백(6페이지)까지 돌아 오전에만 119건을 쓸 수 있었다.
 
 import { readCache, writeCache } from "../lib/api_cache";
 
 // 서비스 URL 뒤에 상세기능(오퍼레이션) 경로가 한 번 더 붙는 형태. 빼면 NO_OPENAPI_SERVICE_ERROR(코드 12).
 const URL_BASE = "https://apis.data.go.kr/B554035/ferry-route-info-v4/get-ferry-route-info-v4";
 // 캐시 키에 스키마 버전(v2)을 붙인다 — 결과 구조가 바뀌면 키를 올려 옛 캐시를 즉시 무효화한다.
-//   (v1 시절 필드명을 잘못 읽어 빈 값이 채워진 결과가 30분간 그대로 서빙된 적이 있다. v3=updatedAt 추가.)
-const CACHE_KEY = "ferry_gauido_v3";
+//   (v1 시절 필드명을 잘못 읽어 빈 값이 채워진 결과가 30분간 그대로 서빙된 적이 있다. v3=updatedAt, v4=scannedAt·shipFilter 추가.)
+const CACHE_KEY = "ferry_gauido_v4";
 const STALE_MS = 30 * 60_000; // 30분 — 취항선명 필터로 갱신 1회 호출이라 여유(최악 48건/일 < 100건 한도)
 const PAGE = 1000;
 const MAX_PAGES = 6; // 전국 1일 운항 5,122행(2026-08-14 실측) → 6,000행까지 커버.
@@ -70,6 +75,8 @@ export interface FerryResult {
   operator: { name: string; phone: string };
   distanceKm: number;
   updatedAt: string;         // 이 결과를 만든 시각(ISO). 화면 '기준 시각' + 갱신이 도는지 확인용.
+  scannedAt?: string;        // 전국 스캔을 마지막으로 돌린 시각 — 하루 1회 제한용(내부).
+  shipFilter?: string;       // psnshpNm에 쓸 취항선명. 스캔으로 학습해 배가 바뀌어도 자가 복구(내부).
   note?: string;
 }
 
@@ -130,15 +137,28 @@ const isTaeanRow = (r: Row) => {
   return ROUTE_TERMS.some((t) => hay.includes(t));
 };
 
-async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryResult> {
+// 오늘 첫 배가 아직 안 떴으면 API에 행이 있을 수 없다 → 호출하지 않는다(호출 예산의 핵심).
+export const beforeFirstDeparture = (hm: string, month: number): boolean => hm < SCHEDULE[seasonOf(month)].out[0];
+
+async function fetchFerryImpl(
+  env: { DATA_GO_KR_KEY?: string },
+  opts: { allowScan: boolean; prevScannedAt?: string; ship?: string } = { allowScan: true },
+): Promise<FerryResult> {
   const { ymd, iso, month, hm } = kstDate();
-  const empty: FerryResult = { available: false, date: iso, route: "안흥(신진도) ↔ 가의도", sailings: [], allNormal: true, ...scheduleBase(month, hm), updatedAt: new Date().toISOString() };
+  const base = { available: false, date: iso, route: "안흥(신진도) ↔ 가의도", sailings: [], allNormal: true, ...scheduleBase(month, hm) };
+  const carry = { scannedAt: opts.prevScannedAt, shipFilter: opts.ship ?? SHIP_NAME };
+  const empty: FerryResult = { ...base, ...carry, updatedAt: new Date().toISOString() };
   const key = env.DATA_GO_KR_KEY;
   if (!key) return empty;
+  // 첫 배 출항 전 — 조회 없이 시간표만. 이 구간을 막지 않으면 매일 오전 8시간 반 동안 헛호출이 쌓인다.
+  if (beforeFirstDeparture(hm, month)) return { ...empty, note: "오늘 첫 배 출항 전입니다. 아래 시간표를 참고하세요." };
   try {
-    // 1차: 취항선명으로 서버측 필터(1회 호출). 배가 바뀌면 비므로 2차 전국 스캔으로 폴백.
-    let mine = (await fetchPage(key, ymd, 1, SHIP_NAME)).rows.filter(isTaeanRow);
-    if (!mine.length) {
+    let scannedAt = opts.prevScannedAt;
+    let shipFilter = opts.ship ?? SHIP_NAME;
+    // 1차: 취항선명으로 서버측 필터(1회 호출).
+    let mine = (await fetchPage(key, ymd, 1, shipFilter)).rows.filter(isTaeanRow);
+    // 2차: 비었을 때만 전국 스캔(6페이지). 배가 바뀐 경우를 위한 것이라 하루 1회로 묶는다.
+    if (!mine.length && opts.allowScan) {
       const first = await fetchPage(key, ymd, 1);
       const rows: Row[] = [...first.rows];
       const need = first.total != null ? Math.ceil(first.total / PAGE) : (first.rows.length >= PAGE ? MAX_PAGES : 1);
@@ -150,8 +170,12 @@ async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryRe
         for (const r of rest) rows.push(...r.rows);
       }
       mine = rows.filter(isTaeanRow);
+      scannedAt = new Date().toISOString();
+      // 스캔으로 실제 취항선명을 학습 → 다음 갱신부터 다시 1페이지로. 배가 바뀌어도 자가 복구된다.
+      const learned = s(mine[0]?.psnshp_nm);
+      if (learned) shipFilter = learned;
     }
-    if (!mine.length) return { ...empty, note: "오늘 등록된 안흥↔가의도 운항 정보가 없습니다." };
+    if (!mine.length) return { ...empty, scannedAt, shipFilter, note: "오늘 등록된 안흥↔가의도 운항 정보가 없습니다." };
 
     // 편(출항시각 × 방향)마다 상태 변경 이력이 여러 행으로 쌓인다 → 편별 '가장 최근 상태'만 남긴다.
     const byTrip = new Map<string, Row>();
@@ -184,6 +208,8 @@ async function fetchFerryImpl(env: { DATA_GO_KR_KEY?: string }): Promise<FerryRe
       sailings,
       allNormal: sailings.every((x) => x.normal),
       ...scheduleBase(month, hm),
+      scannedAt,
+      shipFilter,
       updatedAt: new Date().toISOString(),
     };
   } catch {
@@ -198,7 +224,9 @@ export async function loadFerryFast(
   if (env.ARCHIVE_DB) {
     const cached = await readCache<FerryResult>(env.ARCHIVE_DB, CACHE_KEY);
     // 날짜가 바뀌었으면 무조건 갱신(어제 운항표를 오늘로 보여주면 안 된다).
-    if (cached && cached.value.available && cached.value.date === kstDate().iso) {
+    //   ※ available 여부는 보지 않는다 — 빈 결과(첫 배 전·운항 없음)도 유효한 오늘의 답이고,
+    //     이걸 캐시로 인정하지 않으면 매 요청이 API 조회로 새어나간다(예산 소진의 원인이었다).
+    if (cached && cached.value.date === kstDate().iso) {
       return { result: cached.value, stale: cached.ageMs > STALE_MS };
     }
   }
@@ -206,7 +234,15 @@ export async function loadFerryFast(
 }
 
 export async function refreshFerryCache(env: { DATA_GO_KR_KEY?: string; ARCHIVE_DB?: D1Database }): Promise<FerryResult> {
-  const r = await fetchFerryImpl(env);
-  if (env.ARCHIVE_DB && r.available) await writeCache(env.ARCHIVE_DB, CACHE_KEY, r);
+  // 직전 캐시에서 '오늘 이미 스캔했는지'와 '학습한 취항선명'을 이어받는다.
+  const prev = env.ARCHIVE_DB ? await readCache<FerryResult>(env.ARCHIVE_DB, CACHE_KEY) : null;
+  const sameDay = !!prev && prev.value.date === kstDate().iso;
+  const r = await fetchFerryImpl(env, {
+    allowScan: !(sameDay && !!prev.value.scannedAt), // 전국 스캔은 하루 1회
+    prevScannedAt: sameDay ? prev.value.scannedAt : undefined,
+    ship: sameDay ? prev.value.shipFilter : undefined,
+  });
+  // 빈 결과도 기록한다(위 주석 참조). 기록하지 않으면 캐시가 영원히 비어 매 요청이 API로 간다.
+  if (env.ARCHIVE_DB) await writeCache(env.ARCHIVE_DB, CACHE_KEY, r);
   return r;
 }
