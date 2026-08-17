@@ -8,14 +8,16 @@ import { getBeaches, getMudflat, getFishing, getSunset, getFog, getFerry, fetchS
 import { SunsetCard, FogCard, FerryCard } from "@/components/reports/report-charts";
 import { PageHeader } from "@/components/page-header";
 
-// 검색 유입 핵심 페이지 — '태안 해수욕장 수온'·'안면도 낙조 시간'·'태안 물때' 같은 지역 롱테일 질의를 받는다.
-// (제목 템플릿 '%s | 태안 인사이트'가 붙으므로 여기선 키워드만.)
+// 검색 유입 핵심 페이지 — '태안 해수욕장 수온'·'안면도 낙조 시간'·'태안 물때'·'가의도 배시간' 같은
+// 지역 롱테일 질의를 받는다. (제목 템플릿 '%s | 태안 인사이트'가 붙으므로 여기선 키워드만.)
+//   ※ 제목은 검색량이 큰 해수욕장·물때·낙조를 지키고, 뱃길은 설명문과 본문 제목(h2)으로 신호를 준다.
+//     '가의도 배시간'은 경쟁이 거의 없는 롱테일이라 정확한 문구가 본문에 있으면 충분히 잡힌다.
 export const metadata: Metadata = {
   title: "태안 해수욕장·물때·낙조",
-  description: "태안 해수욕장별 해수욕 적합도(수온·파고)와 갯벌 물때, 낚시 출조 지수, 오늘의 낙조 시각, 해안 해무까지 — 태안 바다를 한 화면에.",
+  description: "태안 해수욕장별 해수욕 적합도(수온·파고)와 갯벌 물때, 낚시 출조 지수, 오늘의 낙조 시각, 해안 해무, 그리고 가의도 배 시간표(안흥항 여객선 운항 현황)까지 — 태안 바다를 한 화면에.",
   openGraph: {
     title: "태안 해수욕장·물때·낙조 — 오늘 바다는 어떤가",
-    description: "해수욕 적합도·갯벌 물때·낚시·낙조·해무를 실시간 관측으로",
+    description: "해수욕 적합도·갯벌 물때·낚시·낙조·해무 + 가의도 배 시간표를 실시간 관측으로",
     type: "website", locale: "ko_KR", siteName: "태안 인사이트",
   },
 };
@@ -47,7 +49,7 @@ export default async function BeachesPage() {
         align="center"
         eyebrow="BEACH BOARD"
         title="이번 주말, 태안 어느 해변?"
-        description={<><strong className="text-brand">해수욕 적합도</strong> · <strong className="text-brand">낙조</strong> · <strong className="text-brand">갯벌 물때</strong> · <strong className="text-brand">낚시 출조</strong> · <strong className="text-brand">해무</strong> — 태안 바다·해변을 한 화면에.</>}
+        description={<><strong className="text-brand">해수욕 적합도</strong> · <strong className="text-brand">낙조</strong> · <strong className="text-brand">갯벌 물때</strong> · <strong className="text-brand">낚시 출조</strong> · <strong className="text-brand">해무</strong> · <strong className="text-brand">가의도 배 시간표</strong> — 태안 바다·해변을 한 화면에.</>}
       />
 
       {!board ? (
@@ -110,7 +112,7 @@ export default async function BeachesPage() {
       {/* 여객선 — 태안 유일 항로(안흥↔가의도). 섬 접근 가능 여부라 해변 정보와 성격이 같아 바다 허브에 둔다. */}
       {ferry && (
         <section>
-          <h2 className="text-xl font-bold text-brand">⛴ 가의도 뱃길</h2>
+          <h2 className="text-xl font-bold text-brand">⛴ 가의도 배 시간표 — 안흥항 여객선</h2>
           <span className="accent-rule mt-3" aria-hidden />
           <FerryCard ferry={ferry} />
         </section>

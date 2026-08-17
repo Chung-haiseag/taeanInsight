@@ -95,8 +95,8 @@ export function GenericHome() {
             desc="날씨·대기질·산불 위험·관광 수요·도로 CCTV — 오늘 움직이는 태안을 한 화면에."
             stat="실시간" statLabel="날씨·대기질·도로 CCTV" />
           <FeatureCard href="/beaches" icon="compass" kicker="바다 · 해변" title="이번 주말, 어느 해변?"
-            desc="해수욕장별 적합도(수온·파고)와 갯벌 물때, 낚시 출조, 낙조 시각과 해무까지."
-            stat="5가지" statLabel="바다 정보 한 화면" />
+            desc="해수욕장별 적합도(수온·파고)와 갯벌 물때, 낚시 출조, 낙조 시각과 해무, 가의도 배 시간표까지."
+            stat="6가지" statLabel="바다 정보 한 화면" />
           <FeatureCard href="/data" icon="won" kicker="지역경제 · 실측" title="아파트값부터 위판 시세까지"
             desc="부동산 실거래가·수산물 위판 경매가·장바구니 물가·주유소 유가 — 태안 경제의 실측값."
             stat="26종" statLabel="공개 데이터 출처" />
