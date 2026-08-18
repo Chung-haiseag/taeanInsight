@@ -49,9 +49,15 @@ function writeStatus(patch) {
   catch { /* 무시 */ } finally { rmSync(tmp, { force: true }); }
 }
 
-function r2Has(key) {
-  try { wrangler(["r2", "object", "get", `${BUCKET}/${key}`, "--remote", "--pipe"], { stdio: ["ignore", "ignore", "ignore"] }); return true; }
-  catch { return false; }
+// 오디오 보유 여부 — **공개 엔드포인트에 HEAD 한 번**. mp3·wav 둘 다 이 경로가 커버한다.
+//   ⚠ 예전엔 `wrangler r2 object get`을 기사마다 띄웠는데(1회 ~10초, 프로세스 기동 비용),
+//     45건 고르려면 90회가 필요해 매일 15분 타임아웃으로 죽었다(2026-08-15~18 나흘 연속).
+//     HTTP HEAD는 ~0.2초라 같은 일이 20초 안에 끝난다.
+async function audioExists(idxno) {
+  try {
+    const r = await fetch(`${API_BASE}/api/audio/news/${idxno}`, { method: "HEAD", signal: AbortSignal.timeout(8000) });
+    return r.ok;
+  } catch { return false; }
 }
 
 const exhausted = new Set(); // 429/한도 도달 키
@@ -103,7 +109,7 @@ function pcmToWav(pcm, rate) {
 }
 
 // 이미 gem2(양질 Gemini 낭독)가 있는 기사 idxno 집합 — manifest 엔드포인트 1회 호출로 취득.
-// 관리자 토큰 없거나 실패하면 null → 개별 r2Has 폴백.
+// 관리자 토큰 없거나 실패하면 null → 공개 엔드포인트 HEAD 폴백(audioExists).
 function loadAdminToken() {
   if (process.env.ADMIN_TOKEN) return process.env.ADMIN_TOKEN;
   try {
@@ -133,9 +139,18 @@ async function main() {
     WHERE length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
     ORDER BY published_at DESC, idxno DESC LIMIT ${win}`);
   const picked = [];
+  let checked = 0;
   for (const r of idRows) {
     const id = String(r.idxno);
-    if (!FORCE && (gem2 ? gem2.has(id) : (r2Has(`audio/news/${id}-gem2.wav`) || r2Has(`audio/news/${id}-gem2.mp3`)))) continue;
+    if (!FORCE) {
+      if (gem2) { if (gem2.has(id)) continue; }
+      else {
+        // 폴백 경로에도 상한을 둔다 — 목록을 못 받은 날 무한정 훑다 타임아웃 나는 것을 막는다.
+        if (checked >= MAX * 6) { console.log(`  폴백 확인 상한(${checked}건) 도달 — 여기까지로 진행`); break; }
+        checked++;
+        if (await audioExists(id)) continue;
+      }
+    }
     picked.push(r);
     if (picked.length >= MAX) break;
   }
