@@ -62,6 +62,7 @@ const NON_NAME = new Set([
   // 2026-08-18 실측에서 인명으로 잘못 잡힌 어절.
   "주최로", "주관으", "위해", "여성", "남성", "최종", "예비", "후보", "소원", "이번주",
   "사진", "왼쪽", "오른쪽", "가운데", "번째", "지도", "지도자", "상임", "연합", "직장",
+  "이미", "이제", "아직", "역시", "특히", "과연", "결국", "우선", "무려", "이런", "그런",
 ]);
 
 /** 성씨 시작·2~4자 한글·직함/불용어 아님이면 인명으로 간주. */
@@ -198,6 +199,8 @@ export function extractAffiliations(body: string): Candidate[] {
       const beforeRe = new RegExp(`([가-힣]{2,4})\\s?([가-힣]{0,3}?)${escapeRe(title)}`, "g");
       for (const m of window.matchAll(beforeRe)) {
         if (m[2] && m[2] !== "태안") continue;
+        // 직함 뒤가 한글로 이어지면 합성어다: '군수표창'·'군수실'·'군수직'은 사람의 직함이 아니다.
+        if (!hasBoundaryAfter(window, (m.index ?? 0) + m[0].length)) continue;
         add(m[1], orgId, title, window);
       }
       // (b) 직함 → 이름 순서('군의원 김영인'): 지역이 낄 자리가 없으므로 그대로 채택.
@@ -217,6 +220,14 @@ export function extractAffiliations(body: string): Candidate[] {
     while ((pos = body.indexOf(alias, from)) !== -1) {
       const end = pos + alias.length;
       from = end;
+      // 별칭 끝글자 + '장'이 직함이면 결합 표기다: '태안해양경찰서'+'장' = 서장, '○○체육회'+'장' = 회장.
+      //   경계 검사에 걸려 통째로 버려지면 진짜 기관장('김승수 태안해양경찰서장')까지 놓친다.
+      const sufTitle = `${alias.slice(-1)}장`;
+      if (body.startsWith("장", end) && (TITLE_CUES as readonly string[]).includes(sufTitle)) {
+        const sw = body.slice(Math.max(0, pos - 20), Math.min(body.length, end + 8));
+        for (const n of namesNear(sw, `${alias}장`, 0)) add(n, orgId, sufTitle, sw);
+        continue;
+      }
       // ── 오귀속 차단 3종(실제 검수에서 확인된 유형) ──
       if (!hasBoundaryAfter(body, end)) continue;      // 태안군청 ⊂ 태안군청소년상담센터
       if (hasSubRegionPrefix(body, pos)) continue;     // 고남면 체육회 ≠ 태안군체육회
@@ -251,7 +262,30 @@ export function extractAffiliations(body: string): Candidate[] {
         for (const n of namesNear(window, alias + glued, 0)) add(n, orgId, glued, window);
         continue;
       }
-      for (const t of titles) for (const n of namesNear(window, t, 0)) add(n, orgId, t, window);
+      // ── 근접 추정은 '별칭에 딱 붙은 어순'만 인정한다 ──
+      //   창(±30자) 안에 직함이 있기만 하면 갖다 붙이던 것이 나열형 문장에서 옆 사람을 끌어왔다.
+      //   실측: '이익창 교육장, 신남규 체육회 상임부회장'에서 이익창이 태안군체육회 교육장이 되고,
+      //         '가세로 군수와 윤희철 지부장'에서 윤희철이 태안군청 지부장이 됐다.
+      //   조직·이름·직함이 서로 인접한 네 어순만 채택한다.
+      const A = escapeRe(alias);
+      const N = "([가-힣]{2,4})";
+      const T = `(${TITLE_CUES.map(escapeRe).join("|")})`;
+      const tight: Array<[RegExp, 1 | 2]> = [
+        [new RegExp(`${A}\\s${N}\\s?${T}`), 1],   // 태안해양경찰서 홍순표 서장
+        [new RegExp(`${A}\\s${T}\\s${N}`), 2],    // 서산수협 조합장 홍길동
+        [new RegExp(`${N}\\s${A}\\s?${T}`), 1],   // 홍길동 서산수협 조합장
+        [new RegExp(`${T}\\s${N}\\s?${A}`), 2],   // 조합장 홍길동 서산수협
+      ];
+      let matched = false;
+      for (const [re, nameIdx] of tight) {
+        const m = re.exec(window);
+        if (!m) continue;
+        const name = m[nameIdx], title = m[nameIdx === 1 ? 2 : 1];
+        add(name, orgId, title, window);
+        matched = true;
+        break;
+      }
+      if (matched) continue;
       // 별칭 인접 인명('홍길동 서산수협 조합장'의 홍길동)은 **별칭 바로 뒤에 직함이 붙어 있을 때만**.
       //   창 아무 데나 있는 직함을 role로 끌어오면 '태안군체육회 오세열 지도자 … 태안군복싱협회장'에서
       //   오세열이 '회장'이 되고, '조용식 태안소방서 의용소방대 연합회장'도 서장으로 둔갑한다(실측).

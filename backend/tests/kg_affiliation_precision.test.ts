@@ -115,3 +115,31 @@ describe("2차 — 근접 추정이 옆 조직 사람을 끌어오던 유형", (
     expect(orgsOf("한 예비후보가 최종 태안군수 후보로 공천됐다", "최종")).toHaveLength(0);
   });
 });
+
+// 3차(2026-08-18) — 나열형 문장. '진태구 군수, 조한무 의장, 이익창 교육장, 김승수 태안해양경찰서장'처럼
+//   기관장들이 줄줄이 나오는 문장에서 옆 사람이 딸려오던 유형. 사용자가 화면에서 직접 잡아냈다.
+describe("3차 — 나열형 문장", () => {
+  const of = (b: string) => extractAffiliations(b).map((c) => `${c.personName}/${c.orgId}/${c.role}`);
+
+  it("옆 사람을 끌어오지 않으면서 진짜 기관장은 회수한다", () => {
+    const b = "진태구 군수, 조한무 의장, 이익창 교육장, 김승수 태안해양경찰서장 등 군내 각급 기관단체장과";
+    const r = of(b);
+    expect(r).not.toContain("이익창/org:taean-coastguard/교육장"); // 이익창은 교육장(태안교육지원청)
+    expect(r).toContain("김승수/org:taean-coastguard/서장");        // 실제 해경서장은 회수
+  });
+
+  it("별칭+장 결합 표기에서 기관장을 놓치지 않는다", () => {
+    expect(of("태안해양경찰서 홍순표 서장이 지난 8일 정부인사발령에")).toContain("홍순표/org:taean-coastguard/서장");
+  });
+
+  it("창 안에 있다는 이유만으로 무관한 직함을 붙이지 않는다", () => {
+    const b = "군청 군수실에서 가세로 군수와 윤희철 지부장, 주해윤 태안군청출장소 지점장 등이 참석한";
+    const r = of(b);
+    expect(r).toContain("가세로/org:taean-gov/군수");
+    expect(r.some((x) => x.startsWith("윤희철"))).toBe(false); // 어느 지부장인지 불명
+  });
+
+  it("직함이 합성어의 일부면 사람의 직함이 아니다('군수표창')", () => {
+    expect(of("이러한 공적은 이미 군수표창, 도지사 표창을")).toHaveLength(0);
+  });
+});
