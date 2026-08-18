@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AffiliationAudit } from "./affiliation-audit";
 import { getAffiliationQueue, rejectAffiliation, verifyKg, bulkVerifyAffiliations, type AffiliationCandidate, type BulkVerifyResult } from "@/lib/api/kg";
 
 // 소속(belongs_to) 검수 — 아카이브에서 추출한 (인물·조직·직함) 후보를 신뢰도순으로 훑어
@@ -64,6 +65,13 @@ export default function AffiliationReview() {
 
   return (
     <div className="space-y-4">
+      {/* 승격분 재검사 — 옛 추출 로직의 오귀속이 사실층에 남아 AI 답변에 인용되는 것을 막는다. */}
+      <details className="rounded-lg border border-amber-500/30 bg-amber-50/40 p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-amber-900">
+          ⚠ 승격된 소속 재검사 — 2026-08-18 추출 규칙 개선 반영
+        </summary>
+        <div className="mt-3"><AffiliationAudit /></div>
+      </details>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-3xl text-sm text-foreground-muted">
           아카이브 기사에서 규칙 추출한 <span className="font-semibold text-brand">소속(인물→조직)</span> 후보입니다. 근거 문장을 보고

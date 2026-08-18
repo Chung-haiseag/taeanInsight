@@ -162,6 +162,15 @@ export function bulkVerifyAffiliations(input: { minConfidence: number; minCount:
   return apiFetch("/api/admin/kg/affiliations/bulk-verify", { method: "POST", body: JSON.stringify(input) });
 }
 
+// 승격된 소속 재검사 — 고친 추출 규칙으로 근거를 다시 돌려 재현 안 되는 건만 받는다(읽기 전용).
+export interface AuditRow {
+  id: string; person: string; org: string; orgId: string;
+  role: string; confidence: number; evidence: string[]; reproduced: boolean;
+}
+export function auditVerifiedAffiliations(limit = 500): Promise<{ total: number; suspects: AuditRow[] }> {
+  return apiFetch(`/api/admin/kg/affiliations/audit?limit=${limit}`);
+}
+
 export function rejectAffiliation(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/affiliations/reject`, { method: "POST", body: JSON.stringify({ id }) });
 }

@@ -97,6 +97,51 @@ export async function affiliationConfidenceHistogram(db: D1Database): Promise<Ar
   return r.results ?? [];
 }
 
+export interface AuditRow {
+  id: string; person: string; org: string; orgId: string;
+  role: string; confidence: number; evidence: string[]; reproduced: boolean;
+}
+
+/**
+ * 이미 승격된(verified=1) 소속을 **고친 추출 규칙으로 재검사**한다.
+ *   각 엣지에는 근거 문장이 저장돼 있으므로, 새 규칙을 그 문장에 다시 돌려 같은 (인물,조직)이
+ *   재현되는지 본다. 재현되지 않으면 옛 로직의 오귀속일 가능성이 높다.
+ *   ⚠ 근거는 80자 발췌라 문맥이 잘려 정상 건도 재현이 안 될 수 있다 → '틀림'이 아니라 '재검토 필요'다.
+ *     판단은 사람이 근거 문장을 보고 한다. 여기서는 읽어야 할 대상만 좁혀준다.
+ */
+export async function auditVerifiedAffiliations(
+  db: D1Database,
+  extract: (body: string) => Array<{ personName: string; orgId: string }>,
+  limit = 500,
+): Promise<{ total: number; suspects: AuditRow[] }> {
+  const r = await db
+    .prepare(
+      `SELECT e.id, e.src_id, e.dst_id, e.attrs_json, n.name AS person, o.name AS org
+       FROM kg_edges e
+       JOIN kg_nodes n ON n.id = e.src_id
+       JOIN kg_nodes o ON o.id = e.dst_id
+       WHERE e.rel = 'belongs_to' AND e.verified = 1
+       LIMIT ?1`,
+    )
+    .bind(Math.max(1, Math.min(2000, limit)))
+    .all<Row>();
+  const rows = r.results ?? [];
+  const suspects: AuditRow[] = [];
+  for (const row of rows) {
+    const c = toCandidate(row);
+    // 근거 문장 중 하나라도 같은 (인물,조직)을 다시 만들어내면 정상으로 본다.
+    const reproduced = c.evidence.some((ev) =>
+      extract(ev).some((x) => x.personName === c.person && x.orgId === c.orgId));
+    if (!reproduced) {
+      suspects.push({
+        id: c.id, person: c.person, org: c.org, orgId: c.orgId,
+        role: c.role, confidence: c.confidence, evidence: c.evidence, reproduced,
+      });
+    }
+  }
+  return { total: rows.length, suspects };
+}
+
 /** 후보 반려 = 미검수 엣지만 삭제(승격된 verified=1은 안전상 보존). */
 export async function rejectAffiliation(db: D1Database, id: string): Promise<boolean> {
   const r = await db
