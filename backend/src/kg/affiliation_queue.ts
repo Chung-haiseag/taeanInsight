@@ -100,6 +100,9 @@ export async function affiliationConfidenceHistogram(db: D1Database): Promise<Ar
 export interface AuditRow {
   id: string; person: string; org: string; orgId: string;
   role: string; confidence: number; evidence: string[]; reproduced: boolean;
+  /** 같은 근거에 **새 규칙**을 돌렸을 때 나오는 결과. 옛 기록과 나란히 보면 무엇이 틀렸는지 바로 보인다.
+   *   예: 옛 '이익창→태안해양경찰서/교육장' vs 새 '김승수→태안해양경찰서/서장'. */
+  nowExtracts: string[];
 }
 
 /**
@@ -133,9 +136,11 @@ export async function auditVerifiedAffiliations(
     const reproduced = c.evidence.some((ev) =>
       extract(ev).some((x) => x.personName === c.person && x.orgId === c.orgId));
     if (!reproduced) {
+      const now = [...new Set(c.evidence.flatMap((ev) => extract(ev).map((x) => `${x.personName} → ${x.orgId.replace("org:", "")}`)))];
       suspects.push({
         id: c.id, person: c.person, org: c.org, orgId: c.orgId,
         role: c.role, confidence: c.confidence, evidence: c.evidence, reproduced,
+        nowExtracts: now,
       });
     }
   }

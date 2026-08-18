@@ -166,6 +166,7 @@ export function bulkVerifyAffiliations(input: { minConfidence: number; minCount:
 export interface AuditRow {
   id: string; person: string; org: string; orgId: string;
   role: string; confidence: number; evidence: string[]; reproduced: boolean;
+  nowExtracts: string[];   // 같은 근거에 새 규칙을 돌린 결과(옛 기록과 대조용)
 }
 export function auditVerifiedAffiliations(limit = 500): Promise<{ total: number; suspects: AuditRow[] }> {
   return apiFetch(`/api/admin/kg/affiliations/audit?limit=${limit}`);

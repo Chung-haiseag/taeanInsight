@@ -75,14 +75,18 @@ export function AffiliationAudit() {
       {rows && rows.length > 0 && (
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-foreground-muted">
-            <tr><th className="py-1">인물 → 조직</th><th>직함</th><th>신뢰도</th><th>근거(저장된 발췌)</th><th className="text-right">조치</th></tr>
+            <tr><th className="py-1">옛 기록</th><th>직함</th><th>새 규칙이 뽑는 것</th><th>근거(저장된 발췌)</th><th className="text-right">조치</th></tr>
           </thead>
           <tbody className="divide-y divide-brand/10">
             {rows.map((r) => (
               <tr key={r.id} className="align-top">
                 <td className="py-2 font-medium text-brand">{r.person} → {r.org}</td>
                 <td className="py-2">{r.role}</td>
-                <td className="py-2 tabular-nums text-foreground-muted">{r.confidence.toFixed(2)}</td>
+                <td className="py-2 text-xs">
+                  {r.nowExtracts.length
+                    ? r.nowExtracts.map((s) => <div key={s} className="text-emerald-700">{s}</div>)
+                    : <span className="text-foreground-muted">— (아무것도 안 나옴)</span>}
+                </td>
                 <td className="py-2 text-xs text-foreground-muted">{r.evidence.join(" / ") || "(근거 없음)"}</td>
                 <td className="py-2 text-right">
                   <button type="button" disabled={busy === r.id || loading} onClick={() => demote(r.id)}
