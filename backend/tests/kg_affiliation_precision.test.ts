@@ -155,3 +155,26 @@ it("잘린 조각은 경계 검사가 막는다", () => {
   const n2 = extractAffiliations("한국서부발전 태안발전본부 본부장 김철수는").map(c=>c.personName);
   expect(n2).not.toContain("한국");
 });
+
+// 5차 — 재추출 결과 표본에서 나온 '타 지자체' 오귀속. 태안 기사엔 인근 시·군 인사가 자주 등장한다.
+describe("5차 — 타 지자체 조직·직함", () => {
+  const of = (b: string) => extractAffiliations(b).map((c) => `${c.personName}→${c.orgId}/${c.role}`);
+
+  it("'서산군수 박정기'를 태안군수로 보지 않는다", () => {
+    expect(of("동학군들은 서산군수 박정기(朴鉦基)와 이").some((x) => x.startsWith("박정기"))).toBe(false);
+  });
+
+  it("'당진군 민종기 군수'처럼 지역이 이름 앞에 와도 거른다", () => {
+    expect(of("주목을 끌고 있는 당진군 민종기 군수는 경남").some((x) => x.startsWith("민종기"))).toBe(false);
+  });
+
+  it("짧은 별칭이 타 지역 기관명 꼬리와 맞는 것을 막는다(남원교육지원청)", () => {
+    expect(of("전북특별자치도 남원교육지원청(교육장 박영수)은 지난 4일").some((x) => x.startsWith("박영수"))).toBe(false);
+  });
+
+  it("한 문장에 같은 별칭이 여럿이면 우리 위치의 것만 쓴다", () => {
+    const r = of("보령시산림조합 백승일 조합장, 태안군산림조합 최우평 조합장 등이 참석했다");
+    expect(r.some((x) => x.startsWith("백승일"))).toBe(false);
+    expect(r.some((x) => x.startsWith("최우평"))).toBe(true);
+  });
+});

@@ -112,12 +112,15 @@ export function hasBoundaryAfter(body: string, at: number): boolean {
   return PARTICLE_AFTER.test(rest);
 }
 
-/** 별칭 앞이 읍·면이면 하위 지역 조직이다. 예: '고남면 체육회' ≠ 태안군체육회.
- *   ※'동·리'는 제외한다 — 인명 끝글자와 겹쳐('홍길동 서산수협') 정상 추출을 죽인다.
- *     태안군은 1읍 7면 체계라 읍·면만으로 충분하다. */
+/** 별칭 앞에 지역 접두가 붙으면 우리 조직이 아니다.
+ *   · 읍·면 → 하위 지역 조직('고남면 체육회' ≠ 태안군체육회). 태안군은 1읍 7면.
+ *   · 시·군 → 타 지자체 조직('보령시산림조합'·'남원교육지원청'). 단 '태안군…'은 우리 것이므로 허용.
+ *   ※'동·리'는 제외 — 인명 끝글자와 겹쳐('홍길동 서산수협') 정상 추출을 죽인다. */
 export function hasSubRegionPrefix(body: string, at: number): boolean {
-  const before = body.slice(Math.max(0, at - 6), at);
-  return /[가-힣]{1,3}(읍|면)\s*[(（]?\s*$/.test(before);
+  const before = body.slice(Math.max(0, at - 8), at);
+  if (/[가-힣]{1,3}(읍|면)\s*[(（]?\s*$/.test(before)) return true;
+  const m = /([가-힣]{1,3})(시|군)\s*[(（]?\s*$/.exec(before);
+  return !!m && m[1] !== "태안";
 }
 
 /** 별칭 뒤가 장소어면 소속이 아니라 '장소 언급'이다. 예: '군청 대강당에서', '태안발전본부 테니스장'. */
@@ -213,6 +216,10 @@ export function extractAffiliations(body: string): Candidate[] {
       const beforeRe = new RegExp(`([가-힣]{2,4})\\s?([가-힣]{0,3}?)${escapeRe(title)}`, "g");
       for (const m of window.matchAll(beforeRe)) {
         if (m[2] && m[2] !== "태안") continue;
+        // 이름 **앞**에 타 지자체 표기가 오는 어순도 있다: '당진군 민종기 군수'.
+        const lead = window.slice(Math.max(0, (m.index ?? 0) - 6), m.index ?? 0);
+        const lm = /([가-힣]{1,3})(시|군|도)\s*$/.exec(lead);
+        if (lm && lm[1] !== "태안") continue;
         // 직함 뒤가 한글로 이어지면 합성어다: '군수표창'·'군수실'·'군수직'은 사람의 직함이 아니다.
         if (!hasBoundaryAfter(window, (m.index ?? 0) + m[0].length)) continue;
         add(m[1], orgId, title, window);
@@ -223,6 +230,8 @@ export function extractAffiliations(body: string): Candidate[] {
       for (const m of window.matchAll(afterRe)) {
         const owner = (m[1] ?? "").trim();
         if (owner && /(군|시|구)$/.test(owner) && !owner.startsWith("태안")) continue;
+        // '서산군수 박정기'처럼 지역명이 직함에 바로 붙는 형태 — owner가 '서산'으로만 잡힌다.
+        if (owner && NON_NAME.has(owner.slice(-2)) && owner.slice(-2) !== "태안") continue;
         add(m[2], orgId, title, window);
       }
     }
@@ -257,12 +266,12 @@ export function extractAffiliations(body: string): Candidate[] {
       //   이것이 '태안해양경찰서(서장 이수찬) … 전경 내무반' 같은 근접 오귀속을 막는 핵심이다.
       const parens = parenTitleOwners(window);
       if (parens.length) {
+        // 괄호 주인은 **그 조직의 별칭·정식명과 정확히 일치**해야 한다. endsWith만 보면 짧은 별칭이
+        //   다른 조직 이름의 꼬리와 우연히 맞는다('소원면체육회'·'남원교육지원청'·'보령시산림조합').
+        const own = ORGS.find((o) => o.id === orgId);
+        const valid = new Set<string>([...(own?.aliases ?? []), own?.name ?? ""]);
         for (const p of parens) {
-          if (!p.org.endsWith(alias)) continue;
-          // 짧은 별칭('체육회')은 다른 조직 이름의 꼬리와 우연히 일치한다('소원면체육회'). 앞부분이
-          //   읍·면이면 하위 지역 조직이므로 우리 조직이 아니다.
-          const head = p.org.slice(0, p.org.length - alias.length);
-          if (/[가-힣]{1,3}(읍|면)$/.test(head)) continue;
+          if (!valid.has(p.org)) continue;
           add(p.name, orgId, p.title, window);
         }
         continue;
@@ -290,14 +299,18 @@ export function extractAffiliations(body: string): Candidate[] {
         [new RegExp(`${N}\\s${A}\\s?${T}`), 1],   // 홍길동 서산수협 조합장
         [new RegExp(`${T}\\s${N}\\s?${A}`), 2],   // 조합장 홍길동 서산수협
       ];
+      //   ⚠ 창 안에 같은 별칭이 여러 번 나올 수 있다('보령시산림조합 … 태안군산림조합'). 패턴이 **우리
+      //     위치의 별칭**에 맞았는지 확인하지 않으면 옆 조직 사람을 가져온다(실측: 백승일→태안군산림조합).
+      const aliasAt = pos - w0;
       let matched = false;
       for (const [re, nameIdx] of tight) {
-        const m = re.exec(window);
-        if (!m) continue;
-        const name = m[nameIdx], title = m[nameIdx === 1 ? 2 : 1];
-        add(name, orgId, title, window);
-        matched = true;
-        break;
+        for (const m of window.matchAll(new RegExp(re.source, "g"))) {
+          if ((m.index ?? 0) + m[0].indexOf(alias) !== aliasAt) continue; // 다른 출현이면 무시
+          add(m[nameIdx], orgId, m[nameIdx === 1 ? 2 : 1], window);
+          matched = true;
+          break;
+        }
+        if (matched) break;
       }
       if (matched) continue;
       // 별칭 인접 인명('홍길동 서산수협 조합장'의 홍길동)은 **별칭 바로 뒤에 직함이 붙어 있을 때만**.
