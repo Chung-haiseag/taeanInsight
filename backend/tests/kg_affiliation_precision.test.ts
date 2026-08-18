@@ -143,3 +143,15 @@ describe("3차 — 나열형 문장", () => {
     expect(of("이러한 공적은 이미 군수표창, 도지사 표창을")).toHaveLength(0);
   });
 });
+
+// 4차 — 승격분 359건 재검사(D1 실데이터)에서 드러난 잔여 누수: 지명·조사 어절·잘린 조각.
+it("지명·조사 어절 차단", () => {
+  for (const s of ["원북면","고남리","홍성군","고문으로","주최로"]) expect([s, isLikelyName(s)]).toEqual([s, false]);
+  for (const s of ["홍길동","김구","가세로","김승수","이수찬","최우평"]) expect([s, isLikelyName(s)]).toEqual([s, true]);
+});
+it("잘린 조각은 경계 검사가 막는다", () => {
+  const n1 = extractAffiliations("홍길동 서산수협 조합장은 어업인 소득을").map(c=>c.personName);
+  expect(n1).not.toContain("장은");
+  const n2 = extractAffiliations("한국서부발전 태안발전본부 본부장 김철수는").map(c=>c.personName);
+  expect(n2).not.toContain("한국");
+});

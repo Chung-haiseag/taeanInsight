@@ -65,6 +65,9 @@ const NON_NAME = new Set([
   "이미", "이제", "아직", "역시", "특히", "과연", "결국", "우선", "무려", "이런", "그런",
 ]);
 
+// 조사를 떼면 일반명사인 어절('고문으로'→고문, '주최로'→주최). 불용어를 조사별로 나열하지 않기 위함.
+const PARTICLES = ["으로", "로", "은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "께서"];
+
 /** 성씨 시작·2~4자 한글·직함/불용어 아님이면 인명으로 간주. */
 export function isLikelyName(s: string): boolean {
   if (!/^[가-힣]{2,4}$/.test(s)) return false;
@@ -72,6 +75,13 @@ export function isLikelyName(s: string): boolean {
   if ((TITLE_CUES as readonly string[]).includes(s)) return false;
   if (s in IMPLIED_ORG) return false;
   if (NON_NAME.has(s)) return false;
+  // 행정구역 접미('원북면'·'고남리'·'홍성군')는 지명이지 인명이 아니다.
+  //   ※'동'은 제외 — 홍길동처럼 실제 인명 끝글자와 겹친다. '구'도 제외(김구).
+  if (s.length >= 3 && /(읍|면|리|군|시|도)$/.test(s)) return false;
+  // 조사를 떼면 일반명사인 경우('고문으로'→고문)
+  for (const p of PARTICLES) {
+    if (s.length > p.length && s.endsWith(p) && NON_NAME.has(s.slice(0, -p.length))) return false;
+  }
   return true;
 }
 
