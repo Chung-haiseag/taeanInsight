@@ -71,3 +71,47 @@ describe("정상 추출은 유지(회귀 방지)", () => {
     expect(orgsOf(body, "최승우")).toContain("org:taean-gov");
   });
 });
+
+// 2차 정밀 점검(2026-08-18) — 검수 화면 20건 실측. 1차 수정 후에도 7건이 남아 재수정했다.
+describe("2차 — 근접 추정이 옆 조직 사람을 끌어오던 유형", () => {
+  const orgsOf = (b: string, n: string) => extractAffiliations(b).filter((c) => c.personName === n);
+
+  it("괄호에 쌍이 여러 개여도 주인을 정확히 가른다", () => {
+    const b = "사는 소원면체육회(회장 성동현, 상임부회장 홍재표)와 태안군체육회 주최로 1천여명의 소원면민과";
+    expect(orgsOf(b, "홍재표")).toHaveLength(0); // 소원면체육회 소속
+    expect(orgsOf(b, "성동현")).toHaveLength(0);
+  });
+
+  it("별칭에 직함이 붙으면 그 복합어 인접 이름만 — 창의 다른 '회장'을 끌어오지 않는다", () => {
+    const b = "왼쪽에서 세 번째가 김진호 회장, 네 번째가 김기두 태안군의회의장. 충청남도 15개";
+    expect(orgsOf(b, "김기두")).toHaveLength(1);
+    expect(orgsOf(b, "김진호")).toHaveLength(0);
+  });
+
+  it("'…에 온/…을 방문해'는 장소 언급이지 소속이 아니다", () => {
+    const b = "1주기 추도식을 위해 태안화력에 온 어머니 김미숙 이사장은 1년 사이";
+    expect(orgsOf(b, "김미숙")).toHaveLength(0);
+  });
+
+  it("별칭 뒤에 직함이 없으면 근접 인명에 엉뚱한 직함을 붙이지 않는다", () => {
+    const b = "사진 왼쪽부터 김현우, 박상재, 태안군체육회 오세열 지도자, 문원동 태안군복싱협회장, 박순용 지도";
+    expect(orgsOf(b, "오세열")).toHaveLength(0);
+  });
+
+  it("타 지자체 괄호 표기('홍성군(군수 이용록)')를 태안군청으로 보지 않는다", () => {
+    const b = "), 청양군(군수 김돈곤), 홍성군(군수 이용록), 예산군(";
+    expect(orgsOf(b, "이용록")).toHaveLength(0);
+    expect(orgsOf(b, "김돈곤")).toHaveLength(0);
+  });
+
+  it("단어 조각을 인명으로 만들지 않는다(어절 경계)", () => {
+    const b = "조용식 태안소방서 의용소방대 연합회장, 안연식 태안소방서 여성의용소방대";
+    const names = extractAffiliations(b).map((c) => c.personName);
+    expect(names).not.toContain("여성의용");
+    expect(names).not.toContain("안군의회");
+  });
+
+  it("부사 '최종'을 인명으로 보지 않는다", () => {
+    expect(orgsOf("한 예비후보가 최종 태안군수 후보로 공천됐다", "최종")).toHaveLength(0);
+  });
+});

@@ -59,6 +59,9 @@ const NON_NAME = new Set([
   "전경", "의경", "해경", "소방", "경찰", "직원", "회원", "임원", "간사", "총무", "감사",
   "고문", "자문", "본부", "지회", "지부", "분회", "협회", "연합", "총회", "선수", "학생",
   "군민", "주최", "주관", "후원", "성금", "성품", "표창", "방문", "간담", "협약", "체결",
+  // 2026-08-18 실측에서 인명으로 잘못 잡힌 어절.
+  "주최로", "주관으", "위해", "여성", "남성", "최종", "예비", "후보", "소원", "이번주",
+  "사진", "왼쪽", "오른쪽", "가운데", "번째", "지도", "지도자", "상임", "연합", "직장",
 ]);
 
 /** 성씨 시작·2~4자 한글·직함/불용어 아님이면 인명으로 간주. */
@@ -104,19 +107,34 @@ export function hasSubRegionPrefix(body: string, at: number): boolean {
 
 /** 별칭 뒤가 장소어면 소속이 아니라 '장소 언급'이다. 예: '군청 대강당에서', '태안발전본부 테니스장'. */
 const VENUE_WORDS = ["대강당", "강당", "상황실", "회의실", "대회의", "소회의", "체육관", "운동장", "테니스장",
-  "축구장", "야구장", "광장", "주차장", "청사", "일원", "앞", "정문", "로비", "食堂", "식당", "다목적"];
+  "축구장", "야구장", "광장", "주차장", "청사", "일원", "앞", "정문", "로비", "식당", "다목적", "프레스센터"];
+// 조사 뒤에 오는 '방문·행사' 서술 — 그 조직에 소속된 게 아니라 거기에 '갔다/열렸다'는 뜻이다.
+//   예: '태안화력에 온 어머니 김미숙 이사장', '군청을 방문해', '태안군체육회 주최로'.
+const VISIT_VERBS = ["온", "와", "가", "방문", "찾아", "들러", "견학", "참석", "열린", "열려", "개최", "주최", "주관", "초청"];
 export function isVenueMention(body: string, afterAt: number): boolean {
-  const nxt = body.slice(afterAt, afterAt + 8).replace(/^[\s(（]+/, "");
-  return VENUE_WORDS.some((w) => nxt.startsWith(w));
+  const raw = body.slice(afterAt, afterAt + 10);
+  const nxt = raw.replace(/^[\s(（]+/, "");
+  if (VENUE_WORDS.some((w) => nxt.startsWith(w))) return true;
+  // 조사(에/에서/을/를/과/와/이/가) + 공백 + 방문어
+  const m = /^(?:에서|에|을|를|과|와|이|가|은|는)?\s*([가-힣]{1,3})/.exec(nxt);
+  return !!m && VISIT_VERBS.includes(m[1]);
 }
 
-/** '조직명(직함 인명)' — 한국 기사에서 가장 신뢰도 높은 소속 표기. 창 안의 모든 쌍을 뽑는다. */
+/** '조직명(직함 인명)' — 한국 기사에서 가장 신뢰도 높은 소속 표기. 창 안의 모든 쌍을 뽑는다.
+ *   괄호 안에 쌍이 여러 개일 수 있다: '소원면체육회(회장 성동현, 상임부회장 홍재표)'.
+ *   단일 쌍만 보면 이런 괄호를 통째로 놓쳐 근접 추정으로 흘러가고, 그러면 옆 조직 사람이 딸려 온다. */
 export function parenTitleOwners(text: string): Array<{ org: string; title: string; name: string }> {
   const out: Array<{ org: string; title: string; name: string }> = [];
-  const re = /([가-힣A-Za-z0-9]{2,20})\s*[(（]\s*([가-힣]{2,5})\s+([가-힣]{2,4})\s*[)）]/g;
-  for (const m of text.matchAll(re)) {
-    if (!(TITLE_CUES as readonly string[]).includes(m[2])) continue;
-    out.push({ org: m[1], title: m[2], name: m[3] });
+  const grp = /([가-힣A-Za-z0-9]{2,20})\s*[(（]([^)）]{2,80})[)）]/g;
+  for (const g of text.matchAll(grp)) {
+    const org = g[1];
+    for (const m of g[2].matchAll(/([가-힣]{2,6})\s+([가-힣]{2,4})/g)) {
+      const [, title, name] = m;
+      // 직함 어휘에 있거나 '…장'으로 끝나는 복합 직함(상임부회장·상임회장 등)이면 인정.
+      if (!(TITLE_CUES as readonly string[]).includes(title) && !/장$/.test(title)) continue;
+      if (!isLikelyName(name)) continue;
+      out.push({ org, title, name });
+    }
   }
   return out;
 }
@@ -129,14 +147,24 @@ function snippet(s: string): string {
   return s.replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
-/** anchor(직함 또는 조직별칭) 인접 인명 후보. before는 지역·조직 접두(absorb자)를 사이에 허용. */
+/** anchor(직함 또는 조직별칭) 인접 인명 후보. before는 지역·조직 접두(absorb자)를 사이에 허용.
+ *   ⚠ 인명 후보는 **어절 경계**를 지켜야 한다. 경계 검사가 없으면 긴 단어를 4자씩 잘라
+ *     '태안군의회의장'→'안군의회', '여성의용소방대'→'여성의용' 같은 조각이 인명으로 잡힌다
+ *     (2026-08-18 실측에서 확인). 앞뒤가 한글이면 더 긴 단어의 일부이므로 버린다. */
 function namesNear(text: string, anchor: string, absorb = 0): string[] {
   const esc = escapeRe(anchor);
   const out: string[] = [];
+  const push = (name: string, at: number) => {
+    const prev = at > 0 ? text[at - 1] : "";
+    const next = text[at + name.length] ?? "";
+    if (/[가-힣]/.test(prev)) return;   // 앞이 한글 → 잘린 조각
+    if (/[가-힣]/.test(next)) return;   // 뒤가 한글 → 잘린 조각
+    out.push(name);
+  };
   const before = new RegExp(`([가-힣]{2,4})\\s?[가-힣]{0,${absorb}}?${esc}`, "g");
   const after = new RegExp(`${esc}\\s?([가-힣]{2,4})`, "g");
-  for (const m of text.matchAll(before)) out.push(m[1]);
-  for (const m of text.matchAll(after)) out.push(m[1]);
+  for (const m of text.matchAll(before)) push(m[1], m.index ?? 0);
+  for (const m of text.matchAll(after)) push(m[1], (m.index ?? 0) + m[0].indexOf(m[1], esc.length - 1));
   return out;
 }
 
@@ -173,8 +201,13 @@ export function extractAffiliations(body: string): Candidate[] {
         add(m[1], orgId, title, window);
       }
       // (b) 직함 → 이름 순서('군의원 김영인'): 지역이 낄 자리가 없으므로 그대로 채택.
-      const afterRe = new RegExp(`${escapeRe(title)}\\s?([가-힣]{2,4})`, "g");
-      for (const m of window.matchAll(afterRe)) add(m[1], orgId, title, window);
+      //     단 '홍성군(군수 이용록)'처럼 괄호 주인이 다른 지자체면 그 지자체의 직함이다.
+      const afterRe = new RegExp(`([가-힣]{2,6})?\\s*[(（]?\\s*${escapeRe(title)}\\s?([가-힣]{2,4})`, "g");
+      for (const m of window.matchAll(afterRe)) {
+        const owner = (m[1] ?? "").trim();
+        if (owner && /(군|시|구)$/.test(owner) && !owner.startsWith("태안")) continue;
+        add(m[2], orgId, title, window);
+      }
     }
   }
 
@@ -199,13 +232,31 @@ export function extractAffiliations(body: string): Candidate[] {
       //   이것이 '태안해양경찰서(서장 이수찬) … 전경 내무반' 같은 근접 오귀속을 막는 핵심이다.
       const parens = parenTitleOwners(window);
       if (parens.length) {
-        for (const p of parens) if (p.org.endsWith(alias)) add(p.name, orgId, p.title, window);
+        for (const p of parens) {
+          if (!p.org.endsWith(alias)) continue;
+          // 짧은 별칭('체육회')은 다른 조직 이름의 꼬리와 우연히 일치한다('소원면체육회'). 앞부분이
+          //   읍·면이면 하위 지역 조직이므로 우리 조직이 아니다.
+          const head = p.org.slice(0, p.org.length - alias.length);
+          if (/[가-힣]{1,3}(읍|면)$/.test(head)) continue;
+          add(p.name, orgId, p.title, window);
+        }
         continue;
       }
 
-      const role = titles[0];
+      // 별칭 뒤에 직함이 곧바로 붙으면('태안군의회의장','태안군복싱협회장') 그 복합어에 인접한
+      //   이름만 소유자다. 창 전체에서 직함을 훑으면 무관한 사람('김진호 회장')이 딸려 온다.
+      //   ※'붙어 있을 때'만 — 공백까지 허용하면 정상 어순('서산수협 조합장 홍길동')을 삼킨다.
+      const glued = TITLE_CUES.find((tc) => body.startsWith(tc, end));
+      if (glued) {
+        for (const n of namesNear(window, alias + glued, 0)) add(n, orgId, glued, window);
+        continue;
+      }
       for (const t of titles) for (const n of namesNear(window, t, 0)) add(n, orgId, t, window);
-      for (const n of namesNear(window, alias, 0)) add(n, orgId, role, window);
+      // 별칭 인접 인명('홍길동 서산수협 조합장'의 홍길동)은 **별칭 바로 뒤에 직함이 붙어 있을 때만**.
+      //   창 아무 데나 있는 직함을 role로 끌어오면 '태안군체육회 오세열 지도자 … 태안군복싱협회장'에서
+      //   오세열이 '회장'이 되고, '조용식 태안소방서 의용소방대 연합회장'도 서장으로 둔갑한다(실측).
+      const roleAfterAlias = TITLE_CUES.find((tc) => window.includes(`${alias} ${tc}`) || window.includes(`${alias}${tc}`));
+      if (roleAfterAlias) for (const n of namesNear(window, alias, 0)) add(n, orgId, roleAfterAlias, window);
     }
   }
 
