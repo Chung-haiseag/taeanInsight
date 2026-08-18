@@ -38,7 +38,9 @@ export default function AffiliationReview() {
   }
   // 일괄 승격 — 서버에서 UPDATE 한 번. 예전엔 후보 1건당 HTTP 1회를 순차로 보내(화면에 로드된 300건만,
   //   회당 1분) 2,394건 처리가 사실상 불가능했다. 먼저 시험 실행으로 건수·분포를 보이고, 확인 후 적용한다.
-  const [minConf, setMinConf] = useState(0.8);
+  // 기본 0.7 — 신뢰도 산식이 '대표직 0.7 + 0.04×(언급−1)'이라 0.8을 넘으려면 같은 인물-조직이
+  //   4회 이상 언급돼야 한다. 실제 후보는 대부분 3회(0.78)라 0.8로 두면 늘 '0건'이 나온다.
+  const [minConf, setMinConf] = useState(0.7);
   const [dry, setDry] = useState<BulkVerifyResult | null>(null);
 
   async function previewBulk() {
@@ -84,7 +86,7 @@ export default function AffiliationReview() {
               신뢰도 ≥
               <select value={minConf} onChange={(e) => { setMinConf(Number(e.target.value)); setDry(null); }}
                 className="ml-1 rounded border border-brand/20 px-1.5 py-1 text-xs">
-                {[0.9, 0.8, 0.7, 0.6].map((v) => <option key={v} value={v}>{v}</option>)}
+                {[0.78, 0.74, 0.7, 0.6, 0.5].map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
             </label>
             <button type="button" onClick={previewBulk} disabled={bulk}
