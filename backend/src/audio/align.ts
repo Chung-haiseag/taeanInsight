@@ -18,7 +18,9 @@ const DAILY_CAP = 20;        // 하루 정렬 상한(건). 20건 ≈ 3,000 뉴�
 const PER_RUN = 2;           // 크론 1회당 처리 건수 — 한 번에 몰아치지 않게
 const COUNTER_KEY = "align_daily";
 
-export interface WordTime { w: string; s: number; e: number; at?: number }  // at = 원문 글자 위치
+// ns = 원문에서 **공백을 제외한 글자 순번**. 공백 정규화는 공백만 건드리므로 전사본·원문·화면의
+//   '공백 아닌 글자 나열'은 동일하다 → 이 순번이면 화면 문단이 어떻게 나뉘어도 항상 맞는다.
+export interface WordTime { w: string; s: number; e: number; ns?: number; len?: number }
 export interface AlignResult { idxno: number; duration: number; words: WordTime[]; builtAt: string }
 
 const kstDay = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -27,33 +29,64 @@ const kstDay = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(
 const norm = (s: string) => s.replace(/[^가-힣0-9a-zA-Z]/g, "");
 
 /**
- * 전사 단어를 **기사 원문의 글자 위치**에 매핑한다.
- *   Whisper 전사본은 원문과 완전히 같지 않다(띄어쓰기·구두점·간혹 오인식). 그래서 전사 단어를
- *   원문에서 앞에서부터 순서대로 찾아가며 위치를 확정하고, 못 찾은 단어는 건너뛴다(뒤 단어가 복구).
- *   → 하이라이트는 항상 **원문 기준**이라 전사 오차가 화면에 드러나지 않는다.
+ * 전사 단어를 **원문의 공백 제외 글자 순번(ns)** 에 매핑한다.
+ *
+ *   Whisper 전사본은 원문과 글자는 거의 같지만 **단어 나눔이 다르다**('지역소멸' vs '지역 소멸').
+ *   그래서 단어 단위 정확 일치만 인정하면 대부분 못 붙는다(실측: 341개 중 66개, 19%).
+ *
+ *   그래서 2단계로 한다:
+ *     ① 앵커 — 정확히 일치하는 단어를 앞에서부터 순서대로 찾아 위치를 확정한다(창 안에서만 찾아
+ *        멀리 있는 우연한 일치로 튀는 것을 막는다).
+ *     ② 보간 — 앵커 사이에 낀 단어는 글자 수 비율로 위치를 채운다. TTS가 원문을 그대로 읽었으므로
+ *        앵커 사이 구간의 글자 흐름은 거의 선형이라 이 근사가 잘 맞는다.
+ *   → 결과적으로 **모든 단어가 위치를 갖는다**(빈 구간 없음).
  */
 export function mapWordsToSource(words: WordTime[], source: string): WordTime[] {
+  const S = norm(source);                       // 공백·기호 제거한 원문
+  if (!S) return [];
+  const items = words.map((w) => ({ ...w, key: norm(w.w) })).filter((w) => w.key);
+
+  // ① 앵커
+  const anchor = new Map<number, number>();     // items 인덱스 → ns 시작
+  let cur = 0;
+  items.forEach((w, i) => {
+    const at = S.indexOf(w.key, cur);
+    if (at >= 0 && at - cur <= 80) { anchor.set(i, at); cur = at + w.key.length; }
+  });
+
+  // ② 보간 — 앵커 사이를 글자 수 비율로 채운다.
   const out: WordTime[] = [];
-  let cursor = 0;
-  for (const w of words) {
-    const key = norm(w.w);
-    if (!key) continue;
-    // 원문에서 cursor 이후로 key의 글자들이 순서대로 나타나는 첫 구간을 찾는다(사이 공백·기호 허용).
-    let i = cursor, ki = 0, start = -1;
-    while (i < source.length && ki < key.length) {
-      const c = source[i];
-      if (/[가-힣0-9a-zA-Z]/.test(c)) {
-        if (c === key[ki]) { if (ki === 0) start = i; ki++; }
-        else if (ki > 0) { i = start; ki = 0; start = -1; }  // 어긋나면 시작점부터 재시도
-      }
-      i++;
-    }
-    if (ki === key.length && start >= 0) {
-      out.push({ ...w, at: start });
-      cursor = i;
-    }
-  }
+  const idxs = [...anchor.keys()].sort((a, b) => a - b);
+  const nsOf = (i: number): number => {
+    if (anchor.has(i)) return anchor.get(i)!;
+    const prev = idxs.filter((x) => x < i).pop();
+    const next = idxs.find((x) => x > i);
+    if (prev == null && next == null) return 0;
+    if (prev == null) return Math.max(0, anchor.get(next!)! - items.slice(i, next!).reduce((n, w) => n + w.key.length, 0));
+    if (next == null) return Math.min(S.length, anchor.get(prev)! + items.slice(prev, i).reduce((n, w) => n + w.key.length, 0));
+    const a = anchor.get(prev)!, b = anchor.get(next)!;
+    const before = items.slice(prev, i).reduce((n, w) => n + w.key.length, 0);
+    const span = items.slice(prev, next).reduce((n, w) => n + w.key.length, 0) || 1;
+    return Math.round(a + (b - a) * (before / span));
+  };
+  items.forEach((w, i) => {
+    out.push({ w: w.w, s: w.s, e: w.e, ns: Math.min(S.length - 1, Math.max(0, nsOf(i))), len: w.key.length });
+  });
   return out;
+}
+
+/** 앵커로 확정된 비율 — 정렬 품질 지표(낮으면 전사 오차가 크다는 뜻). */
+export function anchorRate(words: WordTime[], source: string): number {
+  const S = norm(source);
+  let cur = 0, hit = 0, tot = 0;
+  for (const w of words) {
+    const k = norm(w.w);
+    if (!k) continue;
+    tot++;
+    const at = S.indexOf(k, cur);
+    if (at >= 0 && at - cur <= 80) { hit++; cur = at + k.length; }
+  }
+  return tot ? hit / tot : 0;
 }
 
 /** 오늘 정렬 건수(무료 할당 보호). */
