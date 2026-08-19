@@ -1,5 +1,5 @@
-import { isKnownType, isValidEdge, type Ontology } from "./ontology";
-import { upsertNode, upsertEdge, getNodeType } from "./repository";
+import type { Ontology } from "./ontology";
+import { upsertNode, upsertEdge } from "./repository";
 
 export interface SeedNode { id: string; type: string; name: string; aliases?: string; attrs?: unknown; source: string }
 export interface SeedEdge { id: string; src_id: string; rel: string; dst_id: string; attrs?: unknown; source: string }
@@ -14,16 +14,12 @@ export function assertVerifiable(rec: { source?: string | null }, ctx: string): 
 export async function importSeed(db: D1Database, seed: Seed, o: Ontology): Promise<{ nodes: number; edges: number }> {
   for (const n of seed.nodes) {
     assertVerifiable(n, `node:${n.id}`);
-    if (!isKnownType(o, n.type)) throw new Error(`미등록 타입: ${n.type} (node:${n.id})`);
-    await upsertNode(db, { id: n.id, type: n.type, name: n.name, aliases: n.aliases ?? null, attrs: n.attrs, source: n.source, verified: 1 });
+    await upsertNode(db, { id: n.id, type: n.type, name: n.name, aliases: n.aliases ?? null, attrs: n.attrs, source: n.source, verified: 1 }, o);
   }
   for (const e of seed.edges) {
     assertVerifiable(e, `edge:${e.id}`);
-    const srcType = await getNodeType(db, e.src_id);
-    const dstType = await getNodeType(db, e.dst_id);
-    if (!srcType || !dstType) throw new Error(`엣지 양끝 노드 없음: ${e.id}`);
-    if (!isValidEdge(o, e.rel, srcType, dstType)) throw new Error(`온톨로지 위반 엣지: ${e.rel} ${srcType}->${dstType} (${e.id})`);
-    await upsertEdge(db, { id: e.id, src_id: e.src_id, rel: e.rel, dst_id: e.dst_id, attrs: e.attrs, source: e.source, verified: 1 });
+    // 타입·양끝 검증은 upsertEdge가 한다(규칙을 한 곳에서만 지키게).
+    await upsertEdge(db, { id: e.id, src_id: e.src_id, rel: e.rel, dst_id: e.dst_id, attrs: e.attrs, source: e.source, verified: 1 }, o);
   }
   return { nodes: seed.nodes.length, edges: seed.edges.length };
 }

@@ -11,6 +11,8 @@ import { loadAffiliationQueue, rejectAffiliation } from "./affiliation_queue";
 import { loadFestivalQueue, rejectEvent } from "./event_queue";
 import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, SG_TYPE } from "./nec";
+import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
+import { importSeed } from "./import";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -50,6 +52,36 @@ router.get("/nec/elections", async (c) => {
   }
 });
 
+// ── 군청 조직도 적재 —— org 39개 + part_of. 출처가 군청이라 verified=1(검수 대기열을 만들지 않는다).
+//   기본은 **드라이런**이다. 되돌리기 어려운 쓰기는 무엇이 들어갈지 눈으로 본 뒤에 한다.
+router.post("/gov-org/sync", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const apply = c.req.query("apply") === "1";
+  try {
+    const orgs = await fetchOrgTree();
+    const raw = orgSeed(orgs);
+    // 이미 있는 노드의 출처를 보고, 남의 출처면 노드는 건드리지 않는다.
+    const ids = raw.nodes.map((n) => n.id);
+    const ph = ids.map(() => "?").join(",");
+    const cur = await c.env.ARCHIVE_DB
+      .prepare(`SELECT id, source FROM kg_nodes WHERE id IN (${ph})`)
+      .bind(...ids).all<{ id: string; source: string | null }>();
+    const seed = skipForeignNodes(raw, cur.results ?? []);
+    if (!apply) {
+      return c.json({
+        dryRun: true, orgs: seed.nodes.length, edges: seed.edges.length,
+        keptAsIs: seed.skipped,
+        sample: orgs.slice(0, 8).map((o) => ({ name: o.name, parent: o.parentId, code: o.code })),
+      });
+    }
+    const o = await loadOntology(c.env.ARCHIVE_DB);
+    const r = await importSeed(c.env.ARCHIVE_DB, seed, o);
+    return c.json({ applied: true, ...r, keptAsIs: seed.skipped });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
 router.get("/ontology", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const o = await loadOntology(c.env.ARCHIVE_DB);
@@ -69,7 +101,7 @@ router.post("/nodes", async (c) => {
   if (!isKnownType(o, b.type)) return c.json({ error: `미등록 타입: ${b.type}` }, 400);
   const verified: 0 | 1 = b.verified ? 1 : 0;
   if (verified === 1) { try { assertVerifiable(b, `node:${b.id}`); } catch (e) { return c.json({ error: (e as Error).message }, 400); } }
-  await upsertNode(c.env.ARCHIVE_DB, { id: b.id, type: b.type, name: b.name, aliases: b.aliases ?? null, attrs: b.attrs, source: b.source ?? null, verified });
+  await upsertNode(c.env.ARCHIVE_DB, { id: b.id, type: b.type, name: b.name, aliases: b.aliases ?? null, attrs: b.attrs, source: b.source ?? null, verified }, o);
   return c.json({ ok: true });
 });
 
@@ -84,7 +116,7 @@ router.post("/edges", async (c) => {
   if (!isValidEdge(o, b.rel, srcType, dstType)) return c.json({ error: `온톨로지 위반: ${b.rel} ${srcType}->${dstType}` }, 400);
   const verified: 0 | 1 = b.verified ? 1 : 0;
   if (verified === 1) { try { assertVerifiable(b, `edge:${b.id}`); } catch (e) { return c.json({ error: (e as Error).message }, 400); } }
-  await upsertEdge(c.env.ARCHIVE_DB, { id: b.id, src_id: b.src_id, rel: b.rel, dst_id: b.dst_id, attrs: b.attrs, source: b.source ?? null, verified });
+  await upsertEdge(c.env.ARCHIVE_DB, { id: b.id, src_id: b.src_id, rel: b.rel, dst_id: b.dst_id, attrs: b.attrs, source: b.source ?? null, verified }, o);
   return c.json({ ok: true });
 });
 

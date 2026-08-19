@@ -1,4 +1,5 @@
 import type { LineageItem } from "./facts";
+import { isKnownType, isValidEdge, type Ontology } from "./ontology";
 
 export interface KgNodeInput { id: string; type: string; name: string; aliases?: string | null; attrs?: unknown; source?: string | null; verified: 0 | 1 }
 export interface KgEdgeInput { id: string; src_id: string; rel: string; dst_id: string; attrs?: unknown; source?: string | null; verified: 0 | 1 }
@@ -6,7 +7,14 @@ export interface KgNodeRow { id: string; type: string; name: string; source: str
 
 const now = () => new Date().toISOString();
 
-export async function upsertNode(db: D1Database, n: KgNodeInput): Promise<void> {
+/**
+ * 노드 upsert — **온톨로지를 인자로 받는다**(선택이 아니라 필수).
+ *   예전엔 검증이 importSeed·admin_router에만 걸려 있어서, 대량 적재는 이 함수로 곧장 들어왔다.
+ *   그래서 온톨로지가 규칙이 아니라 문서에 가까웠다(coappears 127만 건이 검증 없이 들어간 이유).
+ *   인자를 필수로 두면 새 호출부가 생겨도 컴파일 단계에서 걸린다.
+ */
+export async function upsertNode(db: D1Database, n: KgNodeInput, o: Ontology): Promise<void> {
+  if (!isKnownType(o, n.type)) throw new Error(`미등록 타입: ${n.type} (node:${n.id})`);
   await db.prepare(
     "INSERT INTO kg_nodes(id,type,name,attrs_json,aliases,source,verified,schema_ver,created_at,updated_at) " +
     "VALUES(?,?,?,?,?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET " +
@@ -15,7 +23,12 @@ export async function upsertNode(db: D1Database, n: KgNodeInput): Promise<void> 
   ).bind(n.id, n.type, n.name, n.attrs ? JSON.stringify(n.attrs) : null, n.aliases ?? null, n.source ?? null, n.verified, now(), now()).run();
 }
 
-export async function upsertEdge(db: D1Database, e: KgEdgeInput): Promise<void> {
+/** 엣지 upsert — 관계 이름과 **양끝 노드 타입**까지 온톨로지에 맞는지 보고 넣는다. */
+export async function upsertEdge(db: D1Database, e: KgEdgeInput, o: Ontology): Promise<void> {
+  const srcType = await getNodeType(db, e.src_id);
+  const dstType = await getNodeType(db, e.dst_id);
+  if (!srcType || !dstType) throw new Error(`엣지 양끝 노드 없음: ${e.id} (${e.src_id} → ${e.dst_id})`);
+  if (!isValidEdge(o, e.rel, srcType, dstType)) throw new Error(`온톨로지 위반 엣지: ${e.rel} ${srcType}->${dstType} (${e.id})`);
   await db.prepare(
     "INSERT INTO kg_edges(id,src_id,rel,dst_id,attrs_json,source,verified,schema_ver,created_at,updated_at) " +
     "VALUES(?,?,?,?,?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET " +
