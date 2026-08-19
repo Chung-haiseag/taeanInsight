@@ -603,7 +603,7 @@ function DataSources() {
             <div className="mt-2 rounded-lg bg-accent-subtle/20 p-3 text-sm">
               <p><strong>인물 {necPre.people}명</strong> · 정당 {necPre.parties}개 · 소속 {necPre.edges}건</p>
               <p className="mt-1 text-xs text-foreground-muted">
-                {necPre.per?.map((p) => `${{ "4": "군수", "5": "도의원", "6": "군의원" }[p.type] ?? p.type} ${p.sgId} ${p.n}명`).join(" · ")}
+                {necPre.per?.map((p) => `${p.type} ${p.n}명`).join(" · ")}
               </p>
               <p className="mt-1 text-foreground-muted">{necPre.names?.join(", ")}</p>
             </div>

@@ -89,11 +89,31 @@ export function isLikelyName(s: string): boolean {
   return true;
 }
 
+/**
+ * 조직 목록의 **정본은 이제 D1**이다.
+ *   아래 ORGS는 손으로 적은 22개라 '농정과'·'관광진흥과' 같은 군청 부서를 아예 몰랐고,
+ *   그것이 소속 정밀도를 다섯 번 고쳐야 했던 근본 원인이었다(2026-08-19).
+ *   군청 조직도(38개)와 정당이 들어오면서 D1이 코드보다 넓어졌다 — 코드 목록은 D1이 비었을 때의 폴백이다.
+ *
+ *   별칭이 없는 노드는 이름만 별칭으로 쓴다. 두 글자 미만 별칭은 버린다(오탐이 폭발한다).
+ */
+export async function loadOrgs(db: D1Database): Promise<OrgDef[]> {
+  const r = await db
+    .prepare("SELECT id, name, COALESCE(aliases,'') AS aliases FROM kg_nodes WHERE type='org'")
+    .all<{ id: string; name: string; aliases: string }>();
+  const rows = r.results ?? [];
+  if (!rows.length) return ORGS;
+  return rows.map((o) => ({
+    id: o.id, name: o.name, cat: "",
+    aliases: [...new Set([o.name, ...o.aliases.split(",")].map((s) => s.trim()).filter((s) => s.length >= 2))],
+  }));
+}
+
 /** 별칭 → 조직 id 역인덱스. 길이 내림차순 — 짧은 별칭('군청')이 긴 이름보다 먼저 걸리면 오귀속된다.
  *   ※ 이전 구현은 주석만 '길이 내림차순'이고 실제로는 정렬하지 않았다. */
-export function orgAliasIndex(): Map<string, string> {
+export function orgAliasIndex(orgs: OrgDef[] = ORGS): Map<string, string> {
   const pairs: Array<[string, string]> = [];
-  for (const o of ORGS) for (const a of o.aliases) pairs.push([a, o.id]);
+  for (const o of orgs) for (const a of o.aliases) pairs.push([a, o.id]);
   pairs.sort((x, y) => y[0].length - x[0].length);
   const idx = new Map<string, string>();
   for (const [a, id] of pairs) if (!idx.has(a)) idx.set(a, id);
@@ -192,9 +212,9 @@ function namesNear(text: string, anchor: string, absorb = 0): string[] {
  *  - 조직 별칭 앵커: 별칭 ±30자 창에 직함이 있으면, 직함 인접 인명 + 별칭 인접 인명을 후보로.
  * 같은 (인물,조직)은 한 후보로 병합.
  */
-export function extractAffiliations(body: string): Candidate[] {
+export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candidate[] {
   if (!body) return [];
-  const idx = orgAliasIndex();
+  const idx = orgAliasIndex(orgs);
   const aliasSet = new Set(idx.keys());
   const out = new Map<string, Candidate>();
   const add = (name: string, orgId: string, role: string, evidence: string) => {
@@ -268,7 +288,7 @@ export function extractAffiliations(body: string): Candidate[] {
       if (parens.length) {
         // 괄호 주인은 **그 조직의 별칭·정식명과 정확히 일치**해야 한다. endsWith만 보면 짧은 별칭이
         //   다른 조직 이름의 꼬리와 우연히 맞는다('소원면체육회'·'남원교육지원청'·'보령시산림조합').
-        const own = ORGS.find((o) => o.id === orgId);
+        const own = orgs.find((o) => o.id === orgId);
         const valid = new Set<string>([...(own?.aliases ?? []), own?.name ?? ""]);
         for (const p of parens) {
           if (!valid.has(p.org)) continue;

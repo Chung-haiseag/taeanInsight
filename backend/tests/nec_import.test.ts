@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tidy, parseCareerLine, parseCareers, districtOf, partyOrgId, toPersonAttrs, toSeed } from "@/kg/nec_import";
+import { tidy, parseCareerLine, parseCareers, districtOf, partyOrgId, toPersonAttrs, toSeed, pickKinds } from "@/kg/nec_import";
 
 // 2026-08-19 실제 응답에서 그대로 옮긴 표본(태안군가선거구 홍상금).
 const 홍상금 = {
@@ -123,5 +123,43 @@ describe("적재 시드", () => {
   it("모든 노드·엣지에 출처가 붙는다", () => {
     expect(seed.nodes.every((n) => n.source.includes("선관위"))).toBe(true);
     expect(seed.edges.every((e) => e.source.includes("선관위"))).toBe(true);
+  });
+});
+
+describe("선거 종류 찾기", () => {
+  // 실제 목록의 모양 — 같은 선거일에 종류별로 여러 줄이 온다.
+  const rows = [
+    { sgId: "20260603", sgName: "제9회 전국동시지방선거", sgTypecode: "0" },
+    { sgId: "20260603", sgName: "구·시·군의 장선거", sgTypecode: "4" },
+    { sgId: "20260603", sgName: "시·도의회의원선거", sgTypecode: "5" },
+    { sgId: "20260603", sgName: "구·시·군의회의원선거", sgTypecode: "6" },
+    { sgId: "20260603", sgName: "광역의원비례대표선거", sgTypecode: "7" },
+    { sgId: "20260603", sgName: "기초의원비례대표선거", sgTypecode: "8" },
+    { sgId: "20220601", sgName: "구·시·군의회의원선거", sgTypecode: "6" },
+  ];
+
+  // 코드 번호를 짐작하면 틀린다 — 이름으로 고른다.
+  it("이름으로 종류를 고르고 코드는 목록에서 읽는다", () => {
+    const kinds = pickKinds(rows);
+    expect(kinds.map((k) => [k.key, k.sgTypecode])).toEqual([
+      ["군수", "4"], ["도의원", "5"], ["군의원", "6"], ["도의원(비례)", "7"], ["군의원(비례)", "8"],
+    ]);
+  });
+
+  // 비례를 빠뜨려 최성미 의원이 통째로 누락됐던 일이 있다.
+  it("비례대표를 반드시 포함한다", () => {
+    expect(pickKinds(rows).some((k) => k.key.includes("비례"))).toBe(true);
+  });
+
+  it("최신 선거일만 본다", () => {
+    expect(pickKinds(rows).every((k) => k.sgId === "20260603")).toBe(true);
+  });
+
+  it("전체 지방선거 줄처럼 관심 없는 종류는 담지 않는다", () => {
+    expect(pickKinds(rows).some((k) => k.sgTypecode === "0")).toBe(false);
+  });
+
+  it("빈 목록이면 빈 결과", () => {
+    expect(pickKinds([])).toEqual([]);
   });
 });

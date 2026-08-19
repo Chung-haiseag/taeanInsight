@@ -12,7 +12,7 @@ import { loadFestivalQueue, rejectEvent } from "./event_queue";
 import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
-import { fetchTaeanCandidates, toSeed as necSeed } from "./nec_import";
+import { fetchTaeanCandidates, toSeed as necSeed, pickKinds } from "./nec_import";
 import { importSeed } from "./import";
 
 const router = new Hono<{ Bindings: Env }>();
@@ -98,13 +98,14 @@ router.get("/nec/sample", async (c) => {
 router.post("/nec/sync", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const apply = c.req.query("apply") === "1";
-  const types = (c.req.query("types") ?? "4,5,6").split(",").filter(Boolean);
   try {
+    // 선거 종류 코드를 짐작하지 않고 목록에서 찾는다 — 비례대표를 빠뜨렸던 자리다.
+    const kinds = pickKinds(await fetchElections(c.env, SG_TYPE.구시군의원));
     const all: Array<Record<string, unknown>> = [];
     const per: Array<{ type: string; sgId: string; n: number }> = [];
-    for (const type of types) {
-      const { sgId, items } = await fetchTaeanCandidates(c.env, type);
-      per.push({ type, sgId, n: items.length });
+    for (const k of kinds) {
+      const { items } = await fetchTaeanCandidates(c.env, k.sgTypecode, k.sgId);
+      per.push({ type: k.key, sgId: k.sgId, n: items.length });
       all.push(...(items as Array<Record<string, unknown>>));
     }
     const seed = necSeed(all);
@@ -239,9 +240,11 @@ router.get("/affiliations", async (c) => {
 router.get("/affiliations/audit", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const { auditVerifiedAffiliations } = await import("./affiliation_queue");
-  const { extractAffiliations } = await import("./affiliation");
+  const { extractAffiliations, loadOrgs } = await import("./affiliation");
   const limit = Number(c.req.query("limit")) || 500;
-  return c.json(await auditVerifiedAffiliations(c.env.ARCHIVE_DB, extractAffiliations, limit));
+  // 조직 목록은 D1이 정본 — 군청 부서·정당까지 알아야 감사 결과가 지금 데이터와 맞는다.
+  const orgs = await loadOrgs(c.env.ARCHIVE_DB);
+  return c.json(await auditVerifiedAffiliations(c.env.ARCHIVE_DB, (b: string) => extractAffiliations(b, orgs), limit));
 });
 
 // 소속 후보 일괄 승격 — 조건(신뢰도·근거 기사수)에 맞는 미검수 엣지를 UPDATE 한 번으로 처리.

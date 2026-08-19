@@ -10,6 +10,29 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { extractAffiliations, ORGS, orgAliasIndex } from "../../backend/src/kg/affiliation.ts";
 
+// 조직 목록의 정본은 D1이다 — 코드의 22개는 군청 부서('농정과'·'관광진흥과')를 모른다.
+//   원격 D1을 읽어 쓰고, 못 읽으면 코드 목록으로 물러난다(작업이 통째로 멈추지 않게).
+function loadOrgsFromD1() {
+  try {
+    const out = execFileSync("npx", [
+      "wrangler", "d1", "execute", "taean-archive", "--remote", "--json", "--command",
+      "SELECT id, name, COALESCE(aliases,'') aliases FROM kg_nodes WHERE type='org'",
+    ], { cwd: new URL("../../backend/", import.meta.url).pathname, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 });
+    const m = out.match(/"results":\s*(\[[\s\S]*?\])\s*,\s*"success"/);
+    const rows = m ? JSON.parse(m[1]) : [];
+    if (!rows.length) throw new Error("빈 결과");
+    return rows.map((o) => ({
+      id: o.id, name: o.name, cat: "",
+      aliases: [...new Set([o.name, ...String(o.aliases).split(",")].map((s) => s.trim()).filter((s) => s.length >= 2))],
+    }));
+  } catch (e) {
+    console.warn(`⚠ D1 조직 목록을 못 읽어 코드 목록(${ORGS.length}개)으로 진행합니다: ${e.message}`);
+    return ORGS;
+  }
+}
+const ORG_LIST = loadOrgsFromD1();
+console.log(`조직 목록 ${ORG_LIST.length}개 사용`);
+
 const OUT_DIR = new URL("./out/", import.meta.url);
 const PROGRESS = new URL("./out/affiliation-progress.json", import.meta.url);
 const SQL_OUT = new URL("./out/affiliation-edges.sql", import.meta.url);
@@ -47,7 +70,7 @@ function d1File(path) {
 const sqlStr = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 
 // ── 대상 필터: 조직 별칭 언급 기사 ──
-const aliases = [...new Set(ORGS.flatMap((o) => o.aliases))];
+const aliases = [...new Set(ORG_LIST.flatMap((o) => o.aliases))];
 const likeClause = aliases.map((a) => `body LIKE '%${a.replace(/'/g, "''")}%'`).join(" OR ");
 
 // ── 진행 상태 ──
@@ -75,7 +98,7 @@ for (;;) {
   for (const r of rows) {
     try {
       last = r.rid;
-      const cands = extractAffiliations(r.body || "");
+      const cands = extractAffiliations(r.body || "", ORG_LIST);
       for (const c of cands) {
         const k = `${c.personName}|${c.orgId}`;
         let e = agg.get(k);
@@ -110,7 +133,7 @@ console.log(`인물 매칭: 후보 이름 ${names.length} 중 기존 person ${ex
 // ── 신뢰도 + 엣지 SQL 생성 ──
 const LEADER = new Set(["조합장", "의장", "부의장", "서장", "청장", "본부장", "지사장", "이사장", "회장", "위원장", "교육장", "군수", "부군수", "군의원"]);
 const now = "2026-08-08T00:00:00Z";
-const orgName = new Map(ORGS.map((o) => [o.id, o.name]));
+const orgName = new Map(ORG_LIST.map((o) => [o.id, o.name]));
 const lines = [];
 let kept = 0;
 const byOrg = {};

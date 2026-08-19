@@ -126,6 +126,34 @@ export function toSeed(cands: NecCandidate[]) {
   return { nodes, edges };
 }
 
+/**
+ * 우리가 담을 선거 종류를 **목록에서 찾아낸다**(코드 번호를 짐작하지 않는다).
+ *   비례대표를 지역구 코드로만 조회해 최성미 의원이 통째로 빠졌던 일이 있다(2026-08-19).
+ *   선거 목록의 각 줄에 sgTypecode와 이름이 함께 오므로, 이름으로 고르는 편이 안전하다.
+ */
+export const WANTED = [
+  { key: "군수", match: /구.?시.?군의? 장/ },
+  { key: "도의원", match: /시.?도의회의원/ },
+  { key: "군의원", match: /구.?시.?군의회의원/ },
+  { key: "도의원(비례)", match: /광역의원비례/ },
+  { key: "군의원(비례)", match: /기초의원비례/ },
+] as const;
+
+export interface ElectionKind { key: string; sgTypecode: string; sgId: string; sgName: string }
+
+/** 최신 선거일의 종류별 코드. 이름이 우리 관심사와 맞는 줄만 고른다. */
+export function pickKinds(rows: Array<{ sgId?: string; sgName?: string; sgTypecode?: string }>): ElectionKind[] {
+  const ids = [...new Set(rows.map((r) => String(r.sgId ?? "")))].filter(Boolean).sort().reverse();
+  const latest = ids[0];
+  if (!latest) return [];
+  const out: ElectionKind[] = [];
+  for (const w of WANTED) {
+    const hit = rows.find((r) => String(r.sgId) === latest && w.match.test(tidy(r.sgName)));
+    if (hit?.sgTypecode) out.push({ key: w.key, sgTypecode: String(hit.sgTypecode), sgId: latest, sgName: tidy(hit.sgName) });
+  }
+  return out;
+}
+
 /** 태안 후보자 받기 — 선거 종류별로 최신 회차부터. */
 export async function fetchTaeanCandidates(env: Env, sgTypecode: string, sgId?: string): Promise<{ sgId: string; items: NecCandidate[] }> {
   let target = sgId;
