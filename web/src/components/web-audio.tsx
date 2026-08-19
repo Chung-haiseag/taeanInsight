@@ -16,12 +16,20 @@ function fmt(s: number): string {
   return `${m}:${String(x).padStart(2, "0")}`;
 }
 
-export function WebAudio({ url, event, variant = "inline", title, subtitle, onPos, controlsRef }: {
+/** 사람이 읽는 길이 표기 — "2분 23초". 고령 독자 기준이라 콜론(2:23)보다 말로 쓴다. */
+function human(s: number): string {
+  const m = Math.floor(s / 60), x = Math.round(s % 60);
+  return m ? (x ? `${m}분 ${x}초` : `${m}분`) : `${x}초`;
+}
+
+export function WebAudio({ url, event, variant = "inline", title, subtitle, onPos, controlsRef, durationHint }: {
   url: string; event: string; variant?: "inline" | "card"; title?: string; subtitle?: string;
   /** 재생 위치(초) — 본문 따라읽기 하이라이트가 구독한다. 재생 중 rAF마다 호출된다. */
   onPos?: (sec: number) => void;
   /** 외부에서 재생을 제어할 수 있게 내부 함수를 실어 보낸다(본문 문장 클릭 → 그 지점부터 듣기). */
   controlsRef?: { current: { seekAndPlay: (sec: number) => void } | null };
+  /** 재생 전 길이 안내(초). 음성은 다 받아야 길이를 알 수 있어, 자막이 잰 값을 미리 받아 쓴다. */
+  durationHint?: number;
 }) {
   const ctxRef = useRef<AudioContext | null>(null);
   const bufRef = useRef<AudioBuffer | null>(null);
@@ -137,6 +145,10 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle, onPo
     </div>
   ) : null;
 
+  const hint = !showBar && st !== "unavailable" && st !== "error" && durationHint
+    ? <span className="text-xs text-foreground-muted">{human(durationHint)}</span>
+    : null;
+
   const notes = (
     <>
       {st === "unavailable" && <span className="text-xs text-foreground-muted">🎧 음성 준비 중 — 곧 자동 생성됩니다</span>}
@@ -154,9 +166,9 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle, onPo
           </div>
           {button}
         </div>
-        {(showBar || st === "unavailable" || st === "error") && <div className="mt-3 flex flex-wrap items-center gap-2">{bar}{notes}</div>}
+        {(showBar || hint || st === "unavailable" || st === "error") && <div className="mt-3 flex flex-wrap items-center gap-2">{bar}{hint}{notes}</div>}
       </section>
     );
   }
-  return <div className="flex flex-wrap items-center gap-2">{button}{bar}{notes}</div>;
+  return <div className="flex flex-wrap items-center gap-2">{button}{bar}{hint}{notes}</div>;
 }

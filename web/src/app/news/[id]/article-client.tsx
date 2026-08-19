@@ -112,7 +112,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
           {raActive ? <ReadAlongText text={article.title} active={raActive} offset={0} /> : article.title}
         </h1>
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
-          <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} controlsRef={audioCtl} />
+          <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} controlsRef={audioCtl} durationHint={raWords?.duration} />
           <ShareBar idxno={Number(params.id)} title={article.title} />
           <button
             type="button"

@@ -6,10 +6,11 @@ import { WebAudio } from "@/components/web-audio";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
-export function NewsAudio({ idxno, onPos, controlsRef }: {
+export function NewsAudio({ idxno, onPos, controlsRef, durationHint }: {
   idxno: number;
   onPos?: (sec: number) => void;
   controlsRef?: { current: { seekAndPlay: (sec: number) => void } | null };
+  durationHint?: number;
 }) {
-  return <WebAudio url={`${API_BASE}/api/audio/news/${idxno}`} event={`news:${idxno}`} variant="inline" onPos={onPos} controlsRef={controlsRef} />;
+  return <WebAudio url={`${API_BASE}/api/audio/news/${idxno}`} event={`news:${idxno}`} variant="inline" onPos={onPos} controlsRef={controlsRef} durationHint={durationHint} />;
 }

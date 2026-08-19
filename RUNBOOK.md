@@ -72,6 +72,9 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-08-19 · **기사 낭독 따라읽기(당진시대 방식)** · `backend/src/audio/align.ts`+`web/src/components/read-along.tsx`
+  낭독 음성을 Workers AI Whisper로 되받아 단어별 시각을 만들고 본문 글자 위치에 맞춘다(비용 0원 — 무료 할당 10,000뉴런/일, 기사당 약 149뉴런, 하루 20건 상한).
+  읽는 문장을 노랗게 칠하고, **문장을 클릭하면 그 지점부터** 듣는다. 재생 전에도 길이("3분 10초")를 알려준다. 크론 `30 */3 * * *`.
 형식: `YYYY-MM-DD · 기능 · 위치/비고`
 
 - 2026-08-19 · 기사듣기 11일 중단 복구 — **한도 소진이 아니라 매일 15분 타임아웃사(死)** — 사용자 제보('아카이브 기사듣기 최근 것이 안 된다')를 추적. `status.json`이 `exhausted:true`·`at:08-08`로 멈춰 있어 **무료 키 부족으로 오인하기 쉬웠으나**(첫 진단이 실제로 틀렸다), journalctl을 보니 08-15~18 **나흘 연속 `start operation timed out`**으로 죽고 있었다. TTS는 시작조차 못 함. **연쇄**: ①VPS에 `ADMIN_TOKEN` 없음(`/etc/taean.env` 미설정·`backend/.dev.vars` 부재) → ②`/api/audio/manifest` 호출 불가 → `loadGem2Set()`=null → ③폴백이 기사마다 `npx wrangler r2 object get`을 **프로세스로 기동**(1회 ~10초) → 45건 고르려면 90회 = **900초, `TimeoutStartSec=900`과 정확히 일치** → ④매일 CPU 15분만 태우고 SIGTERM. **결정적 단서**: 로그의 `Consumed 15min 53s **CPU** time` — 네트워크 대기가 아니라 실연산이라는 뜻이라 '프로세스 반복 기동'을 의심할 수 있었다. **수정**: `r2Has`(wrangler 프로세스) → `audioExists`(공개 엔드포인트 **HTTP HEAD 1회**). `/api/audio/news/:idxno`가 mp3·wav를 모두 커버하므로 요청 한 번이면 된다(~10초 → ~0.2초). 폴백에 확인 상한(MAX*6) 추가, VPS `TimeoutStartSec` 900→1800. **검증**: 선정 15분+ 타임아웃 → **2분 7초**. 수동 실행 결과 `생성 17 · 건너뜀 1 · 키사용 8/9`로 **정상 종료**(이전엔 매번 강제 종료), 최신 8건 중 **7건 재생 가능** 확인. 나머지는 매일 07:00 자동 실행으로 누적. **교훈**: 상태파일(status.json)은 **마지막으로 성공한 시점**만 알려준다 — 그 이후 실패를 못 남기므로, 증상이 상태파일과 어긋나면 **반드시 서비스 로그**를 봐야 한다. ※미해결(선택): VPS 무료 키 2개(로컬 3개)·`ADMIN_TOKEN` 미설정(넣으면 manifest 1회로 더 빨라지나 없어도 동작). tools/news-audio/gen-news-audio.mjs.
