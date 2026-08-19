@@ -140,6 +140,18 @@ audioRouter.get("/manifest", async (c) => {
 });
 
 // GET /api/audio/news/:idxno — 기사별 Gemini 낭독(-gem2.wav)만 서빙. 없으면 503.
+// 낭독 자막 — 재생 위치에 맞춰 본문을 하이라이트하기 위한 단어별 시각.
+//   음성과 짝이라 캐시 정책도 동일(불변). 없으면 404 → 프런트는 하이라이트 없이 재생만 한다.
+audioRouter.get("/news/:idxno/words", async (c) => {
+  const idxno = Number(c.req.param("idxno"));
+  if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
+  const o = await c.env.ARCHIVE_PHOTOS.get(`audio/news/${idxno}-gem2.words.json`);
+  if (!o) return c.json({ error: "no_words" }, 404);
+  return new Response(o.body, {
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=604800, immutable" },
+  });
+});
+
 audioRouter.get("/news/:idxno", async (c) => {
   const idxno = Number(c.req.param("idxno"));
   if (!idxno || !c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);

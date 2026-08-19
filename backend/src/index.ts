@@ -234,6 +234,15 @@ export default {
       } catch (e) {
         console.warn("[cron] 해무 캐시 워밍 실패:", e instanceof Error ? e.message : e);
       }
+      // 낭독 자막 정렬 — 낭독은 있는데 자막이 없는 기사를 조금씩(1회 2건) 만든다.
+      //   Workers AI 무료 할당(하루 1만 뉴런) 안에서만 돌도록 align.ts가 하루 20건으로 막는다.
+      try {
+        const { alignRecent } = await import("./audio/align");
+        const ar = await alignRecent(env);
+        if (ar.done) console.log(`[cron] 낭독 자막 정렬: ${ar.done}건`);
+      } catch (e) {
+        console.warn("[cron] 자막 정렬 실패:", e instanceof Error ? e.message : e);
+      }
       // 여객선 캐시 워밍 — 결항 트리거가 신선한 상태를 보게 한다(아래 취재 알림보다 먼저).
       //   호출 예산: 취항선명 서버측 필터로 1회 = 1건. 30분 크론이라 48건/일(개발계정 100건 한도 내).
       try {
