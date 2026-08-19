@@ -248,3 +248,20 @@ export interface NecSyncResult {
 export function syncNec(apply = false): Promise<NecSyncResult> {
   return apiFetch(`/api/admin/kg/nec/sync${apply ? "?apply=1" : ""}`, { method: "POST" });
 }
+
+export interface CareerSyncResult {
+  dryRun?: boolean; applied?: boolean;
+  links?: Array<{ who: string; org: string; title: string; tense: string | null }>;
+  candidates?: Array<{ name: string; people: string[] }>;
+  unparsed?: Array<{ person: string; text: string }>;
+  edges?: number; candidatesCreated?: number; error?: string;
+}
+
+/** 경력 → 소속. apply=false면 계획만 본다. withCandidates면 새 조직 후보도 검수 대기로 등록. */
+export function syncCareers(apply = false, withCandidates = false): Promise<CareerSyncResult> {
+  const q = new URLSearchParams();
+  if (apply) q.set("apply", "1");
+  if (withCandidates) q.set("candidates", "1");
+  const s = q.toString();
+  return apiFetch(`/api/admin/kg/careers/sync${s ? `?${s}` : ""}`, { method: "POST" });
+}

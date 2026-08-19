@@ -20,9 +20,11 @@ import {
   getNecElections,
   getNecSample,
   syncNec,
+  syncCareers,
   type GovOrgSyncResult,
   type NecSample,
   type NecSyncResult,
+  type CareerSyncResult,
 } from "@/lib/api/kg";
 import MergeConsole from "./merge-console";
 import PeopleExplorer from "./people-explorer";
@@ -508,6 +510,9 @@ function DataSources() {
   const [sample, setSample] = useState<NecSample | null>(null);
   const [necPre, setNecPre] = useState<NecSyncResult | null>(null);
   const [necDone, setNecDone] = useState<NecSyncResult | null>(null);
+  const [car, setCar] = useState<CareerSyncResult | null>(null);
+  const [carDone, setCarDone] = useState<CareerSyncResult | null>(null);
+  const [withCand, setWithCand] = useState(true);
 
   async function run(fn: () => Promise<unknown>, key: string, set: (v: never) => void) {
     setBusy(key);
@@ -611,6 +616,61 @@ function DataSources() {
           {necDone?.error && <p className="mt-2 text-sm text-red-600">적재 실패 — {necDone.error}</p>}
           {necDone && !necDone.error && (
             <p className="mt-2 text-sm font-semibold text-brand">완료 — 노드 {necDone.nodes}개 · 관계 {necDone.edges}건 반영됐습니다.</p>
+          )}
+        </div>
+
+        <div className="border-t border-brand/10 pt-3">
+          <p className="mb-2 text-sm text-foreground-muted">
+            경력에 적힌 단체를 소속으로 잇습니다. <strong>이름이 정확히 같을 때만</strong> 잇습니다 —
+            비슷하다고 붙이면 &lsquo;태안읍체육회&rsquo;가 &lsquo;태안군체육회&rsquo;로 잘못 붙습니다.
+            우리에게 없는 단체는 <strong>새 조직 후보</strong>로 남겨 검수 후 등록합니다.
+          </p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button" disabled={!!busy}
+              onClick={() => { setCarDone(null); void run(() => syncCareers(false), "carPre", setCar as (v: never) => void); }}
+              className="rounded-full border border-brand/40 px-4 py-2 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+            >
+              {busy === "carPre" ? "확인 중…" : "먼저 확인하기"}
+            </button>
+            <button
+              type="button" disabled={!!busy || !car || !!car.error}
+              onClick={() => void run(() => syncCareers(true, withCand), "carApply", setCarDone as (v: never) => void)}
+              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-40"
+            >
+              {busy === "carApply" ? "적재 중…" : "적재하기"}
+            </button>
+            <label className="flex items-center gap-1.5 text-sm text-foreground-muted">
+              <input type="checkbox" checked={withCand} onChange={(e) => setWithCand(e.target.checked)} />
+              새 조직 후보도 함께 등록(검수 대기)
+            </label>
+          </div>
+          {car?.error && <p className="text-sm text-red-600">{car.error}</p>}
+          {car && !car.error && !carDone && (
+            <div className="space-y-2 rounded-lg bg-accent-subtle/20 p-3 text-sm">
+              <p><strong>이어지는 소속 {car.links?.length ?? 0}건</strong></p>
+              <ul className="text-foreground-muted">
+                {car.links?.map((l, i) => (
+                  <li key={i}>· {l.who} → {l.org} {l.title && `(${l.title})`} <span className="text-xs">[{l.tense === "전" ? "전직" : "현직"}]</span></li>
+                ))}
+              </ul>
+              <p className="pt-1"><strong>새 조직 후보 {car.candidates?.length ?? 0}개</strong> — 검수 후 등록됩니다</p>
+              <ul className="max-h-56 overflow-auto text-xs text-foreground-muted">
+                {car.candidates?.map((cd) => <li key={cd.name}>· {cd.name} <span className="opacity-70">({cd.people.join(", ")})</span></li>)}
+              </ul>
+              {!!car.unparsed?.length && (
+                <details className="text-xs text-foreground-muted">
+                  <summary className="cursor-pointer">단체를 못 읽은 줄 {car.unparsed.length}개</summary>
+                  <ul className="mt-1">{car.unparsed.map((u, i) => <li key={i}>· {u.person}: {u.text}</li>)}</ul>
+                </details>
+              )}
+            </div>
+          )}
+          {carDone?.error && <p className="text-sm text-red-600">적재 실패 — {carDone.error}</p>}
+          {carDone && !carDone.error && (
+            <p className="text-sm font-semibold text-brand">
+              완료 — 소속 {carDone.edges}건 반영 · 새 조직 후보 {carDone.candidatesCreated ?? 0}개 검수 대기로 등록.
+            </p>
           )}
         </div>
 

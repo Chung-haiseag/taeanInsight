@@ -13,6 +13,7 @@ import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
 import { fetchTaeanCandidates, toSeed as necSeed, pickKinds } from "./nec_import";
+import { planCareers, toLinkSeed } from "./career_orgs";
 import { importSeed } from "./import";
 
 const router = new Hono<{ Bindings: Env }>();
@@ -120,6 +121,55 @@ router.post("/nec/sync", async (c) => {
     const o = await loadOntology(c.env.ARCHIVE_DB);
     const r = await importSeed(c.env.ARCHIVE_DB, seed, o);
     return c.json({ applied: true, per, ...r });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
+// ── 경력 → 소속 —— 정확히 일치하는 조직만 잇고, 나머지는 새 조직 후보로 남긴다.
+//   후보는 verified=0으로 넣어 **AI 답변 근거로는 안 쓰인다**(검수를 통과해야 쓰인다).
+router.post("/careers/sync", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const db = c.env.ARCHIVE_DB;
+  const apply = c.req.query("apply") === "1";
+  const withCandidates = c.req.query("candidates") === "1";
+  try {
+    const { loadOrgs } = await import("./affiliation");
+    const orgs = await loadOrgs(db);
+    const rows = await db
+      .prepare("SELECT id, name, attrs_json FROM kg_nodes WHERE type='person' AND source LIKE '%선관위%'")
+      .all<{ id: string; name: string; attrs_json: string | null }>();
+    const people = (rows.results ?? []).map((r) => {
+      let a: { election?: string; careers?: Array<{ tense: string | null; text: string }> } = {};
+      try { a = r.attrs_json ? JSON.parse(r.attrs_json) : {}; } catch { /* 깨진 값은 빈 것으로 */ }
+      return { id: r.id, name: r.name, election: a.election, careers: a.careers ?? [] };
+    });
+    const plan = planCareers(people, orgs);
+    if (!apply) {
+      return c.json({
+        dryRun: true,
+        links: plan.links.map((l) => ({ who: l.personName, org: l.orgName, title: l.title, tense: l.tense })),
+        candidates: plan.candidates, unparsed: plan.unparsed,
+      });
+    }
+    const o = await loadOntology(db);
+    const linked = await importSeed(db, toLinkSeed(plan), o);
+
+    let created = 0;
+    if (withCandidates) {
+      // 후보 조직은 검수 대기로 등록만 한다. 사람 연결은 승인 뒤에 다시 돌리면 붙는다.
+      const { upsertNode } = await import("./repository");
+      for (const cd of plan.candidates) {
+        const id = `org:cand-${cd.name.replace(/\s+/g, "")}`;
+        await upsertNode(db, {
+          id, type: "org", name: cd.name, aliases: cd.name,
+          attrs: { fromCareersOf: cd.people },
+          source: "중앙선관위 후보자 경력(검수 대기)", verified: 0,
+        }, o);
+        created++;
+      }
+    }
+    return c.json({ applied: true, edges: linked.edges, candidatesCreated: created });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }
