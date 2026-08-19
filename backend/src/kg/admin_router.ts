@@ -10,8 +10,45 @@ import { listPendingRelations, setRelation, isReltype } from "./relations";
 import { loadAffiliationQueue, rejectAffiliation } from "./affiliation_queue";
 import { loadFestivalQueue, rejectEvent } from "./event_queue";
 import { loadEntityCoverage } from "./coverage";
+import { call, fetchElections, SG_TYPE } from "./nec";
 
 const router = new Hono<{ Bindings: Env }>();
+
+// ── 선관위(중앙선거관리위원회) 실측용 탐침 —— 응답 형태를 눈으로 보고 파서를 짜기 위한 것.
+//   임의 경로 호출을 열어두지 않는다(SSRF): 허용한 오퍼레이션만 부른다.
+const NEC_OPS: Record<string, string> = {
+  elections: "CommonCodeService/getCommonSgCodeList",
+  candidates: "PofelcddInfoInqireService/getPofelcddRegistSttusInfoInqire",
+  winners: "WinnerInfoInqireService2/getWinnerInfoInqire",
+};
+router.get("/nec/probe", async (c) => {
+  const op = c.req.query("op") ?? "elections";
+  const path = NEC_OPS[op];
+  if (!path) return c.json({ error: `허용되지 않은 op: ${op}`, allowed: Object.keys(NEC_OPS) }, 400);
+  const params: Record<string, string> = { pageNo: c.req.query("pageNo") ?? "1", numOfRows: c.req.query("numOfRows") ?? "5" };
+  for (const k of ["sgId", "sgTypecode", "sdName", "sggName", "wiwName"]) {
+    const v = c.req.query(k);
+    if (v) params[k] = v;
+  }
+  try {
+    return c.json({ op, params, body: await call(c.env, path, params) });
+  } catch (e) {
+    return c.json({ op, params, error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
+// 태안 관련 선거 목록 — sgId(선거일)를 알아야 후보자·당선인을 부를 수 있다.
+router.get("/nec/elections", async (c) => {
+  try {
+    const out: Record<string, unknown> = {};
+    for (const [label, code] of Object.entries(SG_TYPE)) {
+      out[label] = (await fetchElections(c.env, code)).map((e) => ({ sgId: e.sgId, name: e.sgName }));
+    }
+    return c.json(out);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
 
 router.get("/ontology", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
