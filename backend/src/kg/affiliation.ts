@@ -122,6 +122,23 @@ export function orgAliasIndex(orgs: OrgDef[] = ORGS): Map<string, string> {
   return idx;
 }
 
+/**
+ * 행정기관(군청 부서·읍면)에 있을 수 있는 직함.
+ *   군청 조직 38개를 사전에 넣자 '태안읍 회장'·'소원면 회장' 같은 것이 대량으로 잡혔다(2026-08-20, 336건 중 82건).
+ *   근거를 보면 전부 "△태안읍(회장 김홍기)"처럼 **어떤 단체의 읍면 지회장** 명단이다.
+ *   읍사무소에 회장은 없다 — 행정기관에는 행정 직함만 인정한다.
+ */
+const ADMIN_TITLE = /(^|[^가-힣])(부?[읍면]장|과장|팀장|계장|국장|실장|담당관|주무관|소장|센터장|본부장|담당)$/;
+
+/** 행정기관 여부 — 군청 조직도로 들어온 부서·읍면. */
+export const isAdminOrgId = (id: string): boolean => id.startsWith("org:taean-dept-");
+
+/** 직함이 그 조직에 있을 법한가. 행정기관이 아니면 따지지 않는다(민간 단체는 직함이 자유롭다). */
+export function roleFitsOrg(orgId: string, role: string): boolean {
+  if (!isAdminOrgId(orgId)) return true;
+  return ADMIN_TITLE.test((role || "").trim());
+}
+
 // ── 오귀속 차단 규칙 ── 실제 검수 화면(2026-08-18)에서 확인된 유형만 정확히 겨냥한다.
 
 /** 별칭 뒤에 조사·구두점이 아닌 한글이 붙으면 더 긴 기관명의 일부다.
@@ -143,6 +160,38 @@ export function hasSubRegionPrefix(body: string, at: number): boolean {
   if (/[가-힣]{1,3}(읍|면)\s*[(（]?\s*$/.test(before)) return true;
   const m = /([가-힣]{1,3})(시|군)\s*[(（]?\s*$/.exec(before);
   return !!m && m[1] !== "태안";
+}
+
+/**
+ * 별칭 **앞**이 한글이면 더 긴 기관명의 일부다 — 뒤쪽(hasBoundaryAfter)과 짝이 되는 규칙.
+ *   조직 사전이 62개로 넓어지자 짧은 별칭이 다른 기관 이름 속에서 걸리기 시작했다(2026-08-20 실측):
+ *     · '서천군의회 조동준 의장'   → 군의회  → 태안군의회 (X)
+ *     · '충남도 해양수산과 이상선' → 수산과  → 태안군 수산과 (X)
+ *     · '재난안전관리과장 박경석'  → 안전관리과 (X, 옛 부서명)
+ *   더 긴 별칭이 있으면 그쪽이 먼저 걸리므로(길이 내림차순 정렬), 이 규칙이 정상 추출을 막지 않는다.
+ */
+export function hasHangulBefore(body: string, at: number): boolean {
+  return at > 0 && /[가-힣]/.test(body[at - 1]);
+}
+
+/**
+ * 별칭 앞에 **다른 광역지자체 이름**이 붙으면 우리 조직이 아니다.
+ *   '충청남도 체육회(회장 심대평)' → 체육회 → 태안군체육회 (X). 심대평은 충남도지사다.
+ *   시·군과 달리 '도'를 일반 규칙으로 두면 인명 끝글자('홍길도 태안군청')를 잘라내므로 이름을 못 박는다.
+ */
+const OTHER_PROVINCE = /(충청[남북]도|충[남북]도|경기도|강원도|전라[남북]도|전[남북]도|경상[남북]도|경[남북]도|제주도)\s*[(（]?\s*$/;
+export function hasOtherProvincePrefix(body: string, at: number): boolean {
+  return OTHER_PROVINCE.test(body.slice(Math.max(0, at - 10), at));
+}
+
+/**
+ * 이름 바로 뒤에 **다른 기관의 직함**이 오는가.
+ *   명단은 '이름 직함 이름 직함'으로 늘어선다: '이용복 군의원 조한식 면장'에서 조한식은 면장이지 군의원이 아니다.
+ *   의장·부의장처럼 같은 기관에서 함께 쓰이는 직함은 넣지 않는다(진짜 소속까지 잘린다).
+ */
+const OTHER_TITLE_AFTER = /^\s*(면장|읍장|과장|국장|실장|소장|서장|조합장|교육장|본부장|센터장|담당관|이사장|청장|원장)/;
+export function followedByOtherTitle(body: string, at: number): boolean {
+  return OTHER_TITLE_AFTER.test(body.slice(at, at + 6));
 }
 
 /** 별칭 뒤가 장소어면 소속이 아니라 '장소 언급'이다. 예: '군청 대강당에서', '태안발전본부 테니스장'. */
@@ -222,6 +271,7 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
   const add = (name: string, orgId: string, role: string, evidence: string) => {
     if (!isLikelyName(name)) return;
     if (aliasSet.has(name)) return; // 조직 별칭 자체는 인명 아님
+    if (!roleFitsOrg(orgId, role)) return;
     const k = `${name}|${orgId}`;
     if (!out.has(k)) out.set(k, { personName: name, orgId, role, evidence: snippet(evidence) });
   };
@@ -231,6 +281,10 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
     let from = 0, pos: number;
     while ((pos = body.indexOf(title, from)) !== -1) {
       from = pos + title.length;
+      // '김의경 부군수 김성진 도의회의원'에서 '부군수' 속 '군수'가 걸려 김성진이 군수가 됐다(2026-08-20).
+      //   더 긴 직함의 꼬리면 건너뛴다 — 그 긴 직함은 따로 처리된다.
+      if (Object.keys(IMPLIED_ORG).some((o) =>
+        o !== title && o.endsWith(title) && body.slice(pos - (o.length - title.length), pos + title.length) === o)) continue;
       const w0 = Math.max(0, pos - 20), w1 = Math.min(body.length, pos + title.length + 12);
       const window = body.slice(w0, w1);
       // (a) 이름 → (지역) → 직함 순서: 사이에 낀 지역명이 '태안'이 아니면 그 지역의 직함이다.
@@ -254,6 +308,10 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
         if (owner && /(군|시|구)$/.test(owner) && !owner.startsWith("태안")) continue;
         // '서산군수 박정기'처럼 지역명이 직함에 바로 붙는 형태 — owner가 '서산'으로만 잡힌다.
         if (owner && NON_NAME.has(owner.slice(-2)) && owner.slice(-2) !== "태안") continue;
+        // 명단 어순('이용복 군의원 조한식 면장')에서는 직함 뒤 이름이 **다음 사람**이다.
+        //   그 이름 바로 뒤에 다른 기관의 직함이 붙어 있으면 그 사람은 그쪽 소속이다(2026-08-20 실측).
+        //   '김영인 의장'처럼 같은 기관에서 함께 쓰이는 직함은 막지 않는다.
+        if (followedByOtherTitle(window, (m.index ?? 0) + m[0].length)) continue;
         add(m[2], orgId, title, window);
       }
     }
@@ -265,6 +323,12 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
     while ((pos = body.indexOf(alias, from)) !== -1) {
       const end = pos + alias.length;
       from = end;
+      // ── 앞쪽 경계 검사는 **결합 표기 처리보다 먼저** 해야 한다 ──
+      //   '안면읍 문화체육회장 고종남'이 태안군체육회로 붙었다(2026-08-20). '체육회'+'장' 지름길이
+      //   가드보다 먼저 돌아 통째로 우회했기 때문이다. 앞에 무엇이 붙었는지는 어느 경로든 똑같이 따져야 한다.
+      if (hasSubRegionPrefix(body, pos)) continue;     // 고남면 체육회 ≠ 태안군체육회
+      if (hasHangulBefore(body, pos)) continue;        // 서천군의회·문화체육회 — 더 긴 이름의 일부
+      if (hasOtherProvincePrefix(body, pos)) continue; // 충청남도 체육회 ≠ 태안군체육회
       // 별칭 끝글자 + '장'이 직함이면 결합 표기다: '태안해양경찰서'+'장' = 서장, '○○체육회'+'장' = 회장.
       //   경계 검사에 걸려 통째로 버려지면 진짜 기관장('김승수 태안해양경찰서장')까지 놓친다.
       const sufTitle = `${alias.slice(-1)}장`;
@@ -273,9 +337,7 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
         for (const n of namesNear(sw, `${alias}장`, 0)) add(n, orgId, sufTitle, sw);
         continue;
       }
-      // ── 오귀속 차단 3종(실제 검수에서 확인된 유형) ──
       if (!hasBoundaryAfter(body, end)) continue;      // 태안군청 ⊂ 태안군청소년상담센터
-      if (hasSubRegionPrefix(body, pos)) continue;     // 고남면 체육회 ≠ 태안군체육회
       if (isVenueMention(body, end)) continue;         // '군청 대강당에서' = 장소 언급
       const w0 = Math.max(0, pos - 30), w1 = Math.min(body.length, end + 30);
       const window = body.slice(w0, w1);

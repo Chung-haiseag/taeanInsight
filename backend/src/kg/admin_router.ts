@@ -175,6 +175,46 @@ router.post("/careers/sync", async (c) => {
   }
 });
 
+// ── 조직 후보 검수 —— 경력에서 나온 새 단체를 목록으로 보고 골라 승인/반려한다.
+//   한 건씩 누르게 하면 24개도 지친다. 목록·일괄 처리를 함께 둔다.
+router.get("/org-candidates", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const r = await c.env.ARCHIVE_DB
+    .prepare("SELECT id, name, COALESCE(source,'') source, COALESCE(attrs_json,'') attrs FROM kg_nodes WHERE type='org' AND verified=0 ORDER BY name")
+    .all<{ id: string; name: string; source: string; attrs: string }>();
+  const items = (r.results ?? []).map((n) => {
+    let people: string[] = [];
+    try { people = (JSON.parse(n.attrs || "{}") as { fromCareersOf?: string[] }).fromCareersOf ?? []; } catch { /* 무시 */ }
+    return { id: n.id, name: n.name, source: n.source, people };
+  });
+  return c.json({ items });
+});
+
+// 승인=verified 1, 반려=노드 삭제(후보라 되돌릴 것이 없다. 사실층 데이터는 삭제하지 않는다).
+router.post("/org-candidates/decide", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const db = c.env.ARCHIVE_DB;
+  type Body = { ids?: string[]; approve?: boolean; aliases?: Record<string, string> };
+  const b = await c.req.json<Body>().catch(() => ({} as Body));
+  const ids = (b.ids ?? []).filter((s: string) => typeof s === "string" && s.startsWith("org:cand-"));
+  if (!ids.length) return c.json({ error: "ids 필요(org:cand-* 만)" }, 400);
+  const ph = ids.map(() => "?").join(",");
+  if (b.approve) {
+    await db.prepare(`UPDATE kg_nodes SET verified=1, updated_at=? WHERE id IN (${ph}) AND type='org'`)
+      .bind(new Date().toISOString(), ...ids).run();
+    // 승인하면서 별칭을 보탤 수 있다('충청남도의회'에 '충남도의회' 같이).
+    for (const [id, al] of Object.entries(b.aliases ?? {})) {
+      if (!ids.includes(id) || !al.trim()) continue;
+      await db.prepare("UPDATE kg_nodes SET aliases=? WHERE id=?").bind(al.trim(), id).run();
+    }
+  } else {
+    // 후보 노드를 지우기 전에 딸린 엣지부터 정리한다(끊긴 엣지가 남지 않게).
+    await db.prepare(`DELETE FROM kg_edges WHERE src_id IN (${ph}) OR dst_id IN (${ph})`).bind(...ids, ...ids).run();
+    await db.prepare(`DELETE FROM kg_nodes WHERE id IN (${ph}) AND type='org' AND verified=0`).bind(...ids).run();
+  }
+  return c.json({ ok: true, n: ids.length, approved: !!b.approve });
+});
+
 router.get("/ontology", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const o = await loadOntology(c.env.ARCHIVE_DB);

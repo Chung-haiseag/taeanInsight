@@ -265,3 +265,16 @@ export function syncCareers(apply = false, withCandidates = false): Promise<Care
   const s = q.toString();
   return apiFetch(`/api/admin/kg/careers/sync${s ? `?${s}` : ""}`, { method: "POST" });
 }
+
+export interface OrgCandidate { id: string; name: string; source: string; people: string[] }
+
+export function listOrgCandidates(): Promise<{ items: OrgCandidate[] }> {
+  return apiFetch("/api/admin/kg/org-candidates");
+}
+
+/** 조직 후보 승인/반려(여러 건). 승인 시 별칭을 함께 보탤 수 있다. */
+export function decideOrgCandidates(ids: string[], approve: boolean, aliases?: Record<string, string>): Promise<{ ok: boolean; n: number }> {
+  return apiFetch("/api/admin/kg/org-candidates/decide", {
+    method: "POST", body: JSON.stringify({ ids, approve, aliases }),
+  });
+}

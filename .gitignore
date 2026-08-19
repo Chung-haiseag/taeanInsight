@@ -90,3 +90,4 @@ tools/seafood/*.log
 
 # 관리자 토큰(로컬 스크립트용, 절대 커밋 금지)
 .admin.token
+.datago.key

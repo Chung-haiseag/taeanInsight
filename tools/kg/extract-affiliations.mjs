@@ -71,7 +71,22 @@ const sqlStr = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 
 // ── 대상 필터: 조직 별칭 언급 기사 ──
 const aliases = [...new Set(ORG_LIST.flatMap((o) => o.aliases))];
-const likeClause = aliases.map((a) => `body LIKE '%${a.replace(/'/g, "''")}%'`).join(" OR ");
+// 조건을 **균형 잡힌 나무**로 묶는다. 평평한 OR 사슬은 항이 늘수록 표현식 깊이가 그대로 늘어,
+//   조직이 22→62개가 되자 SQLite 한계(깊이 100)에 걸려 스캔이 통째로 죽었다(2026-08-20).
+//   둘씩 짝지어 접으면 깊이가 log2(항 수)로 줄어 수백 개도 안전하다.
+function balancedOr(terms) {
+  if (!terms.length) return "0";
+  let level = terms.slice();
+  while (level.length > 1) {
+    const next = [];
+    for (let i = 0; i < level.length; i += 2) {
+      next.push(i + 1 < level.length ? `(${level[i]} OR ${level[i + 1]})` : level[i]);
+    }
+    level = next;
+  }
+  return level[0];
+}
+const likeClause = balancedOr(aliases.map((a) => `body LIKE '%${a.replace(/'/g, "''")}%'`));
 
 // ── 진행 상태 ──
 let state = { lastRowid: 0, processed: 0, agg: [] };

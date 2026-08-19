@@ -4,7 +4,7 @@
 // 백엔드: backend/src/kg/admin_router.ts (Task 7, /api/admin/kg/*).
 // 검증(verified=1) 데이터만 AI 질의 근거로 노출되므로, 여기서 등록·검증한다.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getSession, logout, type Account } from "@/lib/api/auth";
 import { hasRole } from "@/lib/roles";
@@ -21,10 +21,13 @@ import {
   getNecSample,
   syncNec,
   syncCareers,
+  listOrgCandidates,
+  decideOrgCandidates,
   type GovOrgSyncResult,
   type NecSample,
   type NecSyncResult,
   type CareerSyncResult,
+  type OrgCandidate,
 } from "@/lib/api/kg";
 import MergeConsole from "./merge-console";
 import PeopleExplorer from "./people-explorer";
@@ -565,6 +568,8 @@ function DataSources() {
         )}
       </section>
 
+      <OrgCandidateReview />
+
       <section className="space-y-3 rounded-lg border border-brand/15 p-4">
         <h2 className="text-lg font-bold text-brand">🗳️ 중앙선거관리위원회</h2>
         <p className="text-sm text-foreground-muted">
@@ -721,5 +726,87 @@ function DataSources() {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * 조직 후보 검수 — 경력에서 나온 새 단체를 골라 승인한다.
+ *   한 건씩 누르게 하면 스물몇 개도 지친다: 모두 고르기 + 일괄 승인/반려를 둔다.
+ *   기본은 **모두 고른 상태**가 아니다 — 무심코 전부 승인되는 편보다 한 번 더 누르는 편이 낫다.
+ */
+function OrgCandidateReview() {
+  const [items, setItems] = useState<OrgCandidate[] | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await listOrgCandidates();
+      setItems(r.items); setSel(new Set());
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const toggle = (id: string) => setSel((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  async function decide(approve: boolean) {
+    if (!sel.size) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await decideOrgCandidates([...sel], approve);
+      setMsg(`${r.n}개 ${approve ? "승인" : "반려"}했습니다.`);
+      await load();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  }
+
+  if (items && !items.length) return null;
+
+  return (
+    <section className="space-y-3 rounded-lg border border-brand/15 p-4">
+      <h2 className="text-lg font-bold text-brand">🏷️ 새 조직 후보 검수</h2>
+      <p className="text-sm text-foreground-muted">
+        선관위 경력에서 나온 단체입니다. 승인하면 <strong>소속 추출 사전에 들어가</strong> 기사에서 그 단체를 잡기 시작합니다.
+        승인 전에는 AI 답변 근거로 쓰이지 않습니다. 반려하면 후보를 지웁니다.
+      </p>
+      {items === null && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+      {items && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setSel(new Set(items.map((i) => i.id)))}
+              className="rounded border border-brand/25 px-3 py-1.5 text-sm text-brand hover:bg-brand/5">모두 고르기</button>
+            <button type="button" onClick={() => setSel(new Set())}
+              className="rounded border border-brand/25 px-3 py-1.5 text-sm text-brand hover:bg-brand/5">고르기 해제</button>
+            <span className="text-sm text-foreground-muted">{sel.size} / {items.length} 선택</span>
+            <span className="grow" />
+            <button type="button" disabled={busy || !sel.size} onClick={() => void decide(true)}
+              className="rounded border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-40">
+              {busy ? "처리 중…" : `${sel.size}개 승인`}
+            </button>
+            <button type="button" disabled={busy || !sel.size} onClick={() => void decide(false)}
+              className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-40">
+              반려
+            </button>
+          </div>
+          {msg && <p className="text-sm text-brand">{msg}</p>}
+          <ul className="divide-y divide-brand/10 rounded border border-brand/10">
+            {items.map((i) => (
+              <li key={i.id} className="flex items-start gap-3 px-3 py-2 text-sm">
+                <input type="checkbox" checked={sel.has(i.id)} onChange={() => toggle(i.id)} className="mt-1" />
+                <span className="grow">
+                  <span className="font-medium text-brand">{i.name}</span>
+                  {!!i.people.length && <span className="ml-2 text-xs text-foreground-muted">{i.people.join(", ")}의 경력</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
