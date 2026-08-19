@@ -198,3 +198,29 @@ export function getCoverage(): Promise<{ entities: EntityCoverage[]; cachedAt?: 
 export function assignCoverage(entityId: string, note?: string): Promise<{ ok: boolean; sent: number; skipped?: string }> {
   return apiFetch(`/api/admin/kg/coverage/assign`, { method: "POST", body: JSON.stringify({ entityId, note }) });
 }
+
+// ── 외부 데이터 소스 동기화 ─────────────────────────────────────────
+//   토큰을 손으로 옮기지 않고 관리자 화면에서 바로 돌리기 위한 통로.
+
+export interface GovOrgSyncResult {
+  dryRun?: boolean;
+  applied?: boolean;
+  orgs?: number;
+  edges?: number;
+  nodes?: number;
+  keptAsIs?: string[];
+  sample?: Array<{ name: string; parent: string; code: string | null }>;
+  error?: string;
+}
+
+/** 군청 조직도 동기화. apply=false면 무엇이 들어갈지만 미리 본다(기본). */
+export function syncGovOrg(apply = false): Promise<GovOrgSyncResult> {
+  return apiFetch(`/api/admin/kg/gov-org/sync${apply ? "?apply=1" : ""}`, { method: "POST" });
+}
+
+export interface NecElections { [label: string]: Array<{ sgId: string; name: string }> }
+
+/** 선관위 선거 목록 — 활용신청 승인 여부 확인도 겸한다(미승인이면 error에 사유). */
+export function getNecElections(): Promise<NecElections & { error?: string }> {
+  return apiFetch("/api/admin/kg/nec/elections");
+}

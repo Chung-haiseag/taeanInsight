@@ -16,6 +16,9 @@ import {
   upsertKgNode,
   verifyKg,
   type KgNode,
+  syncGovOrg,
+  getNecElections,
+  type GovOrgSyncResult,
 } from "@/lib/api/kg";
 import MergeConsole from "./merge-console";
 import PeopleExplorer from "./people-explorer";
@@ -98,7 +101,7 @@ function KgGate({ account, onOk }: { account: Account | null; onOk: () => void }
 export default function KgAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
-  const [tab, setTab] = useState<"nodes" | "merge" | "people" | "relations" | "affiliations" | "festivals" | "coverage">("nodes");
+  const [tab, setTab] = useState<"nodes" | "merge" | "people" | "relations" | "affiliations" | "festivals" | "coverage" | "sources">("nodes");
 
   useEffect(() => {
     (async () => {
@@ -211,9 +214,18 @@ export default function KgAdminPage() {
         >
           📡 취재 레이더
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("sources")}
+          className={`px-3 py-2 text-sm font-semibold ${
+            tab === "sources" ? "border-b-2 border-brand text-brand" : "text-foreground-muted hover:text-brand"
+          }`}
+        >
+          🔌 데이터 소스
+        </button>
       </div>
 
-      {tab === "nodes" ? <KgConsole /> : tab === "merge" ? <MergeConsole /> : tab === "people" ? <PeopleExplorer /> : tab === "relations" ? <RelationsReview /> : tab === "affiliations" ? <AffiliationReview /> : tab === "festivals" ? <FestivalReview /> : <CoverageRadar />}
+      {tab === "nodes" ? <KgConsole /> : tab === "merge" ? <MergeConsole /> : tab === "people" ? <PeopleExplorer /> : tab === "relations" ? <RelationsReview /> : tab === "affiliations" ? <AffiliationReview /> : tab === "festivals" ? <FestivalReview /> : tab === "coverage" ? <CoverageRadar /> : <DataSources />}
     </div>
   );
 }
@@ -476,5 +488,88 @@ function TenureAddForm({ onAdded }: { onAdded: () => void }) {
         {busy ? "저장 중…" : "역임 추가"}
       </button>
     </section>
+  );
+}
+
+/**
+ * 데이터 소스 — 외부 정답 자료를 지식그래프에 들이는 곳.
+ *   토큰을 손으로 옮기지 않도록, 이미 로그인한 관리자 세션으로 바로 돌린다.
+ *   쓰기는 **미리보기를 거친 뒤에만** 열린다(되돌리기 어려운 일을 눈으로 보고 한다).
+ */
+function DataSources() {
+  const [preview, setPreview] = useState<GovOrgSyncResult | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [done, setDone] = useState<GovOrgSyncResult | null>(null);
+  const [nec, setNec] = useState<string | null>(null);
+
+  async function run(fn: () => Promise<unknown>, key: string, set: (v: never) => void) {
+    setBusy(key);
+    try { set((await fn()) as never); }
+    catch (e) { set({ error: e instanceof Error ? e.message : String(e) } as never); }
+    finally { setBusy(null); }
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-3 rounded-lg border border-brand/15 p-4">
+        <h2 className="text-lg font-bold text-brand">🏛️ 태안군청 조직도</h2>
+        <p className="text-sm text-foreground-muted">
+          군청이 공개한 부서 목록을 조직(org)으로 들이고 상하 관계를 잇습니다. 출처가 군청이라 검수 대기열이 생기지 않습니다.
+          다른 출처로 이미 등록된 조직은 <strong>이름을 건드리지 않고</strong> 관계만 잇습니다.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button" disabled={!!busy}
+            onClick={() => { setDone(null); void run(() => syncGovOrg(false), "preview", setPreview as (v: never) => void); }}
+            className="rounded-full border border-brand/40 px-4 py-2 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+          >
+            {busy === "preview" ? "확인 중…" : "먼저 확인하기"}
+          </button>
+          <button
+            type="button" disabled={!!busy || !preview || !!preview.error}
+            onClick={() => void run(() => syncGovOrg(true), "apply", setDone as (v: never) => void)}
+            className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-40"
+          >
+            {busy === "apply" ? "적재 중…" : "적재하기"}
+          </button>
+        </div>
+
+        {preview?.error && <p className="text-sm text-red-600">불러오기 실패 — {preview.error}</p>}
+        {preview && !preview.error && !done && (
+          <div className="rounded-lg bg-accent-subtle/20 p-3 text-sm">
+            <p><strong>조직 {preview.orgs}개</strong> · 상하 관계 {preview.edges}건이 들어갑니다.</p>
+            {!!preview.keptAsIs?.length && (
+              <p className="mt-1 text-foreground-muted">이름을 그대로 두는 조직: {preview.keptAsIs.join(", ")}</p>
+            )}
+            <ul className="mt-2 space-y-0.5 text-foreground-muted">
+              {preview.sample?.map((s) => <li key={s.name}>· {s.name}</li>)}
+              {(preview.orgs ?? 0) > (preview.sample?.length ?? 0) && <li>· … 외 {(preview.orgs ?? 0) - (preview.sample?.length ?? 0)}개</li>}
+            </ul>
+          </div>
+        )}
+        {done?.error && <p className="text-sm text-red-600">적재 실패 — {done.error}</p>}
+        {done && !done.error && (
+          <p className="text-sm font-semibold text-brand">완료 — 조직 {done.nodes}개 · 관계 {done.edges}건 반영됐습니다.</p>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-brand/15 p-4">
+        <h2 className="text-lg font-bold text-brand">🗳️ 중앙선거관리위원회</h2>
+        <p className="text-sm text-foreground-muted">
+          후보자·당선인 자료로 인물의 정당·선거구·경력을 채웁니다. 아래 단추로 <strong>이용 승인이 났는지</strong> 먼저 확인합니다.
+        </p>
+        <button
+          type="button" disabled={!!busy}
+          onClick={() => { setBusy("nec"); void getNecElections()
+            .then((d) => setNec(d.error ? `안 됨 — ${d.error}` : `승인 확인 — ${Object.entries(d).map(([k, v]) => `${k} ${(v as unknown[]).length}회`).join(" · ")}`))
+            .catch((e) => setNec(`안 됨 — ${e instanceof Error ? e.message : String(e)}`))
+            .finally(() => setBusy(null)); }}
+          className="rounded-full border border-brand/40 px-4 py-2 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+        >
+          {busy === "nec" ? "확인 중…" : "이용 승인 확인"}
+        </button>
+        {nec && <p className={`text-sm ${nec.startsWith("안 됨") ? "text-red-600" : "font-semibold text-brand"}`}>{nec}</p>}
+      </section>
+    </div>
   );
 }
