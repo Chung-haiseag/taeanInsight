@@ -39,7 +39,7 @@ export function useReadAlong(idxno: number, enabled: boolean) {
  * 원문을 **문장 경계**로 나눈다(공백 제외 순번 기준).
  *   낭독 정렬 원문이 `제목.\n본문`이라 제목도 하나의 문장이 된다.
  */
-function sentenceRanges(source: string): Array<{ start: number; end: number }> {
+export function sentenceRanges(source: string): Array<{ start: number; end: number }> {
   const out: Array<{ start: number; end: number }> = [];
   let ns = 0, start = 0;
   for (const ch of source) {
@@ -120,6 +120,74 @@ export function ReadAlongText({ text, active, offset }: {
       {parts.map((p, i) => p.on
         ? <mark key={i} className="rounded bg-[#FFF0A8] text-foreground transition-colors duration-200">{p.t}</mark>
         : <span key={i}>{p.t}</span>)}
+    </>
+  );
+}
+
+/**
+ * 문장별 '시작 시각' 표 — 문장을 클릭하면 그 지점부터 듣기 위해 필요하다.
+ *   그 문장 범위에 들어가는 첫 단어의 시각을 문장 시작으로 본다.
+ */
+export function useSentenceTimes(doc: WordsDoc | null, source: string) {
+  return useMemo(() => {
+    if (!doc) return [] as Array<{ start: number; end: number; t: number }>;
+    const words = doc.words.filter((w) => typeof w.ns === "number");
+    return sentenceRanges(source).map((r) => {
+      const first = words.find((w) => w.ns! >= r.start && w.ns! < r.end);
+      return { ...r, t: first ? first.s : -1 };
+    }).filter((r) => r.t >= 0);
+  }, [doc, source]);
+}
+
+/**
+ * 문단을 **문장 단위로 쪼개 렌더**한다. 각 문장은 클릭하면 그 지점부터 듣기(당진시대 방식).
+ *   활성 문장은 은은하게 칠하고, 나머지는 마우스를 올렸을 때만 옅게 표시해 '누를 수 있다'를 알린다.
+ */
+export function ReadAlongParagraph({ text, offset, active, sentences, onSeek }: {
+  text: string;
+  offset: number;                                   // 이 문단 앞까지의 공백 제외 누적 순번
+  active: { start: number; end: number } | null;
+  sentences: Array<{ start: number; end: number; t: number }>;
+  onSeek?: (sec: number) => void;
+}) {
+  // 이 문단이 차지하는 순번 구간에 걸치는 문장 경계로 잘라 조각을 만든다.
+  const total = nsCount(text);
+  const cuts: number[] = [];
+  for (const s of sentences) {
+    const rel = s.start - offset;
+    if (rel > 0 && rel < total) cuts.push(rel);
+  }
+  const bounds = [0, ...cuts, total];
+
+  const pieces: Array<{ t: string; ns: number }> = [];
+  let ns = 0, buf = "", bi = 1, pieceNs = 0;
+  for (const ch of text) {
+    if (ns >= bounds[bi] && buf) { pieces.push({ t: buf, ns: pieceNs }); buf = ""; pieceNs = ns; bi++; }
+    buf += ch;
+    if (!/\s/.test(ch)) ns++;
+  }
+  if (buf) pieces.push({ t: buf, ns: pieceNs });
+
+  return (
+    <>
+      {pieces.map((p, i) => {
+        const abs = offset + p.ns;
+        const sen = sentences.find((s) => abs >= s.start && abs < s.end);
+        const on = !!active && abs >= active.start && abs < active.end;
+        return (
+          <span
+            key={i}
+            onClick={sen && onSeek ? () => onSeek(sen.t) : undefined}
+            title={sen && onSeek ? "이 문장부터 듣기" : undefined}
+            className={[
+              sen && onSeek ? "cursor-pointer rounded transition-colors" : "",
+              on ? "bg-[#FFF0A8]" : sen && onSeek ? "hover:bg-accent-subtle/40" : "",
+            ].join(" ")}
+          >
+            {p.t}
+          </span>
+        );
+      })}
     </>
   );
 }

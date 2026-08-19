@@ -3,7 +3,7 @@
 // 자체 기사 리더 — 태안신문으로 나가지 않고 우리 사이트에서 기사를 보여준다.
 // 전문은 D1 아카이브에서(우리 쪽 회원 게이트 뒤), 없으면 RSS 발췌로 폴백.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -21,7 +21,7 @@ import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
-import { useReadAlong, useActiveRange, ReadAlongText, useAutoScroll, alignSource } from "@/components/read-along";
+import { useReadAlong, useActiveRange, useSentenceTimes, ReadAlongText, ReadAlongParagraph, useAutoScroll, alignSource } from "@/components/read-along";
 import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
@@ -44,6 +44,10 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
     [article],
   );
   const raActive = useActiveRange(raWords, raSource, playPos);
+  const raSentences = useSentenceTimes(raWords, raSource);
+  // 본문 문장 클릭 → 그 지점부터 듣기(당진시대 방식). 재생 전이면 그 위치부터 재생을 시작한다.
+  const audioCtl = useRef<{ seekAndPlay: (sec: number) => void } | null>(null);
+  const seekTo = useCallback((sec: number) => audioCtl.current?.seekAndPlay(sec), []);
 
   useEffect(() => {
     setMember(getDemoHomeState() === "entitled");
@@ -108,7 +112,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
           {raActive ? <ReadAlongText text={article.title} active={raActive} offset={0} /> : article.title}
         </h1>
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
-          <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} />
+          <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} controlsRef={audioCtl} />
           <ShareBar idxno={Number(params.id)} title={article.title} />
           <button
             type="button"
@@ -118,10 +122,16 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
             <Icon name="print" /> PDF로 저장
           </button>
         </div>
+        {raWords && (
+          <p className="no-print text-xs text-foreground-muted">
+            기사 본문을 요약 없이 그대로 읽습니다. 읽는 위치가 본문에 표시되고,{" "}
+            <strong className="font-semibold text-brand">문장을 클릭하면 그 지점부터</strong> 들을 수 있습니다.
+          </p>
+        )}
       </header>
 
       {member && article.hasFullText ? (
-        <FullBody article={article} idxno={Number(params.id)} active={raActive} hasWords={!!raWords} />
+        <FullBody article={article} idxno={Number(params.id)} active={raActive} hasWords={!!raWords} sentences={raSentences} onSeek={seekTo} />
       ) : (
         <>
           {/* 리드(발췌) */}
@@ -346,11 +356,13 @@ function QuotedText({ text }: { text: string }) {
   );
 }
 
-function FullBody({ article, idxno, active, hasWords }: {
+function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
   article: Reader;
   idxno: number;
   active: { start: number; end: number } | null;   // 따라읽기 활성 구간(부모에서 계산 — 제목과 공유)
   hasWords: boolean;
+  sentences: Array<{ start: number; end: number; t: number }>;
+  onSeek?: (sec: number) => void;
 }) {
   const allParas = splitParagraphs(article.body || "");
   const bodyRef = useAutoScroll(active, hasWords);
@@ -380,7 +392,13 @@ function FullBody({ article, idxno, active, hasWords }: {
           return paras.map((p, i) => {
             const start = off;
             off += nsLen(p);
-            return <p key={i}>{active ? <ReadAlongText text={p} active={active} offset={start} /> : <QuotedText text={p} />}</p>;
+            return (
+              <p key={i}>
+                {hasWords
+                  ? <ReadAlongParagraph text={p} offset={start} active={active} sentences={sentences} onSeek={onSeek} />
+                  : <QuotedText text={p} />}
+              </p>
+            );
           });
         })()}
       </div>

@@ -16,10 +16,12 @@ function fmt(s: number): string {
   return `${m}:${String(x).padStart(2, "0")}`;
 }
 
-export function WebAudio({ url, event, variant = "inline", title, subtitle, onPos }: {
+export function WebAudio({ url, event, variant = "inline", title, subtitle, onPos, controlsRef }: {
   url: string; event: string; variant?: "inline" | "card"; title?: string; subtitle?: string;
   /** 재생 위치(초) — 본문 따라읽기 하이라이트가 구독한다. 재생 중 rAF마다 호출된다. */
   onPos?: (sec: number) => void;
+  /** 외부에서 재생을 제어할 수 있게 내부 함수를 실어 보낸다(본문 문장 클릭 → 그 지점부터 듣기). */
+  controlsRef?: { current: { seekAndPlay: (sec: number) => void } | null };
 }) {
   const ctxRef = useRef<AudioContext | null>(null);
   const bufRef = useRef<AudioBuffer | null>(null);
@@ -86,6 +88,19 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle, onPo
     offsetRef.current = nt; setPos(nt);
     if (srcRef.current) { const s = srcRef.current; s.onended = null; try { s.stop(); } catch { /* */ } srcRef.current = null; startFrom(nt); }
   }, [startFrom]);
+
+  // 본문 문장 클릭 → 아직 안 틀었으면 재생부터 시작하고, 틀었으면 그 지점으로 이동한다.
+  useEffect(() => {
+    if (!controlsRef) return;
+    controlsRef.current = {
+      seekAndPlay: (sec: number) => {
+        if (!bufRef.current) { offsetRef.current = sec; setPos(sec); void play(); return; }
+        seek(sec);
+        if (st !== "playing") void play();
+      },
+    };
+    return () => { if (controlsRef) controlsRef.current = null; };
+  }, [controlsRef, seek, play, st]);
 
   useEffect(() => () => { stopRaf(); try { srcRef.current?.stop(); } catch { /* */ } try { ctxRef.current?.close(); } catch { /* */ } }, []);
 
