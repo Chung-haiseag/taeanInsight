@@ -97,9 +97,11 @@ export function isLikelyName(s: string): boolean {
  *
  *   별칭이 없는 노드는 이름만 별칭으로 쓴다. 두 글자 미만 별칭은 버린다(오탐이 폭발한다).
  */
-export async function loadOrgs(db: D1Database): Promise<OrgDef[]> {
+export async function loadOrgs(db: D1Database, opts: { includePending?: boolean } = {}): Promise<OrgDef[]> {
+  // 기본은 **검수된 조직만**. 검수 대기(verified=0)까지 쓰면 사람이 승인하는 의미가 없어진다.
+  const where = opts.includePending ? "type='org'" : "type='org' AND verified=1";
   const r = await db
-    .prepare("SELECT id, name, COALESCE(aliases,'') AS aliases FROM kg_nodes WHERE type='org'")
+    .prepare(`SELECT id, name, COALESCE(aliases,'') AS aliases FROM kg_nodes WHERE ${where}`)
     .all<{ id: string; name: string; aliases: string }>();
   const rows = r.results ?? [];
   if (!rows.length) return ORGS;

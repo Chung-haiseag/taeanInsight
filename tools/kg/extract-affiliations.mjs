@@ -16,7 +16,7 @@ function loadOrgsFromD1() {
   try {
     const out = execFileSync("npx", [
       "wrangler", "d1", "execute", "taean-archive", "--remote", "--json", "--command",
-      "SELECT id, name, COALESCE(aliases,'') aliases FROM kg_nodes WHERE type='org'",
+      "SELECT id, name, COALESCE(aliases,'') aliases FROM kg_nodes WHERE type='org' AND verified=1",
     ], { cwd: new URL("../../backend/", import.meta.url).pathname, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 });
     const m = out.match(/"results":\s*(\[[\s\S]*?\])\s*,\s*"success"/);
     const rows = m ? JSON.parse(m[1]) : [];
