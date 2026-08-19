@@ -36,18 +36,40 @@ export function useReadAlong(idxno: number, enabled: boolean) {
 }
 
 /**
- * 재생 시각 → 하이라이트할 '공백 제외 글자 구간'.
- *   서버가 이미 ns(공백 제외 순번)·len을 계산해 보내므로 그대로 쓴다.
+ * 원문을 **문장 경계**로 나눈다(공백 제외 순번 기준).
+ *   낭독 정렬 원문이 `제목.\n본문`이라 제목도 하나의 문장이 된다.
+ */
+function sentenceRanges(source: string): Array<{ start: number; end: number }> {
+  const out: Array<{ start: number; end: number }> = [];
+  let ns = 0, start = 0;
+  for (const ch of source) {
+    if (!/\s/.test(ch)) ns++;
+    // 한국어 기사 문장 끝: 마침표·물음표·느낌표·줄바꿈. 닫는 따옴표는 앞 문장에 붙여 둔다.
+    if (ch === "\n" || /[.?!]/.test(ch)) {
+      if (ns > start) { out.push({ start, end: ns }); start = ns; }
+    }
+  }
+  if (ns > start) out.push({ start, end: ns });
+  return out;
+}
+
+/**
+ * 재생 시각 → 하이라이트할 구간(**문장 단위**).
+ *   단어 단위는 글자가 계속 깜빡여 눈이 피로하고, 고령 독자가 따라가기 어렵다.
+ *   그래서 '지금 읽는 단어가 속한 문장' 전체를 은은하게 칠한다 — 시선이 문장에 머문다.
+ *
  *   ※예전엔 서버가 at(원문 글자 인덱스)을 보내 프런트가 매번 환산했는데, 서버가 ns로 바뀐 뒤
  *     프런트가 at을 계속 읽어 **모든 단어가 걸러지고 하이라이트가 통째로 죽었다**(2026-08-19).
  */
-export function useActiveRange(doc: WordsDoc | null, _source: string, pos: number) {
+export function useActiveRange(doc: WordsDoc | null, source: string, pos: number) {
   const marks = useMemo(() => {
     if (!doc) return [] as Array<{ s: number; e: number; ns: number; len: number }>;
     return doc.words
       .filter((w) => typeof w.ns === "number")
       .map((w) => ({ s: w.s, e: w.e, ns: w.ns!, len: w.len ?? nsCount(w.w) }));
   }, [doc]);
+
+  const sentences = useMemo(() => sentenceRanges(source), [source]);
 
   return useMemo(() => {
     if (!marks.length) return null;
@@ -59,10 +81,12 @@ export function useActiveRange(doc: WordsDoc | null, _source: string, pos: numbe
     }
     if (hit < 0) return null;
     const cur = marks[hit];
-    // 마지막 단어가 끝난 뒤로 한참 지났으면 하이라이트 해제(꼬리 잔상 방지).
+    // 마지막 단어가 끝난 뒤로 한참 지났으면 해제(정지·종료 후 잔상 방지).
     if (pos > cur.e + 2) return null;
-    return { start: cur.ns, end: cur.ns + cur.len };
-  }, [marks, pos]);
+    // 그 단어를 품은 문장으로 확장. 못 찾으면(경계 어긋남) 단어 구간으로 폴백.
+    const sen = sentences.find((r) => cur.ns >= r.start && cur.ns < r.end);
+    return sen ?? { start: cur.ns, end: cur.ns + cur.len };
+  }, [marks, sentences, pos]);
 }
 
 /**
@@ -94,7 +118,7 @@ export function ReadAlongText({ text, active, offset }: {
   return (
     <>
       {parts.map((p, i) => p.on
-        ? <mark key={i} className="rounded-sm bg-[#FFE58A] px-0.5 text-foreground shadow-[0_0_0_2px_#FFE58A]">{p.t}</mark>
+        ? <mark key={i} className="rounded bg-[#FFF0A8] text-foreground transition-colors duration-200">{p.t}</mark>
         : <span key={i}>{p.t}</span>)}
     </>
   );
