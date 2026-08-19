@@ -10,8 +10,9 @@ import { listPendingRelations, setRelation, isReltype } from "./relations";
 import { loadAffiliationQueue, rejectAffiliation } from "./affiliation_queue";
 import { loadFestivalQueue, rejectEvent } from "./event_queue";
 import { loadEntityCoverage } from "./coverage";
-import { call, fetchElections, SG_TYPE } from "./nec";
+import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
+import { fetchTaeanCandidates, toSeed as necSeed } from "./nec_import";
 import { importSeed } from "./import";
 
 const router = new Hono<{ Bindings: Env }>();
@@ -77,6 +78,47 @@ router.post("/gov-org/sync", async (c) => {
     const o = await loadOntology(c.env.ARCHIVE_DB);
     const r = await importSeed(c.env.ARCHIVE_DB, seed, o);
     return c.json({ applied: true, ...r, keptAsIs: seed.skipped });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
+// 후보자 원자료 표본 — 파서를 짜기 전에 필드를 확인하는 용도.
+router.get("/nec/sample", async (c) => {
+  const type = c.req.query("type") ?? SG_TYPE.구시군의원;
+  try {
+    return c.json(await fetchTaeanSample(c.env, type));
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
+// ── 선관위 후보자 적재 —— 인물 노드를 새로 만들지 않고 보강한다(person:<이름>은 기존과 같은 id).
+//   조직도와 마찬가지로 기본은 드라이런.
+router.post("/nec/sync", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const apply = c.req.query("apply") === "1";
+  const types = (c.req.query("types") ?? "4,5,6").split(",").filter(Boolean);
+  try {
+    const all: Array<Record<string, unknown>> = [];
+    const per: Array<{ type: string; sgId: string; n: number }> = [];
+    for (const type of types) {
+      const { sgId, items } = await fetchTaeanCandidates(c.env, type);
+      per.push({ type, sgId, n: items.length });
+      all.push(...(items as Array<Record<string, unknown>>));
+    }
+    const seed = necSeed(all);
+    const people = seed.nodes.filter((n) => n.type === "person");
+    if (!apply) {
+      return c.json({
+        dryRun: true, per,
+        people: people.length, parties: seed.nodes.length - people.length, edges: seed.edges.length,
+        names: people.map((n) => n.name),
+      });
+    }
+    const o = await loadOntology(c.env.ARCHIVE_DB);
+    const r = await importSeed(c.env.ARCHIVE_DB, seed, o);
+    return c.json({ applied: true, per, ...r });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }

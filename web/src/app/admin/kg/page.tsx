@@ -18,7 +18,11 @@ import {
   type KgNode,
   syncGovOrg,
   getNecElections,
+  getNecSample,
+  syncNec,
   type GovOrgSyncResult,
+  type NecSample,
+  type NecSyncResult,
 } from "@/lib/api/kg";
 import MergeConsole from "./merge-console";
 import PeopleExplorer from "./people-explorer";
@@ -501,6 +505,9 @@ function DataSources() {
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<GovOrgSyncResult | null>(null);
   const [nec, setNec] = useState<string | null>(null);
+  const [sample, setSample] = useState<NecSample | null>(null);
+  const [necPre, setNecPre] = useState<NecSyncResult | null>(null);
+  const [necDone, setNecDone] = useState<NecSyncResult | null>(null);
 
   async function run(fn: () => Promise<unknown>, key: string, set: (v: never) => void) {
     setBusy(key);
@@ -569,6 +576,89 @@ function DataSources() {
           {busy === "nec" ? "확인 중…" : "이용 승인 확인"}
         </button>
         {nec && <p className={`text-sm ${nec.startsWith("안 됨") ? "text-red-600" : "font-semibold text-brand"}`}>{nec}</p>}
+
+        <div className="border-t border-brand/10 pt-3">
+          <p className="mb-2 text-sm text-foreground-muted">
+            군수·도의원·군의원 후보를 인물 정보로 들입니다. 이미 있는 인물은 <strong>새로 만들지 않고 채웁니다</strong>
+            (생년월일·정당·선거구·경력). 재산·전과는 자료에 없어 들어오지 않습니다.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button" disabled={!!busy}
+              onClick={() => { setNecDone(null); void run(() => syncNec(false), "necPre", setNecPre as (v: never) => void); }}
+              className="rounded-full border border-brand/40 px-4 py-2 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+            >
+              {busy === "necPre" ? "확인 중…" : "먼저 확인하기"}
+            </button>
+            <button
+              type="button" disabled={!!busy || !necPre || !!necPre.error}
+              onClick={() => void run(() => syncNec(true), "necApply", setNecDone as (v: never) => void)}
+              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-40"
+            >
+              {busy === "necApply" ? "적재 중…" : "적재하기"}
+            </button>
+          </div>
+          {necPre?.error && <p className="mt-2 text-sm text-red-600">{necPre.error}</p>}
+          {necPre && !necPre.error && !necDone && (
+            <div className="mt-2 rounded-lg bg-accent-subtle/20 p-3 text-sm">
+              <p><strong>인물 {necPre.people}명</strong> · 정당 {necPre.parties}개 · 소속 {necPre.edges}건</p>
+              <p className="mt-1 text-xs text-foreground-muted">
+                {necPre.per?.map((p) => `${{ "4": "군수", "5": "도의원", "6": "군의원" }[p.type] ?? p.type} ${p.sgId} ${p.n}명`).join(" · ")}
+              </p>
+              <p className="mt-1 text-foreground-muted">{necPre.names?.join(", ")}</p>
+            </div>
+          )}
+          {necDone?.error && <p className="mt-2 text-sm text-red-600">적재 실패 — {necDone.error}</p>}
+          {necDone && !necDone.error && (
+            <p className="mt-2 text-sm font-semibold text-brand">완료 — 노드 {necDone.nodes}개 · 관계 {necDone.edges}건 반영됐습니다.</p>
+          )}
+        </div>
+
+        <div className="border-t border-brand/10 pt-3">
+          <p className="mb-2 text-sm text-foreground-muted">
+            자료가 어떤 모양으로 오는지 한 건만 열어봅니다. 이걸 보고 경력·소속을 읽는 방식을 정합니다.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[["구시군의원", "6"], ["구시군장", "4"], ["시도의원", "5"]].map(([label, code]) => (
+              <button
+                key={code} type="button" disabled={!!busy}
+                onClick={() => { setBusy(code); setSample(null); void getNecSample(code)
+                  .then(setSample)
+                  .catch((e) => setSample({ sgId: null, matched: 0, sample: null, fields: [], error: e instanceof Error ? e.message : String(e) }))
+                  .finally(() => setBusy(null)); }}
+                className="rounded-full border border-brand/30 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+              >
+                {busy === code ? "여는 중…" : `${label} 표본`}
+              </button>
+            ))}
+          </div>
+          {sample?.error && <p className="mt-2 text-sm text-red-600">{sample.error}</p>}
+          {sample && !sample.error && (
+            <div className="mt-2 space-y-2 text-sm">
+              <p className="text-foreground-muted">선거 목록 {sample.elections ?? 0}회차 · 최근부터 조회</p>
+              {!!sample.attempts?.length && (
+                <table className="w-full text-xs">
+                  <thead className="text-foreground-muted">
+                    <tr><th className="text-left font-normal">조회 조건</th><th className="text-right font-normal">전체</th><th className="text-right font-normal">태안</th></tr>
+                  </thead>
+                  <tbody>
+                    {sample.attempts.map((a, i) => (
+                      <tr key={i} className={a.matched ? "font-semibold text-brand" : ""}>
+                        <td className="tabular-nums">{a.how}{a.note ? ` — ${a.note}` : ""}</td>
+                        <td className="text-right tabular-nums">{a.total}</td><td className="text-right tabular-nums">{a.matched}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {sample.sample ? (
+                <pre className="max-h-96 overflow-auto rounded bg-foreground/5 p-3 text-xs leading-relaxed">
+                  {JSON.stringify(sample.sample, null, 1)}
+                </pre>
+              ) : <p className="text-foreground-muted">태안 후보가 잡히지 않았습니다.</p>}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

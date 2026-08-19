@@ -224,3 +224,27 @@ export interface NecElections { [label: string]: Array<{ sgId: string; name: str
 export function getNecElections(): Promise<NecElections & { error?: string }> {
   return apiFetch("/api/admin/kg/nec/elections");
 }
+
+export interface NecSample {
+  elections?: number;
+  attempts?: Array<{ how: string; total: number; matched: number; note?: string }>;
+  sgId: string | null; how?: string | null; matched: number;
+  sample: Record<string, unknown> | null; fields: string[]; error?: string;
+}
+
+/** 후보자 원자료 표본 — 파서를 짜기 전에 실제 필드를 확인하는 용도. */
+export function getNecSample(type = "6"): Promise<NecSample> {
+  return apiFetch(`/api/admin/kg/nec/sample?type=${type}`);
+}
+
+export interface NecSyncResult {
+  dryRun?: boolean; applied?: boolean;
+  per?: Array<{ type: string; sgId: string; n: number }>;
+  people?: number; parties?: number; edges?: number; nodes?: number;
+  names?: string[]; error?: string;
+}
+
+/** 선관위 후보자 적재. apply=false면 누가 들어갈지만 미리 본다(기본). */
+export function syncNec(apply = false): Promise<NecSyncResult> {
+  return apiFetch(`/api/admin/kg/nec/sync${apply ? "?apply=1" : ""}`, { method: "POST" });
+}

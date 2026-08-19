@@ -85,8 +85,75 @@ export async function call(env: Env, path: string, params: Record<string, string
 
 export interface SgCode { sgId: string; sgName: string; sgTypecode: string; sgVotedate?: string }
 
-/** 선거 목록 — sgId(선거일 YYYYMMDD)를 얻어야 후보자·당선인을 부를 수 있다. */
+/**
+ * 선거 목록 — sgId(선거일 YYYYMMDD)를 얻어야 후보자·당선인을 부를 수 있다.
+ *   ⚠ **전체 페이지를 받아야 한다.** 첫 100건만 받으면 재보궐선거만 잡히고 정작
+ *     전국동시지방선거(2022·2018·2014)를 놓친다 — 실제로 그렇게 0건이 나왔다.
+ */
 export async function fetchElections(env: Env, sgTypecode: string): Promise<SgCode[]> {
-  const body = await call(env, "CommonCodeService/getCommonSgCodeList", { pageNo: 1, numOfRows: 100, sgTypecode });
-  return readItems<SgCode>(body);
+  const out: SgCode[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const body = await call(env, "CommonCodeService/getCommonSgCodeList", { pageNo: page, numOfRows: 100, sgTypecode });
+    const items = readItems<SgCode>(body);
+    out.push(...items);
+    if (items.length < 100 || out.length >= readTotal(body)) break;
+  }
+  return out;
+}
+
+/**
+ * 태안 후보자 표본 — **파서를 짜기 전에 실제 필드를 눈으로 보기 위한 것**.
+ *   응답 형태를 모르는 채 파서를 먼저 쓰면 틀린다(낭독 정렬에서 겪은 그대로).
+ *   최신 선거부터 훑어 태안 후보가 잡히는 첫 회차의 원자료를 그대로 돌려준다.
+ */
+export interface SampleAttempt { how: string; total: number; matched: number; note?: string }
+
+// 지역을 좁히는 조회 조건 후보 — 어느 이름이 먹는지 문서만 봐선 알 수 없어 함께 시도한다.
+//   (전체 4,402건을 100건씩 45쪽 받는 건 낭비다. 서버에서 좁히는 게 맞다.)
+const NARROWERS: Array<{ how: string; params: Record<string, string> }> = [
+  { how: "sdName+wiwName", params: { sdName: "충청남도", wiwName: "태안군" } },
+  { how: "sdName+sggName", params: { sdName: "충청남도", sggName: "태안군" } },
+  { how: "wiwName만", params: { wiwName: "태안군" } },
+  { how: "sdName만", params: { sdName: "충청남도" } },
+];
+
+const OP = "PofelcddInfoInqireService/getPofelcddRegistSttusInfoInqire";
+const hasTaean = (r: unknown) => JSON.stringify(r).includes("태안");
+
+/**
+ * 태안 후보자 표본 — **파서를 짜기 전에 실제 필드를 눈으로 보기 위한 것**.
+ *   응답 형태를 모르는 채 파서를 먼저 쓰면 틀린다(낭독 정렬에서 겪은 그대로).
+ *
+ *   조회 조건 이름(sdName/sggName/wiwName)이 어느 것인지 확실치 않아 차례로 시도하고,
+ *   **시도마다 전체·태안 건수를 남긴다** — 0건일 때 '조건이 틀림'인지 '태안이 없음'인지 갈라야 하므로.
+ */
+export async function fetchTaeanSample(env: Env, sgTypecode: string): Promise<{
+  elections: number; sgId: string | null; attempts: SampleAttempt[];
+  how: string | null; matched: number; sample: unknown | null; fields: string[];
+}> {
+  const elections = await fetchElections(env, sgTypecode);
+  // 같은 날짜가 선거종류만 달리해 여러 줄로 오므로 날짜를 중복 제거한다.
+  const ids = [...new Set(elections.map((e) => String(e.sgId)))].sort().reverse().slice(0, 3);
+  const attempts: SampleAttempt[] = [];
+
+  for (const sgId of ids) {
+    for (const n of NARROWERS) {
+      let items: Array<Record<string, unknown>> = [];
+      let total = 0;
+      try {
+        const body = await call(env, OP, { pageNo: 1, numOfRows: 100, sgId, sgTypecode, ...n.params });
+        items = readItems<Record<string, unknown>>(body);
+        total = readTotal(body);
+      } catch (e) {
+        attempts.push({ how: `${sgId} ${n.how}`, total: 0, matched: 0, note: e instanceof Error ? e.message.slice(0, 80) : "오류" });
+        continue;
+      }
+      const hit = items.filter(hasTaean);
+      attempts.push({ how: `${sgId} ${n.how}`, total, matched: hit.length });
+      if (hit.length) {
+        return { elections: elections.length, sgId, attempts, how: n.how, matched: hit.length, sample: hit[0], fields: Object.keys(hit[0]) };
+      }
+    }
+  }
+  return { elections: elections.length, sgId: ids[0] ?? null, attempts, how: null, matched: 0, sample: null, fields: [] };
 }
