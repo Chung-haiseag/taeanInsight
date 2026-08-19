@@ -3,7 +3,7 @@
 // 자체 기사 리더 — 태안신문으로 나가지 않고 우리 사이트에서 기사를 보여준다.
 // 전문은 D1 아카이브에서(우리 쪽 회원 게이트 뒤), 없으면 RSS 발췌로 폴백.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -21,6 +21,7 @@ import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
+import { useReadAlong, useActiveRange, ReadAlongText, useAutoScroll, alignSource } from "@/components/read-along";
 import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
@@ -33,6 +34,16 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!initialArticle);
   const [member, setMember] = useState(false);
+  // 낭독 재생 위치(초) — 따라읽기 하이라이트가 쓴다. 재생 안 하면 0으로 남아 하이라이트도 없다.
+  const [playPos, setPlayPos] = useState(0);
+  // 낭독은 '제목 → 본문' 순으로 읽으므로 **제목도 하이라이트 대상**이다(초반 7초가 제목이라
+  //   제목을 빼면 재생 직후엔 아무 데도 안 칠해져 기능이 꺼진 것처럼 보인다 — 실제로 그랬다).
+  const raWords = useReadAlong(Number(params.id), playPos > 0);
+  const raSource = useMemo(
+    () => (article ? alignSource(article.title, article.body || "") : ""),
+    [article],
+  );
+  const raActive = useActiveRange(raWords, raSource, playPos);
 
   useEffect(() => {
     setMember(getDemoHomeState() === "entitled");
@@ -93,9 +104,11 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
           <span className="text-foreground-muted">{formatDate(article.publishedAt)}</span>
           {article.author && <span className="text-foreground-muted">· {article.author}</span>}
         </div>
-        <h1 className="text-display-sm font-bold text-brand">{article.title}</h1>
+        <h1 className="text-display-sm font-bold text-brand">
+          {raActive ? <ReadAlongText text={article.title} active={raActive} offset={0} /> : article.title}
+        </h1>
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
-          <NewsAudio idxno={Number(params.id)} />
+          <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} />
           <ShareBar idxno={Number(params.id)} title={article.title} />
           <button
             type="button"
@@ -108,7 +121,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
       </header>
 
       {member && article.hasFullText ? (
-        <FullBody article={article} idxno={Number(params.id)} />
+        <FullBody article={article} idxno={Number(params.id)} active={raActive} hasWords={!!raWords} />
       ) : (
         <>
           {/* 리드(발췌) */}
@@ -304,6 +317,9 @@ function PagerBtn({
   );
 }
 
+/** 공백 제외 글자 수 — 따라읽기 순번 계산의 기준(정렬 데이터와 동일 규칙). */
+const nsLen = (s: string) => s.replace(/\s/g, "").length;
+
 function splitParagraphs(text: string): string[] {
   const t = (text || "").trim();
   if (!t) return [];
@@ -330,8 +346,14 @@ function QuotedText({ text }: { text: string }) {
   );
 }
 
-function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
+function FullBody({ article, idxno, active, hasWords }: {
+  article: Reader;
+  idxno: number;
+  active: { start: number; end: number } | null;   // 따라읽기 활성 구간(부모에서 계산 — 제목과 공유)
+  hasWords: boolean;
+}) {
   const allParas = splitParagraphs(article.body || "");
+  const bodyRef = useAutoScroll(active, hasWords);
   const isEbook = idxno >= 90000001 && idxno <= 90099999;
   const leadImg = article.images[0] ?? null;
   // 사진설명: 사진이 있고 첫 문단이 짧으면(≤45자 = 캡션) 본문에서 분리해 사진 아래 중앙에 배치.
@@ -350,10 +372,17 @@ function FullBody({ article, idxno }: { article: Reader; idxno: number }) {
       )}
 
       {/* 본문 — 줄간격·문단간격은 가독성 기준(과도한 여백 방지) */}
-      <div className="space-y-4 text-[1.02rem] leading-[1.7] text-foreground">
-        {paras.map((p, i) => (
-          <p key={i}><QuotedText text={p} /></p>
-        ))}
+      {/*   따라읽기: 정렬 원문이 `제목.\n본문`이라 본문 문단의 순번은 제목 글자 수부터 시작한다. */}
+      <div ref={bodyRef as React.RefObject<HTMLDivElement>} className="space-y-4 text-[1.02rem] leading-[1.7] text-foreground">
+        {(() => {
+          let off = nsLen(`${article.title}.`);
+          if (hasCaption) off += nsLen(allParas[0]);
+          return paras.map((p, i) => {
+            const start = off;
+            off += nsLen(p);
+            return <p key={i}>{active ? <ReadAlongText text={p} active={active} offset={start} /> : <QuotedText text={p} />}</p>;
+          });
+        })()}
       </div>
 
       {/* 나머지 본문 사진(리드 외) */}

@@ -11,7 +11,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-export interface WordTime { w: string; s: number; e: number; at?: number }
+// ns = 원문에서 공백을 제외한 글자 순번, len = 그 단어의 글자 수(서버 align.ts가 계산해 보낸다).
+export interface WordTime { w: string; s: number; e: number; ns?: number; len?: number }
 interface WordsDoc { idxno: number; duration: number; words: WordTime[] }
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
@@ -36,16 +37,17 @@ export function useReadAlong(idxno: number, enabled: boolean) {
 
 /**
  * 재생 시각 → 하이라이트할 '공백 제외 글자 구간'.
- *   정렬 원문 기준 at(글자 위치)을 non-space 순번으로 바꿔 화면과 맞춘다.
+ *   서버가 이미 ns(공백 제외 순번)·len을 계산해 보내므로 그대로 쓴다.
+ *   ※예전엔 서버가 at(원문 글자 인덱스)을 보내 프런트가 매번 환산했는데, 서버가 ns로 바뀐 뒤
+ *     프런트가 at을 계속 읽어 **모든 단어가 걸러지고 하이라이트가 통째로 죽었다**(2026-08-19).
  */
-export function useActiveRange(doc: WordsDoc | null, source: string, pos: number) {
-  // 단어별 non-space 시작 순번을 미리 계산(원문은 안 바뀌므로 1회).
+export function useActiveRange(doc: WordsDoc | null, _source: string, pos: number) {
   const marks = useMemo(() => {
     if (!doc) return [] as Array<{ s: number; e: number; ns: number; len: number }>;
     return doc.words
-      .filter((w) => typeof w.at === "number")
-      .map((w) => ({ s: w.s, e: w.e, ns: nsCount(source.slice(0, w.at!)), len: nsCount(w.w) }));
-  }, [doc, source]);
+      .filter((w) => typeof w.ns === "number")
+      .map((w) => ({ s: w.s, e: w.e, ns: w.ns!, len: w.len ?? nsCount(w.w) }));
+  }, [doc]);
 
   return useMemo(() => {
     if (!marks.length) return null;
@@ -92,7 +94,7 @@ export function ReadAlongText({ text, active, offset }: {
   return (
     <>
       {parts.map((p, i) => p.on
-        ? <mark key={i} className="rounded bg-accent/25 text-foreground transition-colors">{p.t}</mark>
+        ? <mark key={i} className="rounded-sm bg-[#FFE58A] px-0.5 text-foreground shadow-[0_0_0_2px_#FFE58A]">{p.t}</mark>
         : <span key={i}>{p.t}</span>)}
     </>
   );

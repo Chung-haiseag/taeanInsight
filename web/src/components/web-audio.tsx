@@ -16,8 +16,10 @@ function fmt(s: number): string {
   return `${m}:${String(x).padStart(2, "0")}`;
 }
 
-export function WebAudio({ url, event, variant = "inline", title, subtitle }: {
+export function WebAudio({ url, event, variant = "inline", title, subtitle, onPos }: {
   url: string; event: string; variant?: "inline" | "card"; title?: string; subtitle?: string;
+  /** 재생 위치(초) — 본문 따라읽기 하이라이트가 구독한다. 재생 중 rAF마다 호출된다. */
+  onPos?: (sec: number) => void;
 }) {
   const ctxRef = useRef<AudioContext | null>(null);
   const bufRef = useRef<AudioBuffer | null>(null);
@@ -26,7 +28,10 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle }: {
   const offsetRef = useRef(0);    // 일시정지/seek 지점(초)
   const rafRef = useRef(0);
   const [st, setSt] = useState<St>("idle");
-  const [pos, setPos] = useState(0);
+  const [pos, setPosState] = useState(0);
+  // 위치 갱신은 항상 이 함수로 — 화면 표시와 따라읽기 하이라이트가 어긋나지 않게 한 곳에서 통지.
+  const onPosRef = useRef(onPos); onPosRef.current = onPos;
+  const setPos = (v: number) => { setPosState(v); onPosRef.current?.(v); };
   const [dur, setDur] = useState(0);
 
   const stopRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; } };
