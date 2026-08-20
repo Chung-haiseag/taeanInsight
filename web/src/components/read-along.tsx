@@ -90,41 +90,6 @@ export function useActiveRange(doc: WordsDoc | null, source: string, pos: number
 }
 
 /**
- * 텍스트 조각을 렌더하며, 전체에서의 non-space 순번이 active 구간에 걸리는 글자를 강조한다.
- *   `offsetRef`로 앞 조각까지의 누적 순번을 이어받아, 문단이 나뉘어도 순번이 연속된다.
- */
-export function ReadAlongText({ text, active, offset }: {
-  text: string;
-  active: { start: number; end: number } | null;
-  offset: number;
-}) {
-  if (!active) return <>{text}</>;
-  const total = nsCount(text);
-  // 이 조각이 활성 구간과 겹치지 않으면 그대로.
-  if (active.end <= offset || active.start >= offset + total) return <>{text}</>;
-
-  // 글자 단위로 훑으며 강조 구간만 <mark>로 감싼다.
-  const parts: Array<{ t: string; on: boolean }> = [];
-  let ns = offset, buf = "", on = false;
-  for (const ch of text) {
-    const isSpace = /\s/.test(ch);
-    const nowOn = !isSpace && ns >= active.start && ns < active.end;
-    if (nowOn !== on && buf) { parts.push({ t: buf, on }); buf = ""; }
-    on = nowOn; buf += ch;
-    if (!isSpace) ns++;
-  }
-  if (buf) parts.push({ t: buf, on });
-
-  return (
-    <>
-      {parts.map((p, i) => p.on
-        ? <mark key={i} className="rounded bg-[#FFF0A8] text-foreground transition-colors duration-200">{p.t}</mark>
-        : <span key={i}>{p.t}</span>)}
-    </>
-  );
-}
-
-/**
  * 문장별 '시작 시각' 표 — 문장을 클릭하면 그 지점부터 듣기 위해 필요하다.
  *   그 문장 범위에 들어가는 첫 단어의 시각을 문장 시작으로 본다.
  */
@@ -142,6 +107,10 @@ export function useSentenceTimes(doc: WordsDoc | null, source: string) {
 /**
  * 문단을 **문장 단위로 쪼개 렌더**한다. 각 문장은 클릭하면 그 지점부터 듣기(당진시대 방식).
  *   활성 문장은 은은하게 칠하고, 나머지는 마우스를 올렸을 때만 옅게 표시해 '누를 수 있다'를 알린다.
+ *
+ *   제목도 이걸로 렌더한다. 예전엔 제목만 글자 단위 컴포넌트를 써서 두 가지가 어긋났다(2026-08-20):
+ *     · 공백이 강조에서 빠져 **단어마다 노란 칸**이 따로 생겼다(제목이 토막나 보였다).
+ *     · 클릭이 안 걸려 있어 제목을 눌러도 처음부터 듣기가 안 됐다.
  */
 export function ReadAlongParagraph({ text, offset, active, sentences, onSeek }: {
   text: string;

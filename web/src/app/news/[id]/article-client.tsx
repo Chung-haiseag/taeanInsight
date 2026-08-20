@@ -21,7 +21,7 @@ import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import { ReadingTracker } from "@/components/reading-tracker";
 import { NewsAudio } from "@/components/news-audio";
-import { useReadAlong, useActiveRange, useSentenceTimes, ReadAlongText, ReadAlongParagraph, useAutoScroll, alignSource } from "@/components/read-along";
+import { useReadAlong, useActiveRange, useSentenceTimes, ReadAlongParagraph, useAutoScroll, alignSource } from "@/components/read-along";
 import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
@@ -109,7 +109,9 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
           {article.author && <span className="text-foreground-muted">· {article.author}</span>}
         </div>
         <h1 className="text-display-sm font-bold text-brand">
-          {raActive ? <ReadAlongText text={article.title} active={raActive} offset={0} /> : article.title}
+          {raWords
+            ? <ReadAlongParagraph text={article.title} offset={0} active={raActive} sentences={raSentences} onSeek={seekTo} />
+            : article.title}
         </h1>
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
           <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} controlsRef={audioCtl} durationHint={raWords?.duration} />

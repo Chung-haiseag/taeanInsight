@@ -194,6 +194,18 @@ export function followedByOtherTitle(body: string, at: number): boolean {
   return OTHER_TITLE_AFTER.test(body.slice(at, at + 6));
 }
 
+/**
+ * 이름 끝에 붙은 조사를 뗀다 — '군의원 김영인이 참석해'에서 '김영인이'가 인명으로 잡혔다.
+ *   4글자 이름은 드물고, 끝글자가 조사이며 앞 3글자가 인명이면 조사로 본다.
+ *   3글자 이름('김영이')을 잘라내지 않도록 **4글자일 때만** 적용한다.
+ */
+const TAIL_PARTICLE = /[이가은는을를와과의도]$/;
+export function trimNameParticle(name: string): string {
+  if (name.length !== 4 || !TAIL_PARTICLE.test(name)) return name;
+  const head = name.slice(0, 3);
+  return isLikelyName(head) ? head : name;
+}
+
 /** 별칭 뒤가 장소어면 소속이 아니라 '장소 언급'이다. 예: '군청 대강당에서', '태안발전본부 테니스장'. */
 const VENUE_WORDS = ["대강당", "강당", "상황실", "회의실", "대회의", "소회의", "체육관", "운동장", "테니스장",
   "축구장", "야구장", "광장", "주차장", "청사", "일원", "앞", "정문", "로비", "식당", "다목적", "프레스센터"];
@@ -268,7 +280,8 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
   const idx = orgAliasIndex(orgs);
   const aliasSet = new Set(idx.keys());
   const out = new Map<string, Candidate>();
-  const add = (name: string, orgId: string, role: string, evidence: string) => {
+  const add = (rawName: string, orgId: string, role: string, evidence: string) => {
+    const name = trimNameParticle(rawName);
     if (!isLikelyName(name)) return;
     if (aliasSet.has(name)) return; // 조직 별칭 자체는 인명 아님
     if (!roleFitsOrg(orgId, role)) return;
@@ -292,6 +305,9 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
       const beforeRe = new RegExp(`([가-힣]{2,4})\\s?([가-힣]{0,3}?)${escapeRe(title)}`, "g");
       for (const m of window.matchAll(beforeRe)) {
         if (m[2] && m[2] !== "태안") continue;
+        // 이름은 **완결된 낱말**이어야 한다. '태안군의회 군의원'에서 꼬리 '안군의회'가
+        //   안씨 이름처럼 보여 인물로 등록됐다(2026-08-20). 앞 글자가 한글이면 더 긴 말의 일부다.
+        if (/[가-힣]/.test(window[(m.index ?? 0) - 1] ?? "")) continue;
         // 이름 **앞**에 타 지자체 표기가 오는 어순도 있다: '당진군 민종기 군수'.
         const lead = window.slice(Math.max(0, (m.index ?? 0) - 6), m.index ?? 0);
         const lm = /([가-힣]{1,3})(시|군|도)\s*$/.exec(lead);
@@ -300,10 +316,19 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
         if (!hasBoundaryAfter(window, (m.index ?? 0) + m[0].length)) continue;
         add(m[1], orgId, title, window);
       }
+      // 직함 **앞**에 이미 사람 이름이 붙어 있으면 그 사람이 주인이다 — 뒤 이름은 다음 사람이다.
+      //   '조한무 군의원 전창균 태안군축구협회'에서 군의원은 조한무이고 전창균은 축구협회 쪽이다(2026-08-20).
+      //   앞서 넣은 규칙은 뒤에 '직함'이 올 때만 막았는데, 뒤에 '조직 이름'이 오는 형태가 남아 있었다.
+      //   앞 이름은 **완결된 낱말**이어야 한다. '태안군의회 군의원'에서 꼬리 '안군의회'가
+      //   안씨 이름처럼 보여 잡혔다 — 앞 글자가 한글이면 더 긴 말의 일부다.
+      const leadWin = body.slice(Math.max(0, pos - 7), pos);
+      const lead = /(^|[^가-힣])([가-힣]{2,4})\s?$/.exec(leadWin);
+      const ownedBefore = !!lead && isLikelyName(lead[2]);
+
       // (b) 직함 → 이름 순서('군의원 김영인'): 지역이 낄 자리가 없으므로 그대로 채택.
       //     단 '홍성군(군수 이용록)'처럼 괄호 주인이 다른 지자체면 그 지자체의 직함이다.
       const afterRe = new RegExp(`([가-힣]{2,6})?\\s*[(（]?\\s*${escapeRe(title)}\\s?([가-힣]{2,4})`, "g");
-      for (const m of window.matchAll(afterRe)) {
+      for (const m of ownedBefore ? [] : window.matchAll(afterRe)) {
         const owner = (m[1] ?? "").trim();
         if (owner && /(군|시|구)$/.test(owner) && !owner.startsWith("태안")) continue;
         // '서산군수 박정기'처럼 지역명이 직함에 바로 붙는 형태 — owner가 '서산'으로만 잡힌다.

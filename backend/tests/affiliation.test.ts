@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractAffiliations, isLikelyName, ORGS, orgAliasIndex, roleFitsOrg } from "../src/kg/affiliation";
+import { extractAffiliations, isLikelyName, ORGS, orgAliasIndex, roleFitsOrg, trimNameParticle } from "../src/kg/affiliation";
 
 describe("isLikelyName", () => {
   it("성씨로 시작하는 2~4자 한글은 인명", () => {
@@ -164,5 +164,54 @@ describe("명단 어순", () => {
   it("의장·부의장은 막지 않는다", () => {
     const r = extractAffiliations("태안군의회 군의원 김영인 의장이 인사말을 했다");
     expect(r.some((c) => c.personName === "김영인")).toBe(true);
+  });
+});
+
+describe("직함 앞에 이미 이름이 있으면", () => {
+  // 실제 검수 화면(2026-08-20): 전창균이 태안군의회 군의원으로 붙었다. 군의원은 조한무다.
+  it("뒤 이름을 그 직함의 사람으로 삼지 않는다", () => {
+    const body = "에는 허정회 부군수를 비롯해 조한무 군의원 전창균 태안군축구협회 회장이 참석했다";
+    const r = extractAffiliations(body);
+    expect(r.find((c) => c.personName === "전창균")).toBeUndefined();
+    expect(r.find((c) => c.personName === "조한무")?.role).toBe("군의원");
+    expect(r.find((c) => c.personName === "허정회")?.role).toBe("부군수");
+  });
+
+  // 직함이 먼저 오는 어순은 그대로 살아 있어야 한다.
+  it("'군의원 김영인'처럼 직함이 앞서면 그대로 잡는다", () => {
+    const r = extractAffiliations("이날 행사에는 군의원 김영인이 참석해 축사를 했다");
+    expect(r.find((c) => c.personName === "김영인")?.role).toBe("군의원");
+  });
+});
+
+describe("이름 끝 조사", () => {
+  it("'김영인이 참석해'에서 조사를 뗀다", () => {
+    expect(trimNameParticle("김영인이")).toBe("김영인");
+    expect(extractAffiliations("이날 행사에는 군의원 김영인이 참석해 축사를 했다")
+      .find((c) => c.personName === "김영인")?.role).toBe("군의원");
+  });
+
+  // 3글자 이름을 잘라내면 멀쩡한 사람이 사라진다.
+  it("3글자 이름은 건드리지 않는다", () => {
+    expect(trimNameParticle("김영이")).toBe("김영이");
+    expect(trimNameParticle("홍길동")).toBe("홍길동");
+  });
+
+  it("조사가 아니면 그대로 둔다", () => {
+    expect(trimNameParticle("남궁민수")).toBe("남궁민수");
+  });
+});
+
+describe("조직명 꼬리를 인물로 삼지 않기", () => {
+  // '태안군의회'의 꼬리 '안군의회'가 안씨 이름처럼 보여 인물 노드로 등록됐다.
+  it("태안군의회에서 '안군의회'를 사람으로 잡지 않는다", () => {
+    const r = extractAffiliations("태안군의회 군의원 김영인 의장이 인사말을 했다");
+    expect(r.find((c) => c.personName === "안군의회")).toBeUndefined();
+    expect(r.find((c) => c.personName === "김영인")?.role).toBe("군의원");
+  });
+
+  it("이름이 앞서는 정상 어순은 그대로 잡는다", () => {
+    expect(extractAffiliations("이날 행사에서 가세로 군수가 축사를 했다")
+      .find((c) => c.personName === "가세로")?.role).toBe("군수");
   });
 });
