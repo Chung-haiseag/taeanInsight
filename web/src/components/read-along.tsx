@@ -54,52 +54,31 @@ export function sentenceRanges(source: string): Array<{ start: number; end: numb
 }
 
 /**
- * 재생 시각 → 하이라이트할 구간(**문장 단위**).
- *   단어 단위는 글자가 계속 깜빡여 눈이 피로하고, 고령 독자가 따라가기 어렵다.
- *   그래서 '지금 읽는 단어가 속한 문장' 전체를 은은하게 칠한다 — 시선이 문장에 머문다.
- *
- *   ※예전엔 서버가 at(원문 글자 인덱스)을 보내 프런트가 매번 환산했는데, 서버가 ns로 바뀐 뒤
- *     프런트가 at을 계속 읽어 **모든 단어가 걸러지고 하이라이트가 통째로 죽었다**(2026-08-19).
+ * 문장 시작 위치가 조금 앞설 수 있는 허용치(글자).
+ *   낭독 정렬은 앵커 사이를 글자수 비율로 채우므로 2~5글자쯤 오차가 남는다.
+ *   실측(2026-08-20): 문장마다 **진짜 첫 단어가 경계보다 2~5글자 앞**에 놓였고,
+ *   그대로 두면 첫 단어를 건너뛰어 0.2~1.7초 늦게 시작했다.
+ *   늦게 시작해 첫 마디를 놓치는 것보다, 조금 일찍 시작하는 편이 낫다.
  */
-export function useActiveRange(doc: WordsDoc | null, source: string, pos: number) {
-  const marks = useMemo(() => {
-    if (!doc) return [] as Array<{ s: number; e: number; ns: number; len: number }>;
-    return doc.words
-      .filter((w) => typeof w.ns === "number")
-      .map((w) => ({ s: w.s, e: w.e, ns: w.ns!, len: w.len ?? nsCount(w.w) }));
-  }, [doc]);
+const START_TOL = 8;
 
-  const sentences = useMemo(() => sentenceRanges(source), [source]);
-
-  return useMemo(() => {
-    if (!marks.length) return null;
-    // 현재 시각이 속한 단어(없으면 직전 단어) — 이분 탐색.
-    let lo = 0, hi = marks.length - 1, hit = -1;
-    while (lo <= hi) {
-      const m = (lo + hi) >> 1;
-      if (marks[m].s <= pos) { hit = m; lo = m + 1; } else hi = m - 1;
-    }
-    if (hit < 0) return null;
-    const cur = marks[hit];
-    // 마지막 단어가 끝난 뒤로 한참 지났으면 해제(정지·종료 후 잔상 방지).
-    if (pos > cur.e + 2) return null;
-    // 그 단어를 품은 문장으로 확장. 못 찾으면(경계 어긋남) 단어 구간으로 폴백.
-    const sen = sentences.find((r) => cur.ns >= r.start && cur.ns < r.end);
-    return sen ?? { start: cur.ns, end: cur.ns + cur.len };
-  }, [marks, sentences, pos]);
-}
+export interface SentenceTime { start: number; end: number; t: number }
 
 /**
- * 문장별 '시작 시각' 표 — 문장을 클릭하면 그 지점부터 듣기 위해 필요하다.
- *   그 문장 범위에 들어가는 첫 단어의 시각을 문장 시작으로 본다.
+ * 문장별 '시작 시각' 표 — 하이라이트와 클릭이 **같은 표**를 쓴다.
+ *   둘이 따로 계산하면 칠해지는 문장과 재생되는 곳이 어긋난다.
  */
-export function useSentenceTimes(doc: WordsDoc | null, source: string) {
+export function useSentenceTimes(doc: WordsDoc | null, source: string): SentenceTime[] {
   return useMemo(() => {
-    if (!doc) return [] as Array<{ start: number; end: number; t: number }>;
+    if (!doc) return [];
     const words = doc.words.filter((w) => typeof w.ns === "number");
     return sentenceRanges(source).map((r) => {
-      const first = words.find((w) => w.ns! >= r.start && w.ns! < r.end);
-      return { ...r, t: first ? first.s : -1 };
+      const i = words.findIndex((w) => w.ns! >= r.start && w.ns! < r.end);
+      if (i < 0) return { ...r, t: -1 };
+      // 바로 앞 단어가 경계에 바짝 붙어 있으면 그것이 이 문장의 첫 단어다.
+      const prev = i > 0 ? words[i - 1] : null;
+      const usedPrev = prev && r.start - prev.ns! <= START_TOL;
+      return { ...r, t: usedPrev ? prev!.s : words[i].s };
     }).filter((r) => r.t >= 0);
   }, [doc, source]);
 }
@@ -183,3 +162,27 @@ export function useAutoScroll(active: { start: number; end: number } | null, ena
 /** 정렬 기준 원문 — 서버(gen-news-audio.mjs)의 script와 **같은 형태**여야 순번이 맞는다. */
 export const alignSource = (title: string, body: string) =>
   `${title}.\n${(body || "").replace(/\s+/g, " ").trim()}`;
+
+/**
+ * 재생 시각 → 하이라이트할 문장.
+ *   **문장 시작 시각표를 그대로 쓴다** — 클릭이 데려가는 곳과 칠해지는 곳이 어긋나지 않게.
+ *   예전엔 '지금 읽는 단어가 속한 문장'을 따로 찾았는데, 단어 위치에 2~5글자 오차가 있어
+ *   칠해지는 문장이 한 박자 늦었다(2026-08-20).
+ */
+export function useActiveRange(sentences: SentenceTime[], pos: number, duration: number) {
+  return useMemo(() => {
+    if (!sentences.length) return null;
+    // 시작 시각이 pos 이하인 마지막 문장 — 이분 탐색.
+    let lo = 0, hi = sentences.length - 1, hit = -1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (sentences[m].t <= pos) { hit = m; lo = m + 1; } else hi = m - 1;
+    }
+    if (hit < 0) return null;
+    // 마지막 문장이 끝난 뒤로 한참 지났으면 해제(정지·종료 후 잔상 방지).
+    const next = sentences[hit + 1];
+    const until = next ? next.t : duration + 2;
+    if (pos > until + 2) return null;
+    return { start: sentences[hit].start, end: sentences[hit].end };
+  }, [sentences, pos, duration]);
+}

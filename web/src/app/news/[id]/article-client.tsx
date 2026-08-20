@@ -43,8 +43,9 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
     () => (article ? alignSource(article.title, article.body || "") : ""),
     [article],
   );
-  const raActive = useActiveRange(raWords, raSource, playPos);
+  // 문장 시각표 하나를 하이라이트·클릭이 함께 쓴다(따로 계산하면 서로 어긋난다).
   const raSentences = useSentenceTimes(raWords, raSource);
+  const raActive = useActiveRange(raSentences, playPos, raWords?.duration ?? 0);
   // 본문 문장 클릭 → 그 지점부터 듣기(당진시대 방식). 재생 전이면 그 위치부터 재생을 시작한다.
   const audioCtl = useRef<{ seekAndPlay: (sec: number) => void } | null>(null);
   const seekTo = useCallback((sec: number) => audioCtl.current?.seekAndPlay(sec), []);
