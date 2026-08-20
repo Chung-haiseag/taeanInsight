@@ -21,7 +21,10 @@ const COUNTER_KEY = "align_daily";
 // ns = 원문에서 **공백을 제외한 글자 순번**. 공백 정규화는 공백만 건드리므로 전사본·원문·화면의
 //   '공백 아닌 글자 나열'은 동일하다 → 이 순번이면 화면 문단이 어떻게 나뉘어도 항상 맞는다.
 export interface WordTime { w: string; s: number; e: number; ns?: number; len?: number }
-export interface AlignResult { idxno: number; duration: number; words: WordTime[]; builtAt: string }
+export interface AlignResult { idxno: number; duration: number; words: WordTime[]; builtAt: string; ver?: number }
+
+// 좌표계 규격 버전. 2 = 공백만 뺀 순번(프런트와 동일). 1은 문장부호까지 뺀 순번이라 어긋났다.
+export const NS_VER = 2;
 
 const kstDay = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
@@ -42,8 +45,22 @@ const norm = (s: string) => s.replace(/[^가-힣0-9a-zA-Z]/g, "");
  *   → 결과적으로 **모든 단어가 위치를 갖는다**(빈 구간 없음).
  */
 export function mapWordsToSource(words: WordTime[], source: string): WordTime[] {
-  const S = norm(source);                       // 공백·기호 제거한 원문
+  const S = norm(source);                       // 공백·기호 제거한 원문(대조용 좌표)
   if (!S) return [];
+  // ⚠ 프런트는 **공백만 뺀 순번**으로 글자를 센다(문장부호 포함). 대조는 기호를 빼야 잘 맞으므로,
+  //   두 좌표를 잇는 표를 만들어 **마지막에 프런트 좌표로 환산**한다.
+  //   이걸 안 해서 문장부호 하나마다 1글자씩 밀렸고, 기사 중반에는 17글자까지 어긋났다(2026-08-20).
+  //   그 탓에 문장을 눌러도 한참 뒤부터 재생됐다.
+  const nsOfNorm: number[] = [];
+  {
+    let ns = 0;
+    for (const ch of source) {
+      if (/\s/.test(ch)) continue;
+      if (/[가-힣0-9a-zA-Z]/.test(ch)) nsOfNorm.push(ns);
+      ns++;
+    }
+  }
+  const toNs = (k: number) => nsOfNorm[Math.max(0, Math.min(nsOfNorm.length - 1, k))] ?? 0;
   const items = words.map((w) => ({ ...w, key: norm(w.w) })).filter((w) => w.key);
 
   // ① 앵커
@@ -70,7 +87,8 @@ export function mapWordsToSource(words: WordTime[], source: string): WordTime[] 
     return Math.round(a + (b - a) * (before / span));
   };
   items.forEach((w, i) => {
-    out.push({ w: w.w, s: w.s, e: w.e, ns: Math.min(S.length - 1, Math.max(0, nsOf(i))), len: w.key.length });
+    const k = Math.min(S.length - 1, Math.max(0, nsOf(i)));
+    out.push({ w: w.w, s: w.s, e: w.e, ns: toNs(k), len: w.key.length });
   });
   return out;
 }
@@ -129,13 +147,31 @@ export async function alignOne(env: Env, idxno: number, source: string): Promise
   const r2 = env.ARCHIVE_PHOTOS;
   if (!r2) return null;
   const key = `audio/news/${idxno}-gem2.words.json`;
-  if (await r2.head(key)) return null;
+
+  const cur = await r2.get(key);
+  if (cur) {
+    // 이미 있는 자막이 옛 좌표계면 **Whisper를 다시 돌리지 않고 위치만 다시 계산**한다.
+    //   시각(s·e)은 그대로 쓰고 ns만 환산하면 되므로 뉴런이 들지 않는다.
+    let old: AlignResult | null = null;
+    try { old = (await cur.json()) as AlignResult; } catch { /* 깨졌으면 새로 만든다 */ }
+    if (old && (old.ver ?? 1) >= NS_VER) return null;
+    if (old?.words?.length) {
+      const fixed: AlignResult = {
+        idxno, duration: old.duration,
+        words: mapWordsToSource(old.words.map((w) => ({ w: w.w, s: w.s, e: w.e })), source),
+        builtAt: new Date().toISOString(), ver: NS_VER,
+      };
+      await r2.put(key, JSON.stringify(fixed), { httpMetadata: { contentType: "application/json" } });
+      return fixed;
+    }
+  }
+
   const t = await transcribe(env, idxno);
   if (!t) return null;
   const result: AlignResult = {
     idxno, duration: t.duration,
     words: mapWordsToSource(t.words, source),
-    builtAt: new Date().toISOString(),
+    builtAt: new Date().toISOString(), ver: NS_VER,
   };
   await r2.put(key, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } });
   return result;
@@ -160,7 +196,7 @@ export async function alignRecent(env: Env): Promise<{ done: number; skipped?: s
     // 낭독이 없으면 정렬할 대상도 아니다.
     const hasAudio = (await r2.head(`audio/news/${a.idxno}-gem2.mp3`)) ?? (await r2.head(`audio/news/${a.idxno}-gem2.wav`));
     if (!hasAudio) continue;
-    if (await r2.head(`audio/news/${a.idxno}-gem2.words.json`)) continue;
+    // 자막이 이미 있어도 건너뛰지 않는다 — 옛 좌표계면 alignOne이 뉴런 없이 다시 계산한다.
     // 낭독에 넣은 원고와 동일하게 구성해야 매핑이 맞는다(gen-news-audio.mjs의 script와 같은 형태).
     const source = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     try {
