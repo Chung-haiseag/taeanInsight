@@ -1,3 +1,5 @@
+import { triageRelation, countTriage, type Triage, type TriageCounts } from "./relation_triage";
+
 // 인물 관계형 질의 감지 + '검증된(verified=1)' 관계 근거 블록 생성(순수) + 얇은 D1.
 //   플랫폼 원칙: 자동추출(verified=0) 관계는 공개 AI 답변에 단정하지 않는다. 이 게이트는 관리자가
 //   검수 승격한 관계만 주입하므로, 검증분이 없으면 무동작(안전). 군수 Fact 게이트(facts.ts)와 같은 패턴.
@@ -30,8 +32,17 @@ export const RELTYPES = ["협력·동료", "대립·갈등", "소속·상하", "
 export function isReltype(v: string): boolean { return (RELTYPES as readonly string[]).includes(v); }
 
 // 얇은 D1: 관계 검수 대기 목록 — 라벨됨(reltype 있음, '기타' 제외)·미검증(verified=0)·바이라인 제외, weight 내림차순.
-export interface PendingRelation { edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason?: string }
-export async function listPendingRelations(db: D1Database, limit = 100): Promise<PendingRelation[]> {
+export interface PendingRelation { edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason?: string; triage?: Triage }
+
+/**
+ * 검수 대기 목록 + **자동 선별**.
+ *   분류기가 모른다고 한 것(unsure)과 라벨이 근거와 어긋난 것(mismatch)을 갈라내,
+ *   사람이 '검토 필요'만 보게 한다. 갈래는 relation_triage.ts가 순수하게 판정한다.
+ *   넉넉히 읽어(lim*4) 갈래를 나눈 뒤 원하는 갈래만 잘라 준다 — 걸러내면 한 화면이 텅 비므로.
+ */
+export async function listPendingRelations(
+  db: D1Database, limit = 100, want: Triage | "all" = "review",
+): Promise<{ items: PendingRelation[]; counts: TriageCounts }> {
   const { loadHubIds } = await import("./people");
   const lim = Math.min(Math.max(1, Math.floor(limit) || 100), 300);
   const r = await db.prepare(
@@ -43,12 +54,18 @@ export async function listPendingRelations(db: D1Database, limit = 100): Promise
     "WHERE e.rel='coappears' AND e.verified=0 " +
     "AND json_extract(e.attrs_json,'$.reltype') IS NOT NULL AND json_extract(e.attrs_json,'$.reltype')<>'기타' " +
     "ORDER BY weight DESC LIMIT ?",
-  ).bind(lim * 2).all<{ edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason: string | null }>();
+  ).bind(lim * 6).all<{ edgeId: string; aId: string; a: string; bId: string; b: string; reltype: string; weight: number; reason: string | null }>();
   const hubs = await loadHubIds(db);
-  return (r.results ?? [])
+  const all = (r.results ?? [])
     .filter((x) => !hubs.has(x.aId) && !hubs.has(x.bId)) // 바이라인(기자/편집인) 쌍 제외
-    .slice(0, lim)
-    .map((x) => ({ edgeId: x.edgeId, aId: x.aId, a: x.a, bId: x.bId, b: x.b, reltype: x.reltype, weight: Number(x.weight) || 0, reason: x.reason ?? undefined }));
+    .map((x) => ({
+      edgeId: x.edgeId, aId: x.aId, a: x.a, bId: x.bId, b: x.b, reltype: x.reltype,
+      weight: Number(x.weight) || 0, reason: x.reason ?? undefined,
+      triage: triageRelation(x.reltype, x.reason),
+    }));
+  const counts = countTriage(all);
+  const items = (want === "all" ? all : all.filter((x) => x.triage === want)).slice(0, lim);
+  return { items, counts };
 }
 
 // 얇은 D1: coappears 엣지의 라벨(reltype) 수정 + 검증(verified) 설정. reltype 미지정이면 verified만 변경.

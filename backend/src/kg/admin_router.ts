@@ -307,7 +307,10 @@ router.get("/person/:id/brief", async (c) => {
 router.get("/relations/pending", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const limit = Math.max(1, Math.min(300, Number(c.req.query("limit")) || 100));
-  return c.json({ relations: await listPendingRelations(c.env.ARCHIVE_DB, limit) });
+  // triage=review(기본)·mismatch·unsure·all — 자동 선별 갈래.
+  const want = (c.req.query("triage") ?? "review") as "review" | "mismatch" | "unsure" | "all";
+  const r = await listPendingRelations(c.env.ARCHIVE_DB, limit, want);
+  return c.json({ relations: r.items, counts: r.counts });
 });
 // 관계 라벨 수정(relabel) + 검증 설정. { id, reltype?, verified? }
 router.post("/relation/set", async (c) => {
