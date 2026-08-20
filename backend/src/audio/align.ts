@@ -15,7 +15,8 @@ import { readCache, writeCache } from "../lib/api_cache";
 const MODEL = "@cf/openai/whisper-large-v3-turbo";
 const NEURONS_PER_MIN = 46.63;
 const DAILY_CAP = 20;        // 하루 정렬 상한(건). 20건 ≈ 3,000 뉴런 = 무료 할당의 30%
-const PER_RUN = 2;           // 크론 1회당 처리 건수 — 한 번에 몰아치지 않게
+const PER_RUN = 2;           // 크론 1회당 **새로 만드는** 건수(뉴런 소모) — 한 번에 몰아치지 않게
+const REMAP_PER_RUN = 30;    // 크론 1회당 **좌표계 환산** 건수. 뉴런이 0이라 상한과 무관하게 돈다.
 const COUNTER_KEY = "align_daily";
 
 // ns = 원문에서 **공백을 제외한 글자 순번**. 공백 정규화는 공백만 건드리므로 전사본·원문·화면의
@@ -142,30 +143,51 @@ async function transcribe(env: Env, idxno: number): Promise<{ duration: number; 
   return { duration: res.transcription_info?.duration ?? words[words.length - 1].e, words };
 }
 
-/** 기사 1건 정렬 → R2 저장. 이미 있으면 건너뛴다. */
-export async function alignOne(env: Env, idxno: number, source: string): Promise<AlignResult | null> {
+/** 정렬 결과 + **뉴런을 썼는지**. 환산만 한 건은 공짜라 하루 상한에 세면 안 된다. */
+export interface AlignOutcome { doc: AlignResult; usedAI: boolean }
+
+/** 자막을 R2에 쓴다 — 다음 크론이 **내려받지 않고도** 좌표계를 알도록 ver를 메타데이터에 남긴다. */
+async function putWords(r2: R2Bucket, key: string, doc: AlignResult): Promise<void> {
+  await r2.put(key, JSON.stringify(doc), {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { ver: String(doc.ver ?? NS_VER) },
+  });
+}
+
+/** 기사 1건 정렬 → R2 저장. 이미 새 좌표계면 null. `allowAI=false`면 전사(뉴런)는 하지 않는다. */
+export async function alignOne(
+  env: Env, idxno: number, source: string, opts: { allowAI?: boolean } = {},
+): Promise<AlignOutcome | null> {
   const r2 = env.ARCHIVE_PHOTOS;
   if (!r2) return null;
   const key = `audio/news/${idxno}-gem2.words.json`;
 
-  const cur = await r2.get(key);
-  if (cur) {
+  // 메타데이터만 보고 끝낼 수 있으면 본문을 안 내려받는다(크론이 30분마다 최근 60건을 훑으므로).
+  const meta = await r2.head(key);
+  if (meta && Number(meta.customMetadata?.ver ?? 0) >= NS_VER) return null;
+
+  if (meta) {
     // 이미 있는 자막이 옛 좌표계면 **Whisper를 다시 돌리지 않고 위치만 다시 계산**한다.
     //   시각(s·e)은 그대로 쓰고 ns만 환산하면 되므로 뉴런이 들지 않는다.
     let old: AlignResult | null = null;
-    try { old = (await cur.json()) as AlignResult; } catch { /* 깨졌으면 새로 만든다 */ }
-    if (old && (old.ver ?? 1) >= NS_VER) return null;
+    try { old = ((await (await r2.get(key))?.json()) ?? null) as AlignResult | null; } catch { /* 깨졌으면 새로 만든다 */ }
+    if (old && (old.ver ?? 1) >= NS_VER) {
+      // 내용은 최신인데 메타데이터만 없는 옛 파일 — 한 번 다시 써서 다음부터 head로 끝낸다.
+      await putWords(r2, key, old);
+      return null;
+    }
     if (old?.words?.length) {
       const fixed: AlignResult = {
         idxno, duration: old.duration,
         words: mapWordsToSource(old.words.map((w) => ({ w: w.w, s: w.s, e: w.e })), source),
         builtAt: new Date().toISOString(), ver: NS_VER,
       };
-      await r2.put(key, JSON.stringify(fixed), { httpMetadata: { contentType: "application/json" } });
-      return fixed;
+      await putWords(r2, key, fixed);
+      return { doc: fixed, usedAI: false };
     }
   }
 
+  if (opts.allowAI === false) return null;
   const t = await transcribe(env, idxno);
   if (!t) return null;
   const result: AlignResult = {
@@ -173,16 +195,23 @@ export async function alignOne(env: Env, idxno: number, source: string): Promise
     words: mapWordsToSource(t.words, source),
     builtAt: new Date().toISOString(), ver: NS_VER,
   };
-  await r2.put(key, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } });
-  return result;
+  await putWords(r2, key, result);
+  return { doc: result, usedAI: true };
 }
 
-/** 크론용 — 낭독은 있는데 자막이 없는 최신 기사 몇 건을 정렬한다. */
-export async function alignRecent(env: Env): Promise<{ done: number; skipped?: string }> {
+/**
+ * 크론용 — 낭독은 있는데 자막이 없거나 **옛 좌표계인** 최신 기사를 처리한다.
+ *
+ *   ⚠ 두 가지는 비용이 다르다:
+ *     · 새로 만들기 = Whisper 호출 = 뉴런 소모 → 하루 상한(DAILY_CAP)을 지킨다.
+ *     · 옛 좌표계 환산 = 계산만  = **0 뉴런**   → 상한과 무관하게 처리한다.
+ *   이 둘을 한 통에 세는 바람에 좌표계 수정이 하루 2건씩만 퍼졌고, 고친 다음 날에도
+ *   최근 60건 중 36건이 옛 좌표 그대로였다(2026-08-20 실측) — 눌러도 엉뚱한 데서 재생된다.
+ */
+export async function alignRecent(env: Env): Promise<{ done: number; remapped: number; skipped?: string }> {
   const db = env.ARCHIVE_DB, r2 = env.ARCHIVE_PHOTOS;
-  if (!db || !r2) return { done: 0, skipped: "no_binding" };
+  if (!db || !r2) return { done: 0, remapped: 0, skipped: "no_binding" };
   const used = await todayCount(env);
-  if (used >= DAILY_CAP) return { done: 0, skipped: `daily_cap(${used}/${DAILY_CAP})` };
 
   const rows = await db
     .prepare(`SELECT idxno, title, substr(COALESCE(body, excerpt, ''),1,1500) AS body
@@ -190,23 +219,25 @@ export async function alignRecent(env: Env): Promise<{ done: number; skipped?: s
               ORDER BY published_at DESC, idxno DESC LIMIT 60`)
     .all<{ idxno: number; title: string; body: string }>();
 
-  let done = 0;
+  let done = 0, remapped = 0;
   for (const a of rows.results ?? []) {
-    if (done >= PER_RUN || used + done >= DAILY_CAP) break;
+    const canAI = done < PER_RUN && used + done < DAILY_CAP;
+    if (!canAI && remapped >= REMAP_PER_RUN) break;
     // 낭독이 없으면 정렬할 대상도 아니다.
     const hasAudio = (await r2.head(`audio/news/${a.idxno}-gem2.mp3`)) ?? (await r2.head(`audio/news/${a.idxno}-gem2.wav`));
     if (!hasAudio) continue;
-    // 자막이 이미 있어도 건너뛰지 않는다 — 옛 좌표계면 alignOne이 뉴런 없이 다시 계산한다.
     // 낭독에 넣은 원고와 동일하게 구성해야 매핑이 맞는다(gen-news-audio.mjs의 script와 같은 형태).
     const source = `${a.title}.\n${(a.body || "").replace(/\s+/g, " ").trim()}`;
     try {
-      if (await alignOne(env, a.idxno, source)) done++;
+      const r = await alignOne(env, a.idxno, source, { allowAI: canAI });
+      if (!r) continue;
+      if (r.usedAI) done++; else remapped++;
     } catch (e) {
       console.warn(`[align] ${a.idxno} 실패:`, e instanceof Error ? e.message : e);
     }
   }
   if (done) await bumpCount(env, done);
-  return { done };
+  return { done, remapped, skipped: used >= DAILY_CAP ? `daily_cap(${used}/${DAILY_CAP})` : undefined };
 }
 
 export const estimateNeurons = (minutes: number) => Math.round(minutes * NEURONS_PER_MIN);

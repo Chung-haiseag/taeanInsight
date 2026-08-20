@@ -234,12 +234,12 @@ export default {
       } catch (e) {
         console.warn("[cron] 해무 캐시 워밍 실패:", e instanceof Error ? e.message : e);
       }
-      // 낭독 자막 정렬 — 낭독은 있는데 자막이 없는 기사를 조금씩(1회 2건) 만든다.
+      // 낭독 자막 정렬 — 자막이 없는 기사는 조금씩(1회 2건) 만들고, 옛 좌표계는 무료로 환산한다.
       //   Workers AI 무료 할당(하루 1만 뉴런) 안에서만 돌도록 align.ts가 하루 20건으로 막는다.
       try {
         const { alignRecent } = await import("./audio/align");
         const ar = await alignRecent(env);
-        if (ar.done) console.log(`[cron] 낭독 자막 정렬: ${ar.done}건`);
+        if (ar.done || ar.remapped) console.log(`[cron] 낭독 자막 정렬: 신규 ${ar.done}건 · 좌표계 환산 ${ar.remapped}건(무료)`);
       } catch (e) {
         console.warn("[cron] 자막 정렬 실패:", e instanceof Error ? e.message : e);
       }

@@ -93,3 +93,91 @@ describe("좌표계 — 프런트와 같은 순번을 써야 한다", () => {
     expect(mapped[0].ns).toBe(nsIndex(source, source.indexOf("목표어")));
   });
 });
+
+// ── 크론 예산 ──────────────────────────────────────────────────────────
+// 좌표계를 고쳐도 최근 60건 중 36건이 옛 좌표 그대로였다(2026-08-20 실측).
+//   원인은 정렬 로직이 아니라 **예산**이었다 — 환산은 뉴런이 0인데 새로 만들기와 같은
+//   하루 20건 상한을 나눠 쓰고 있어서, 수정이 하루 2건씩만 퍼졌다.
+import { alignRecent } from "../src/audio/align";
+
+interface Stored { body: string; meta?: Record<string, string> }
+
+/** R2·D1·AI를 최소한으로 흉내낸다. 실제 호출 횟수를 세는 것이 이 시험의 목적. */
+function stubEnv(articles: number[], words: Record<number, unknown>, usedToday = 0) {
+  const store = new Map<string, Stored>();
+  for (const [k, v] of Object.entries(words)) {
+    store.set(`audio/news/${k}-gem2.words.json`, { body: JSON.stringify(v) });
+  }
+  for (const i of articles) store.set(`audio/news/${i}-gem2.mp3`, { body: "audio" });
+
+  const calls = { ai: 0, get: 0, bumped: 0 };
+  const r2 = {
+    head: async (k: string) => (store.has(k) ? { customMetadata: store.get(k)!.meta } : null),
+    get: async (k: string) => {
+      if (!store.has(k)) return null;
+      calls.get++;
+      const b = store.get(k)!.body;
+      return { json: async () => JSON.parse(b), arrayBuffer: async () => new ArrayBuffer(8) };
+    },
+    put: async (k: string, v: string, o?: { customMetadata?: Record<string, string> }) => {
+      store.set(k, { body: v, meta: o?.customMetadata });
+    },
+  };
+  const db = {
+    prepare(sql: string) {
+      const st = {
+        bind: () => st,
+        first: async () =>
+          sql.includes("api_cache")
+            ? { value: JSON.stringify({ day: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), n: usedToday }), updated_at: new Date().toISOString() }
+            : null,
+        run: async () => { calls.bumped++; return {}; },
+        all: async () => ({ results: articles.map((i) => ({ idxno: i, title: "제목", body: "본문 ".repeat(200) })) }),
+      };
+      return st;
+    },
+  };
+  const AI = { run: async () => { calls.ai++; return { segments: [{ words: [{ word: "제목", start: 0, end: 1 }] }], transcription_info: { duration: 1 } }; } };
+  return { env: { ARCHIVE_DB: db, ARCHIVE_PHOTOS: r2, AI } as never, calls, store };
+}
+
+const oldDoc = (idxno: number) => ({ idxno, duration: 10, ver: 1, builtAt: "", words: [{ w: "제목", s: 0, e: 1, ns: 0 }] });
+
+describe("크론 예산 — 환산은 공짜, 새로 만들기만 상한", () => {
+  it("하루 상한을 다 써도 옛 좌표계는 전부 환산된다", async () => {
+    const ids = [1, 2, 3, 4, 5];
+    const { env, calls, store } = stubEnv(ids, Object.fromEntries(ids.map((i) => [i, oldDoc(i)])), 20);
+    const r = await alignRecent(env);
+
+    expect(r.remapped).toBe(5);        // 상한(20/20)에 걸려도 다섯 건 모두 처리
+    expect(r.done).toBe(0);
+    expect(calls.ai).toBe(0);          // 뉴런을 한 번도 쓰지 않는다
+    expect(calls.bumped).toBe(0);      // 그러므로 하루 카운터도 올리지 않는다
+    expect(JSON.parse(store.get("audio/news/1-gem2.words.json")!.body).ver).toBe(2);
+  });
+
+  it("새로 만들기는 종전대로 1회 2건까지만", async () => {
+    const { env, calls } = stubEnv([1, 2, 3, 4, 5], {}, 0);
+    const r = await alignRecent(env);
+    expect(r.done).toBe(2);
+    expect(calls.ai).toBe(2);
+  });
+
+  it("상한을 넘겼으면 새로 만들지 않는다", async () => {
+    const { env, calls } = stubEnv([1, 2, 3], {}, 20);
+    const r = await alignRecent(env);
+    expect(r.done).toBe(0);
+    expect(calls.ai).toBe(0);
+    expect(r.skipped).toContain("daily_cap");
+  });
+
+  it("이미 새 좌표계면 파일을 내려받지 않는다(메타데이터로 판별)", async () => {
+    const ids = [1, 2, 3];
+    const { env, calls, store } = stubEnv(ids, Object.fromEntries(ids.map((i) => [i, { ...oldDoc(i), ver: 2 }])), 0);
+    await alignRecent(env);                       // 1회차: 내려받아 메타데이터를 붙인다
+    expect(store.get("audio/news/1-gem2.words.json")!.meta).toEqual({ ver: "2" });
+    const before = calls.get;
+    await alignRecent(env);                       // 2회차: head만으로 끝나야 한다
+    expect(calls.get).toBe(before);
+  });
+});
