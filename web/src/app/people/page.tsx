@@ -114,14 +114,30 @@ export default function PeoplePage() {
                   loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               )}
               <div>
-                <h2 className="text-2xl font-bold text-brand">{prof.person.name}</h2>
-                <p className="text-xs text-foreground-muted">아카이브 등장 {prof.person.mentions.toLocaleString()}건</p>
+                <h2 className="text-2xl font-bold text-brand">
+                  {prof.person.name}
+                  {prof.nec?.hanja && <span className="ml-2 text-lg font-normal text-foreground-muted">{prof.nec.hanja}</span>}
+                  {prof.nec?.birthYear && <span className="ml-2 text-sm font-normal text-foreground-muted">({prof.nec.birthYear}년생)</span>}
+                </h2>
+                <p className="text-xs text-foreground-muted">
+                  {prof.nec && prof.nec.total > 0 && (
+                    <>
+                      출마 {prof.nec.total}회
+                      {prof.nec.wins > 0 && ` · 당선 ${prof.nec.wins}회`}
+                      {prof.nec.span && ` · 활동 ${prof.nec.span}`}
+                      {" · "}
+                    </>
+                  )}
+                  아카이브 등장 {prof.person.mentions.toLocaleString()}건
+                </p>
               </div>
             </div>
             <button type="button" onClick={() => setProf(null)} className="shrink-0 text-sm text-accent underline">← 검색으로</button>
           </div>
 
           <PersonIntro prof={prof} />
+
+          {prof.nec && prof.nec.total > 0 && <CandidacyTable nec={prof.nec} />}
 
           {prof.offices.length > 0 && (
             <section className="rounded-lg border border-brand/15 bg-background p-4">
@@ -194,6 +210,70 @@ export default function PeoplePage() {
 // ── 인물 소개(기사 근거 AI 전기 + 확정 팩트 스트립) ─────────────
 const TOPIC_NOISE = new Set(["개최", "대상", "성황", "성료", "실시", "위한", "한다", "선정", "진행"]);
 // 한 덩어리 소개글을 읽기 좋게 문단 분할 — 첫 문장은 리드(누구인가), 이후는 2문장씩 묶어 문단으로.
+/**
+ * 출마 이력 — 선거일·선거구·정당·직업·결과. 선관위 후보자·당선인 자료가 근거다.
+ *   ⚠ 결과를 모르는 회차는 **빈 칸이 아니라 '모름'** 으로 적는다. 빈 칸은 낙선처럼 보인다.
+ */
+function CandidacyTable({ nec }: { nec: NonNullable<PersonProfile["nec"]> }) {
+  const anyJob = nec.runs.some((r) => r.job);
+  return (
+    <section className="rounded-lg border border-brand/15 bg-background p-4">
+      <h3 className="mb-1 text-sm font-bold text-brand">
+        출마 이력 <span className="font-normal text-foreground-muted">(중앙선거관리위원회)</span>
+      </h3>
+      <p className="mb-3 text-xs text-foreground-muted">후보자 본인이 신고하고 선관위가 공고한 자료입니다.</p>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[34rem] text-sm">
+          <thead>
+            <tr className="border-b border-brand/15 text-left text-xs text-foreground-muted">
+              <th className="py-1 pr-3 font-semibold">선거일</th>
+              <th className="py-1 pr-3 font-semibold">선거</th>
+              <th className="py-1 pr-3 font-semibold">선거구</th>
+              <th className="py-1 pr-3 font-semibold">정당</th>
+              {anyJob && <th className="py-1 pr-3 font-semibold">직업</th>}
+              <th className="py-1 font-semibold">결과</th>
+            </tr>
+          </thead>
+          <tbody>
+            {nec.runs.map((r) => (
+              <tr key={`${r.sgId}${r.kind}`} className="border-b border-brand/5 last:border-0">
+                <td className="py-1.5 pr-3 tabular-nums">
+                  {r.date}
+                  {r.assumed && <span className="ml-1 text-xs text-foreground-muted" title="생년월일이 없어 이름으로 맞춘 기록입니다">추정</span>}
+                </td>
+                <td className="py-1.5 pr-3">{r.kind}</td>
+                <td className="py-1.5 pr-3 text-foreground-muted">{r.district || "—"}</td>
+                <td className="py-1.5 pr-3">{r.party || "—"}</td>
+                {anyJob && <td className="py-1.5 pr-3 text-foreground-muted">{r.job || "—"}</td>}
+                <td className="py-1.5">
+                  {r.result === "당선" ? (
+                    <span className="font-bold text-brand">당선</span>
+                  ) : r.result === "낙선" ? (
+                    <span className="text-foreground-muted">낙선</span>
+                  ) : (
+                    <span className="text-foreground-muted" title="당선자 자료를 받지 못한 회차입니다">모름</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!!nec.careers?.length && (
+        <div className="mt-3 border-t border-brand/10 pt-3">
+          <p className="mb-1 text-xs font-semibold text-brand">신고 경력</p>
+          <ul className="space-y-0.5 text-sm text-foreground-muted">
+            {nec.careers.map((c, i) => (
+              <li key={i}>· {c.tense ? `(${c.tense}) ` : ""}{c.text}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function briefParagraphs(text: string): string[] {
   const s = text.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
   if (s.length <= 2) return s;

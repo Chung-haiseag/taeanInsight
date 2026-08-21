@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupCandidates, toHistorySeed, toQuarantineNodes, dupPersonId } from "@/kg/nec_people";
+import { groupCandidates, toHistorySeed, toQuarantineNodes, dupPersonId, readNecInfo } from "@/kg/nec_people";
 
 // 회차를 넘나드는 후보자 목록. kind는 부르는 쪽이 붙인다(선거 종류 코드는 목록에서 읽으므로).
 const C = (o: Partial<Parameters<typeof groupCandidates>[0][number]>) => ({
@@ -174,5 +174,54 @@ describe("적재 시드", () => {
   it("모든 노드·엣지에 출처가 붙는다", () => {
     expect(seed.nodes.every((n) => n.source.includes("선관위"))).toBe(true);
     expect(seed.edges.every((e) => e.source.includes("선관위"))).toBe(true);
+  });
+});
+
+describe("화면용 인물 정보 읽기", () => {
+  // 당진시대 인물 화면과 같은 정보 — 이름·한자·생년 / 출마 N회·당선 N회·활동 기간 / 출마 이력 표.
+  const attrs = JSON.stringify({
+    birthday: "19571120", hanja: "梁基林", gender: "여",
+    party: "국민의힘", parties: ["국민의힘", "새누리당"],
+    careers: [{ tense: "현", text: "태안군의원" }],
+    runs: [
+      { sgId: "20140604", kind: "군의원", district: "가선거구", party: "새누리당", job: "정당인", result: "당선" },
+      { sgId: "20180613", kind: "군의원", district: "가선거구", party: "국민의힘", result: "당선" },
+    ],
+  });
+
+  it("생년월일에서 태어난 해를 뽑는다", () => {
+    expect(readNecInfo(attrs)!.birthYear).toBe("1957");
+  });
+
+  it("출마·당선 횟수와 활동 기간을 센다", () => {
+    const n = readNecInfo(attrs)!;
+    expect([n.total, n.wins, n.span]).toEqual([2, 2, "2014~2018"]);
+  });
+
+  it("선거일을 읽기 좋은 날짜로 바꾼다", () => {
+    expect(readNecInfo(attrs)!.runs[0].date).toBe("2014-06-04");
+  });
+
+  it("한 번만 나왔으면 기간이 아니라 한 해로 적는다", () => {
+    const one = JSON.stringify({ runs: [{ sgId: "20220601", kind: "군수" }] });
+    expect(readNecInfo(one)!.span).toBe("2022");
+  });
+
+  // 당락을 모르는 회차를 낙선처럼 보이게 하면 안 된다.
+  it("결과를 모르는 회차는 당선 횟수에 넣지 않고 모름으로 남긴다", () => {
+    const n = readNecInfo(JSON.stringify({ runs: [{ sgId: "19980604", kind: "군의원" }] }))!;
+    expect(n.wins).toBe(0);
+    expect(n.runs[0].result).toBeUndefined();
+  });
+
+  it("선관위 자료가 없는 인물은 null", () => {
+    expect(readNecInfo(null)).toBeNull();
+    expect(readNecInfo("{}")).toBeNull();
+    expect(readNecInfo("깨진 값")).toBeNull();
+  });
+
+  it("출마 이력이 없어도 생년·한자만 있으면 보여준다", () => {
+    const n = readNecInfo(JSON.stringify({ birthday: "19600101", hanja: "洪吉童" }));
+    expect(n).toMatchObject({ birthYear: "1960", hanja: "洪吉童", total: 0 });
   });
 });

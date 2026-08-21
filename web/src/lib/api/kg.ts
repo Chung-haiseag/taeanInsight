@@ -116,8 +116,25 @@ export function searchPersons(q: string): Promise<{ results: PersonSearchResult[
   return apiFetch(`/api/admin/kg/persons/search?q=${encodeURIComponent(q)}`);
 }
 
+/** 선관위 후보자·당선인 자료. 결과(result)가 없으면 '모름'이지 낙선이 아니다. */
+export interface NecCandidacy {
+  sgId: string; year: string; date: string;
+  kind: string; district?: string; party?: string; job?: string;
+  result?: "당선" | "낙선";
+  assumed?: boolean;
+}
+export interface NecInfo {
+  birthday?: string; birthYear?: string; hanja?: string; gender?: string;
+  party?: string; parties?: string[];
+  careers?: { tense: string | null; text: string }[];
+  runs: NecCandidacy[];
+  total: number; wins: number; span?: string;
+  sameNameCount?: number;
+}
+
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
+  nec?: NecInfo | null;
   photo?: string | null; // 역대 군수·현직 군의원 공식 사진 URL(백엔드 상대경로), 없으면 null
   graph: { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] };
   coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];

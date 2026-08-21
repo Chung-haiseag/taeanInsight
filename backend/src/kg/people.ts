@@ -32,6 +32,7 @@ import { personEgo } from "./graph";
 import { extractKeywords, UBIQUITOUS } from "../query/keywords";
 import { mayorPhotoFor } from "./mayors";
 import { councilPhotoFor } from "./council_members";
+import { readNecInfo, type NecInfo } from "./nec_people";
 
 // 바이라인 id 집합 — 등장 기사 수 >= HUB_MENTIONS 인 person(현재 김동이·신문웅).
 //   상관 서브쿼리(person마다 COUNT)는 296K행·115ms → kg_mentions 단일 GROUP BY HAVING(227K행·23ms)로 5× 단축.
@@ -78,6 +79,8 @@ export async function detectPersonInQuery(db: D1Database, query: string): Promis
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
   photo?: string | null; // 역대 군수·현직 군의원이면 공식 사진 URL(/api/archive/photo/...), 없으면 null
+  /** 선관위 후보자·당선인 자료(출마 이력·생년·한자). 선관위에 없는 인물이면 null. */
+  nec?: NecInfo | null;
   graph: { center: { id: string; name: string } | null; nodes: GraphNode[]; edges: Edge[] };
   coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];
@@ -201,9 +204,10 @@ export function stripHanja(s: string): string {
 
 export async function buildPersonProfile(db: D1Database, id: string, limit = 12): Promise<PersonProfile | null> {
   const p = await db.prepare(
-    "SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+    "SELECT n.id AS id, n.name AS name, n.attrs_json AS attrs_json, " +
+    "(SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
     "FROM kg_nodes n WHERE n.id=? AND n.type='person'",
-  ).bind(id).first<{ id: string; name: string; mentions: number }>();
+  ).bind(id).first<{ id: string; name: string; attrs_json: string | null; mentions: number }>();
   if (!p) return null;
 
   const hubIds = await loadHubIds(db);
@@ -268,6 +272,7 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   return {
     person: { id: p.id, name: p.name, mentions: Number(p.mentions) || 0, isHub: isHub(Number(p.mentions) || 0) },
     photo: mayorPhotoFor(p.name) ?? councilPhotoFor(p.name), // 군수·현직 군의원 공식 사진
+    nec: readNecInfo(p.attrs_json),                          // 선관위 출마 이력(없으면 null)
     graph,
     coappear,
     articles: arts.results ?? [],

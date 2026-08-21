@@ -12,9 +12,10 @@ import { loadFestivalQueue, rejectEvent } from "./event_queue";
 import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
-import { fetchTaeanCandidates, toSeed as necSeed, pickKinds } from "./nec_import";
+import { fetchTaeanCandidates, toSeed as necSeed, pickKinds, TAEAN_QUERY } from "./nec_import";
 import { localElectionDays, assemblyElectionDays, probeLocalDays, probeAssemblyDays, fetchTaeanHistory } from "./nec_history";
 import { groupCandidates, toHistorySeed, toQuarantineNodes } from "./nec_people";
+import { fetchWinners, buildWinnerIndex, markResults } from "./nec_winners";
 import { planCareers, toLinkSeed } from "./career_orgs";
 import { importSeed } from "./import";
 
@@ -182,6 +183,13 @@ router.post("/nec/sync-history", async (c) => {
     const { items, failed } = await fetchTaeanHistory(c.env, local, assembly);
 
     const grouped = groupCandidates(items);
+
+    // 당락은 후보자 자료에 없다 — 당선인 API를 따로 받아 매긴다.
+    //   못 받은 회차는 '모름'으로 둔다(낙선으로 단정하면 거짓이 된다).
+    const w = await fetchWinners(c.env, local, assembly, TAEAN_QUERY);
+    const widx = buildWinnerIndex(w.fetched);
+    markResults(grouped, widx);
+
     const seed = toHistorySeed(grouped);
     const quarantine = toQuarantineNodes(grouped);
     const people = seed.nodes.filter((n) => n.type === "person");
@@ -196,6 +204,14 @@ router.post("/nec/sync-history", async (c) => {
         runs: a.people.map((p) => p.runs.map((r) => `${r.sgId.slice(0, 4)} ${r.kind}`)),
       })),
       quarantined: quarantine.length,
+      winners: {
+        covered: widx.covered.size, names: widx.keys.size,
+        failed: w.failed,
+        // 당선인 API의 필드 이름을 문서로 단정하지 않는다 — 처음 한 건을 그대로 보여 확인한다.
+        sampleFields: w.sample ? Object.keys(w.sample) : [],
+      },
+      elected: grouped.people.reduce((n, p) => n + p.runs.filter((r) => r.result === "당선").length, 0),
+      unknownResult: grouped.people.reduce((n, p) => n + p.runs.filter((r) => !r.result).length, 0),
     };
     if (!apply) {
       return c.json({ dryRun: true, ...summary, names: people.map((n) => n.name) });

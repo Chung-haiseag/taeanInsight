@@ -26,6 +26,8 @@ export interface Run {
   job?: string;
   /** 생년월일이 없어 **이름만으로** 붙인 기록. 짐작이라는 표시를 남겨 되짚을 수 있게 한다. */
   assumed?: true;
+  /** 당락. 당선자 목록을 받은 회차에만 채운다 — 없으면 '모름'이지 낙선이 아니다. */
+  result?: "당선" | "낙선";
 }
 
 export interface Career { tense: string | null; text: string }
@@ -223,4 +225,68 @@ export function toQuarantineNodes(g: GroupResult): SeedNode[] {
     }
   }
   return out;
+}
+
+// ── 화면용 —— 저장된 속성을 인물 페이지가 쓰기 좋은 모양으로 읽는다. ────────────────
+//   당진시대 인물 화면과 같은 정보: 이름·한자·생년 / 출마 N회·당선 N회·활동 기간 / 출마 이력 표.
+
+export interface CandidacyRun {
+  sgId: string; year: string; date: string;
+  kind: string; district?: string; party?: string; job?: string;
+  result?: "당선" | "낙선";
+  /** 생년월일이 없어 이름만으로 붙인 회차 — 화면에서 '추정'으로 표시할 수 있게. */
+  assumed?: boolean;
+}
+
+export interface NecInfo {
+  birthday?: string; birthYear?: string; hanja?: string; gender?: string;
+  party?: string; parties?: string[];
+  careers?: Career[];
+  runs: CandidacyRun[];
+  total: number;
+  /** 당선 횟수. **결과를 모르는 회차는 세지 않는다** — 모름은 낙선이 아니다. */
+  wins: number;
+  span?: string;
+  /** 동명이인 격리 노드면 몇 명으로 갈렸는지. */
+  sameNameCount?: number;
+}
+
+const dashDate = (sgId: string) =>
+  /^\d{8}$/.test(sgId) ? `${sgId.slice(0, 4)}-${sgId.slice(4, 6)}-${sgId.slice(6, 8)}` : sgId;
+
+/** 저장된 attrs_json → 화면용 정보(순수). 선관위 자료가 없는 인물이면 null. */
+export function readNecInfo(attrsJson: string | null | undefined): NecInfo | null {
+  if (!attrsJson) return null;
+  let a: Record<string, unknown>;
+  try { a = JSON.parse(attrsJson) as Record<string, unknown>; } catch { return null; }
+  if (!a || typeof a !== "object") return null;
+
+  const raw = Array.isArray(a.runs) ? (a.runs as Run[]) : [];
+  const birthday = typeof a.birthday === "string" ? a.birthday : undefined;
+  const hanja = typeof a.hanja === "string" ? a.hanja : undefined;
+  const careers = Array.isArray(a.careers) ? (a.careers as Career[]) : undefined;
+  // 출마 이력도 생년도 한자도 없으면 선관위에서 온 인물이 아니다.
+  if (!raw.length && !birthday && !hanja && !careers?.length) return null;
+
+  const runs: CandidacyRun[] = raw.map((r) => ({
+    sgId: r.sgId, year: String(r.sgId ?? "").slice(0, 4), date: dashDate(String(r.sgId ?? "")),
+    kind: r.kind, district: r.district, party: r.party, job: r.job,
+    result: r.result, assumed: r.assumed,
+  }));
+  const years = runs.map((r) => r.year).filter(Boolean).sort();
+  const span = years.length ? (years[0] === years[years.length - 1] ? years[0] : `${years[0]}~${years[years.length - 1]}`) : undefined;
+
+  const info: NecInfo = {
+    runs, total: runs.length,
+    wins: runs.filter((r) => r.result === "당선").length,
+  };
+  if (birthday) { info.birthday = birthday; info.birthYear = birthday.slice(0, 4); }
+  if (hanja) info.hanja = hanja;
+  if (typeof a.gender === "string") info.gender = a.gender;
+  if (typeof a.party === "string") info.party = a.party;
+  if (Array.isArray(a.parties)) info.parties = a.parties as string[];
+  if (careers?.length) info.careers = careers;
+  if (span) info.span = span;
+  if (typeof a.sameNameCount === "number") info.sameNameCount = a.sameNameCount;
+  return info;
 }
