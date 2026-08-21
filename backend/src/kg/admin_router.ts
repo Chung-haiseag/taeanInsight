@@ -13,6 +13,7 @@ import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
 import { fetchTaeanCandidates, toSeed as necSeed, pickKinds } from "./nec_import";
+import { localElectionDays, assemblyElectionDays, probeLocalDays, probeAssemblyDays } from "./nec_history";
 import { planCareers, toLinkSeed } from "./career_orgs";
 import { importSeed } from "./import";
 
@@ -79,6 +80,41 @@ router.post("/gov-org/sync", async (c) => {
     const o = await loadOntology(c.env.ARCHIVE_DB);
     const r = await importSeed(c.env.ARCHIVE_DB, seed, o);
     return c.json({ applied: true, ...r, keptAsIs: seed.skipped });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
+// ── 역대 선거 실측 —— **후보자를 받기 전에** 어느 회차가 대상인지 눈으로 확인한다.
+//   선관위에서 두 번 헛짚었다(목록 100건 잘림 → 재보궐만 · 조회 조건 오해 → 태안 0건).
+//   그래서 회차별 태안 후보 수를 먼저 세어 화면에 띄운다. 쓰기는 하지 않는다.
+router.get("/nec/history", async (c) => {
+  const probe = c.req.query("probe") !== "0";
+  const max = Math.min(Number(c.req.query("max") ?? 12) || 12, 20);
+  try {
+    const [localRows, assemblyRows] = await Promise.all([
+      fetchElections(c.env, SG_TYPE.구시군의원),
+      fetchElections(c.env, SG_TYPE.국회의원),
+    ]);
+    const local = localElectionDays(localRows).slice(0, max);
+    const assembly = assemblyElectionDays(assemblyRows).slice(0, max);
+    if (!probe) {
+      return c.json({
+        listed: { local: localRows.length, assembly: assemblyRows.length },
+        local: local.map((d) => ({ sgId: d.sgId, year: d.year, kinds: d.kinds.map((k) => k.key) })),
+        assembly: assembly.map((d) => ({ sgId: d.sgId, year: d.year })),
+      });
+    }
+    const [localCounts, assemblyCounts] = await Promise.all([
+      probeLocalDays(c.env, local),
+      probeAssemblyDays(c.env, assembly),
+    ]);
+    const sum = (ds: Array<{ total: number }>) => ds.reduce((s, d) => s + d.total, 0);
+    return c.json({
+      listed: { local: localRows.length, assembly: assemblyRows.length },
+      local: localCounts, assembly: assemblyCounts,
+      candidates: sum(localCounts) + sum(assemblyCounts),
+    });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }

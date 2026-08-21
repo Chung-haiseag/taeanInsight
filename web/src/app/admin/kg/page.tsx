@@ -18,6 +18,7 @@ import {
   type KgNode,
   syncGovOrg,
   getNecElections,
+  getNecHistory,
   getNecSample,
   syncNec,
   syncCareers,
@@ -25,6 +26,8 @@ import {
   decideOrgCandidates,
   type GovOrgSyncResult,
   type NecSample,
+  type NecHistory,
+  type NecDayCount,
   type NecSyncResult,
   type CareerSyncResult,
   type OrgCandidate,
@@ -505,12 +508,43 @@ function TenureAddForm({ onAdded }: { onAdded: () => void }) {
  *   토큰을 손으로 옮기지 않도록, 이미 로그인한 관리자 세션으로 바로 돌린다.
  *   쓰기는 **미리보기를 거친 뒤에만** 열린다(되돌리기 어려운 일을 눈으로 보고 한다).
  */
+/** 회차별 태안 후보 수 — 어느 해까지 자료가 있는지 한눈에 보이게. */
+function ElectionYears({ title, days }: { title: string; days: NecDayCount[] }) {
+  if (!days.length) return null;
+  return (
+    <div>
+      <p className="font-semibold text-brand">{title}</p>
+      <ul className="mt-1 space-y-0.5">
+        {days.map((d) => {
+          const failed = d.per.find((p) => p.error);
+          return (
+            <li key={d.sgId} className={d.total ? "" : "text-foreground-muted"}>
+              <span className="mr-2 inline-block w-12 font-semibold tabular-nums">{d.year}</span>
+              {d.total > 0 ? (
+                <>
+                  <span className="font-semibold tabular-nums">{d.total}명</span>
+                  <span className="text-foreground-muted">
+                    {" — "}{d.per.filter((p) => p.n > 0).map((p) => `${p.key} ${p.n}`).join(" · ")}
+                  </span>
+                </>
+              ) : (
+                <span>{failed ? `못 불러옴 — ${failed.error}` : "자료 없음"}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function DataSources() {
   const [preview, setPreview] = useState<GovOrgSyncResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<GovOrgSyncResult | null>(null);
   const [nec, setNec] = useState<string | null>(null);
   const [sample, setSample] = useState<NecSample | null>(null);
+  const [hist, setHist] = useState<NecHistory | null>(null);
   const [necPre, setNecPre] = useState<NecSyncResult | null>(null);
   const [necDone, setNecDone] = useState<NecSyncResult | null>(null);
   const [car, setCar] = useState<CareerSyncResult | null>(null);
@@ -586,6 +620,31 @@ function DataSources() {
           {busy === "nec" ? "확인 중…" : "이용 승인 확인"}
         </button>
         {nec && <p className={`text-sm ${nec.startsWith("안 됨") ? "text-red-600" : "font-semibold text-brand"}`}>{nec}</p>}
+
+        <div className="border-t border-brand/10 pt-3">
+          <p className="mb-2 text-sm text-foreground-muted">
+            <strong>역대 선거에 태안 후보가 몇 명 있는지</strong> 먼저 세어 봅니다. 선관위 자료가 어느 해까지
+            거슬러 가는지는 문서로 알 수 없어, 적재기를 짜기 전에 눈으로 확인합니다.{" "}
+            <strong>이 단추는 아무것도 저장하지 않습니다.</strong>
+          </p>
+          <button
+            type="button" disabled={!!busy}
+            onClick={() => void run(getNecHistory, "hist", setHist as (v: never) => void)}
+            className="rounded-full border border-brand/40 px-4 py-2 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+          >
+            {busy === "hist" ? "세는 중… (30초쯤 걸립니다)" : "역대 회차 세어보기"}
+          </button>
+          {hist?.error && <p className="mt-2 text-sm text-red-600">안 됨 — {hist.error}</p>}
+          {hist && !hist.error && (
+            <div className="mt-3 space-y-3 rounded-lg bg-accent-subtle/20 p-3 text-sm">
+              <p>
+                모두 <strong>{hist.candidates}명</strong>이 대상입니다 — 지금 들어와 있는 20명은 2026년 한 회차뿐입니다.
+              </p>
+              <ElectionYears title="지방선거" days={hist.local ?? []} />
+              <ElectionYears title="국회의원 선거" days={hist.assembly ?? []} />
+            </div>
+          )}
+        </div>
 
         <div className="border-t border-brand/10 pt-3">
           <p className="mb-2 text-sm text-foreground-muted">

@@ -228,6 +228,23 @@ export function getNecElections(): Promise<NecElections & { error?: string }> {
   return apiFetch("/api/admin/kg/nec/elections");
 }
 
+export interface NecDayCount {
+  sgId: string; year: string; total: number;
+  per: Array<{ key: string; sgTypecode: string; n: number; error?: string }>;
+}
+export interface NecHistory {
+  listed?: { local: number; assembly: number };
+  local?: NecDayCount[];
+  assembly?: NecDayCount[];
+  candidates?: number;
+  error?: string;
+}
+
+/** 역대 선거 실측 — 회차별 태안 후보 수. 적재 전에 무엇이 있는지 눈으로 보는 용도(쓰기 없음). */
+export function getNecHistory(): Promise<NecHistory> {
+  return apiFetch("/api/admin/kg/nec/history");
+}
+
 export interface NecSample {
   elections?: number;
   attempts?: Array<{ how: string; total: number; matched: number; note?: string }>;
