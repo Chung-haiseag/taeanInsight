@@ -90,8 +90,14 @@ export function isTaeanDistrict(sggName: string | undefined | null): boolean {
  *   선거구 칸에 '가선거구'만 오고 '태안군'은 wiwName에 따로 있는 것으로 보인다.
  *   한쪽만 보면 그 종류가 통째로 사라진다.
  */
-export function isTaeanRow(row: { sggName?: string; wiwName?: string }): boolean {
-  return isTaeanDistrict(row.sggName) || isTaeanDistrict(row.wiwName);
+export function isTaeanRow(
+  row: { sggName?: string; wiwName?: string; addr?: string },
+  opts: { byAddr?: boolean } = {},
+): boolean {
+  if (isTaeanDistrict(row.sggName) || isTaeanDistrict(row.wiwName)) return true;
+  // 비례대표는 선거구가 '충청남도' 전체라 이름으로는 영영 못 가린다(실측: 도의원 비례 전 회차 0건).
+  //   그때만 주소를 본다. 지역구에서 주소까지 보면 태안에 사는 서산 후보가 딸려 들어온다.
+  return !!opts.byAddr && isTaeanDistrict(row.addr);
 }
 
 // ── 실측 —— 회차별로 태안 후보가 몇 명인지 **후보자를 다 받지 않고** 센다. ─────────────
@@ -188,15 +194,18 @@ const NARROW = [
 
 /** 한 회차·한 종류의 태안 줄을 받는다. 어느 조건이 걸렸는지도 함께 돌려준다(다음 진단의 근거). */
 export async function fetchTaeanRows(
-  env: Env, op: string, sgId: string, sgTypecode: string,
-): Promise<{ rows: NecCandidate[]; how: string }> {
+  env: Env, op: string, sgId: string, sgTypecode: string, opts: { byAddr?: boolean } = {},
+): Promise<{ rows: NecCandidate[]; how: string; seen: number }> {
+  let seen = 0;
   for (const n of NARROW) {
     const got = await fetchAll(env, op, { sgId, sgTypecode, ...n.params }, n.pages);
+    seen = Math.max(seen, got.length);
     // 조건이 걸렸어도 **한 번 더 거른다** — 앞부분 일치가 엉뚱한 시군을 물고 올 수 있다.
-    const kept = got.filter(isTaeanRow);
-    if (kept.length) return { rows: kept, how: n.how };
+    const kept = got.filter((r) => isTaeanRow(r, opts));
+    if (kept.length) return { rows: kept, how: n.how, seen: got.length };
   }
-  return { rows: [], how: "없음" };
+  // 0건일 때 **원본이 몇 건 왔는지**를 남긴다 — API가 빈손인지, 받았는데 못 걸러낸 건지 갈린다.
+  return { rows: [], how: seen ? `안걸림(원본 ${seen}건)` : "빈손", seen };
 }
 
 export interface HistoryFetch {
@@ -219,7 +228,7 @@ export async function fetchTaeanHistory(env: Env, local: ElectionDay[], assembly
   const jobs = [...local, ...assembly].flatMap((d) => d.kinds.map((k) => ({ sgId: d.sgId, k })));
   await inBatches(jobs, 4, async ({ sgId, k }) => {
     try {
-      const r = await fetchTaeanRows(env, OP_CAND, sgId, k.sgTypecode);
+      const r = await fetchTaeanRows(env, OP_CAND, sgId, k.sgTypecode, { byAddr: k.key.includes("비례") });
       how.push({ sgId, kind: k.key, how: r.how });
       items.push(...r.rows.map((x) => ({ ...x, kind: k.key })));
     } catch (e) {

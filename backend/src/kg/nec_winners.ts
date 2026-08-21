@@ -87,7 +87,7 @@ export async function fetchWinners(
       try {
         // 후보자와 **같은 조회 조건 사다리**를 쓴다 — 회차마다 선거구 표기가 달라
         //   한 조건으로는 30년치를 못 덮는다(2026-08-22 실측).
-        const r = await fetchTaeanRows(env, OP_WINNER, d.sgId, k.sgTypecode);
+        const r = await fetchTaeanRows(env, OP_WINNER, d.sgId, k.sgTypecode, { byAddr: k.key.includes("비례") });
         if (!sample && r.rows.length) sample = r.rows[0] as WinnerRow;
         fetched.push({ sgId: d.sgId, kind: k.key, rows: r.rows as WinnerRow[] });
       } catch (e) {

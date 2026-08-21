@@ -608,7 +608,9 @@ function NecHistoryReport({ r }: { r: NecHistorySync }) {
                         </span>
                       </>
                     ) : (
-                      <span>0건 — {ks.map((k) => k.kind).join(" · ")}</span>
+                      <span>
+                        0건 — {ks.map((k) => `${k.kind}${k.how && k.how !== "?" ? `(${k.how})` : ""}`).join(" · ")}
+                      </span>
                     )}
                   </li>
                 );

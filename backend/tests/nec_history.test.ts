@@ -144,3 +144,21 @@ describe("태안 후보 가려내기", () => {
     expect(isTaeanRow({ sggName: "서산시태안군" })).toBe(true);
   });
 });
+
+describe("비례대표는 주소로 가린다", () => {
+  // 도의원 비례는 선거구가 '충청남도' 전체다 — 선거구 이름으로는 태안 사람을 영영 못 가린다.
+  //   실측(2026-08-22): 도의원(비례)이 전 회차 0건. 군의원 비례는 선거구가 '태안군'이라 나왔다.
+  it("선거구가 도 전체여도 주소가 태안이면 태안 사람", () => {
+    expect(isTaeanRow({ sggName: "충청남도" }, { byAddr: true })).toBe(false);
+    expect(isTaeanRow({ sggName: "충청남도", addr: "충청남도  태안군  원북면  원이로" }, { byAddr: true })).toBe(true);
+  });
+
+  it("주소를 보라고 하지 않으면 주소는 안 본다", () => {
+    // 지역구 선거에서 주소까지 보면, 태안에 사는 서산 후보가 태안 사람으로 딸려 들어온다.
+    expect(isTaeanRow({ sggName: "서산시가선거구", addr: "충청남도 태안군 태안읍" })).toBe(false);
+  });
+
+  it("주소가 없으면 태안이 아니다", () => {
+    expect(isTaeanRow({ sggName: "충청남도" }, { byAddr: true })).toBe(false);
+  });
+});
