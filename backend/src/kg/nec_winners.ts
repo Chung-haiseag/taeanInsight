@@ -9,9 +9,8 @@
 //     그래서 회차·종류별로 **받아왔는지(covered)** 를 따로 기억하고, 받은 것만 판정한다.
 
 import type { Env } from "../types";
-import { call, readItems } from "./nec";
 import { tidy } from "./nec_import";
-import { isTaeanDistrict, type ElectionDay } from "./nec_history";
+import { fetchTaeanRows, type ElectionDay } from "./nec_history";
 import type { GroupResult, PersonGroup } from "./nec_people";
 
 const OP_WINNER = "WinnerInfoInqireService2/getWinnerInfoInqire";
@@ -77,35 +76,24 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  *   국회의원은 선거구가 합구('서산시태안군')라 조회로 좁힐 수 없어 충남 전체를 받아 거른다.
  */
 export async function fetchWinners(
-  env: Env, local: ElectionDay[], assembly: ElectionDay[], taeanQuery: Record<string, string>,
+  env: Env, local: ElectionDay[], assembly: ElectionDay[],
 ): Promise<{ fetched: FetchedWinners[]; failed: Array<{ sgId: string; kind: string; error: string }>; sample: WinnerRow | null }> {
   const fetched: FetchedWinners[] = [];
   const failed: Array<{ sgId: string; kind: string; error: string }> = [];
   let sample: WinnerRow | null = null;
 
-  const grab = async (sgId: string, kind: string, params: Record<string, string>, filterTaean: boolean) => {
-    try {
-      const rows: WinnerRow[] = [];
-      for (let page = 1; page <= 3; page++) {
-        const body = await call(env, OP_WINNER, { ...params, sgId, pageNo: page, numOfRows: 100 });
-        const got = readItems<WinnerRow>(body);
-        rows.push(...got);
-        if (got.length < 100) break;
+  for (const d of [...local, ...assembly]) {
+    for (const k of d.kinds) {
+      try {
+        // 후보자와 **같은 조회 조건 사다리**를 쓴다 — 회차마다 선거구 표기가 달라
+        //   한 조건으로는 30년치를 못 덮는다(2026-08-22 실측).
+        const r = await fetchTaeanRows(env, OP_WINNER, d.sgId, k.sgTypecode);
+        if (!sample && r.rows.length) sample = r.rows[0] as WinnerRow;
+        fetched.push({ sgId: d.sgId, kind: k.key, rows: r.rows as WinnerRow[] });
+      } catch (e) {
+        failed.push({ sgId: d.sgId, kind: k.key, error: errMsg(e) });
       }
-      const kept = filterTaean ? rows.filter((r) => isTaeanDistrict(r.sggName)) : rows;
-      if (!sample && kept.length) sample = kept[0];
-      fetched.push({ sgId, kind, rows: kept });
-    } catch (e) {
-      failed.push({ sgId, kind, error: errMsg(e) });
     }
-  };
-
-  for (const d of local) {
-    for (const k of d.kinds) await grab(d.sgId, k.key, { sgTypecode: k.sgTypecode, ...taeanQuery }, false);
-  }
-  for (const d of assembly) {
-    const k = d.kinds[0];
-    await grab(d.sgId, k.key, { sgTypecode: k.sgTypecode, sdName: "충청남도" }, true);
   }
   return { fetched, failed, sample };
 }

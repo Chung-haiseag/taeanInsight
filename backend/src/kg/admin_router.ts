@@ -12,7 +12,7 @@ import { loadFestivalQueue, rejectEvent } from "./event_queue";
 import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
-import { fetchTaeanCandidates, toSeed as necSeed, pickKinds, TAEAN_QUERY } from "./nec_import";
+import { fetchTaeanCandidates, toSeed as necSeed, pickKinds } from "./nec_import";
 import { localElectionDays, assemblyElectionDays, probeLocalDays, probeAssemblyDays, fetchTaeanHistory } from "./nec_history";
 import { groupCandidates, toHistorySeed, toQuarantineNodes } from "./nec_people";
 import { fetchWinners, buildWinnerIndex, markResults } from "./nec_winners";
@@ -172,7 +172,7 @@ router.post("/nec/sync-history", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const db = c.env.ARCHIVE_DB;
   const apply = c.req.query("apply") === "1";
-  const max = Math.min(Number(c.req.query("max") ?? 12) || 12, 20);
+  const max = Math.min(Number(c.req.query("max") ?? 20) || 20, 30);
   try {
     const [localRows, assemblyRows] = await Promise.all([
       fetchElections(c.env, SG_TYPE.구시군의원),
@@ -180,13 +180,13 @@ router.post("/nec/sync-history", async (c) => {
     ]);
     const local = localElectionDays(localRows).slice(0, max);
     const assembly = assemblyElectionDays(assemblyRows).slice(0, max);
-    const { items, failed } = await fetchTaeanHistory(c.env, local, assembly);
+    const { items, failed, how } = await fetchTaeanHistory(c.env, local, assembly);
 
     const grouped = groupCandidates(items);
 
     // 당락은 후보자 자료에 없다 — 당선인 API를 따로 받아 매긴다.
     //   못 받은 회차는 '모름'으로 둔다(낙선으로 단정하면 거짓이 된다).
-    const w = await fetchWinners(c.env, local, assembly, TAEAN_QUERY);
+    const w = await fetchWinners(c.env, local, assembly);
     const widx = buildWinnerIndex(w.fetched);
     markResults(grouped, widx);
 
@@ -197,10 +197,14 @@ router.post("/nec/sync-history", async (c) => {
 
     // 어느 회차·종류에서 몇 건이 왔는지 — 적게 오면 **어디서 빠지는지** 이걸 봐야 안다.
     //   대상으로 고른 회차인데 0건이면 조회 조건이 안 맞은 것이고, 회차 자체가 없으면 자료가 없는 것이다.
-    const per: Array<{ sgId: string; year: string; kind: string; n: number }> = [];
+    const per: Array<{ sgId: string; year: string; kind: string; n: number; how: string }> = [];
     for (const d of [...local, ...assembly]) {
       for (const k of d.kinds) {
-        per.push({ sgId: d.sgId, year: d.year, kind: k.key, n: items.filter((r) => String(r.sgId) === d.sgId && r.kind === k.key).length });
+        per.push({
+          sgId: d.sgId, year: d.year, kind: k.key,
+          n: items.filter((r) => String(r.sgId) === d.sgId && r.kind === k.key).length,
+          how: how.find((h) => h.sgId === d.sgId && h.kind === k.key)?.how ?? "?",
+        });
       }
     }
 
@@ -219,6 +223,7 @@ router.post("/nec/sync-history", async (c) => {
         failed: w.failed,
         // 당선인 API의 필드 이름을 문서로 단정하지 않는다 — 처음 한 건을 그대로 보여 확인한다.
         sampleFields: w.sample ? Object.keys(w.sample) : [],
+        sampleRow: w.sample,
       },
       elected: grouped.people.reduce((n, p) => n + p.runs.filter((r) => r.result === "당선").length, 0),
       unknownResult: grouped.people.reduce((n, p) => n + p.runs.filter((r) => !r.result).length, 0),

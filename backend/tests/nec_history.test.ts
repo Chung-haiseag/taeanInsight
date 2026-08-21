@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { localElectionDays, assemblyElectionDays, isTaeanDistrict } from "@/kg/nec_history";
+import { localElectionDays, assemblyElectionDays, isTaeanDistrict, isTaeanRow } from "@/kg/nec_history";
 
 // 선거 목록은 sgTypecode를 하나만 넣어 불러도 **같은 날 치러진 다른 종류까지** 함께 온다
 //   (2026-08-19 실측: sgTypecode=6으로 불렀는데 20260603에 8줄이 왔다).
@@ -97,5 +97,50 @@ describe("태안 선거구 판별", () => {
   it("빈 값은 태안이 아니다", () => {
     expect(isTaeanDistrict("")).toBe(false);
     expect(isTaeanDistrict(undefined)).toBe(false);
+  });
+});
+
+// ── 실측(2026-08-22)에서 드러난 것 ────────────────────────────────────────
+//   미리보기에 2024·2023·2021·2020·2019·2017·2016·2015년이 대상으로 잡혔다.
+//   전부 재보궐이다 — '같은 날 3종류 이상'이라는 기준만으로는 안 갈렸다.
+const 재보궐섞인목록 = [
+  { sgId: "20260603", sgName: "구·시·군의 장선거", sgTypecode: "4" },
+  { sgId: "20260603", sgName: "시·도의회의원선거", sgTypecode: "5" },
+  { sgId: "20260603", sgName: "구·시·군의회의원선거", sgTypecode: "6" },
+  { sgId: "20241016", sgName: "구·시·군의 장 재·보궐선거", sgTypecode: "4" },
+  { sgId: "20241016", sgName: "시·도의회의원 재·보궐선거", sgTypecode: "5" },
+  { sgId: "20241016", sgName: "구·시·군의회의원 재·보궐선거", sgTypecode: "6" },
+];
+
+describe("재보궐 걸러내기", () => {
+  it("재보궐만 치른 날은 동시지방선거가 아니다", () => {
+    expect(localElectionDays(재보궐섞인목록).map((d) => d.sgId)).toEqual(["20260603"]);
+  });
+
+  it("종류가 3개여도 이름이 재보궐이면 뺀다", () => {
+    // 이전 규칙은 '3종류 이상'만 봐서 위 20241016을 대상으로 삼았다.
+    expect(localElectionDays(재보궐섞인목록).some((d) => d.sgId === "20241016")).toBe(false);
+  });
+});
+
+describe("태안 후보 가려내기", () => {
+  // 2026년은 sggName='태안군가선거구'라 앞부분 일치로 걸렸지만,
+  //   옛 회차는 선거구 칸에 '가선거구'만 오고 '태안군'은 wiwName에 따로 있다(추정).
+  //   그래서 두 칸을 모두 본다 — 한쪽만 보면 군의원 지역구가 통째로 0건이 된다.
+  it("선거구 이름에 태안이 있으면 태안", () => {
+    expect(isTaeanRow({ sggName: "태안군가선거구" })).toBe(true);
+  });
+
+  it("선거구에 없어도 시군 칸에 태안이 있으면 태안", () => {
+    expect(isTaeanRow({ sggName: "가선거구", wiwName: "태안군" })).toBe(true);
+  });
+
+  it("둘 다 아니면 태안이 아니다", () => {
+    expect(isTaeanRow({ sggName: "서산시가선거구", wiwName: "서산시" })).toBe(false);
+    expect(isTaeanRow({})).toBe(false);
+  });
+
+  it("합구 선거구도 태안으로 본다", () => {
+    expect(isTaeanRow({ sggName: "서산시태안군" })).toBe(true);
   });
 });

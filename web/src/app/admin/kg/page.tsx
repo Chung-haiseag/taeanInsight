@@ -574,7 +574,7 @@ function NecHistoryReport({ r }: { r: NecHistorySync }) {
         {!!r.winners && (
           <span className="text-foreground-muted">
             {" · "}당선인 자료 받은 회차 {r.winners.covered}개
-            {!!r.winners.sampleFields.length && ` · 필드 ${r.winners.sampleFields.slice(0, 8).join(", ")}`}
+            {!!r.winners.sampleFields.length && ` · 당선인 필드 ${r.winners.sampleFields.join(", ")}`}
             {!r.winners.covered && " — 한 회차도 못 받았습니다"}
           </span>
         )}
@@ -588,8 +588,8 @@ function NecHistoryReport({ r }: { r: NecHistorySync }) {
           </p>
           <ul className="mt-1 space-y-0.5">
             {Object.entries(
-              r.per.reduce<Record<string, Array<{ kind: string; n: number }>>>((acc, x) => {
-                (acc[x.year] ??= []).push({ kind: x.kind, n: x.n });
+              r.per.reduce<Record<string, Array<{ kind: string; n: number; how: string }>>>((acc, x) => {
+                (acc[x.year] ??= []).push({ kind: x.kind, n: x.n, how: x.how });
                 return acc;
               }, {}),
             )
@@ -603,6 +603,9 @@ function NecHistoryReport({ r }: { r: NecHistorySync }) {
                       <>
                         <span className="font-semibold tabular-nums">{tot}건</span>
                         <span className="text-foreground-muted"> — {ks.map((k) => `${k.kind} ${k.n}`).join(" · ")}</span>
+                        <span className="ml-2 text-xs text-foreground-muted">
+                          [{[...new Set(ks.map((k) => k.how).filter((h) => h && h !== "없음"))].join("/")}]
+                        </span>
                       </>
                     ) : (
                       <span>0건 — {ks.map((k) => k.kind).join(" · ")}</span>

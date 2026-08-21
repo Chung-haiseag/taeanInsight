@@ -269,9 +269,9 @@ export interface NecHistorySync {
   people?: number; parties?: number; edges?: number; nodes?: number;
   ambiguous?: Array<{ name: string; birthdays: string[]; runs: string[][] }>;
   quarantined?: number;
-  per?: Array<{ sgId: string; year: string; kind: string; n: number }>;
+  per?: Array<{ sgId: string; year: string; kind: string; n: number; how: string }>;
   days?: { local: string[]; assembly: string[] };
-  winners?: { covered: number; names: number; failed: Array<{ sgId: string; kind: string; error: string }>; sampleFields: string[] };
+  winners?: { covered: number; names: number; failed: Array<{ sgId: string; kind: string; error: string }>; sampleFields: string[]; sampleRow?: Record<string, unknown> | null };
   elected?: number;
   unknownResult?: number;
   names?: string[];

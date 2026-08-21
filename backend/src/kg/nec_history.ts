@@ -38,6 +38,9 @@ export function localElectionDays(rows: ElectionRow[], minKinds = 3): ElectionDa
     const sgId = String(r.sgId ?? "");
     if (!sgId || !r.sgTypecode) continue;
     const sgName = tidy(r.sgName);
+    // ⚠ 재보궐은 뺀다. '같은 날 3종류 이상'만으로는 안 갈렸다 — 재보궐도 군수·도의원·군의원을
+    //   한날 치르는 날이 있어 2024·2023·2021·2020년이 통째로 대상에 들어왔다(2026-08-22 실측).
+    if (BYELECTION.test(sgName)) continue;
     // '전국동시지방선거' 총괄 줄(코드 0)은 종류가 아니라 그날의 이름이라 조회 대상이 아니다.
     const w = WANTED.find((x) => x.match.test(sgName));
     if (!w) continue;
@@ -77,6 +80,18 @@ export function assemblyElectionDays(rows: ElectionRow[]): ElectionDay[] {
  */
 export function isTaeanDistrict(sggName: string | undefined | null): boolean {
   return tidy(sggName).replace(/[\s·・]/g, "").includes("태안");
+}
+
+/**
+ * 후보자 한 줄이 태안인가(순수) — **선거구 칸과 시군 칸을 모두 본다.**
+ *
+ *   2026년은 sggName이 '태안군가선거구'라 앞부분 일치(sggName=태안군)로 걸렸다.
+ *   그런데 옛 회차는 군의원 지역구·도의원이 **0건**으로 나왔다(2026-08-22 실측).
+ *   선거구 칸에 '가선거구'만 오고 '태안군'은 wiwName에 따로 있는 것으로 보인다.
+ *   한쪽만 보면 그 종류가 통째로 사라진다.
+ */
+export function isTaeanRow(row: { sggName?: string; wiwName?: string }): boolean {
+  return isTaeanDistrict(row.sggName) || isTaeanDistrict(row.wiwName);
 }
 
 // ── 실측 —— 회차별로 태안 후보가 몇 명인지 **후보자를 다 받지 않고** 센다. ─────────────
@@ -145,11 +160,11 @@ export async function probeAssemblyDays(env: Env, days: ElectionDay[]): Promise<
   });
 }
 
-/** 한 조건으로 후보자 전 쪽을 받는다. */
-async function fetchAll(env: Env, params: Record<string, string | number>, maxPages: number): Promise<NecCandidate[]> {
+/** 한 조건으로 전 쪽을 받는다. */
+async function fetchAll(env: Env, op: string, params: Record<string, string | number>, maxPages: number): Promise<NecCandidate[]> {
   const out: NecCandidate[] = [];
   for (let page = 1; page <= maxPages; page++) {
-    const body = await call(env, OP_CAND, { ...params, pageNo: page, numOfRows: 100 });
+    const body = await call(env, op, { ...params, pageNo: page, numOfRows: 100 });
     const got = readItems<NecCandidate>(body);
     out.push(...got);
     if (got.length < 100 || out.length >= readTotal(body)) break;
@@ -157,9 +172,38 @@ async function fetchAll(env: Env, params: Record<string, string | number>, maxPa
   return out;
 }
 
+/**
+ * 조회 조건 후보 — **싼 것부터** 시도하고 걸리면 멈춘다.
+ *
+ *   2026년은 `sggName=태안군`(앞부분 일치)으로 한 쪽이면 끝난다.
+ *   그런데 옛 회차는 이 조건으로 군의원 지역구·도의원이 0건이었다(2026-08-22 실측).
+ *   선거구 표기가 회차마다 달라 **한 조건으로는 30년치를 못 덮는다.**
+ *   마지막 수단인 '충남 전체'는 여러 쪽을 받아야 하므로, 앞의 것이 걸리면 거기서 끝낸다.
+ */
+const NARROW = [
+  { how: "선거구", params: { sdName: "충청남도", sggName: "태안군" }, pages: 5 },
+  { how: "시군", params: { sdName: "충청남도", wiwName: "태안군" }, pages: 5 },
+  { how: "충남전체", params: { sdName: "충청남도" }, pages: 8 },
+] as const;
+
+/** 한 회차·한 종류의 태안 줄을 받는다. 어느 조건이 걸렸는지도 함께 돌려준다(다음 진단의 근거). */
+export async function fetchTaeanRows(
+  env: Env, op: string, sgId: string, sgTypecode: string,
+): Promise<{ rows: NecCandidate[]; how: string }> {
+  for (const n of NARROW) {
+    const got = await fetchAll(env, op, { sgId, sgTypecode, ...n.params }, n.pages);
+    // 조건이 걸렸어도 **한 번 더 거른다** — 앞부분 일치가 엉뚱한 시군을 물고 올 수 있다.
+    const kept = got.filter(isTaeanRow);
+    if (kept.length) return { rows: kept, how: n.how };
+  }
+  return { rows: [], how: "없음" };
+}
+
 export interface HistoryFetch {
   items: Array<NecCandidate & { kind: string }>;
   failed: Array<{ sgId: string; kind: string; error: string }>;
+  /** 회차·종류별로 어느 조회 조건이 걸렸는지. 0건일 때 원인을 가리는 근거가 된다. */
+  how: Array<{ sgId: string; kind: string; how: string }>;
 }
 
 /**
@@ -170,27 +214,18 @@ export interface HistoryFetch {
 export async function fetchTaeanHistory(env: Env, local: ElectionDay[], assembly: ElectionDay[]): Promise<HistoryFetch> {
   const items: Array<NecCandidate & { kind: string }> = [];
   const failed: HistoryFetch["failed"] = [];
+  const how: HistoryFetch["how"] = [];
 
-  const localJobs = local.flatMap((d) => d.kinds.map((k) => ({ sgId: d.sgId, k })));
-  await inBatches(localJobs, 4, async ({ sgId, k }) => {
+  const jobs = [...local, ...assembly].flatMap((d) => d.kinds.map((k) => ({ sgId: d.sgId, k })));
+  await inBatches(jobs, 4, async ({ sgId, k }) => {
     try {
-      const got = await fetchAll(env, { sgId, sgTypecode: k.sgTypecode, ...TAEAN_QUERY }, 5);
-      items.push(...got.map((r) => ({ ...r, kind: k.key })));
+      const r = await fetchTaeanRows(env, OP_CAND, sgId, k.sgTypecode);
+      how.push({ sgId, kind: k.key, how: r.how });
+      items.push(...r.rows.map((x) => ({ ...x, kind: k.key })));
     } catch (e) {
       failed.push({ sgId, kind: k.key, error: errMsg(e) });
     }
   });
 
-  // 국회의원은 선거구가 합구('서산시태안군')라 조회로 좁힐 수 없다 — 충남 전체를 받아 거른다.
-  await inBatches(assembly, 3, async (d) => {
-    const k = d.kinds[0];
-    try {
-      const got = await fetchAll(env, { sgId: d.sgId, sgTypecode: k.sgTypecode, sdName: "충청남도" }, 3);
-      items.push(...got.filter((r) => isTaeanDistrict(r.sggName)).map((r) => ({ ...r, kind: k.key })));
-    } catch (e) {
-      failed.push({ sgId: d.sgId, kind: k.key, error: errMsg(e) });
-    }
-  });
-
-  return { items, failed };
+  return { items, failed, how };
 }
