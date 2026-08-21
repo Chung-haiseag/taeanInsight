@@ -674,6 +674,7 @@ function DataSources() {
         {nec && <p className={`text-sm ${nec.startsWith("안 됨") ? "text-red-600" : "font-semibold text-brand"}`}>{nec}</p>}
 
         <div className="border-t border-brand/10 pt-3">
+          <h3 className="mb-1 text-sm font-bold text-brand">① 어느 회차가 있는지 세어보기<span className="ml-2 rounded-full bg-accent-subtle/50 px-2 py-0.5 text-xs font-normal text-foreground-muted">저장 안 함</span></h3>
           <p className="mb-2 text-sm text-foreground-muted">
             <strong>역대 선거에 태안 후보가 몇 명 있는지</strong> 먼저 세어 봅니다. 선관위 자료가 어느 해까지
             거슬러 가는지는 문서로 알 수 없어, 적재기를 짜기 전에 눈으로 확인합니다.{" "}
@@ -699,6 +700,10 @@ function DataSources() {
         </div>
 
         <div className="border-t border-brand/10 pt-3">
+          <h3 className="mb-1 text-sm font-bold text-brand">
+            ② 역대 인물 적재
+            <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-background">여기부터</span>
+          </h3>
           <p className="mb-2 text-sm text-foreground-muted">
             <strong>역대 회차를 모두</strong> 인물로 들입니다. 같은 사람이 여러 번 나왔으면 한 명으로 모으고
             출마 이력을 쌓습니다. <strong>이름이 같고 생년월일이 다르면 합치지 않고</strong> 따로 세워 검수로 넘깁니다
@@ -731,7 +736,8 @@ function DataSources() {
           )}
         </div>
 
-        <div className="border-t border-brand/10 pt-3">
+        <div className="border-t border-brand/10 pt-3 opacity-70">
+          <h3 className="mb-1 text-sm font-bold text-foreground-muted">최신 회차만 들이기<span className="ml-2 rounded-full bg-accent-subtle/50 px-2 py-0.5 text-xs font-normal text-foreground-muted">②를 하면 따로 누를 필요 없습니다</span></h3>
           <p className="mb-2 text-sm text-foreground-muted">
             군수·도의원·군의원 후보를 인물 정보로 들입니다. 이미 있는 인물은 <strong>새로 만들지 않고 채웁니다</strong>
             (생년월일·정당·선거구·경력). 재산·전과는 자료에 없어 들어오지 않습니다.
@@ -769,6 +775,7 @@ function DataSources() {
         </div>
 
         <div className="border-t border-brand/10 pt-3">
+          <h3 className="mb-1 text-sm font-bold text-brand">③ 경력에 적힌 단체를 소속으로 잇기<span className="ml-2 rounded-full bg-accent-subtle/50 px-2 py-0.5 text-xs font-normal text-foreground-muted">②를 한 뒤에</span></h3>
           <p className="mb-2 text-sm text-foreground-muted">
             경력에 적힌 단체를 소속으로 잇습니다. <strong>이름이 정확히 같을 때만</strong> 잇습니다 —
             비슷하다고 붙이면 &lsquo;태안읍체육회&rsquo;가 &lsquo;태안군체육회&rsquo;로 잘못 붙습니다.
@@ -823,7 +830,8 @@ function DataSources() {
           )}
         </div>
 
-        <div className="border-t border-brand/10 pt-3">
+        <div className="border-t border-brand/10 pt-3 opacity-70">
+          <h3 className="mb-1 text-sm font-bold text-foreground-muted">원자료 한 건 열어보기<span className="ml-2 rounded-full bg-accent-subtle/50 px-2 py-0.5 text-xs font-normal text-foreground-muted">확인용 · 저장 안 함</span></h3>
           <p className="mb-2 text-sm text-foreground-muted">
             자료가 어떤 모양으로 오는지 한 건만 열어봅니다. 이걸 보고 경력·소속을 읽는 방식을 정합니다.
           </p>
