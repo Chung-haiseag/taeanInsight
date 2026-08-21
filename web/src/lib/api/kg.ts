@@ -245,6 +245,22 @@ export function getNecHistory(): Promise<NecHistory> {
   return apiFetch("/api/admin/kg/nec/history");
 }
 
+export interface NecHistorySync {
+  dryRun?: boolean; applied?: boolean;
+  fetched?: number; years?: string[];
+  failed?: Array<{ sgId: string; kind: string; error: string }>;
+  people?: number; parties?: number; edges?: number; nodes?: number;
+  ambiguous?: Array<{ name: string; birthdays: string[]; runs: string[][] }>;
+  quarantined?: number;
+  names?: string[];
+  error?: string;
+}
+
+/** 역대 회차 인물 적재. apply=false면 누가 들어갈지만 미리 본다(기본). */
+export function syncNecHistory(apply = false): Promise<NecHistorySync> {
+  return apiFetch(`/api/admin/kg/nec/sync-history${apply ? "?apply=1" : ""}`, { method: "POST" });
+}
+
 export interface NecSample {
   elections?: number;
   attempts?: Array<{ how: string; total: number; matched: number; note?: string }>;

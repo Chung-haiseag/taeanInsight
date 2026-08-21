@@ -144,3 +144,53 @@ export async function probeAssemblyDays(env: Env, days: ElectionDay[]): Promise<
     }
   });
 }
+
+/** 한 조건으로 후보자 전 쪽을 받는다. */
+async function fetchAll(env: Env, params: Record<string, string | number>, maxPages: number): Promise<NecCandidate[]> {
+  const out: NecCandidate[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const body = await call(env, OP_CAND, { ...params, pageNo: page, numOfRows: 100 });
+    const got = readItems<NecCandidate>(body);
+    out.push(...got);
+    if (got.length < 100 || out.length >= readTotal(body)) break;
+  }
+  return out;
+}
+
+export interface HistoryFetch {
+  items: Array<NecCandidate & { kind: string }>;
+  failed: Array<{ sgId: string; kind: string; error: string }>;
+}
+
+/**
+ * 역대 회차의 태안 후보를 모두 받는다.
+ *   회차·종류 하나가 실패해도 나머지는 계속 받는다 — 30년치를 한 번의 오류로 잃지 않는다.
+ *   종류(kind)를 여기서 붙여 넘긴다. 뒤에서 코드 번호를 다시 해석하지 않게 하기 위해서다.
+ */
+export async function fetchTaeanHistory(env: Env, local: ElectionDay[], assembly: ElectionDay[]): Promise<HistoryFetch> {
+  const items: Array<NecCandidate & { kind: string }> = [];
+  const failed: HistoryFetch["failed"] = [];
+
+  const localJobs = local.flatMap((d) => d.kinds.map((k) => ({ sgId: d.sgId, k })));
+  await inBatches(localJobs, 4, async ({ sgId, k }) => {
+    try {
+      const got = await fetchAll(env, { sgId, sgTypecode: k.sgTypecode, ...TAEAN_QUERY }, 5);
+      items.push(...got.map((r) => ({ ...r, kind: k.key })));
+    } catch (e) {
+      failed.push({ sgId, kind: k.key, error: errMsg(e) });
+    }
+  });
+
+  // 국회의원은 선거구가 합구('서산시태안군')라 조회로 좁힐 수 없다 — 충남 전체를 받아 거른다.
+  await inBatches(assembly, 3, async (d) => {
+    const k = d.kinds[0];
+    try {
+      const got = await fetchAll(env, { sgId: d.sgId, sgTypecode: k.sgTypecode, sdName: "충청남도" }, 3);
+      items.push(...got.filter((r) => isTaeanDistrict(r.sggName)).map((r) => ({ ...r, kind: k.key })));
+    } catch (e) {
+      failed.push({ sgId: d.sgId, kind: k.key, error: errMsg(e) });
+    }
+  });
+
+  return { items, failed };
+}

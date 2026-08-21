@@ -13,7 +13,8 @@ import { loadEntityCoverage } from "./coverage";
 import { call, fetchElections, fetchTaeanSample, SG_TYPE } from "./nec";
 import { fetchOrgTree, toSeed as orgSeed, skipForeignNodes } from "./gov_org";
 import { fetchTaeanCandidates, toSeed as necSeed, pickKinds } from "./nec_import";
-import { localElectionDays, assemblyElectionDays, probeLocalDays, probeAssemblyDays } from "./nec_history";
+import { localElectionDays, assemblyElectionDays, probeLocalDays, probeAssemblyDays, fetchTaeanHistory } from "./nec_history";
+import { groupCandidates, toHistorySeed, toQuarantineNodes } from "./nec_people";
 import { planCareers, toLinkSeed } from "./career_orgs";
 import { importSeed } from "./import";
 
@@ -157,6 +158,55 @@ router.post("/nec/sync", async (c) => {
     const o = await loadOntology(c.env.ARCHIVE_DB);
     const r = await importSeed(c.env.ARCHIVE_DB, seed, o);
     return c.json({ applied: true, per, ...r });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
+  }
+});
+
+// ── 역대 회차 인물 적재 —— 2026년 한 장면을 30년치 이력으로.
+//   ⚠ 동명이인은 **사실층에 넣지 않는다**. 선관위 자료는 verified=1로 들어가 AI가 바로 인용하므로,
+//     생년월일이 갈리면 `person:<이름>#<생년월일>`을 verified=0으로 격리하고 이름 노드는 건드리지 않는다.
+//   기본은 드라이런. 되돌리기 어려운 쓰기는 무엇이 들어갈지 눈으로 본 뒤에 한다.
+router.post("/nec/sync-history", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const db = c.env.ARCHIVE_DB;
+  const apply = c.req.query("apply") === "1";
+  const max = Math.min(Number(c.req.query("max") ?? 12) || 12, 20);
+  try {
+    const [localRows, assemblyRows] = await Promise.all([
+      fetchElections(c.env, SG_TYPE.구시군의원),
+      fetchElections(c.env, SG_TYPE.국회의원),
+    ]);
+    const local = localElectionDays(localRows).slice(0, max);
+    const assembly = assemblyElectionDays(assemblyRows).slice(0, max);
+    const { items, failed } = await fetchTaeanHistory(c.env, local, assembly);
+
+    const grouped = groupCandidates(items);
+    const seed = toHistorySeed(grouped);
+    const quarantine = toQuarantineNodes(grouped);
+    const people = seed.nodes.filter((n) => n.type === "person");
+    const years = [...new Set(items.map((r) => String(r.sgId ?? "").slice(0, 4)))].sort();
+
+    const summary = {
+      fetched: items.length, years, failed,
+      people: people.length, parties: seed.nodes.length - people.length, edges: seed.edges.length,
+      ambiguous: grouped.ambiguous.map((a) => ({
+        name: a.name,
+        birthdays: a.people.map((p) => p.birthday || "모름"),
+        runs: a.people.map((p) => p.runs.map((r) => `${r.sgId.slice(0, 4)} ${r.kind}`)),
+      })),
+      quarantined: quarantine.length,
+    };
+    if (!apply) {
+      return c.json({ dryRun: true, ...summary, names: people.map((n) => n.name) });
+    }
+    const o = await loadOntology(db);
+    const r = await importSeed(db, seed, o);
+    // 격리 노드는 **검수 대기(verified=0)** 로 따로 쓴다 — 사실층에 섞이면 안 된다.
+    for (const n of quarantine) {
+      await upsertNode(db, { id: n.id, type: n.type, name: n.name, attrs: n.attrs, source: n.source, verified: 0 }, o);
+    }
+    return c.json({ applied: true, ...summary, ...r });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }

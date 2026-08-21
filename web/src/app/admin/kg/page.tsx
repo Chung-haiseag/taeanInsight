@@ -19,6 +19,7 @@ import {
   syncGovOrg,
   getNecElections,
   getNecHistory,
+  syncNecHistory,
   getNecSample,
   syncNec,
   syncCareers,
@@ -28,6 +29,7 @@ import {
   type NecSample,
   type NecHistory,
   type NecDayCount,
+  type NecHistorySync,
   type NecSyncResult,
   type CareerSyncResult,
   type OrgCandidate,
@@ -538,6 +540,54 @@ function ElectionYears({ title, days }: { title: string; days: NecDayCount[] }) 
   );
 }
 
+/** 역대 인물 적재 미리보기 — 무엇이 들어가고 무엇이 걸러졌는지. */
+function NecHistoryReport({ r }: { r: NecHistorySync }) {
+  return (
+    <div className="mt-3 space-y-3 rounded-lg bg-accent-subtle/20 p-3 text-sm">
+      <p>
+        후보자 <strong>{r.fetched}건</strong>을 받아 <strong>인물 {r.people}명</strong>으로 모았습니다
+        {!!r.years?.length && <span className="text-foreground-muted"> · {r.years[0]}~{r.years[r.years.length - 1]}년</span>}
+        . 정당 {r.parties}개 · 소속 {r.edges}건이 함께 들어갑니다.
+      </p>
+
+      {!!r.ambiguous?.length && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-50/60 p-3 dark:bg-amber-950/20">
+          <p className="font-semibold text-amber-800 dark:text-amber-300">
+            이름이 같고 생년월일이 다른 사람 {r.ambiguous.length}건 — 합치지 않고 검수로 넘깁니다
+          </p>
+          <ul className="mt-1 space-y-1">
+            {r.ambiguous.map((a) => (
+              <li key={a.name}>
+                <strong>{a.name}</strong>
+                <span className="text-foreground-muted">
+                  {" — "}{a.birthdays.map((b, i) => `${b} (${a.runs[i]?.join(", ") ?? ""})`).join(" / ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!!r.failed?.length && (
+        <div>
+          <p className="font-semibold text-red-700">못 받은 회차 {r.failed.length}건</p>
+          <ul className="mt-1 space-y-0.5 text-foreground-muted">
+            {r.failed.slice(0, 6).map((f) => <li key={`${f.sgId}${f.kind}`}>· {f.sgId.slice(0, 4)} {f.kind} — {f.error}</li>)}
+            {r.failed.length > 6 && <li>· … 외 {r.failed.length - 6}건</li>}
+          </ul>
+        </div>
+      )}
+
+      {!!r.names?.length && (
+        <details>
+          <summary className="cursor-pointer text-foreground-muted">들어갈 인물 {r.names.length}명 보기</summary>
+          <p className="mt-1 text-foreground-muted">{r.names.join(" · ")}</p>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function DataSources() {
   const [preview, setPreview] = useState<GovOrgSyncResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -545,6 +595,8 @@ function DataSources() {
   const [nec, setNec] = useState<string | null>(null);
   const [sample, setSample] = useState<NecSample | null>(null);
   const [hist, setHist] = useState<NecHistory | null>(null);
+  const [hpre, setHpre] = useState<NecHistorySync | null>(null);
+  const [hdone, setHdone] = useState<NecHistorySync | null>(null);
   const [necPre, setNecPre] = useState<NecSyncResult | null>(null);
   const [necDone, setNecDone] = useState<NecSyncResult | null>(null);
   const [car, setCar] = useState<CareerSyncResult | null>(null);
@@ -643,6 +695,39 @@ function DataSources() {
               <ElectionYears title="지방선거" days={hist.local ?? []} />
               <ElectionYears title="국회의원 선거" days={hist.assembly ?? []} />
             </div>
+          )}
+        </div>
+
+        <div className="border-t border-brand/10 pt-3">
+          <p className="mb-2 text-sm text-foreground-muted">
+            <strong>역대 회차를 모두</strong> 인물로 들입니다. 같은 사람이 여러 번 나왔으면 한 명으로 모으고
+            출마 이력을 쌓습니다. <strong>이름이 같고 생년월일이 다르면 합치지 않고</strong> 따로 세워 검수로 넘깁니다
+            — 합쳐 버리면 없던 사람이 만들어지고, 선관위 자료는 AI 답변에 바로 인용됩니다.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button" disabled={!!busy}
+              onClick={() => { setHdone(null); void run(() => syncNecHistory(false), "hpre", setHpre as (v: never) => void); }}
+              className="rounded-full border border-brand/40 px-4 py-2 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60"
+            >
+              {busy === "hpre" ? "모으는 중… (1분쯤)" : "먼저 확인하기"}
+            </button>
+            <button
+              type="button" disabled={!!busy || !hpre || !!hpre.error}
+              onClick={() => void run(() => syncNecHistory(true), "hap", setHdone as (v: never) => void)}
+              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background hover:bg-brand/90 disabled:opacity-40"
+            >
+              {busy === "hap" ? "적재 중…" : "적재하기"}
+            </button>
+          </div>
+          {hpre?.error && <p className="mt-2 text-sm text-red-600">안 됨 — {hpre.error}</p>}
+          {hpre && !hpre.error && !hdone && <NecHistoryReport r={hpre} />}
+          {hdone?.error && <p className="mt-2 text-sm text-red-600">적재 실패 — {hdone.error}</p>}
+          {hdone && !hdone.error && (
+            <p className="mt-2 text-sm font-semibold text-brand">
+              완료 — 인물 {hdone.people}명 · 정당 {hdone.parties}개 · 관계 {hdone.edges}건 반영됐습니다
+              {!!hdone.quarantined && ` · 동명이인 ${hdone.quarantined}건은 검수 대기로 두었습니다`}.
+            </p>
           )}
         </div>
 
