@@ -568,6 +568,52 @@ function NecHistoryReport({ r }: { r: NecHistorySync }) {
         </div>
       )}
 
+      <p>
+        당선 <strong>{r.elected ?? 0}회</strong>
+        {!!r.unknownResult && <span className="text-foreground-muted"> · 결과 모름 {r.unknownResult}회</span>}
+        {!!r.winners && (
+          <span className="text-foreground-muted">
+            {" · "}당선인 자료 받은 회차 {r.winners.covered}개
+            {!!r.winners.sampleFields.length && ` · 필드 ${r.winners.sampleFields.slice(0, 8).join(", ")}`}
+            {!r.winners.covered && " — 한 회차도 못 받았습니다"}
+          </span>
+        )}
+      </p>
+
+      {!!r.per?.length && (
+        <details open>
+          <summary className="cursor-pointer font-semibold text-brand">회차별로 몇 건 왔는지 보기</summary>
+          <p className="mt-1 text-xs text-foreground-muted">
+            대상으로 고른 회차인데 0건이면 조회 조건이 안 맞은 것이고, 회차가 아예 없으면 선관위에 자료가 없는 것입니다.
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {Object.entries(
+              r.per.reduce<Record<string, Array<{ kind: string; n: number }>>>((acc, x) => {
+                (acc[x.year] ??= []).push({ kind: x.kind, n: x.n });
+                return acc;
+              }, {}),
+            )
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .map(([year, ks]) => {
+                const tot = ks.reduce((sum, k) => sum + k.n, 0);
+                return (
+                  <li key={year} className={tot ? "" : "text-foreground-muted"}>
+                    <span className="mr-2 inline-block w-12 font-semibold tabular-nums">{year}</span>
+                    {tot ? (
+                      <>
+                        <span className="font-semibold tabular-nums">{tot}건</span>
+                        <span className="text-foreground-muted"> — {ks.map((k) => `${k.kind} ${k.n}`).join(" · ")}</span>
+                      </>
+                    ) : (
+                      <span>0건 — {ks.map((k) => k.kind).join(" · ")}</span>
+                    )}
+                  </li>
+                );
+              })}
+          </ul>
+        </details>
+      )}
+
       {!!r.failed?.length && (
         <div>
           <p className="font-semibold text-red-700">못 받은 회차 {r.failed.length}건</p>

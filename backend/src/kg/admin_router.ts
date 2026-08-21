@@ -195,8 +195,18 @@ router.post("/nec/sync-history", async (c) => {
     const people = seed.nodes.filter((n) => n.type === "person");
     const years = [...new Set(items.map((r) => String(r.sgId ?? "").slice(0, 4)))].sort();
 
+    // 어느 회차·종류에서 몇 건이 왔는지 — 적게 오면 **어디서 빠지는지** 이걸 봐야 안다.
+    //   대상으로 고른 회차인데 0건이면 조회 조건이 안 맞은 것이고, 회차 자체가 없으면 자료가 없는 것이다.
+    const per: Array<{ sgId: string; year: string; kind: string; n: number }> = [];
+    for (const d of [...local, ...assembly]) {
+      for (const k of d.kinds) {
+        per.push({ sgId: d.sgId, year: d.year, kind: k.key, n: items.filter((r) => String(r.sgId) === d.sgId && r.kind === k.key).length });
+      }
+    }
+
     const summary = {
-      fetched: items.length, years, failed,
+      fetched: items.length, years, failed, per,
+      days: { local: local.map((d) => d.year), assembly: assembly.map((d) => d.year) },
       people: people.length, parties: seed.nodes.length - people.length, edges: seed.edges.length,
       ambiguous: grouped.ambiguous.map((a) => ({
         name: a.name,
