@@ -82,18 +82,20 @@ export async function fetchWinners(
   const failed: Array<{ sgId: string; kind: string; error: string }> = [];
   let sample: WinnerRow | null = null;
 
-  for (const d of [...local, ...assembly]) {
-    for (const k of d.kinds) {
+  // 회차 수가 스무 개를 넘어 하나씩 부르면 너무 느리다 — 몇 개씩 나눠 동시에 부른다.
+  const jobs = [...local, ...assembly].flatMap((d) => d.kinds.map((k) => ({ sgId: d.sgId, k })));
+  for (let i = 0; i < jobs.length; i += 4) {
+    await Promise.all(jobs.slice(i, i + 4).map(async ({ sgId, k }) => {
       try {
         // 후보자와 **같은 조회 조건 사다리**를 쓴다 — 회차마다 선거구 표기가 달라
         //   한 조건으로는 30년치를 못 덮는다(2026-08-22 실측).
-        const r = await fetchTaeanRows(env, OP_WINNER, d.sgId, k.sgTypecode, { byAddr: k.key.includes("비례") });
+        const r = await fetchTaeanRows(env, OP_WINNER, sgId, k.sgTypecode, { byAddr: k.key.includes("비례") });
         if (!sample && r.rows.length) sample = r.rows[0] as WinnerRow;
-        fetched.push({ sgId: d.sgId, kind: k.key, rows: r.rows as WinnerRow[] });
+        fetched.push({ sgId, kind: k.key, rows: r.rows as WinnerRow[] });
       } catch (e) {
-        failed.push({ sgId: d.sgId, kind: k.key, error: errMsg(e) });
+        failed.push({ sgId, kind: k.key, error: errMsg(e) });
       }
-    }
+    }));
   }
   return { fetched, failed, sample };
 }

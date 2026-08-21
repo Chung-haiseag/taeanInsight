@@ -602,9 +602,10 @@ function NecHistoryReport({ r }: { r: NecHistorySync }) {
                     {tot ? (
                       <>
                         <span className="font-semibold tabular-nums">{tot}건</span>
-                        <span className="text-foreground-muted"> — {ks.map((k) => `${k.kind} ${k.n}`).join(" · ")}</span>
-                        <span className="ml-2 text-xs text-foreground-muted">
-                          [{[...new Set(ks.map((k) => k.how).filter((h) => h && h !== "없음"))].join("/")}]
+                        <span className="text-foreground-muted">
+                          {" — "}
+                          {/* 0건인 종류는 **어느 조건까지 갔는지** 함께 적는다 — 한 해 안에서도 종류마다 다르다. */}
+                          {ks.map((k) => `${k.kind} ${k.n}${k.n === 0 && k.how && k.how !== "?" ? `(${k.how})` : ""}`).join(" · ")}
                         </span>
                       </>
                     ) : (
