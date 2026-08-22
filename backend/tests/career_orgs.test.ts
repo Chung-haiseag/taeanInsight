@@ -189,3 +189,24 @@ describe("같은 사람·같은 조직은 한 줄로 모은다", () => {
     expect((seed.edges[0].attrs as { evidence: string }).evidence).toContain("의장");
   });
 });
+
+describe("대수 표기에 '제'가 없을 때", () => {
+  // 실측(2026-08-22): 새 조직 후보에 '2대 태안군의회'가 올라왔다.
+  //   '제2대'는 떼는데 '제' 없이 '2대'로 오면 못 떼어 없는 단체가 만들어진다.
+  it("'2대 태안군의회'도 태안군의회로 읽는다", () => {
+    expect(extractCareerOrg("2대 태안군의회 의원")).toEqual({ org: "태안군의회", title: "의원" });
+  });
+
+  it("'제'가 있든 없든 같다", () => {
+    expect(extractCareerOrg("제2대 태안군의회 의원")).toEqual(extractCareerOrg("2대 태안군의회 의원"));
+  });
+
+  it("뒤에 붙은 대수도 이름에서 뺀다", () => {
+    expect(extractCareerOrg("태안군의회 8대 의원")).toMatchObject({ org: "태안군의회" });
+  });
+
+  it("숫자로 시작하는 진짜 단체 이름은 지키지 않는다(대·기가 붙을 때만 뗀다)", () => {
+    // '4H연합회'처럼 숫자로 시작해도 대수 표기가 아니면 건드리지 않는다.
+    expect(extractCareerOrg("4H연합회 회장")).toMatchObject({ org: "4H연합회" });
+  });
+});

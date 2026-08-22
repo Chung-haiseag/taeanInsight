@@ -31,7 +31,8 @@ const clean = (s: string) =>
     .replace(/^\(?\s*(현|전)\s*\)?\s*/, "")           // 시제 표기
     .replace(/[()（）]/g, " ")
     // '제8대,제9대 태안군의회'처럼 대수가 여러 번 붙는다 — 앞쪽 대수와 구분자를 모두 턴다.
-    .replace(/^(?:\s*[,·、]?\s*제\s*\d+\s*[대기])+\s*/, "")
+    //   '제'가 없이 '2대 태안군의회'로 오기도 한다 — 그대로 두면 없는 단체가 만들어진다(2026-08-22 실측).
+    .replace(/^(?:\s*[,·、]?\s*제?\s*\d+\s*[대기])+\s*/, "")
     .replace(/^[\s,·、~-]+/, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -70,7 +71,7 @@ export function extractCareerOrg(text: string): CareerOrg | null {
     }
   }
   // '제9대 태안군의회 후반기' 같은 꼬리 수식어는 이름에서 뺀다.
-  org = org.replace(/\s*(후반기|전반기|초대|제\s*\d+\s*[대기])\s*$/, "").trim();
+  org = org.replace(/\s*(후반기|전반기|초대|제?\s*\d+\s*[대기])\s*$/, "").trim();
   if (org.length < 3) return null;
   void tail;
   return { org, title };
