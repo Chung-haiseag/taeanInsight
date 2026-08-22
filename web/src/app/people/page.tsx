@@ -150,6 +150,23 @@ export default function PeoplePage() {
             </section>
           )}
 
+          {!!prof.affiliations?.length && (
+            <section className="rounded-lg border border-brand/15 bg-background p-4">
+              <h3 className="mb-2 text-sm font-bold text-brand">
+                소속 <span className="font-normal text-foreground-muted">(검증됨)</span>
+              </h3>
+              <ul className="space-y-1 text-sm">
+                {prof.affiliations.map((a) => (
+                  <li key={a.orgId}>
+                    · {a.org}
+                    {a.role && <span className="text-foreground-muted"> {a.role}</span>}
+                    {a.years && <span className="text-xs text-foreground-muted"> · {a.years}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {prof.graph.nodes.length > 0 && <RelationGraph prof={prof} onOpen={open} />}
 
           {prof.coappear.length > 0 && (

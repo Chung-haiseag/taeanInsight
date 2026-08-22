@@ -76,6 +76,55 @@ export async function detectPersonInQuery(db: D1Database, query: string): Promis
   return cand.length ? { id: cand[0].id, name: cand[0].name } : null;
 }
 
+export interface Affiliation { org: string; orgId: string; role: string; years: string; evidence: string }
+
+/**
+ * 연도 표기 정리(순수).
+ *   기사에서 뽑은 소속은 years가 **배열**로 저장돼 있어 그대로 찍으면 JSON이 화면에 나온다.
+ *   선관위 쪽은 '2014·2018' 문자열이다. 둘 다 받아 '처음~끝'으로 줄인다.
+ */
+export function formatYears(years: string | string[] | undefined | null): string {
+  const list = (Array.isArray(years) ? years : String(years ?? "").split(/[·,\s]+/))
+    .map((y) => String(y).trim()).filter(Boolean).sort();
+  if (!list.length) return "";
+  return list[0] === list[list.length - 1] ? list[0] : `${list[0]}~${list[list.length - 1]}`;
+}
+
+/**
+ * 같은 조직이 두 줄로 들어온 것을 합친다(순수).
+ *
+ *   ⚠ 엣지 id 형식이 둘이다 — 기사에서 뽑은 소속은 `e:belongs:<이름>__<조직>`,
+ *     선관위 경력에서 만든 것은 `<인물>--belongs_to--<조직>`. 그래서 같은 (사람, 조직)이
+ *     D1에 두 줄로 남아 있다(2026-08-22 확인). 화면에 두 번 나오면 다른 자리인 줄 안다.
+ *     근본 정리(한 형식으로 모으기)는 따로 하고, 우선 보이는 것부터 합친다.
+ */
+export function mergeAffiliations(rows: Affiliation[]): Affiliation[] {
+  const by = new Map<string, Affiliation>();
+  for (const r of rows) {
+    const cur = by.get(r.orgId);
+    if (!cur) { by.set(r.orgId, { ...r }); continue; }
+    const roles = [...new Set([...cur.role.split("·"), ...r.role.split("·")].map((x) => x.trim()).filter(Boolean))];
+    cur.role = roles.join("·");
+    if (!cur.years) cur.years = r.years;
+    if (!cur.evidence) cur.evidence = r.evidence;
+  }
+  return [...by.values()];
+}
+
+/**
+ * 소속 표시 순서(순수).
+ *   정당은 출마 이력 표에서 이미 회차별로 보이므로 뒤로 보낸다 — 기관·단체가 새 정보다.
+ *   정당끼리는 최근 것이 앞(지금 어디 소속인지가 먼저 읽혀야 한다).
+ */
+export function orderAffiliations(rows: Affiliation[]): Affiliation[] {
+  const isParty = (r: Affiliation) => r.orgId.startsWith("org:party-");
+  return [...rows].sort((a, b) => {
+    if (isParty(a) !== isParty(b)) return isParty(a) ? 1 : -1;
+    if (isParty(a)) return (b.years || "").localeCompare(a.years || "");
+    return a.org.localeCompare(b.org);
+  });
+}
+
 export interface PersonProfile {
   person: { id: string; name: string; mentions: number; isHub: boolean } | null;
   photo?: string | null; // 역대 군수·현직 군의원이면 공식 사진 URL(/api/archive/photo/...), 없으면 null
@@ -85,6 +134,8 @@ export interface PersonProfile {
   coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
+  /** 소속(검수된 것만). 정당은 뒤로 보낸다. */
+  affiliations: Affiliation[];
   timeline: { year: number; count: number }[];
   topics: { term: string; count: number }[];
 }
@@ -248,6 +299,11 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     "SELECT o.name AS office, e.attrs_json AS attrs_json FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id " +
     "WHERE e.src_id=? AND e.rel='held' AND e.verified=1",
   ).bind(id).all<{ office: string; attrs_json: string | null }>();
+  // 소속(검수된 belongs_to만) — 화면에 '어디 소속인가'를 보여주기 위해.
+  const affP = db.prepare(
+    "SELECT o.id AS orgId, o.name AS org, e.attrs_json AS attrs_json FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id " +
+    "WHERE e.src_id=? AND e.rel='belongs_to' AND e.verified=1 AND o.verified=1",
+  ).bind(id).all<{ orgId: string; org: string; attrs_json: string | null }>();
   // 시기별 추이(연도별 기사 수)
   const tlP = db.prepare(
     "SELECT CAST(strftime('%Y', a.published_at) AS INTEGER) AS year, COUNT(*) AS count " +
@@ -260,7 +316,7 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     "WHERE m.node_id=? AND a.title IS NOT NULL ORDER BY a.published_at DESC LIMIT 300",
   ).bind(id).all<{ title: string }>();
 
-  const [graph, coappear, arts, off, tl, tt] = await Promise.all([graphP, coappearP, artsP, offP, tlP, ttP]);
+  const [graph, coappear, arts, off, aff, tl, tt] = await Promise.all([graphP, coappearP, artsP, offP, affP, tlP, ttP]);
   const offices = (off.results ?? []).map((x) => {
     let a: { start?: string; end?: string; ordinal?: number } = {};
     try { a = JSON.parse(x.attrs_json ?? "{}"); } catch { /* */ }
@@ -277,6 +333,13 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     coappear,
     articles: arts.results ?? [],
     offices,
+    affiliations: orderAffiliations(mergeAffiliations((aff.results ?? []).map((r) => {
+      let a: { role?: string; roles?: string[]; years?: string | string[]; evidence?: string } = {};
+      try { a = r.attrs_json ? JSON.parse(r.attrs_json) : {}; } catch { /* 깨진 값은 빈 것으로 */ }
+      // 여러 대수에 걸쳐 직함이 달랐으면 함께 적는다 — 대표 직함만 보이면 의장을 지낸 사실이 묻힌다.
+      const role = a.roles?.length ? a.roles.join("·") : (a.role ?? "");
+      return { org: r.org, orgId: r.orgId, role, years: formatYears(a.years), evidence: a.evidence ?? "" };
+    }))),
     timeline,
     topics,
   };
