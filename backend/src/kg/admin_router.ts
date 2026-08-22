@@ -98,7 +98,12 @@ router.get("/nec/history", async (c) => {
       fetchElections(c.env, SG_TYPE.구시군의원),
       fetchElections(c.env, SG_TYPE.국회의원),
     ]);
-    const local = localElectionDays(localRows).slice(0, max);
+    // ⚠ 자를 때는 **종류가 많은 날(동시지방선거)을 먼저** 담는다.
+    //   군수 표기를 넓히자 재보궐 날짜도 3종류 조건을 통과하게 됐고, 상한을 차지해
+    //   가장 오래된 2002년이 잘려나갔다(2026-08-22 실측: 190건→174건, 2002년 소실).
+    const local = [...localElectionDays(localRows)]
+      .sort((a, b) => b.kinds.length - a.kinds.length || b.sgId.localeCompare(a.sgId))
+      .slice(0, max);
     const assembly = assemblyElectionDays(assemblyRows).slice(0, max);
     if (!probe) {
       return c.json({
@@ -172,7 +177,7 @@ router.post("/nec/sync-history", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const db = c.env.ARCHIVE_DB;
   const apply = c.req.query("apply") === "1";
-  const max = Math.min(Number(c.req.query("max") ?? 20) || 20, 30);
+  const max = Math.min(Number(c.req.query("max") ?? 30) || 30, 40);
   try {
     const [localRows, assemblyRows] = await Promise.all([
       fetchElections(c.env, SG_TYPE.구시군의원),
