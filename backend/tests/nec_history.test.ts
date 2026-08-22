@@ -162,3 +162,29 @@ describe("비례대표는 주소로 가린다", () => {
     expect(isTaeanRow({ sggName: "충청남도" }, { byAddr: true })).toBe(false);
   });
 });
+
+describe("군수 선거 이름 표기가 회차마다 다르다", () => {
+  // 실측(2026-08-22): 2014년부터는 군수가 잡히는데 2010·2006·2002년은 종류 목록에서 통째로 빠졌다.
+  //   진태구 전 군수(2002·2006 당선)가 인물에 아예 없었다. 띄어쓰기 하나로 20년이 사라진다.
+  const forms = ["구·시·군의 장선거", "구·시·군의장선거", "기초단체장선거"];
+
+  for (const name of forms) {
+    it(`'${name}'도 군수로 본다`, () => {
+      const days = localElectionDays([
+        { sgId: "20060531", sgName: name, sgTypecode: "4" },
+        { sgId: "20060531", sgName: "시·도의회의원선거", sgTypecode: "5" },
+        { sgId: "20060531", sgName: "구·시·군의회의원선거", sgTypecode: "6" },
+      ]);
+      expect(days[0].kinds.map((k) => k.key)).toContain("군수");
+    });
+  }
+
+  it("군의회의원선거를 군수로 잘못 보지 않는다", () => {
+    const days = localElectionDays([
+      { sgId: "20060531", sgName: "구·시·군의회의원선거", sgTypecode: "6" },
+      { sgId: "20060531", sgName: "시·도의회의원선거", sgTypecode: "5" },
+      { sgId: "20060531", sgName: "광역의원비례대표선거", sgTypecode: "7" },
+    ]);
+    expect(days[0].kinds.map((k) => k.key)).not.toContain("군수");
+  });
+});
