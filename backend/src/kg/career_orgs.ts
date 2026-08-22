@@ -91,16 +91,30 @@ export interface CareerPerson { id: string; name: string; election?: string; car
 
 export interface CareerResult {
   /** 우리 조직과 정확히 맞아 바로 이을 수 있는 소속 */
-  links: Array<{ personId: string; personName: string; orgId: string; orgName: string; title: string; tense: string | null; election?: string }>;
+  links: Array<{ personId: string; personName: string; orgId: string; orgName: string; title: string; titles: string[]; tense: string | null; election?: string }>;
   /** 우리에게 없는 단체 — 검수 후 조직으로 등록할 후보 */
   candidates: Array<{ name: string; people: string[] }>;
   /** 단체 이름을 특정하지 못한 줄(예: '성일종 국회의원 보좌관') */
   unparsed: Array<{ person: string; text: string }>;
 }
 
+/**
+ * 직함 서열 — **대표 직함을 고르는 기준**(앞이 높다).
+ *
+ *   역대 회차를 넣자 같은 사람·같은 조직이 여러 줄이 됐다. 저장은 사람+조직 하나당
+ *   한 줄이라 마지막 줄이 앞 줄을 덮어쓴다 — '이용희 (의장)'이 '(의원)'으로 덮이면
+ *   의장을 지낸 사실이 사라진다(2026-08-22 실측). 그래서 **가장 높은 직함**을 남긴다.
+ *   여기 없는 직함은 서열을 모르므로 의원·위원보다 아래로 둔다(짐작하지 않는다).
+ */
+const TITLE_RANK = ["의장", "부의장", "회장", "부회장", "위원장", "부위원장", "대표", "단장", "원장", "소장", "국장", "이사", "의원", "위원"];
+const rankOf = (t: string) => {
+  const i = TITLE_RANK.indexOf(t);
+  return i < 0 ? TITLE_RANK.length : i;
+};
+
 /** 인물들의 경력 → 이을 소속 + 새 조직 후보 + 못 읽은 줄. */
 export function planCareers(people: CareerPerson[], orgs: OrgDef[]): CareerResult {
-  const links: CareerResult["links"] = [];
+  const byLink = new Map<string, CareerResult["links"][number]>();
   const cand = new Map<string, Set<string>>();
   const unparsed: CareerResult["unparsed"] = [];
 
@@ -111,7 +125,21 @@ export function planCareers(people: CareerPerson[], orgs: OrgDef[]): CareerResul
       const orgId = exactOrgId(co.org, orgs);
       if (orgId) {
         const orgName = orgs.find((o) => o.id === orgId)?.name ?? co.org;
-        links.push({ personId: p.id, personName: p.name, orgId, orgName, title: co.title, tense: c.tense, election: p.election });
+        const key = `${p.id}|${orgId}`;
+        const cur = byLink.get(key);
+        if (!cur) {
+          byLink.set(key, {
+            personId: p.id, personName: p.name, orgId, orgName,
+            title: co.title, titles: co.title ? [co.title] : [], tense: c.tense, election: p.election,
+          });
+        } else {
+          if (co.title && !cur.titles.includes(co.title)) cur.titles.push(co.title);
+          // 대표 직함은 가장 높은 것. 직함을 못 읽은 줄이 앞의 직함을 지우면 안 된다.
+          if (co.title && (!cur.title || rankOf(co.title) < rankOf(cur.title))) cur.title = co.title;
+          // 현직 기록이 하나라도 있으면 현직으로 본다.
+          if (c.tense === "현") cur.tense = "현";
+          else if (!cur.tense) cur.tense = c.tense;
+        }
       } else {
         const set = cand.get(co.org) ?? new Set<string>();
         set.add(p.name);
@@ -130,7 +158,7 @@ export function planCareers(people: CareerPerson[], orgs: OrgDef[]): CareerResul
     if (s.size > cur.people.size || (s.size === cur.people.size && name.length < cur.name.length)) cur.name = name;
   }
   return {
-    links,
+    links: [...byLink.values()],
     candidates: [...merged.values()]
       .map((c) => ({ name: c.name, people: [...c.people] }))
       .sort((a, b) => b.people.length - a.people.length || a.name.localeCompare(b.name)),
@@ -149,9 +177,10 @@ export function toLinkSeed(r: CareerResult) {
       src_id: l.personId, rel: "belongs_to", dst_id: l.orgId,
       attrs: {
         role: l.title || undefined,
+        roles: l.titles.length > 1 ? l.titles : undefined,
         years: l.election ? l.election.slice(0, 4) : undefined,
         // 시제를 남긴다 — '전' 소속을 현재처럼 보이게 하면 사실이 아니다.
-        evidence: `${l.tense === "전" ? "전직" : l.tense === "현" ? "현직" : "경력"} · 선관위 후보자 등록`,
+        evidence: `${l.tense === "전" ? "전직" : l.tense === "현" ? "현직" : "경력"} ${l.titles.join("·") || ""} · 선관위 후보자 등록`.replace(/\s+/g, " "),
       },
       source: SRC,
     })),

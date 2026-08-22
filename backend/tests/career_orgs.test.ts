@@ -126,3 +126,66 @@ describe("실측에서 드러난 다듬기", () => {
     expect(r.candidates[0].people).toEqual(["가", "나"]);
   });
 });
+
+// ── 역대 회차를 넣은 뒤 드러난 것(2026-08-22) ────────────────────────────
+//   경력이 회차마다 쌓여 같은 사람·같은 조직이 여러 줄이 됐다.
+//   저장은 사람+조직 하나당 한 줄이라 **마지막 줄이 앞 줄을 덮어쓴다** —
+//   '이용희 (의장)'이 '(의원)'으로 덮이면 의장을 지낸 사실이 사라진다.
+describe("같은 사람·같은 조직은 한 줄로 모은다", () => {
+  const 이용희 = {
+    id: "person:이용희", name: "이용희", election: "20260603",
+    careers: [
+      { tense: "전", text: "제8대 태안군의회 의원" },
+      { tense: "현", text: "제9대 태안군의회 의장" },
+      { tense: "현", text: "태안군의회 의원" },
+    ],
+  };
+  const r = planCareers([이용희], ORGS);
+
+  it("네 줄이 아니라 한 줄이 된다", () => {
+    expect(r.links).toHaveLength(1);
+  });
+
+  it("가장 높은 직함을 대표로 남긴다 — 의장이 의원으로 덮이면 안 된다", () => {
+    expect(r.links[0].title).toBe("의장");
+  });
+
+  it("지낸 직함을 모두 보존한다", () => {
+    expect(r.links[0].titles).toEqual(expect.arrayContaining(["의장", "의원"]));
+  });
+
+  it("현직 기록이 하나라도 있으면 현직으로 본다", () => {
+    expect(r.links[0].tense).toBe("현");
+  });
+
+  it("직함을 못 읽은 줄이 대표 직함을 지우지 않는다", () => {
+    const 조한무 = {
+      id: "person:조한무", name: "조한무",
+      careers: [
+        { tense: "현", text: "태안군의회 의원" },
+        { tense: "현", text: "태안군의회" },     // 직함 없음
+      ],
+    };
+    const p = planCareers([조한무], ORGS);
+    expect(p.links).toHaveLength(1);
+    expect(p.links[0].title).toBe("의원");
+  });
+
+  it("조직이 다르면 따로 남는다", () => {
+    const 김원대 = {
+      id: "person:김원대", name: "김원대",
+      careers: [
+        { tense: "현", text: "태안군의회 의원" },
+        { tense: "현", text: "태안군체육회 부회장" },
+      ],
+    };
+    const p = planCareers([김원대], ORGS);
+    expect(p.links.map((l) => l.orgId).sort()).toEqual(["org:taean-cci", "org:taean-council"]);
+  });
+
+  it("시드 근거에 지낸 직함이 함께 적힌다", () => {
+    const seed = toLinkSeed(r);
+    expect(seed.edges).toHaveLength(1);
+    expect((seed.edges[0].attrs as { evidence: string }).evidence).toContain("의장");
+  });
+});

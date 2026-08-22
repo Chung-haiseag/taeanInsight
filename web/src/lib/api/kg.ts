@@ -309,7 +309,7 @@ export function syncNec(apply = false): Promise<NecSyncResult> {
 
 export interface CareerSyncResult {
   dryRun?: boolean; applied?: boolean;
-  links?: Array<{ who: string; org: string; title: string; tense: string | null }>;
+  links?: Array<{ who: string; org: string; title: string; titles?: string[]; tense: string | null }>;
   candidates?: Array<{ name: string; people: string[] }>;
   unparsed?: Array<{ person: string; text: string }>;
   edges?: number; candidatesCreated?: number; error?: string;

@@ -859,7 +859,14 @@ function DataSources() {
               <p><strong>이어지는 소속 {car.links?.length ?? 0}건</strong></p>
               <ul className="text-foreground-muted">
                 {car.links?.map((l, i) => (
-                  <li key={i}>· {l.who} → {l.org} {l.title && `(${l.title})`} <span className="text-xs">[{l.tense === "전" ? "전직" : "현직"}]</span></li>
+                  <li key={i}>
+                    · {l.who} → {l.org} {l.title && `(${l.title})`}
+                    {/* 여러 대수에 걸쳐 직함이 달랐으면 함께 적는다 — 대표 직함만 남기면 의장을 지낸 사실이 안 보인다. */}
+                    {l.titles && l.titles.length > 1 && (
+                      <span className="ml-1 text-xs text-foreground-muted">지낸 직함 {l.titles.join("·")}</span>
+                    )}
+                    <span className="ml-1 text-xs">[{l.tense === "전" ? "전직" : "현직"}]</span>
+                  </li>
                 ))}
               </ul>
               <p className="pt-1"><strong>새 조직 후보 {car.candidates?.length ?? 0}개</strong> — 검수 후 등록됩니다</p>

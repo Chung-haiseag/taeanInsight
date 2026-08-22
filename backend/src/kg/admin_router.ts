@@ -270,7 +270,7 @@ router.post("/careers/sync", async (c) => {
     if (!apply) {
       return c.json({
         dryRun: true,
-        links: plan.links.map((l) => ({ who: l.personName, org: l.orgName, title: l.title, tense: l.tense })),
+        links: plan.links.map((l) => ({ who: l.personName, org: l.orgName, title: l.title, titles: l.titles, tense: l.tense })),
         candidates: plan.candidates, unparsed: plan.unparsed,
       });
     }
