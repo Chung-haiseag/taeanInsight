@@ -44,6 +44,22 @@ export function visionParagraphs(fullTextAnnotation) {
 }
 
 /**
+ * macOS 내장 OCR(`ocr_vision`) 출력 → 문단 목록(순수).
+ *   `[{t,x,y,w,h}]`를 이미 0~1로 내주므로 환산이 필요 없다.
+ *   ⚠ 이쪽은 **줄 단위**다(문단이 아니라). 오히려 좋다 — 칠하는 모양이 지면 글줄과 딱 맞는다.
+ */
+export function ocrLines(rows) {
+  const r4 = (n) => Math.round((Number(n) || 0) * 10000) / 10000;
+  return (Array.isArray(rows) ? rows : [])
+    .filter((l) => norm(l?.t) && Number(l?.w) > 0 && Number(l?.h) > 0)
+    .map((l) => ({
+      text: String(l.t),
+      // x가 음수로 아주 조금 나오는 일이 있다(정규화 오차) — 0 아래로는 내리지 않는다.
+      box: { x: Math.max(0, r4(l.x)), y: Math.max(0, r4(l.y)), w: r4(l.w), h: r4(l.h) },
+    }));
+}
+
+/**
  * 문단이 이 기사의 것인가(순수).
  *   짧은 토막(win 글자)을 훑어 본문에 있는 비율을 본다 — 글자가 조금 달라도 견딘다.
  *   너무 짧은 문단은 여러 기사에 흔히 나오므로 아예 보지 않는다.
@@ -64,7 +80,7 @@ export function paragraphScore(paraText, bodyNorm, { win = 12 } = {}) {
  *   @returns {{boxes: Array, matched: number}} matched = 본문 글자 중 찾아낸 비율(0~1)
  */
 export function articleRegion(paragraphs, { title = "", body = "" }, opts = {}) {
-  const { win = 12, minScore = 0.6 } = opts;
+  const { win = 10, minScore = 0.5 } = opts;
   const bodyNorm = norm(`${title} ${body}`);
   if (bodyNorm.length < win) return { boxes: [], matched: 0 };
 
@@ -83,8 +99,9 @@ export function articleRegion(paragraphs, { title = "", body = "" }, opts = {}) 
  *   ⚠ 한 문단이 여러 기사에 걸리면 **가장 잘 맞는 기사**에만 준다 — 안 그러면 이웃 기사끼리
  *     같은 자리를 서로 칠해 지면이 온통 붉어진다.
  */
+// 기본값은 실측으로 정했다(1997-12-26 1면: win=10·0.5에서 본문 96% 매칭, win=12로 올리면 43%로 떨어짐).
 export function assignPage(paragraphs, articles, opts = {}) {
-  const { win = 12, minScore = 0.6 } = opts;
+  const { win = 10, minScore = 0.5 } = opts;
   const bodies = articles.map((a) => norm(`${a.title ?? ""} ${a.body ?? ""}`));
   const picked = articles.map(() => []);
   const covered = articles.map(() => 0);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { norm, toBox, visionParagraphs, paragraphScore, articleRegion, assignPage } from "../../tools/ebook/region-lib.mjs";
+import { norm, toBox, visionParagraphs, ocrLines, paragraphScore, articleRegion, assignPage } from "../../tools/ebook/region-lib.mjs";
 
 // 지면 하나에 기사가 여섯~여덟 개씩 실린다. 지금 읽는 기사가 어디인지 짚어주려면
 //   글자인식 문단 상자를 기사 본문과 맞춰야 한다.
@@ -127,5 +127,26 @@ describe("지면 전체 배정", () => {
 
   it("기사마다 찾은 비율을 낸다", () => {
     expect(assignPage(paras, arts).every((x: { matched: number }) => x.matched > 0)).toBe(true);
+  });
+});
+
+describe("맥 내장 글자인식 결과 읽기", () => {
+  // ocr_vision 은 [{t,x,y,w,h}]를 이미 0~1로 내준다(y=상단 기준). 환산이 필요 없다.
+  it("줄과 상자를 그대로 옮긴다", () => {
+    expect(ocrLines([{ t: "태안군의회", x: 0.1, y: 0.2, w: 0.3, h: 0.02 }]))
+      .toEqual([{ text: "태안군의회", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.02 } }]);
+  });
+
+  // 정규화 오차로 x가 -3.7e-10 처럼 아주 조금 음수로 나온다(실측).
+  it("좌표가 0 아래로 내려가지 않는다", () => {
+    expect(ocrLines([{ t: "[1]", x: -3.7e-10, y: 0.02, w: 0.03, h: 0.01 }])[0].box.x).toBe(0);
+  });
+
+  it("글이 없거나 넓이가 0인 줄은 버린다", () => {
+    expect(ocrLines([{ t: "   ", x: 0, y: 0, w: 0.1, h: 0.1 }, { t: "가", x: 0, y: 0, w: 0, h: 0.1 }])).toEqual([]);
+  });
+
+  it("입력이 배열이 아니어도 안전하다", () => {
+    expect(ocrLines(null)).toEqual([]);
   });
 });
