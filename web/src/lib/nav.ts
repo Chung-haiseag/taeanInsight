@@ -7,15 +7,21 @@ export interface NavItem {
   minRole: Role | null;
 }
 
+// 순서 = 이 신문이 무엇인지 말하는 차례다.
+//   37년치 기록이 이 사이트의 본체이므로 **아카이브가 앞**에 온다(실시간은 곁들이는 것).
+//   인물·과거신문은 전부 아카이브에서 나온 것이라 바로 뒤에 붙는다.
 export const NAV_ITEMS: NavItem[] = [
+  { href: "/news", label: "뉴스아카이브", minRole: null },
+  { href: "/paper", label: "과거신문", minRole: null },
+  // 인물은 아카이브에서 파생된 **과거 사실**이라 무료다(유료로 지키는 것은 미래 판단정보다).
+  //   사람 이름 검색은 지역 언론의 가장 큰 유입 통로이기도 하다.
+  { href: "/people", label: "인물", minRole: null },
   { href: "/live", label: "지금 태안", minRole: null },
   { href: "/beaches", label: "해변", minRole: null },
   { href: "/data", label: "지역경제", minRole: null },
-  { href: "/news", label: "뉴스아카이브", minRole: null },
   { href: "/membership", label: "멤버십", minRole: null },
   { href: "/query", label: "질의응답", minRole: "user" },
   { href: "/reports", label: "주간 리포트", minRole: "user" },
-  { href: "/people", label: "인물 탐색", minRole: "user" },
   { href: "/citizen", label: "시민기자", minRole: "citizen" }, // 시민기자 등급부터. 일반회원은 /me에서 신청
   { href: "/me", label: "내 페이지", minRole: "user" },
   { href: "/reporter", label: "취재 알림", minRole: "reporter" },

@@ -5,6 +5,7 @@
 //   GET /api/archive/photo/:key                        R2 사진 서빙(공개)
 
 import { Hono } from "hono";
+import { EBOOK_MIN, EBOOK_MAX, groupIssues, type IssueRow } from "./paper";
 
 import type { Env } from "../types";
 
@@ -295,6 +296,58 @@ archiveRouter.get("/:idxno{[0-9]+}", async (c) => {
     if (g) region = { boxes: safeJson(g.boxes_json), matched: Number(g.matched) || 0 };
   }
   return c.json({ ...row, images: safeJson(row.images), region });
+});
+
+// ── 과거신문(지면) 훑어보기 ────────────────────────────────────────────────
+//   지면 스캔 7,343장을 R2에 넣어두고도 들어갈 길이 없었다(기사를 열어야만 보였다).
+//   연도 목록 → 그 해 발행일·지면 목록. 스캔 자체는 아래 /photo 로 서빙된다.
+archiveRouter.get("/papers/years", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const r = await db.prepare(
+    `SELECT year,
+            COUNT(DISTINCT substr(published_at,1,10)) AS issues,
+            COUNT(DISTINCT substr(published_at,1,10) || section) AS pages,
+            COUNT(*) AS articles
+       FROM archive_articles
+      WHERE idxno BETWEEN ?1 AND ?2 AND section LIKE '지면%'
+      GROUP BY year ORDER BY year`,
+  ).bind(EBOOK_MIN, EBOOK_MAX).all();
+  const res = c.json({ years: r.results ?? [] });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
+});
+
+archiveRouter.get("/papers/:year{[0-9]{4}}", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const year = Number(c.req.param("year"));
+  const r = await db.prepare(
+    `SELECT substr(published_at,1,10) AS d, section, COUNT(*) AS n
+       FROM archive_articles
+      WHERE idxno BETWEEN ?1 AND ?2 AND year = ?3 AND section LIKE '지면%'
+      GROUP BY d, section`,
+  ).bind(EBOOK_MIN, EBOOK_MAX, year).all<IssueRow>();
+  const issues = groupIssues(r.results ?? []);
+  const res = c.json({ year, issues });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
+});
+
+// 한 지면에 실린 기사 목록 — 지면을 보다가 기사로 들어가는 길.
+archiveRouter.get("/papers/:year{[0-9]{4}}/:date{[0-9-]+}/:no{[0-9]{1,2}}", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const date = c.req.param("date");
+  const no = String(Number(c.req.param("no"))).padStart(2, "0");
+  const r = await db.prepare(
+    `SELECT idxno, title, excerpt FROM archive_articles
+      WHERE idxno BETWEEN ?1 AND ?2 AND substr(published_at,1,10) = ?3 AND section = ?4
+      ORDER BY idxno`,
+  ).bind(EBOOK_MIN, EBOOK_MAX, date, `지면 ${no}면`).all();
+  const res = c.json({ date, page: Number(no), articles: r.results ?? [] });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
 });
 
 // R2 사진 서빙
