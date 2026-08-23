@@ -21,7 +21,7 @@ import { decodeEntities } from "@/lib/html";
 import { PageHeader } from "@/components/page-header";
 import { TvVideoGrid } from "@/components/tv-video-grid";
 import { Icon } from "@/components/icon";
-import { CATEGORY_ORDER, sortCategoryTabs, listUrl, listStateFrom } from "./newsarchive-helpers";
+import { CATEGORY_ORDER, sortCategoryTabs, listUrl, listStateFrom, scrollKey } from "./newsarchive-helpers";
 
 const FIRST_YEAR = 1990;
 const THIS_YEAR = new Date().getFullYear(); // 매해 자동 갱신 — 하드코딩 금지(1월마다 수동 갱신 불필요)
@@ -86,6 +86,35 @@ function NewsArchive() {
       if (seq === requestSeq.current) setLoading(false);
     }
   }
+
+  // ── 스크롤 위치 되살리기 ────────────────────────────────────────────────
+  //   뒤로 오면 브라우저가 위치를 되살려 주지만, 그 시점엔 목록이 아직 비어 있어(비동기 조회)
+  //   높이가 0이라 맨 위로 떨어진다. 그래서 떠날 때 위치를 적어두고 조회가 끝난 뒤 직접 되돌린다.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = scrollKey({ q, cat: category, year, page });
+    let tick = 0;
+    const onScroll = () => {
+      // 스크롤마다 쓰면 저장이 너무 잦다 — 한 프레임에 한 번만 적는다.
+      if (tick) return;
+      tick = requestAnimationFrame(() => {
+        tick = 0;
+        try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* 저장 실패는 무시 */ }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); if (tick) cancelAnimationFrame(tick); };
+  }, [q, category, year, page]);
+
+  // 되살아난 첫 조회가 끝나면 그 자리로 내린다(한 번만).
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !hits || typeof window === "undefined") return;
+    restored.current = true;
+    let y = 0;
+    try { y = Number(sessionStorage.getItem(scrollKey(initial))) || 0; } catch { /* 읽기 실패는 무시 */ }
+    if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));   // 목록이 그려진 뒤에
+  }, [hits, initial]);
 
   // 최초 로드는 **주소에 적힌 페이지**로, 이후 카테고리 탭 변경은 1페이지부터.
   const didInit = useRef(false);
