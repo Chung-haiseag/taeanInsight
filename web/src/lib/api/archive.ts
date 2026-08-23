@@ -33,6 +33,8 @@ export interface ArchiveArticle extends ArchiveHit {
   faithfulness?: number | null; // 전자북 OCR 충실도(낮으면 독자에 원본 대조 안내)
   /** 지면에서 이 기사가 차지한 자리(0~1 백분율). 한 지면에 기사가 여럿이라 어느 것인지 짚어준다. */
   region?: { boxes: Array<{ x: number; y: number; w: number; h: number }>; matched: number } | null;
+  /** 지면 광고인가. 기사 검색에서는 빠지고 '옛 광고'에서 찾는다. */
+  isAd?: boolean;
 }
 
 export async function searchArchive(params: {

@@ -24,7 +24,7 @@ describe("sortCategoryTabs", () => {
   });
 });
 
-import { listUrl, listStateFrom, scrollKey } from "./newsarchive-helpers";
+import { listUrl, listStateFrom } from "./newsarchive-helpers";
 
 // 3페이지에서 기사를 열고 뒤로 오면 1페이지로 돌아갔다 — 검색어·페이지가 주소에 없었다.
 describe("목록 상태를 주소에 담기", () => {
@@ -57,19 +57,5 @@ describe("주소에서 목록 상태 읽기", () => {
   it("이상한 값은 기본값으로 되돌린다 — 주소는 남이 고칠 수 있다", () => {
     expect(from({ page: "-3", year: "abcd" })).toMatchObject({ page: 1, year: "" });
     expect(from({ page: "여덟" })).toMatchObject({ page: 1 });
-  });
-});
-
-describe("스크롤 위치 열쇠", () => {
-  it("검색·페이지가 같아야 같은 열쇠", () => {
-    const a = { q: "해경", cat: "all", year: "", page: 3 };
-    expect(scrollKey(a)).toBe(scrollKey({ ...a }));
-  });
-
-  // 다른 검색인데 옛 위치로 내려가면 엉뚱한 자리에 떨어진다.
-  it("검색어나 페이지가 다르면 다른 열쇠", () => {
-    const a = { q: "해경", cat: "all", year: "", page: 3 };
-    expect(scrollKey(a)).not.toBe(scrollKey({ ...a, page: 4 }));
-    expect(scrollKey(a)).not.toBe(scrollKey({ ...a, q: "군수" }));
   });
 });

@@ -98,7 +98,10 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
       {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
       <ReadingTracker idxno={Number(params.id)} category={article.category} />
       <div className="no-print flex gap-4 text-sm text-foreground-muted">
-        <Link href="/news" className="hover:text-brand">← 뉴스아카이브</Link>
+        {/* 광고는 기사 검색에 없다 — 왔던 곳으로 돌려보내야 맞다. */}
+        {article.isAd
+          ? <Link href="/paper/ads" className="hover:text-brand">← 옛 광고</Link>
+          : <Link href="/news" className="hover:text-brand">← 뉴스아카이브</Link>}
       </div>
 
       <header className="space-y-3 border-b border-brand/10 pb-6">

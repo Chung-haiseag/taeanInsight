@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { listScrollKey, useListScrollMemory } from "@/lib/list-memory";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 const KINDS = ["부동산", "구인", "상점·업소", "차량·기타", "기타"] as const;
@@ -10,14 +12,29 @@ interface Res { counts?: Record<string, number>; total?: number; page?: number; 
 
 const day = (s: string) => `${s.slice(5, 7)}.${s.slice(8, 10)}`;
 
+// useSearchParams는 정적 렌더 중엔 Suspense 경계가 필요하다.
+export function AdsClient(props: { years: Array<{ year: number; n: number }> }) {
+  return <Suspense fallback={null}><Ads {...props} /></Suspense>;
+}
+
 /** 연도·갈래로 광고를 훑는다. 기사 검색과 섞지 않되, 찾을 길은 열어둔다. */
-export function AdsClient({ years }: { years: Array<{ year: number; n: number }> }) {
-  const [year, setYear] = useState<number | null>(years[0]?.year ?? 1997);
-  const [kind, setKind] = useState("");
-  const [page, setPage] = useState(1);
-  const [qInput, setQInput] = useState("");
-  const [q, setQ] = useState("");
+function Ads({ years }: { years: Array<{ year: number; n: number }> }) {
+  const router = useRouter();
+  const sp = useSearchParams();
+  // 지금 조건을 주소에 담는다 — 광고를 열고 뒤로 오면 브라우저가 이 주소로 돌아오므로,
+  //   여기서 읽어야 보던 연도·갈래·검색어가 그대로 남는다(뉴스아카이브와 같은 이유).
+  const initYear = sp.get("year");
+  const [year, setYear] = useState<number | null>(
+    initYear === "all" ? null : Number(initYear) || (years[0]?.year ?? 1997),
+  );
+  const [kind, setKind] = useState(sp.get("kind") ?? "");
+  const [page, setPage] = useState(Math.max(1, Number(sp.get("page")) || 1));
+  const [qInput, setQInput] = useState(sp.get("q") ?? "");
+  const [q, setQ] = useState(sp.get("q") ?? "");
   const [data, setData] = useState<Res | null>(null);
+
+  // 목록이 그려진 뒤 보던 자리로 되돌린다(뒤로가기).
+  useListScrollMemory(listScrollKey("/paper/ads", { year: year ?? "all", kind, q, page }), !!data?.items);
 
   useEffect(() => {
     let alive = true;
@@ -28,12 +45,20 @@ export function AdsClient({ years }: { years: Array<{ year: number; n: number }>
     if (q) sp.set("q", q);
     if (kind) sp.set("kind", kind);
     const qs = sp;
+    // 주소에도 같은 조건을 적어둔다. push가 아니라 replace라 뒤로가기 기록이 길어지지 않는다.
+    const url = new URLSearchParams();
+    if (year !== null) url.set("year", String(year)); else url.set("year", "all");
+    if (kind) url.set("kind", kind);
+    if (q) url.set("q", q);
+    if (page > 1) url.set("page", String(page));
+    router.replace(`/paper/ads?${url}`, { scroll: false });
+
     fetch(`${API_BASE}/api/archive/ads?${qs}`)
       .then((r) => (r.ok ? r.json() : {}))
       .then((d) => { if (alive) setData(d as Res); })
       .catch(() => { if (alive) setData({}); });
     return () => { alive = false; };
-  }, [year, kind, page, q]);
+  }, [year, kind, page, q, router]);
 
   const pick = (fn: () => void) => { fn(); setPage(1); };
 

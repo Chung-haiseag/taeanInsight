@@ -46,10 +46,3 @@ export function listStateFrom(get: (k: string) => string | null): ListState {
     page: Number.isInteger(n) && n > 0 ? n : 1,
   };
 }
-
-/**
- * 목록 스크롤 위치를 기억할 열쇠(순수).
- *   같은 검색·같은 페이지로 돌아왔을 때만 되살려야 한다 — 다른 검색인데 옛 위치로
- *   내려가면 엉뚱한 자리에 떨어진다.
- */
-export const scrollKey = (s: ListState) => `news:scroll:${listUrl(s)}`;
