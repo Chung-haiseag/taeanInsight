@@ -4,14 +4,19 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // 원본 지면 인라인 줌/팬 — 새 창 없이 그 자리에서 확대(최대 4배)·마우스 드래그 이동.
 // 확대 시 고해상(fullSrc) 이미지로 교체해 선명하게. fullSrc 미지정 시 src 사용.
+/** 지면에서 이 기사가 차지한 자리(0~1 백분율). 픽셀이 아니라 비율이라 확대해도 그대로 얹힌다. */
+export interface PageBox { x: number; y: number; w: number; h: number }
+
 export function ZoomPanImage({
   src,
   fullSrc,
   maxHeightClass = "max-h-[32rem]",
+  regions,
 }: {
   src: string;
   fullSrc?: string;
   maxHeightClass?: string;
+  regions?: PageBox[];
 }) {
   const [zoom, setZoom] = useState(1); // 1=폭맞춤, 최대 4배
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -80,9 +85,16 @@ export function ZoomPanImage({
         }}
         onPointerUp={() => { drag.current.on = false; }}
       >
-        <div style={{ width: `${zoom * 100}%` }} className="transition-[width] duration-150">
+        <div style={{ width: `${zoom * 100}%` }} className="relative transition-[width] duration-150">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imgSrc} alt="원본 지면" className="w-full select-none" draggable={false} loading="lazy" />
+          {/* 지금 읽는 기사 자리. 한 지면에 기사가 여섯~여덟 개라 이게 없으면 어느 것인지 알 수 없다.
+              문단마다 따로 칠한다 — 통짜 사각형 하나로 묶으면 두 단 사이의 남의 기사까지 덮는다. */}
+          {regions?.map((b, i) => (
+            <span key={i} aria-hidden="true"
+              className="pointer-events-none absolute rounded-[2px] bg-red-500/20 ring-1 ring-red-500/45"
+              style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` }} />
+          ))}
         </div>
       </div>
     </div>

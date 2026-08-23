@@ -431,7 +431,7 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
       {isEbook && <CorrectionRequest idxno={idxno} />}
 
       {/* 전자북: 원본 지면 스캔 (디지털화 본문과 대조 가능) */}
-      {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} />}
+      {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} boxes={article.pageBoxes ?? undefined} />}
 
       {/* 출처 표기 */}
       <div className="flex items-center justify-between border-t border-brand/10 pt-4 text-sm">
@@ -493,7 +493,7 @@ function DemoMemberToggle({ member, onChange }: { member: boolean; onChange: (v:
 }
 
 // 전자북 원본 지면 — 토글로 열 때만 로드, 클릭하면 전용 뷰어(확대·이동)로 열람
-function OriginalPage({ src, label }: { src: string; label: string }) {
+function OriginalPage({ src, label, boxes }: { src: string; label: string; boxes?: Array<{ x: number; y: number; w: number; h: number }> }) {
   const [open, setOpen] = useState(false);
   const [viewer, setViewer] = useState(false);
   const fullSrc = src.replace(/\.jpg(\?|$)/, "full.jpg$1"); // page_03.jpg → page_03full.jpg
@@ -512,6 +512,7 @@ function OriginalPage({ src, label }: { src: string; label: string }) {
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-foreground-muted">
               주간태안신문 원본 지면 스캔 — ＋− 버튼으로 확대하고 드래그로 이동하세요.
+              {boxes?.length ? <span className="ml-1 font-semibold text-red-600">붉게 칠한 곳이 이 기사입니다.</span> : null}
             </p>
             <button
               onClick={() => setViewer(true)}
@@ -520,7 +521,7 @@ function OriginalPage({ src, label }: { src: string; label: string }) {
               <Icon name="search" /> 전체화면
             </button>
           </div>
-          <ZoomPanImage src={src} fullSrc={fullSrc} maxHeightClass="max-h-[40rem]" />
+          <ZoomPanImage src={src} fullSrc={fullSrc} maxHeightClass="max-h-[40rem]" regions={boxes} />
         </div>
       )}
       {viewer && <PageViewer src={fullSrc} label={label} onClose={() => setViewer(false)} />}

@@ -31,6 +31,8 @@ export interface ArchiveArticle extends ArchiveHit {
   images?: string[];
   url?: string;
   faithfulness?: number | null; // 전자북 OCR 충실도(낮으면 독자에 원본 대조 안내)
+  /** 지면에서 이 기사가 차지한 자리(0~1 백분율). 한 지면에 기사가 여럿이라 어느 것인지 짚어준다. */
+  region?: { boxes: Array<{ x: number; y: number; w: number; h: number }>; matched: number } | null;
 }
 
 export async function searchArchive(params: {

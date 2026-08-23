@@ -19,6 +19,8 @@ export interface Reader {
   pageImage?: string | null; // 전자북(과거지면): 원본 지면 스캔
   pageLabel?: string | null; // 예: "1990.5.14 · 지면 03면"
   faithfulness?: number | null; // 전자북 OCR 충실도
+  /** 지면에서 이 기사가 차지한 자리. 없으면 안 칠한다. */
+  pageBoxes?: Array<{ x: number; y: number; w: number; h: number }> | null;
 }
 
 // 이 값 미만이면 "OCR 불완전 — 원본 지면 확인" 안내. 1990~1994 옛 신문은 수치 무관 항상 안내.
@@ -65,6 +67,7 @@ export function archiveToReader(a: ArchiveArticle, idxno: number): Reader {
     source: "archive",
     hasFullText: !!(a.body && a.body.length > 0),
     faithfulness: typeof a.faithfulness === "number" ? a.faithfulness : null,
+    pageBoxes: Array.isArray(a.region?.boxes) && a.region.boxes.length ? a.region.boxes : null,
     ...ebookPageImage(idxno, a.section, a.published_at),
   };
 }

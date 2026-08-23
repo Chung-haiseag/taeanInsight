@@ -285,7 +285,16 @@ archiveRouter.get("/:idxno{[0-9]+}", async (c) => {
   const idxno = Number(c.req.param("idxno"));
   const row = await db.prepare("SELECT * FROM archive_articles WHERE idxno = ?").bind(idxno).first();
   if (!row) return c.json({ error: "not_found" }, 404);
-  return c.json({ ...row, images: safeJson(row.images) });
+  // 지면에서 이 기사가 차지한 자리 — 원본 스캔 위에 짚어주기 위해. 없으면 안 그린다.
+  //   전자북 대역만 조회한다(현대 기사엔 지면 스캔이 없다).
+  let region: unknown = null;
+  if (idxno >= 90000001 && idxno <= 90099999) {
+    const g = await db.prepare("SELECT boxes_json, matched FROM ebook_regions WHERE idxno = ?")
+      .bind(idxno).first<{ boxes_json: string; matched: number }>()
+      .catch(() => null);                      // 표가 아직 없어도 기사는 열려야 한다
+    if (g) region = { boxes: safeJson(g.boxes_json), matched: Number(g.matched) || 0 };
+  }
+  return c.json({ ...row, images: safeJson(row.images), region });
 });
 
 // R2 사진 서빙
