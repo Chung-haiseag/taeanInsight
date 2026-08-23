@@ -26,6 +26,7 @@ export default async function PaperIndex() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <PageHeader
+        eyebrow={<Link href="/news" className="text-accent underline">← 뉴스아카이브</Link>}
         title="📰 과거신문"
         description="주간태안신문 지면을 그대로 넘겨봅니다. 연도를 고르면 발행일이 나옵니다."
       />

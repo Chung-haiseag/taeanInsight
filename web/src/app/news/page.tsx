@@ -219,6 +219,17 @@ function NewsArchive() {
         )}
       </div>
 
+      {/* 보는 방식 — 기사와 옛 광고를 갈라 놓았으니 오가는 길을 여기 둔다.
+          상단 메뉴를 늘리는 대신 아카이브라는 한 우산 아래 묶는다. */}
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-background">기사 검색</span>
+        <Link href="/paper/ads"
+          className="rounded-full border border-brand/25 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5">
+          🏷 옛 광고
+          <span className="ml-1.5 font-normal text-foreground-muted">그 시절 집값·품삯</span>
+        </Link>
+      </div>
+
       {/* 검색 폼 — 키워드 + 연도 */}
       <form onSubmit={runSearch} className="space-y-3 rounded-2xl border border-brand/15 bg-background p-5 shadow-card">
         <input

@@ -27,7 +27,7 @@ export default async function AdsPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <PageHeader
-        eyebrow={<Link href="/paper" className="text-accent underline">← 과거신문</Link>}
+        eyebrow={<Link href="/news" className="text-accent underline">← 뉴스아카이브</Link>}
         title="🏷 옛 광고"
         description="그 시절 태안의 집값·월세·품삯이 그대로 남아 있는 지면 광고입니다."
       />

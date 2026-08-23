@@ -431,7 +431,7 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
       {isEbook && <CorrectionRequest idxno={idxno} />}
 
       {/* 전자북: 원본 지면 스캔 (디지털화 본문과 대조 가능) */}
-      {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} boxes={article.pageBoxes ?? undefined} />}
+      {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} boxes={article.pageBoxes ?? undefined} date={(article.publishedAt ?? "").slice(0, 10)} />}
 
       {/* 출처 표기 */}
       <div className="flex items-center justify-between border-t border-brand/10 pt-4 text-sm">
@@ -493,7 +493,7 @@ function DemoMemberToggle({ member, onChange }: { member: boolean; onChange: (v:
 }
 
 // 전자북 원본 지면 — 토글로 열 때만 로드, 클릭하면 전용 뷰어(확대·이동)로 열람
-function OriginalPage({ src, label, boxes }: { src: string; label: string; boxes?: Array<{ x: number; y: number; w: number; h: number }> }) {
+function OriginalPage({ src, label, boxes, date }: { src: string; label: string; boxes?: Array<{ x: number; y: number; w: number; h: number }>; date?: string }) {
   const [open, setOpen] = useState(false);
   const [viewer, setViewer] = useState(false);
   const fullSrc = src.replace(/\.jpg(\?|$)/, "full.jpg$1"); // page_03.jpg → page_03full.jpg
@@ -514,12 +514,24 @@ function OriginalPage({ src, label, boxes }: { src: string; label: string; boxes
               주간태안신문 원본 지면 스캔 — ＋− 버튼으로 확대하고 드래그로 이동하세요.
               {boxes?.length ? <span className="ml-1 font-semibold text-red-600">붉게 칠한 곳이 이 기사입니다.</span> : null}
             </p>
-            <button
-              onClick={() => setViewer(true)}
-              className="shrink-0 rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
-            >
-              <Icon name="search" /> 전체화면
-            </button>
+            <span className="flex shrink-0 items-center gap-2">
+              {/* 지면 넘겨보기는 상단 메뉴가 아니라 **여기서 이어진다** — 기사를 읽다
+                  '이 날 신문 전체를 보고 싶다'가 자연스러운 흐름이다. */}
+              {/^\d{4}-\d{2}-\d{2}$/.test(date ?? "") && (
+                <Link
+                  href={`/paper/${date!.slice(0, 4)}/${date}`}
+                  className="rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
+                >
+                  이 날 신문 전체 보기 →
+                </Link>
+              )}
+              <button
+                onClick={() => setViewer(true)}
+                className="rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
+              >
+                <Icon name="search" /> 전체화면
+              </button>
+            </span>
           </div>
           <ZoomPanImage src={src} fullSrc={fullSrc} maxHeightClass="max-h-[40rem]" regions={boxes} />
         </div>
