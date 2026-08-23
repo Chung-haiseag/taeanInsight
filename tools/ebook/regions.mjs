@@ -69,6 +69,14 @@ async function vision(imageUrl) {
   return r.fullTextAnnotation || null;
 }
 
+/** 키가 틀렸으면 7,343장을 다 태우기 전에 멈춘다 — 한 번 겪었다(자리표시자를 그대로 붙였다). */
+function fatalIfBadKey(msg) {
+  if (!/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|API key expired/i.test(String(msg))) return;
+  console.error("\n키가 유효하지 않습니다. GOOGLE_VISION_API_KEY 를 확인하고 다시 실행하세요.");
+  console.error("(체크포인트에 성공한 지면만 적혀 있어, 다시 돌리면 실패분부터 이어갑니다.)");
+  process.exit(1);
+}
+
 /** 네트워크·서버 일시오류는 지수 백오프로 다시 시도한다. */
 async function fetchRetry(url, opts = {}, tries = 4) {
   let last;
@@ -76,7 +84,10 @@ async function fetchRetry(url, opts = {}, tries = 4) {
     try {
       const res = await fetch(url, opts);
       if (res.ok) return res;
-      if (res.status < 500 && res.status !== 429) throw new Error(`${res.status} ${(await res.text()).slice(0, 160)}`);
+      if (res.status < 500 && res.status !== 429) {
+        const t = (await res.text()).replace(/\s+/g, " ");
+        throw new Error(`${res.status} ${t.slice(0, 160)}`);
+      }
       last = new Error(`${res.status}`);
     } catch (e) { last = e; }
     await sleep(800 * 2 ** i);
@@ -129,7 +140,11 @@ async function one(url) {
 for (let i = 0; i < keys.length; i += CONC) {
   await Promise.all(keys.slice(i, i + CONC).map(async (url) => {
     try { await one(url); ckpt.done[url] = 1; }
-    catch (e) { failed++; log(`✗ ${url.split("/").slice(-2).join("/")} — ${e instanceof Error ? e.message : e}`); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      fatalIfBadKey(msg);
+      failed++; log(`✗ ${url.split("/").slice(-2).join("/")} — ${msg}`);
+    }
   }));
   saveCkpt();
   if (lines.length) { appendFileSync(SQL_OUT, lines.splice(0).join("\n") + "\n"); }   // 중간중간 저장
