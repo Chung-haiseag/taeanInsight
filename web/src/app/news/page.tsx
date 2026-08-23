@@ -131,8 +131,24 @@ function NewsArchive() {
 
     let tries = 0, timer = 0, cancelled = false;
     // 사용자가 직접 손대면 그만둔다 — 되살리기가 사람 손을 이기면 안 된다.
-    const stop = () => { cancelled = true; clearTimeout(timer); };
-    for (const ev of ["wheel", "touchstart", "keydown"]) window.addEventListener(ev, stop, { passive: true, once: true });
+    //   ⚠ 다만 **바로 켜면 안 된다.** 맥 트랙패드 두 손가락 스와이프로 뒤로 오면 그 제스처의
+    //     잔여 입력이 wheel로 계속 들어와, 되살리기가 시작하자마자 취소된다(버튼으로 뒤로 가면
+    //     멀쩡한데 스와이프로만 안 되던 이유). 잠깐 뒤에 켜고, 미세한 움직임은 무시한다.
+    let armed = false;
+    const armTimer = window.setTimeout(() => { armed = true; }, 500);
+    const onUser = (e: Event) => {
+      if (!armed) return;
+      if (e.type === "wheel" && Math.abs((e as WheelEvent).deltaY) < 4) return;
+      stop();
+    };
+    const events = ["wheel", "touchstart", "keydown"] as const;
+    const stop = () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearTimeout(armTimer);
+      for (const ev of events) window.removeEventListener(ev, onUser);
+    };
+    for (const ev of events) window.addEventListener(ev, onUser, { passive: true });
 
     const attempt = () => {
       if (cancelled) return;
