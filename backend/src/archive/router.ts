@@ -321,16 +321,35 @@ archiveRouter.get("/ads", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "archive_db_unbound" }, 503);
   const year = Number(c.req.query("year"));
-  if (!Number.isInteger(year)) return c.json({ error: "invalid_year" }, 400);
+  const q = (c.req.query("q") ?? "").trim();
+  // 검색어가 없으면 연도가 있어야 한다(연도별 훑어보기).
+  if (!q && !Number.isInteger(year)) return c.json({ error: "invalid_year" }, 400);
   const want = c.req.query("kind") ?? "";
   const page = Math.max(1, Number(c.req.query("page")) || 1);
   const SIZE = 60;
 
-  // 갈래는 저장돼 있지 않다 — 그 해 광고를 읽어 여기서 가른다(한 해 1천 건 안팎이라 가볍다).
-  const r = await db.prepare(
-    "SELECT idxno, title, section, published_at, substr(COALESCE(body,''),1,200) AS b " +
-    "FROM archive_articles WHERE COALESCE(is_ad,0)=1 AND year=? ORDER BY published_at, idxno",
-  ).bind(year).all<{ idxno: number; title: string; section: string; published_at: string; b: string }>()
+  // 갈래는 저장돼 있지 않다 — 읽어서 여기서 가른다.
+  //   검색어가 있으면 **연도를 넘어** 전체에서 찾는다(연도를 정해 두면 그 해만).
+  //   훑어보기만 있고 찾기가 없으면 1만 2천 건은 자료로 못 쓴다.
+  const cols = "idxno, title, section, published_at, substr(COALESCE(body,''),1,200) AS b";
+  const r = await (q.length >= 2
+    ? (q.length >= 3
+      // 3글자 이상은 FTS(트라이그램), 2글자는 제목 LIKE — 기사 검색과 같은 규칙.
+      ? db.prepare(
+          `SELECT ${cols.replace(/\b(idxno|title|section|published_at|body)\b/g, "a.$1")} ` +
+          "FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid " +
+          "WHERE archive_fts MATCH ? AND COALESCE(a.is_ad,0)=1" + (Number.isInteger(year) ? " AND a.year=?" : "") +
+          " ORDER BY a.published_at LIMIT 600",
+        ).bind(...(Number.isInteger(year) ? [q, year] : [q]))
+      : db.prepare(
+          `SELECT ${cols} FROM archive_articles ` +
+          "WHERE COALESCE(is_ad,0)=1 AND title LIKE ?" + (Number.isInteger(year) ? " AND year=?" : "") +
+          " ORDER BY published_at LIMIT 600",
+        ).bind(...(Number.isInteger(year) ? [`%${q}%`, year] : [`%${q}%`])))
+    : db.prepare(
+        `SELECT ${cols} FROM archive_articles WHERE COALESCE(is_ad,0)=1 AND year=? ORDER BY published_at, idxno`,
+      ).bind(year)
+  ).all<{ idxno: number; title: string; section: string; published_at: string; b: string }>()
     .catch(() => null);
   const rows = r?.results ?? [];
   const tagged = rows.map((x) => ({ ...x, kind: adKind({ title: x.title, body: x.b }) }));
@@ -339,7 +358,7 @@ archiveRouter.get("/ads", async (c) => {
   const picked = want ? tagged.filter((t) => t.kind === want) : tagged;
 
   const res = c.json({
-    year, kind: want || null, counts, total: picked.length,
+    year: Number.isInteger(year) ? year : null, q: q || null, kind: want || null, counts, total: picked.length,
     page, totalPages: Math.max(1, Math.ceil(picked.length / SIZE)),
     items: picked.slice((page - 1) * SIZE, page * SIZE),
   });

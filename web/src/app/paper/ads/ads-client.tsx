@@ -12,27 +12,62 @@ const day = (s: string) => `${s.slice(5, 7)}.${s.slice(8, 10)}`;
 
 /** 연도·갈래로 광고를 훑는다. 기사 검색과 섞지 않되, 찾을 길은 열어둔다. */
 export function AdsClient({ years }: { years: Array<{ year: number; n: number }> }) {
-  const [year, setYear] = useState(years[0]?.year ?? 1997);
+  const [year, setYear] = useState<number | null>(years[0]?.year ?? 1997);
   const [kind, setKind] = useState("");
   const [page, setPage] = useState(1);
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
   const [data, setData] = useState<Res | null>(null);
 
   useEffect(() => {
     let alive = true;
     setData(null);
-    const q = new URLSearchParams({ year: String(year), page: String(page) });
-    if (kind) q.set("kind", kind);
-    fetch(`${API_BASE}/api/archive/ads?${q}`)
+    const sp = new URLSearchParams({ page: String(page) });
+    // 검색어가 있으면 연도를 안 걸어 **전 기간**에서 찾는다 — 연도 단추를 누르면 그 해로 좁힌다.
+    if (year !== null) sp.set("year", String(year));
+    if (q) sp.set("q", q);
+    if (kind) sp.set("kind", kind);
+    const qs = sp;
+    fetch(`${API_BASE}/api/archive/ads?${qs}`)
       .then((r) => (r.ok ? r.json() : {}))
       .then((d) => { if (alive) setData(d as Res); })
       .catch(() => { if (alive) setData({}); });
     return () => { alive = false; };
-  }, [year, kind, page]);
+  }, [year, kind, page, q]);
 
   const pick = (fn: () => void) => { fn(); setPage(1); };
 
   return (
     <div className="space-y-4">
+      {/* 훑어보기만 있고 찾기가 없으면 1만 2천 건은 자료로 못 쓴다. */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); pick(() => setQ(qInput.trim())); }}
+        className="flex gap-2"
+      >
+        <input
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
+          placeholder="상호·지번·품목으로 찾기 — 예: 동문리, 전세, 노래방"
+          className="w-full rounded border border-brand/25 px-3 py-2 text-sm"
+          aria-label="옛 광고 검색"
+        />
+        <button type="submit" className="shrink-0 rounded bg-brand px-4 py-2 text-sm font-semibold text-background">찾기</button>
+        {q && (
+          <button type="button" onClick={() => { setQInput(""); pick(() => setQ("")); }}
+            className="shrink-0 rounded border border-brand/25 px-3 py-2 text-sm text-brand">지우기</button>
+        )}
+      </form>
+
+      {q && (
+        <p className="text-sm text-foreground-muted">
+          <strong className="text-brand">{q}</strong> 검색 {data?.total ?? 0}건
+          {year !== null ? ` · ${year}년` : " · 전 기간"}
+          {year !== null && (
+            <button type="button" onClick={() => pick(() => setYear(null))} className="ml-2 text-accent underline">전 기간에서 찾기</button>
+          )}
+        </p>
+      )}
+
       <div className="flex flex-wrap gap-1.5">
         {years.map((y) => (
           <button key={y.year} type="button" onClick={() => pick(() => setYear(y.year))}
