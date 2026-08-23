@@ -93,27 +93,52 @@ function NewsArchive() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const key = scrollKey({ q, cat: category, year, page });
-    let tick = 0;
+    let timer = 0;
     const onScroll = () => {
-      // 스크롤마다 쓰면 저장이 너무 잦다 — 한 프레임에 한 번만 적는다.
-      if (tick) return;
-      tick = requestAnimationFrame(() => {
-        tick = 0;
+      // 스크롤마다 쓰면 저장이 너무 잦다 — 잠깐 모았다 한 번만 적는다.
+      //   ⚠ requestAnimationFrame을 쓰면 안 된다. 탭이 뒤에 있거나 화면이 안 그려지는 동안
+      //     프레임 콜백이 멈춰 저장이 통째로 빠진다(실측에서 그렇게 놓쳤다).
+      if (timer) return;
+      timer = window.setTimeout(() => {
+        timer = 0;
         try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* 저장 실패는 무시 */ }
-      });
+      }, 150);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { window.removeEventListener("scroll", onScroll); if (tick) cancelAnimationFrame(tick); };
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (timer) clearTimeout(timer);
+      // 떠나기 직전 위치를 확실히 남긴다 — 모아두던 것이 아직 안 적혔을 수 있다.
+      try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* 무시 */ }
+    };
   }, [q, category, year, page]);
 
   // 되살아난 첫 조회가 끝나면 그 자리로 내린다(한 번만).
+  //   ⚠ 한 번만 시도하면 안 된다. 그 순간 목록은 막 그려졌을 뿐이라 **페이지가 아직 짧다**
+  //     (실측: 뒤로 온 직후 2,526px → 사진이 들어오며 3,861px). 갈 곳이 없어 0으로 잘린다.
+  //     그래서 높이가 자랄 때까지 짧게 다시 시도한다.
   const restored = useRef(false);
   useEffect(() => {
     if (restored.current || !hits || typeof window === "undefined") return;
     restored.current = true;
     let y = 0;
     try { y = Number(sessionStorage.getItem(scrollKey(initial))) || 0; } catch { /* 읽기 실패는 무시 */ }
-    if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));   // 목록이 그려진 뒤에
+    if (y <= 0) return;
+
+    let tries = 0, timer = 0, cancelled = false;
+    // 사용자가 직접 손대면 그만둔다 — 되살리기가 사람 손을 이기면 안 된다.
+    const stop = () => { cancelled = true; clearTimeout(timer); };
+    for (const ev of ["wheel", "touchstart", "keydown"]) window.addEventListener(ev, stop, { passive: true, once: true });
+
+    const attempt = () => {
+      if (cancelled) return;
+      // 'instant' — 부드러운 스크롤로 두면 애니메이션과 재시도가 서로 싸운다.
+      window.scrollTo({ top: y, behavior: "instant" });
+      if (Math.abs(window.scrollY - y) > 4 && tries++ < 25) timer = window.setTimeout(attempt, 100);
+      else stop();
+    };
+    timer = window.setTimeout(attempt, 0);   // 프레임 콜백에 기대지 않는다(위와 같은 이유)
+    return stop;
   }, [hits, initial]);
 
   // 최초 로드는 **주소에 적힌 페이지**로, 이후 카테고리 탭 변경은 1페이지부터.
