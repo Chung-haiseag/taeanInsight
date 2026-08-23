@@ -457,7 +457,7 @@ router.get("/affiliations", async (c) => {
 // 갈래째 일괄 승격 — 근거가 스스로 증명하는 갈래만. '확인필요'는 거부한다.
 router.post("/affiliations/bulk-verify-triage", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
-  const b = await c.req.json<{ want?: string; apply?: boolean }>().catch(() => ({}));
+  const b = await c.req.json<{ want?: string; apply?: boolean }>().catch(() => ({} as { want?: string; apply?: boolean }));
   const w = b.want;
   if (w !== "인사발령" && w !== "근거직결" && w !== "확인필요") return c.json({ error: "want 값이 잘못됐습니다" }, 400);
   const { bulkVerifyByTriage } = await import("./affiliation_queue");
@@ -498,7 +498,22 @@ router.post("/affiliations/reject", async (c) => {
 router.get("/events/pending", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const limit = Math.max(1, Math.min(500, Number(c.req.query("limit")) || 200));
-  return c.json({ candidates: await loadFestivalQueue(c.env.ARCHIVE_DB, limit) });
+  const w = c.req.query("want");
+  const want = w === "태안" || w === "타지역" || w === "이름아님" || w === "전체" ? w : "확인필요";
+  const q = await loadFestivalQueue(c.env.ARCHIVE_DB, limit, want);
+  return c.json({ candidates: q.items, counts: q.counts, want: q.want });
+});
+
+// 갈래째 승인·반려 — 지명이 답을 말해주는 갈래만. '확인필요'는 거부한다.
+//   ⚠ 반려는 삭제다. 기본은 드라이런이고 apply=true를 명시해야 실제로 지운다.
+router.post("/events/bulk-triage", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ want?: string; action?: string; apply?: boolean }>().catch(() => ({} as { want?: string; action?: string; apply?: boolean }));
+  const w = b.want;
+  if (w !== "태안" && w !== "타지역" && w !== "이름아님" && w !== "확인필요") return c.json({ error: "want 값이 잘못됐습니다" }, 400);
+  const action = b.action === "reject" ? "reject" : "approve";
+  const { bulkFestivalByTriage } = await import("./event_queue");
+  return c.json(await bulkFestivalByTriage(c.env.ARCHIVE_DB, w, action, b.apply === true));
 });
 router.post("/events/reject", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);

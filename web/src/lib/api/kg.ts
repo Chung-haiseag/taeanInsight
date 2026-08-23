@@ -211,8 +211,21 @@ export function rejectAffiliation(id: string): Promise<{ ok: boolean }> {
 export interface FestivalCandidate {
   id: string; name: string; count: number; years: string[]; evidence: string[]; sources: string[];
 }
-export function getFestivalQueue(limit = 200): Promise<{ candidates: FestivalCandidate[] }> {
-  return apiFetch(`/api/admin/kg/events/pending?limit=${limit}`);
+export type FestTriage = "태안" | "타지역" | "이름아님" | "확인필요";
+export interface FestTriageCounts { 태안: number; 타지역: number; 이름아님: number; 확인필요: number }
+
+export function getFestivalQueue(limit = 200, want: FestTriage | "전체" = "확인필요"):
+  Promise<{ candidates: Array<FestivalCandidate & { triage: FestTriage }>; counts?: FestTriageCounts }> {
+  return apiFetch(`/api/admin/kg/events/pending?limit=${limit}&want=${encodeURIComponent(want)}`);
+}
+
+/** 갈래째 승인·반려. apply 생략 = 시험 실행(건수·이름만). 반려는 삭제라 되돌릴 수 없다. */
+export interface FestBulkResult {
+  want: string; action: string; matched: number; changed: number; applied: boolean;
+  names?: string[]; refused?: string; error?: string;
+}
+export function bulkFestivalTriage(want: FestTriage, action: "approve" | "reject", apply = false): Promise<FestBulkResult> {
+  return apiFetch(`/api/admin/kg/events/bulk-triage`, { method: "POST", body: JSON.stringify({ want, action, apply }) });
 }
 export function rejectEvent(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/admin/kg/events/reject`, { method: "POST", body: JSON.stringify({ id }) });
