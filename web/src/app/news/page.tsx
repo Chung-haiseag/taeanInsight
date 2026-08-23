@@ -94,22 +94,26 @@ function NewsArchive() {
     if (typeof window === "undefined") return;
     const key = scrollKey({ q, cat: category, year, page });
     let timer = 0;
+    // ⚠ **사람이 굴린 마지막 자리**를 따로 기억한다. 떠날 때 window.scrollY를 읽으면 안 된다 —
+    //   기사로 넘어가며 이미 맨 위로 간 뒤에 정리 함수가 돌아, 좋은 값을 0으로 덮어쓴다
+    //   (실측: 1,000까지 내리고 기사를 눌렀더니 저장값이 0이 됐다).
+    const lastY = { v: Math.round(window.scrollY) };
+    const write = () => {
+      try { sessionStorage.setItem(key, String(lastY.v)); } catch { /* 저장 실패는 무시 */ }
+    };
     const onScroll = () => {
+      lastY.v = Math.round(window.scrollY);
       // 스크롤마다 쓰면 저장이 너무 잦다 — 잠깐 모았다 한 번만 적는다.
       //   ⚠ requestAnimationFrame을 쓰면 안 된다. 탭이 뒤에 있거나 화면이 안 그려지는 동안
       //     프레임 콜백이 멈춰 저장이 통째로 빠진다(실측에서 그렇게 놓쳤다).
       if (timer) return;
-      timer = window.setTimeout(() => {
-        timer = 0;
-        try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* 저장 실패는 무시 */ }
-      }, 150);
+      timer = window.setTimeout(() => { timer = 0; write(); }, 150);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (timer) clearTimeout(timer);
-      // 떠나기 직전 위치를 확실히 남긴다 — 모아두던 것이 아직 안 적혔을 수 있다.
-      try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* 무시 */ }
+      write();   // 모아두던 것이 아직 안 적혔을 수 있다 — 사람이 굴린 마지막 자리로 적는다.
     };
   }, [q, category, year, page]);
 
