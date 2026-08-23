@@ -4,8 +4,9 @@
 // 상단 카테고리 탭·키워드 검색·연도 필터로 좁힌다. 태안군TV는 유튜브 패스스루.
 // 화면 전체를 /api/archive/search가 구동(검색어 없으면 최신순 목록).
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   searchArchive,
@@ -20,18 +21,28 @@ import { decodeEntities } from "@/lib/html";
 import { PageHeader } from "@/components/page-header";
 import { TvVideoGrid } from "@/components/tv-video-grid";
 import { Icon } from "@/components/icon";
-import { CATEGORY_ORDER, sortCategoryTabs } from "./newsarchive-helpers";
+import { CATEGORY_ORDER, sortCategoryTabs, listUrl, listStateFrom } from "./newsarchive-helpers";
 
 const FIRST_YEAR = 1990;
 const THIS_YEAR = new Date().getFullYear(); // 매해 자동 갱신 — 하드코딩 금지(1월마다 수동 갱신 불필요)
 const YEARS = Array.from({ length: THIS_YEAR - FIRST_YEAR + 1 }, (_, i) => String(THIS_YEAR - i));
 
+// useSearchParams는 정적 렌더 중엔 Suspense 경계가 필요하다.
 export default function NewsArchivePage() {
-  const [category, setCategory] = useState<string>("all"); // "all" | 카테고리 | "tv"
-  const [qInput, setQInput] = useState("");
-  const [q, setQ] = useState("");
-  const [year, setYear] = useState("");
-  const [page, setPage] = useState(1);
+  return <Suspense fallback={null}><NewsArchive /></Suspense>;
+}
+
+function NewsArchive() {
+  const router = useRouter();
+  const sp = useSearchParams();
+  // 주소에 적힌 상태로 시작한다 — 기사에서 뒤로 오면 브라우저가 그 주소로 돌아오므로,
+  //   여기서 읽어야 3페이지에서 떠났을 때 3페이지로 되돌아온다(예전엔 1페이지로 갔다).
+  const initial = useRef(listStateFrom((k) => sp.get(k))).current;
+  const [category, setCategory] = useState<string>(initial.cat); // "all" | 카테고리 | "tv"
+  const [qInput, setQInput] = useState(initial.q);
+  const [q, setQ] = useState(initial.q);
+  const [year, setYear] = useState(initial.year);
+  const [page, setPage] = useState(initial.page);
   const [hits, setHits] = useState<ArchiveHit[] | null>(null);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -48,7 +59,7 @@ export default function NewsArchivePage() {
   useEffect(() => { getMe().then((m) => setInterests(m.preferences?.categories ?? [])).catch(() => {}); }, []);
 
   // 아카이브 검색(검색어 없으면 최신순). 탭/검색/연도/페이지 변경 시 호출.
-  async function load(p: number, opts?: { q?: string; category?: string; year?: string }) {
+  async function load(p: number, opts?: { q?: string; category?: string; year?: string; keepScroll?: boolean }) {
     const catRaw = opts?.category ?? category;
     const cat = catRaw === "all" || catRaw === "tv" ? "" : catRaw;
     const query = opts?.q ?? q;
@@ -64,7 +75,10 @@ export default function NewsArchivePage() {
       setTotalPages(r.totalPages ?? 1);
       setHasMore(r.hasMore ?? false);
       setPage(p);
-      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+      // 지금 상태를 주소에 적어둔다. push가 아니라 replace라 뒤로가기 기록이 길어지지 않는다.
+      router.replace(listUrl({ q: query, cat: catRaw, year: yr, page: p }), { scroll: false });
+      // 뒤로 와서 되살아난 첫 조회는 화면을 올리지 않는다 — 보던 자리에 그대로 있어야 한다.
+      if (!opts?.keepScroll && typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       if (seq !== requestSeq.current) return;
       setError(err instanceof Error ? err.message : "불러오지 못했습니다");
@@ -73,9 +87,15 @@ export default function NewsArchivePage() {
     }
   }
 
-  // 최초 로드 + 카테고리 탭 변경(태안군TV 제외) → 1페이지부터 재조회
+  // 최초 로드는 **주소에 적힌 페이지**로, 이후 카테고리 탭 변경은 1페이지부터.
+  const didInit = useRef(false);
   useEffect(() => {
     if (category === "tv") return;
+    if (!didInit.current) {
+      didInit.current = true;
+      void load(initial.page, { keepScroll: true });
+      return;
+    }
     void load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
