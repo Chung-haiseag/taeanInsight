@@ -448,7 +448,20 @@ router.post("/relation/set", async (c) => {
 router.get("/affiliations", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
   const limit = Math.max(1, Math.min(500, Number(c.req.query("limit")) || 150));
-  return c.json({ candidates: await loadAffiliationQueue(c.env.ARCHIVE_DB, limit) });
+  const w = c.req.query("want");
+  const want = w === "인사발령" || w === "근거직결" || w === "전체" ? w : "확인필요";
+  const q = await loadAffiliationQueue(c.env.ARCHIVE_DB, limit, want);
+  return c.json({ candidates: q.items, counts: q.counts, want: q.want });
+});
+
+// 갈래째 일괄 승격 — 근거가 스스로 증명하는 갈래만. '확인필요'는 거부한다.
+router.post("/affiliations/bulk-verify-triage", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "db_unavailable" }, 503);
+  const b = await c.req.json<{ want?: string; apply?: boolean }>().catch(() => ({}));
+  const w = b.want;
+  if (w !== "인사발령" && w !== "근거직결" && w !== "확인필요") return c.json({ error: "want 값이 잘못됐습니다" }, 400);
+  const { bulkVerifyByTriage } = await import("./affiliation_queue");
+  return c.json(await bulkVerifyByTriage(c.env.ARCHIVE_DB, w, b.apply === true));
 });
 // 승격된 소속 재검사 — 고친 추출 규칙으로 근거 문장을 다시 돌려 재현 안 되는 건만 추린다.
 //   읽기 전용. 강등은 기존 /verify(verified=false)로 처리한다(삭제하지 않고 검수 큐로 되돌림).

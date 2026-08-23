@@ -169,8 +169,18 @@ export interface AffiliationCandidate {
   id: string; personId: string; person: string; orgId: string; org: string;
   role: string; count: number; confidence: number; years: string[]; evidence: string[]; sources: string[];
 }
-export function getAffiliationQueue(limit = 150): Promise<{ candidates: AffiliationCandidate[] }> {
-  return apiFetch(`/api/admin/kg/affiliations?limit=${limit}`);
+export type AffTriage = "인사발령" | "근거직결" | "확인필요";
+export interface AffTriageCounts { 인사발령: number; 근거직결: number; 확인필요: number }
+
+export function getAffiliationQueue(limit = 150, want: AffTriage | "전체" = "확인필요"):
+  Promise<{ candidates: Array<AffiliationCandidate & { triage: AffTriage }>; counts?: AffTriageCounts; want?: string }> {
+  return apiFetch(`/api/admin/kg/affiliations?limit=${limit}&want=${encodeURIComponent(want)}`);
+}
+
+/** 갈래째 일괄 승격. apply 생략 = 시험 실행(건수만). '확인필요'는 서버가 거부한다. */
+export interface TriageBulkResult { want: string; matched: number; updated: number; applied: boolean; refused?: string; error?: string }
+export function bulkVerifyByTriage(want: AffTriage, apply = false): Promise<TriageBulkResult> {
+  return apiFetch(`/api/admin/kg/affiliations/bulk-verify-triage`, { method: "POST", body: JSON.stringify({ want, apply }) });
 }
 // 소속 후보 일괄 승격 — 조건에 맞는 미검수 엣지를 서버에서 UPDATE 한 번으로 처리.
 //   apply 생략 = 시험 실행(건수만). 예전엔 후보 1건당 HTTP 1회를 순차로 보내 2,394건 처리가 불가능했다.

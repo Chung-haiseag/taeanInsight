@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { AffiliationAudit } from "./affiliation-audit";
-import { getAffiliationQueue, rejectAffiliation, verifyKg, bulkVerifyAffiliations, type AffiliationCandidate, type BulkVerifyResult } from "@/lib/api/kg";
+import { getAffiliationQueue, rejectAffiliation, verifyKg, bulkVerifyAffiliations, bulkVerifyByTriage,
+  type AffiliationCandidate, type BulkVerifyResult, type AffTriage, type AffTriageCounts, type TriageBulkResult } from "@/lib/api/kg";
 
 // 소속(belongs_to) 검수 — 아카이브에서 추출한 (인물·조직·직함) 후보를 신뢰도순으로 훑어
 // 승인(verified=1=사실층·AI 근거) 또는 반려(삭제)한다. 지어내기 방지: 승인된 소속만 공개 답변·관계망에 인용.
@@ -12,13 +13,32 @@ export default function AffiliationReview() {
   const [approved, setApproved] = useState(0);
   const [rejected, setRejected] = useState(0);
   const [bulk, setBulk] = useState(false);
+  // 갈래 — 근거 문장이 스스로 증명하는 것과 사람이 봐야 하는 것을 가른다.
+  const [want, setWant] = useState<AffTriage | "전체">("확인필요");
+  const [counts, setCounts] = useState<AffTriageCounts | null>(null);
+  const [tBulk, setTBulk] = useState<TriageBulkResult | null>(null);
 
-  async function load() {
-    setErr(null); setRows(null);
-    try { setRows((await getAffiliationQueue(300)).candidates); }
-    catch { setErr("목록을 불러오지 못했습니다. 로그인/권한을 확인하세요."); setRows([]); }
+  async function load(w: AffTriage | "전체" = want) {
+    setErr(null); setRows(null); setTBulk(null);
+    try {
+      const r = await getAffiliationQueue(300, w);
+      setRows(r.candidates); setCounts(r.counts ?? null);
+    } catch { setErr("목록을 불러오지 못했습니다. 로그인/권한을 확인하세요."); setRows([]); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load("확인필요"); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  async function approveTriage(w: AffTriage) {
+    const dry = await bulkVerifyByTriage(w).catch(() => null);
+    if (!dry || dry.refused) { setTBulk(dry ?? { want: w, matched: 0, updated: 0, applied: false, error: "확인 실패" }); return; }
+    if (!dry.matched) { setTBulk(dry); return; }
+    if (!window.confirm(`'${w}' ${dry.matched}건을 검증 완료(사실층)로 승격합니다.\n승격된 소속은 AI 답변에 근거로 인용됩니다. 진행할까요?`)) return;
+    setBulk(true);
+    try {
+      const r = await bulkVerifyByTriage(w, true);
+      setTBulk(r); setApproved((n) => n + r.updated);
+      await load();
+    } catch { /* 유지 */ } finally { setBulk(false); }
+  }
 
   async function approve(r: AffiliationCandidate) {
     setBusy(r.id);
@@ -74,6 +94,39 @@ export default function AffiliationReview() {
         </summary>
         <div className="mt-3"><AffiliationAudit /></div>
       </details>
+      {/* 갈래 — 근거 문장의 모양으로 미리 갈라, 사람이 볼 것만 남긴다.
+          실측(2026-08-23, 대기 362건): 인사발령 17% · 근거직결 46% · 확인필요 36%. */}
+      <div className="rounded-lg border border-brand/15 bg-accent-subtle/15 p-3">
+        <p className="mb-2 text-sm">
+          근거 문장의 모양으로 <strong>미리 갈라뒀습니다.</strong> 앞의 두 갈래는 조직명과 이름이 근거 안에서 한 덩어리라
+          근거가 스스로 증명합니다 — 갈래째 승인하시면 됩니다. 마지막 갈래만 하나씩 보시면 됩니다.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {(["확인필요", "근거직결", "인사발령", "전체"] as const).map((w) => (
+            <button key={w} type="button" onClick={() => { setWant(w); void load(w); }}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                want === w ? "bg-brand text-background" : "border border-brand/25 text-brand hover:bg-brand/5"}`}>
+              {w === "확인필요" ? "🔍 사람이 볼 것" : w === "근거직결" ? "🔗 근거 직결" : w === "인사발령" ? "📋 인사발령" : "전체"}
+              {counts && w !== "전체" && <span className="ml-1 tabular-nums">{counts[w]}</span>}
+            </button>
+          ))}
+          {(want === "근거직결" || want === "인사발령") && (
+            <button type="button" onClick={() => void approveTriage(want)} disabled={bulk}
+              className="rounded border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+              {bulk ? "승격 중…" : `이 갈래 ${counts?.[want] ?? 0}건 일괄 승인`}
+            </button>
+          )}
+        </div>
+        {tBulk?.refused && <p className="mt-2 text-sm text-amber-700">{tBulk.refused}</p>}
+        {tBulk?.applied && <p className="mt-2 text-sm font-semibold text-emerald-700">{tBulk.updated}건 승격했습니다.</p>}
+        {want === "확인필요" && (
+          <p className="mt-2 text-xs text-foreground-muted">
+            이 갈래는 조직명이 근거 문장에 없어 근접 추정으로 붙은 것입니다 — 맞는 것(&lsquo;상공회의소(회장 최길학)&rsquo;)과
+            틀린 것(&lsquo;진태구 군수, 이익창 군수를 비롯&rsquo;)이 섞여 있어 갈래째 승인할 수 없습니다.
+          </p>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-3xl text-sm text-foreground-muted">
           아카이브 기사에서 규칙 추출한 <span className="font-semibold text-brand">소속(인물→조직)</span> 후보입니다. 근거 문장을 보고
@@ -106,7 +159,7 @@ export default function AffiliationReview() {
               {dry.applied && <strong className="ml-2 text-emerald-700">→ {dry.updated.toLocaleString()}건 승격 완료</strong>}
             </span>
           )}
-          <button type="button" onClick={load} className="rounded border border-brand/30 px-3 py-1.5 text-sm text-brand hover:bg-brand/5">새로고침</button>
+          <button type="button" onClick={() => void load()} className="rounded border border-brand/30 px-3 py-1.5 text-sm text-brand hover:bg-brand/5">새로고침</button>
         </div>
       </div>
       {(approved > 0 || rejected > 0) && (

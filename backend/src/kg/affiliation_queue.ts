@@ -2,6 +2,7 @@
 //   후보 적재는 tools/kg/extract-affiliations.mjs(결정론 추출). 여기선 조회·정렬·삭제만.
 
 import type { D1Database } from "@cloudflare/workers-types";
+import { triageAffiliation, countAffTriage, type AffTriage, type AffTriageCounts } from "./affiliation_triage";
 
 export interface AffiliationCandidate {
   id: string;
@@ -33,19 +34,60 @@ export function sortByConfidence(cs: AffiliationCandidate[]): AffiliationCandida
   return [...cs].sort((a, b) => b.confidence - a.confidence || b.count - a.count);
 }
 
-export async function loadAffiliationQueue(db: D1Database, limit = 150): Promise<AffiliationCandidate[]> {
-  const r = await db
-    .prepare(
-      `SELECT e.id, e.src_id, e.dst_id, e.attrs_json, n.name AS person, o.name AS org
-       FROM kg_edges e
-       JOIN kg_nodes n ON n.id = e.src_id
-       JOIN kg_nodes o ON o.id = e.dst_id
-       WHERE e.rel = 'belongs_to' AND e.verified = 0
-       LIMIT 3000`,
-    )
-    .all<Row>();
-  const cs = (r.results ?? []).map(toCandidate);
-  return sortByConfidence(cs).slice(0, limit);
+const QUEUE_SQL =
+  `SELECT e.id, e.src_id, e.dst_id, e.attrs_json, n.name AS person, o.name AS org
+   FROM kg_edges e
+   JOIN kg_nodes n ON n.id = e.src_id
+   JOIN kg_nodes o ON o.id = e.dst_id
+   WHERE e.rel = 'belongs_to' AND e.verified = 0
+   LIMIT 3000`;
+
+export interface AffiliationQueue {
+  items: Array<AffiliationCandidate & { triage: AffTriage }>;
+  counts: AffTriageCounts;
+  want: AffTriage | "전체";
+}
+
+/**
+ * 검수 큐 — **갈래를 나눠** 돌려준다.
+ *   근거 문장이 스스로 증명하는 것(인사발령·근거직결)과 사람이 봐야 하는 것을 가른다.
+ *   판단은 여전히 사람이 하되, 볼 양을 줄이는 것이 목적이다.
+ */
+export async function loadAffiliationQueue(
+  db: D1Database, limit = 150, want: AffTriage | "전체" = "확인필요",
+): Promise<AffiliationQueue> {
+  const r = await db.prepare(QUEUE_SQL).all<Row>();
+  const all = (r.results ?? []).map(toCandidate);
+  const counts = countAffTriage(all);
+  const tagged = all.map((c) => ({ ...c, triage: triageAffiliation(c) }));
+  const picked = want === "전체" ? tagged : tagged.filter((c) => c.triage === want);
+  return { items: sortByConfidence(picked).map((c) => c as AffiliationCandidate & { triage: AffTriage }).slice(0, limit), counts, want };
+}
+
+/**
+ * 갈래째 일괄 승격. 기본은 드라이런 — 무엇이 올라가는지 보고 나서 한다.
+ *   ⚠ '확인필요'는 갈래째 승격할 수 없다. 그 갈래는 맞는 것과 틀린 것이 섞여 있어
+ *     한꺼번에 올리면 오추출이 그대로 AI 답변 근거가 된다.
+ */
+export async function bulkVerifyByTriage(
+  db: D1Database, want: AffTriage, apply = false,
+): Promise<{ want: AffTriage; matched: number; updated: number; applied: boolean; refused?: string }> {
+  if (want === "확인필요") {
+    return { want, matched: 0, updated: 0, applied: false, refused: "이 갈래는 맞는 것과 틀린 것이 섞여 있어 갈래째 승격할 수 없습니다" };
+  }
+  const r = await db.prepare(QUEUE_SQL).all<Row>();
+  const ids = (r.results ?? []).map(toCandidate).filter((c) => triageAffiliation(c) === want).map((c) => c.id);
+  if (!apply) return { want, matched: ids.length, updated: 0, applied: false };
+  let updated = 0;
+  // D1은 한 문장의 바인딩 수에 한계가 있다 — 나눠 보낸다.
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const ph = chunk.map(() => "?").join(",");
+    const res = await db.prepare(`UPDATE kg_edges SET verified = 1, updated_at = ? WHERE id IN (${ph})`)
+      .bind(new Date().toISOString(), ...chunk).run();
+    updated += Number(res.meta?.changes ?? 0);
+  }
+  return { want, matched: ids.length, updated, applied: true };
 }
 
 /** 일괄 승격 조건 정규화 — 임계값을 벗어난 입력으로 전체가 승격되는 사고를 막는다. */
