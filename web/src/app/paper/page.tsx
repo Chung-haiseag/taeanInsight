@@ -36,6 +36,15 @@ export default async function PaperIndex() {
         </p>
       )}
 
+      <Link href="/paper/ads"
+        className="mb-6 flex items-center justify-between rounded-lg border border-brand/15 bg-accent-subtle/20 p-4 transition hover:border-brand/40">
+        <span>
+          <span className="font-semibold text-brand">🏷 옛 광고 보기</span>
+          <span className="ml-2 text-sm text-foreground-muted">그 시절 집값·월세·품삯이 그대로 남아 있습니다</span>
+        </span>
+        <span aria-hidden="true" className="text-brand">→</span>
+      </Link>
+
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {years.map((y) => (
           <li key={y.year}>

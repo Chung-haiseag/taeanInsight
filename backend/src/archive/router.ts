@@ -6,6 +6,7 @@
 
 import { Hono } from "hono";
 import { EBOOK_MIN, EBOOK_MAX, groupIssues, type IssueRow } from "./paper";
+import { adKind } from "./ad_filter";
 
 import type { Env } from "../types";
 
@@ -34,6 +35,9 @@ archiveRouter.get("/search", async (c) => {
 
   const filters: string[] = [];
   const binds: unknown[] = [];
+  // 지면 광고는 검색에서 뺀다 — 30년 전 월세·구인 광고가 결과의 3분의 1을 차지했다.
+  //   지운 게 아니라 표시만 단 것이라, 주소를 직접 열면 기사 화면은 그대로 나온다.
+  filters.push("COALESCE(a.is_ad,0) = 0");
   if (category) {
     filters.push("a.category = ?");
     binds.push(category);
@@ -138,10 +142,10 @@ archiveRouter.get("/stats", async (c) => {
   try {
     const [agg, cats] = await Promise.all([
       db
-        .prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles")
+        .prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles WHERE COALESCE(is_ad,0)=0")
         .first<{ total: number; minYear: number | null; maxYear: number | null }>(),
       db
-        .prepare("SELECT category, COUNT(*) AS n FROM archive_articles WHERE category IS NOT NULL GROUP BY category")
+        .prepare("SELECT category, COUNT(*) AS n FROM archive_articles WHERE category IS NOT NULL AND COALESCE(is_ad,0)=0 GROUP BY category")
         .all<{ category: string; n: number }>(),
     ]);
     return c.json(
@@ -295,7 +299,52 @@ archiveRouter.get("/:idxno{[0-9]+}", async (c) => {
       .catch(() => null);                      // 표가 아직 없어도 기사는 열려야 한다
     if (g) region = { boxes: safeJson(g.boxes_json), matched: Number(g.matched) || 0 };
   }
-  return c.json({ ...row, images: safeJson(row.images), region });
+  return c.json({ ...row, images: safeJson(row.images), region, isAd: Number(row.is_ad) === 1 });
+});
+
+// ── 지면 광고 훑어보기 ────────────────────────────────────────────────────
+//   광고는 숨길 것이 아니라 **따로 보여줄 자료**다 — 1990~2001년 태안의 전세·매매가와
+//   구인 임금이 여기 있다(금액이 적힌 것만 3,788건). 군청 통계에도 없는 읍면 단위 시세다.
+//   기사 검색에서는 빼되(섞이면 노이즈), 이 경로로는 연도·갈래별로 훑어볼 수 있게 한다.
+archiveRouter.get("/ads/years", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const r = await db.prepare(
+    "SELECT year, COUNT(*) AS n FROM archive_articles WHERE COALESCE(is_ad,0)=1 GROUP BY year ORDER BY year",
+  ).all().catch(() => null);                    // 아직 표시 전이면 빈 목록으로
+  const res = c.json({ years: r?.results ?? [] });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
+});
+
+archiveRouter.get("/ads", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const year = Number(c.req.query("year"));
+  if (!Number.isInteger(year)) return c.json({ error: "invalid_year" }, 400);
+  const want = c.req.query("kind") ?? "";
+  const page = Math.max(1, Number(c.req.query("page")) || 1);
+  const SIZE = 60;
+
+  // 갈래는 저장돼 있지 않다 — 그 해 광고를 읽어 여기서 가른다(한 해 1천 건 안팎이라 가볍다).
+  const r = await db.prepare(
+    "SELECT idxno, title, section, published_at, substr(COALESCE(body,''),1,200) AS b " +
+    "FROM archive_articles WHERE COALESCE(is_ad,0)=1 AND year=? ORDER BY published_at, idxno",
+  ).bind(year).all<{ idxno: number; title: string; section: string; published_at: string; b: string }>()
+    .catch(() => null);
+  const rows = r?.results ?? [];
+  const tagged = rows.map((x) => ({ ...x, kind: adKind({ title: x.title, body: x.b }) }));
+  const counts: Record<string, number> = {};
+  for (const t of tagged) counts[t.kind] = (counts[t.kind] ?? 0) + 1;
+  const picked = want ? tagged.filter((t) => t.kind === want) : tagged;
+
+  const res = c.json({
+    year, kind: want || null, counts, total: picked.length,
+    page, totalPages: Math.max(1, Math.ceil(picked.length / SIZE)),
+    items: picked.slice((page - 1) * SIZE, page * SIZE),
+  });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
 });
 
 // ── 과거신문(지면) 훑어보기 ────────────────────────────────────────────────

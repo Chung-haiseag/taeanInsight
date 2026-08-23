@@ -211,7 +211,8 @@ newsRouter.get("/sitemap-ids", async (c) => {
   if (!db) return c.json({ year: null, ids: [] });
   const year = Number(c.req.query("year"));
   if (!Number.isInteger(year) || year < 1980 || year > 2100) return c.json({ error: "invalid_year" }, 400);
-  const r = await db.prepare("SELECT idxno, published_at FROM archive_articles WHERE year = ? ORDER BY idxno").bind(year)
+  const r = await // 광고는 사이트맵에 넣지 않는다 — 100자짜리 얇은 페이지가 1.4만 개면 구글이 사이트 전체를 저품질로 본다.
+    db.prepare("SELECT idxno, published_at FROM archive_articles WHERE year = ? AND COALESCE(is_ad,0)=0 ORDER BY idxno").bind(year)
     .all<{ idxno: number; published_at: string | null }>();
   c.header("Cache-Control", "public, s-maxage=86400");
   return c.json({ year, ids: (r.results ?? []).map((x) => ({ id: x.idxno, publishedAt: x.published_at })) });
