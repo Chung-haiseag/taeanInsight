@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 세로쓰기(縱書) 옛 지면 전용 디지타이저 — Gemini 멀티모달이 지면 이미지를 직접 읽어
 //   ① 전사(세로조판·한자혼용 인식) + ② 기사 분리 를 한 번에. (OCR·Claude 미사용)
-//   ※ 일반 가로조판은 digitize-ocr.mjs(Vision OCR=진실원천) 사용 — 이건 OCR이 깨지는 1990용.
+//   ※ 일반 가로조판은 digitize-ocr.mjs(Vision OCR=진실원천) 사용 — 이건 OCR이 깨지는 1990~1994용.
 //
 // 사용:
 //   export GEMINI_API_KEY=...
@@ -35,13 +35,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function arg(n, d) { const i = process.argv.indexOf(n); return i !== -1 ? process.argv[i + 1] : d; }
 async function sh(cmd, args) { return exec(cmd, args, { maxBuffer: 96 * 1024 * 1024 }); }
 
-const PROMPT = `이 이미지는 1990년 한국 지역신문(태안신문) 지면입니다. 본문은 대체로 **세로쓰기(縱書, 위→아래, 칼럼은 오른쪽→왼쪽)**이고 한글·한자가 섞여 있습니다.
+const PROMPT = `이 이미지는 1990년대 한국 지역신문(태안신문) 지면입니다. 본문은 대체로 **세로쓰기(縱書, 위→아래, 칼럼은 오른쪽→왼쪽)**이고 한글·한자가 섞여 있습니다.
 지면을 읽어 기사들을 구분해 JSON 배열로만 출력하세요(설명 없이 JSON만).
 - 지면의 글자를 **정확히 전사**하라 — 요약·재작성·창작 금지. 한자는 원문 그대로 보존(예: 泰安, 郡守).
 - 세로로 읽어 자연스러운 가로 문장으로 옮기되, **한국어 맞춤법에 맞게 띄어쓰기**하라.
 - 판독 불가 글자는 □ 로 표기(추측해서 지어내지 마라).
 - 제호(신문 머리글)·발행정보·판권·목차는 제외.
-- 광고/홍보(상품광고·축하광고·분양·전화문의·시세표 등)는 "isAd": true 로 표시.
+- 광고/홍보(상품광고·축하광고·분양·전화문의·시세표 등)는 "isAd": true 로 표시. **빠뜨리지 말고 광고도 모두 담아라** — 그 시절 물가·상호를 담은 자료다.
 - 본문이 거의 없는 표·명단·공고 지면이면 빈 배열 [] 을 출력.
 각 기사: {"title": "제목", "body": "본문", "category": "${CATS.join("|")}", "isAd": true/false}`;
 
@@ -166,16 +166,20 @@ async function main() {
     inTok += it; outTok += ot;
 
     const leadImage = `${PHOTO_BASE}/ebook/${date}/page_${page}.jpg`;
-    const baseRec = (title, body, category = "society") => ({
+    const baseRec = (title, body, category = "society", isAd = false) => ({
       date, page, title,
       publishedAt: `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+09:00`,
       year: Number(date.slice(0, 4)), section: `지면 ${page}면`,
       category, author: null, membersOnly: false, ocrEngine: "gemini_vision",
       faithfulness: 1, bodyChars: body.length, excerpt: body.replace(/\s+/g, " ").slice(0, 158) + "…",
       body, images: [], leadImage, url: null,
+      // 광고도 **버리지 않고 표시해 남긴다** — 1990~2001년 태안의 집값·월세·품삯이 여기 있다.
+      //   기사 검색에서는 빠지고 '옛 광고'(/paper/ads)에서 연도·갈래로 찾는다.
+      isAd,
     });
 
-    const good = arts.filter((a) => a?.title && a?.body && String(a.body).length >= 10);
+    // 광고는 본문이 짧다("전세 1,000만원 674-2907") — 기사 기준(10자)으로 자르면 통째로 사라진다.
+    const good = arts.filter((a) => a?.title && a?.body && String(a.body).length >= (a.isAd === true ? 4 : 10));
     if (!good.length || truncated) {
       // 본문 없는 표·명단 지면 또는 절단 → 스텁 1건 + 검수표시
       await writeRec(baseRec(
@@ -186,9 +190,10 @@ async function main() {
       return;
     }
     for (const a of good) {
-      if (a.isAd === true) { nDrop++; continue; }
+      const isAd = a.isAd === true;
+      if (isAd) nDrop++;
       const cat = CATS.includes(a.category) ? a.category : "society";
-      await writeRec(baseRec(String(a.title), String(a.body), cat));
+      await writeRec(baseRec(String(a.title), String(a.body), cat, isAd));
     }
     // gemini-vision 전사는 원문 대조 가드가 없으므로 검수 권장 표시(면 단위 1줄)
     await appendFile(OUT_REVIEW, `${date}_${page}\tgemini-vision 전사(검수권장) 기사 ${good.length - good.filter(a=>a.isAd===true).length}\n`);
@@ -208,7 +213,7 @@ async function main() {
 
   const cost = (inTok / 1e6) * 0.30 + (outTok / 1e6) * 2.50; // gemini-2.5-flash 대략 단가
   console.log(`\n\n=== 완료 ===`);
-  console.log(`기사 ${nArt} · 스텁 ${nStub} · 광고제외 ${nDrop} · 실패 ${nFail}`);
+  console.log(`기사 ${nArt} · 스텁 ${nStub} · 광고 ${nDrop}(표시해 보존) · 실패 ${nFail}`);
   console.log(`Gemini in ${inTok}/out ${outTok} ≈ $${cost.toFixed(4)}`);
   console.log(`출력: ${OUT_JSONL}  ·  검수: ${OUT_REVIEW}`);
   console.log(`다음: node publish.mjs --skip-spacing`);

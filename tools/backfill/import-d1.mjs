@@ -59,7 +59,9 @@ async function main() {
     // 행마다 개별 INSERT (단일 statement가 D1 한도 넘지 않게 — 본문 최대 ~17KB)
     const header =
       "INSERT OR REPLACE INTO archive_articles\n" +
-      "(idxno,title,published_at,year,section,category,author,excerpt,body,images,lead_image,members_only,url) VALUES\n";
+      "(idxno,title,published_at,year,section,category,author,excerpt,body,images,lead_image,members_only,url,is_ad) VALUES\n";
+    // ⚠ INSERT OR REPLACE라 다시 적재하면 is_ad가 레코드 값으로 **덮인다**.
+    //   광고 표시를 손으로 손본 연도를 재적재하면 그 손질이 날아간다 — 재적재 범위를 좁혀서 하라.
     const sql = rows.map((r) => header + r + ";").join("\n") + "\n";
     const name = `insert_${String(fileIdx).padStart(3, "0")}.sql`;
     await writeFile(join(SQL_DIR, name), sql);
@@ -90,6 +92,7 @@ async function main() {
           q(a.leadImage),
           a.membersOnly ? 1 : 0,
           q(a.url),
+          a.isAd ? 1 : 0,        // 지면 광고 — 기사 검색에서 빠지고 '옛 광고'에서 찾는다
         ].join(",") +
         ")",
     );
