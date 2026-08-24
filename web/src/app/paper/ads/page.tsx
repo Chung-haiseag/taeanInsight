@@ -30,6 +30,12 @@ export default async function AdsPage() {
         eyebrow={<Link href="/news" className="text-accent underline">← 뉴스아카이브</Link>}
         title="🏷 옛 광고"
         description="그 시절 태안의 집값·월세·품삯이 그대로 남아 있는 지면 광고입니다."
+        actions={
+          <Link href="/paper/prices"
+            className="rounded-full border border-brand/25 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5">
+            💰 옛날 물가 보기
+          </Link>
+        }
       />
       {total > 0 && (
         <p className="mb-6 text-sm text-foreground-muted">

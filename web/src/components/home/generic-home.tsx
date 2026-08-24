@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import { Icon, type IconName } from "@/components/icon";
 import { PersonalizedNewsStrip } from "@/components/home/personalized-news";
+import { OldAdTodayCard } from "@/components/home/old-ad-today";
 import { LiveSummaryStrip } from "@/components/home/live-summary";
 import { getArchiveStats, type ArchiveStats } from "@/lib/api/archive";
 import { getWeekendDemand, type DemandForecast } from "@/lib/api/reports";
@@ -72,6 +73,9 @@ export function GenericHome() {
 
       {/* 지금 태안 — 라이브 핵심 지표(실데이터) */}
       <LiveSummaryStrip />
+
+      {/* 30년 전 오늘의 광고 — 아카이브가 매일 새로 말을 거는 자리 */}
+      <OldAdTodayCard />
 
       {/* 대표 콘텐츠 쇼케이스 */}
       <section aria-labelledby="showcase-heading">

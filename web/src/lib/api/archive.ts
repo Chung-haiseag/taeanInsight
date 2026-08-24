@@ -87,3 +87,14 @@ export const ARCHIVE_CATEGORY_LABELS: Record<string, string> = {
   culture: "문화·교육",
   society: "지역사회",
 };
+
+// ── 30년 전 오늘의 광고 ────────────────────────────────────────────────────
+export interface OldAdToday { idxno: number; title: string; year: number; date: string; b: string; yearsAgo: number }
+export async function getOldAdToday(): Promise<OldAdToday | null> {
+  try {
+    const r = await apiFetch<{ item: OldAdToday | null }>("/api/archive/ads/on-this-day");
+    return r.item ?? null;
+  } catch {
+    return null;
+  }
+}

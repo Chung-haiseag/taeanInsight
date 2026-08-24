@@ -7,6 +7,7 @@
 import { Hono } from "hono";
 import { EBOOK_MIN, EBOOK_MAX, groupIssues, type IssueRow } from "./paper";
 import { adKind } from "./ad_filter";
+import { PRICE_LABELS } from "./ad_prices";
 
 import type { Env } from "../types";
 
@@ -331,12 +332,12 @@ archiveRouter.get("/ads", async (c) => {
   // 갈래는 저장돼 있지 않다 — 읽어서 여기서 가른다.
   //   검색어가 있으면 **연도를 넘어** 전체에서 찾는다(연도를 정해 두면 그 해만).
   //   훑어보기만 있고 찾기가 없으면 1만 2천 건은 자료로 못 쓴다.
-  const cols = "idxno, title, section, published_at, substr(COALESCE(body,''),1,200) AS b";
+  const cols = "idxno, title, section, published_at, ad_key, substr(COALESCE(body,''),1,200) AS b";
   const r = await (q.length >= 2
     ? (q.length >= 3
       // 3글자 이상은 FTS(트라이그램), 2글자는 제목 LIKE — 기사 검색과 같은 규칙.
       ? db.prepare(
-          `SELECT ${cols.replace(/\b(idxno|title|section|published_at|body)\b/g, "a.$1")} ` +
+          `SELECT ${cols.replace(/\b(idxno|title|section|published_at|ad_key|body)\b/g, "a.$1")} ` +
           "FROM archive_fts f JOIN archive_articles a ON a.idxno=f.rowid " +
           "WHERE archive_fts MATCH ? AND COALESCE(a.is_ad,0)=1" + (Number.isInteger(year) ? " AND a.year=?" : "") +
           " ORDER BY a.published_at LIMIT 600",
@@ -349,20 +350,100 @@ archiveRouter.get("/ads", async (c) => {
     : db.prepare(
         `SELECT ${cols} FROM archive_articles WHERE COALESCE(is_ad,0)=1 AND year=? ORDER BY published_at, idxno`,
       ).bind(year)
-  ).all<{ idxno: number; title: string; section: string; published_at: string; b: string }>()
+  ).all<{ idxno: number; title: string; section: string; published_at: string; ad_key: string | null; b: string }>()
     .catch(() => null);
   const rows = r?.results ?? [];
-  const tagged = rows.map((x) => ({ ...x, kind: adKind({ title: x.title, body: x.b }) }));
+
+  // 같은 광고 접기 — 반복 게재(ad_key 동일)는 첫 번째 것만 남긴다(마이그레이션 056).
+  //   신도신협 같은 광고는 한 해에만 수십 번 실려, 안 접으면 목록이 그 광고로 도배된다.
+  const seenKey = new Set<string>();
+  const foldedRows = rows.filter((x) => {
+    if (!x.ad_key) return true;
+    if (seenKey.has(x.ad_key)) return false;
+    seenKey.add(x.ad_key);
+    return true;
+  });
+
+  const tagged = foldedRows.map((x) => ({ ...x, kind: adKind({ title: x.title, body: x.b }) }));
   const counts: Record<string, number> = {};
   for (const t of tagged) counts[t.kind] = (counts[t.kind] ?? 0) + 1;
   const picked = want ? tagged.filter((t) => t.kind === want) : tagged;
+  const pageItems = picked.slice((page - 1) * SIZE, page * SIZE);
+
+  // 화면에 나갈 것들만 게재 이력(총 몇 회·몇 년~몇 년)을 붙인다 — 한 번의 IN 조회.
+  const keys = [...new Set(pageItems.map((x) => x.ad_key).filter((k): k is string => !!k))];
+  const runs = new Map<string, { n: number; y0: number; y1: number }>();
+  if (keys.length) {
+    const g = await db.prepare(
+      "SELECT ad_key, COUNT(*) AS n, MIN(year) AS y0, MAX(year) AS y1 FROM archive_articles " +
+      `WHERE ad_key IN (${keys.map(() => "?").join(",")}) GROUP BY ad_key`,
+    ).bind(...keys).all<{ ad_key: string; n: number; y0: number; y1: number }>().catch(() => null);
+    for (const x of g?.results ?? []) runs.set(x.ad_key, { n: x.n, y0: x.y0, y1: x.y1 });
+  }
 
   const res = c.json({
     year: Number.isInteger(year) ? year : null, q: q || null, kind: want || null, counts, total: picked.length,
     page, totalPages: Math.max(1, Math.ceil(picked.length / SIZE)),
-    items: picked.slice((page - 1) * SIZE, page * SIZE),
+    items: pageItems.map(({ ad_key, ...x }) => ({ ...x, runs: (ad_key && runs.get(ad_key)) || null })),
   });
   res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
+});
+
+// ── 옛날 물가 — 광고에서 뽑은 시세표 ─────────────────────────────────────
+//   ad_prices 는 광고 본문에서 라벨(전세·매매…) 붙은 금액을 뽑아둔 표(마이그레이션 055).
+//   행이 3천 개 남짓이라 통째로 읽어 여기서 중앙값을 낸다 — D1엔 median이 없다.
+archiveRouter.get("/ads/prices", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const r = await db.prepare("SELECT label, year, man FROM ad_prices").all<{ label: string; year: number; man: number }>()
+    .catch(() => null);
+  const rows = r?.results ?? [];
+  const byKey = new Map<string, number[]>();
+  for (const x of rows) {
+    const k = `${x.label}|${x.year}`;
+    (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(x.man);
+  }
+  const q = (sorted: number[], p: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
+  const labels = PRICE_LABELS.map((label) => {
+    const series = [];
+    for (let year = 1990; year <= 2001; year++) {
+      const v = byKey.get(`${label}|${year}`);
+      if (!v || v.length === 0) continue;
+      const s = [...v].sort((a, b) => a - b);
+      series.push({ year, n: s.length, med: q(s, 0.5), p25: q(s, 0.25), p75: q(s, 0.75) });
+    }
+    return { label, total: series.reduce((a, x) => a + x.n, 0), series };
+  }).filter((l) => l.total > 0);
+  const res = c.json({ labels });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
+});
+
+// ── 30년 전 오늘의 광고 ──────────────────────────────────────────────────
+//   같은 날짜(월-일 ±3일)의 옛 광고 하나를 날짜로 정해지는 규칙으로 뽑는다 —
+//   하루 동안 누가 봐도 같은 광고가 나오고, 자정이 지나면 바뀐다. 주간지라
+//   정확히 같은 날짜의 광고가 없는 날이 많아 ±3일 창을 쓴다.
+archiveRouter.get("/ads/on-this-day", async (c) => {
+  const db = c.env.ARCHIVE_DB;
+  if (!db) return c.json({ error: "archive_db_unbound" }, 503);
+  const now = new Date(Date.now() + 9 * 3600 * 1000);           // KST
+  const days: string[] = [];
+  for (let d = -3; d <= 3; d++) {
+    const t = new Date(now.getTime() + d * 86400 * 1000);
+    days.push(`${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`);
+  }
+  const r = await db.prepare(
+    "SELECT idxno, title, year, substr(published_at,1,10) AS date, substr(COALESCE(body,''),1,300) AS b " +
+    "FROM archive_articles WHERE COALESCE(is_ad,0)=1 AND substr(published_at,6,5) IN (" +
+    days.map(() => "?").join(",") + ") AND length(COALESCE(body,'')) >= 20 ORDER BY idxno",
+  ).bind(...days).all<{ idxno: number; title: string; year: number; date: string; b: string }>().catch(() => null);
+  const rows = r?.results ?? [];
+  if (!rows.length) return c.json({ item: null });
+  const seed = Number(`${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}`);
+  const pick = rows[seed % rows.length];
+  const res = c.json({ item: { ...pick, yearsAgo: now.getUTCFullYear() - pick.year } });
+  res.headers.set("Cache-Control", "public, s-maxage=3600");    // 자정을 크게 넘겨 묵지 않게 1시간
   return res;
 });
 

@@ -7,7 +7,11 @@ import { listScrollKey, useListScrollMemory } from "@/lib/list-memory";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 const KINDS = ["부동산", "구인", "상점·업소", "차량·기타", "기타"] as const;
 
-interface Ad { idxno: number; title: string; section: string; published_at: string; b: string; kind: string }
+interface Ad {
+  idxno: number; title: string; section: string; published_at: string; b: string; kind: string;
+  /** 게재 이력 — 같은 광고가 여러 호에 실렸으면 총 횟수·기간(서버에서 접어 보낸다) */
+  runs?: { n: number; y0: number; y1: number } | null;
+}
 interface Res { counts?: Record<string, number>; total?: number; page?: number; totalPages?: number; items?: Ad[] }
 
 const day = (s: string) => `${s.slice(5, 7)}.${s.slice(8, 10)}`;
@@ -128,6 +132,11 @@ function Ads({ years }: { years: Array<{ year: number; n: number }> }) {
               </p>
               <p className="mt-0.5 font-semibold text-brand">{a.title}</p>
               <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{a.b}</p>
+              {a.runs && a.runs.n >= 2 && (
+                <p className="mt-1.5 inline-block rounded-full bg-brand/5 px-2 py-0.5 text-xs text-brand">
+                  {a.runs.y0 === a.runs.y1 ? `${a.runs.y0}년` : `${a.runs.y0}~${a.runs.y1}년`} {a.runs.n}회 게재
+                </p>
+              )}
             </Link>
           </li>
         ))}

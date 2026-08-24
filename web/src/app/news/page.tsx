@@ -163,6 +163,11 @@ function NewsArchive() {
           🏷 옛 광고
           <span className="ml-1.5 font-normal text-foreground-muted">그 시절 집값·품삯</span>
         </Link>
+        <Link href="/paper/prices"
+          className="rounded-full border border-brand/25 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5">
+          💰 옛날 물가
+          <span className="ml-1.5 font-normal text-foreground-muted">광고로 만든 30년 시세표</span>
+        </Link>
       </div>
 
       {/* 검색 폼 — 키워드 + 연도 */}
