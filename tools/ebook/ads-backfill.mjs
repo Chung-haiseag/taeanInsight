@@ -77,24 +77,41 @@ const PROMPT = `이 이미지는 1990년대 한국 지역신문(태안신문) �
 - 판독 불가 글자는 □ 로 표기.
 - 광고가 없으면 빈 배열 [] 을 출력.`;
 
+// flash는 비결정적으로 출력 무한반복(루프→MAX_TOKENS)에 빠진다. 단일 설정은 안전하지 않으므로
+//   설정을 바꿔 다시 시도한다 — 각 시도가 독립적이라 실패율이 크게 떨어진다(원 파이프라인의 교훈).
+//   실측(2026-08-24): 재시도 없이 돌렸더니 560면 중 18면이 MAX_TOKENS로 통째로 날아갔다.
+const ATTEMPTS = [
+  { think: 0, temp: 0.1 }, { think: 0, temp: 0.5 }, { think: 512, temp: 0.3 }, { think: 1024, temp: 0.7 },
+];
+
 async function gemini(imgB64) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`, {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: "image/jpeg", data: imgB64 } }] }],
-      generationConfig: {
-        temperature: 0.1, maxOutputTokens: 16384, responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 0 },          // 기계적 전사 — 사고 끔(프로젝트 방침)
-        mediaResolution: "MEDIA_RESOLUTION_HIGH",       // 1800px 이미지의 세부를 살린다
-      },
-    }),
-  });
-  const j = await res.json();
-  if (j.error) throw new Error(`Gemini: ${String(j.error.message).slice(0, 120)}`);
-  const c = j.candidates?.[0];
-  if (c?.finishReason && c.finishReason !== "STOP") throw new Error(`Gemini finish=${c.finishReason}`);
-  const txt = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-  try { return JSON.parse(txt); } catch { throw new Error("JSON 파싱 실패"); }
+  let last;
+  for (const a of ATTEMPTS) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: "image/jpeg", data: imgB64 } }] }],
+        generationConfig: {
+          temperature: a.temp, maxOutputTokens: 16384, responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: a.think },
+          mediaResolution: "MEDIA_RESOLUTION_HIGH",     // 1800px 이미지의 세부를 살린다
+        },
+      }),
+    });
+    const j = await res.json();
+    if (j.error) {
+      // 키·권한 문제는 다시 시도해도 소용없다.
+      if (/API key|PERMISSION|quota|RESOURCE_EXHAUSTED/i.test(String(j.error.message))) {
+        throw new Error(`Gemini: ${String(j.error.message).slice(0, 120)}`);
+      }
+      last = new Error(`Gemini: ${String(j.error.message).slice(0, 120)}`); continue;
+    }
+    const c = j.candidates?.[0];
+    if (c?.finishReason && c.finishReason !== "STOP") { last = new Error(`Gemini finish=${c.finishReason}`); continue; }
+    const txt = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+    try { return JSON.parse(txt); } catch { last = new Error("JSON 파싱 실패"); }
+  }
+  throw last ?? new Error("Gemini 실패");
 }
 
 // ── 대상 지면 모으기 ───────────────────────────────────────────────────────
