@@ -46,6 +46,11 @@ const pageOf = (section: string | null | undefined): number | null => {
   return m ? Number(m[1]) : null;
 };
 
+/** 제목의 안내·공고 표기. 이것만으로는 안 지킨다 — 본문에 기관명이 함께 있어야 한다. */
+const NOTICE_TITLE = /(안내|공고|알림|신고|캠페인)/;
+/** 관공서·공공기관·군부대. '조합'은 넣지 않는다 — 신협 광고가 있다. '부대'도 단독으론 안 된다(부대찌개). */
+const INSTITUTION = /(정부|군청|[가-힣]*전화국|경찰청|경찰서|보건소|[가-힣]*교육청|우체국|읍사무소|면사무소|한국전력|국세청|병무청|군부대|제\s?\d+\s?부대|선거관리위원회)/;
+
 export interface AdVerdict { ad: boolean; score: number; why: string[] }
 
 /**
@@ -78,6 +83,11 @@ export function adScore(a: ArticleLike): AdVerdict {
 
   // 기사체 종결어미가 있으면 기자가 쓴 글이다 — 강하게 되돌린다.
   if (NEWS_ENDING.test(body)) { s -= 3; why.push("기사체 종결어미"); }
+  // 관공서·군부대의 안내·공고 — '습니다'체라 기사체 보호를 못 받는다(정부 공고가 광고로 잡혔었다).
+  //   ⚠ '안내'만으로 지키면 안 된다: 업소 '개업 안내'는 광고다. 제목의 안내·공고 + 본문의 기관명이 함께 있어야 한다.
+  if (NOTICE_TITLE.test(title) && INSTITUTION.test(text)) { s -= 4; why.push("관공서 안내·공고"); }
+  // 화보 면 — 캡션에 옆 광고 조각이 섞여 추출된다('사진으로 보는'이 광고로 잡혔었다).
+  if (/사진으로 보|화보/.test(title)) { s -= 4; why.push("화보"); }
   // 길고 전화번호가 없으면 칼럼·기고다('마음의 등불' 651자).
   if (len >= 600 && !PHONE.test(text)) { s -= 3; why.push("긴 글·연락처 없음"); }
 
