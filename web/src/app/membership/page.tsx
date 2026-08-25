@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { trackEvent } from "@/lib/api/reading";
+import { accountNumberOf } from "@/lib/bank";
 import {
   getTerms, getMyMembership, createOrder, cancelOrder,
   type Term, type MyMembership, type OrderResult,
@@ -294,7 +295,11 @@ function DepositGuide({ order, phone, onCancel }: { order: OrderResult; phone: s
 
       {bank && (
         <button type="button"
-          onClick={() => { navigator.clipboard?.writeText(bank).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {}); }}
+          onClick={() => {
+            // 은행 앱 입력칸은 숫자만 받는다 — 은행명·예금주가 끼면 붙여넣기가 막힌다.
+            const text = accountNumberOf(bank) ?? bank;
+            navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
+          }}
           className="mt-4 w-full rounded-xl border-2 border-brand/20 px-4 py-3 font-semibold text-brand hover:bg-brand/5">
           {copied ? "복사했습니다 ✓" : "계좌번호 복사하기"}
         </button>
