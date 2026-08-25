@@ -7,6 +7,7 @@ import { renderWidgets } from "@/components/me/widget_registry";
 import { ToneToggleBar, useToneToggle } from "@/components/me/tone_toggle";
 import { PushOptInButton } from "@/components/me/push_opt_in";
 import { MeHeroStrip } from "@/components/me/hero-strip";
+import { MembershipStatus } from "@/components/me/membership-status";
 import { MeOwnerBoard } from "@/components/me/owner-board";
 import { MyCorrections } from "@/components/me/my-corrections";
 import { CitizenApply } from "@/components/me/citizen-apply";
@@ -104,6 +105,8 @@ function MeDashboard({ data }: { data: MeResponse }) {
       <CitizenApply />
 
       {/* 오늘 한눈에 — 히어로 요약 */}
+      <MembershipStatus />
+
       <MeHeroStrip preferences={preferences} />
 
       {/* 오디오 브리핑(2인 대담) */}

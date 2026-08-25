@@ -72,6 +72,10 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-08-25 · **멤버십 실결제(계좌이체) + 가짜 페이월 제거** · `backend/src/membership/plan.ts`·`membership/router.ts`·`web/src/app/membership`·`admin/membership-tab.tsx`·`db/057`
+  옛 화면은 요금제 넷을 늘어놓고 '사전 신청'만 받았다 — 실측 **45명이 보고 클릭 0·신청 0**. 하나(월 9,900원)만 권하고 실제 가입되게 바꿨다. 결제는 **계좌이체**(PG 가맹점 계약 없이 오늘 도는 길, 고령 독자에게 카드보다 익숙): 신청 → 입금 안내(계좌·금액·입금자명·신청번호 `TA-2608-A7K3`) → 관리자가 통장 대조 후 '입금 확인' → 그때 등급이 열린다(`/admin` 💳 멤버십 입금 탭). 12개월은 두 달 무료로 길게 유도(이체 횟수를 줄인다).
+  ⚠ **가짜 페이월을 걷어냈다**: 홈·기사 페이월이 localStorage(`taean-demo-home-state`)로 열려 있었고 프로덕션에 데모 토글(`NEXT_PUBLIC_USE_MOCK=true`)까지 노출돼 **누구나 결제 없이 유료 화면을 켤 수 있었다**. 판정을 서버(`/api/membership/me` → `isMember`)로 옮기고 만료일까지 본다 — 예전 `plan!=='free'`는 한 번 결제하면 영원히 열렸다. 아카이브 기사는 계속 무료(로그인 문턱만).
+  남은 것: 관리자 화면에서 **입금 계좌·문의 전화 입력**(비어 있으면 신청자가 입금할 곳을 못 본다), 카드결제는 PG 계약 후 같은 주문 표에 얹으면 된다.
 - 2026-08-25 · **옛날 물가(/paper/prices) + 30년 전 오늘의 광고 + 같은 광고 묶기** · `backend/src/archive/ad_prices.ts`·`archive/router.ts`·`web/src/app/paper/prices`·`components/home/old-ad-today.tsx`·`db/055·056`
   광고 21,973건에서 라벨 붙은 금액 3,082건 추출(전세·매매·월세·보증금·권리금·평당, `ad_prices` 표). 자동차 매매가 부동산에 섞이던 오탐을 부동산 문맥어로 차단. `/paper/prices`가 연도별 중앙값 표+SVG 추이(IMF 반토막이 매매 1997→98에 그대로 보인다), 연도 클릭=근거 광고 검색. 홈에 '30년 전 오늘의 광고' 카드(±3일 창·날짜 결정론·자정 교체). 반복 게재 광고는 `ad_key`(제목+본문 60자 열쇠, 2,666묶음·8,863건)로 접어 목록 도배 제거 + 'N회 게재(y0~y1)' 배지 — 제목만으로 묶으면 '구인' 난 제목이 171건을 오합쳐서 제목+본문으로 묶는다.
 - 2026-08-23 · **아카이브 중심 재편 + 과거신문 신설 + 인물 공개** · `web/src/lib/nav.ts`·`web/src/app/paper/**`·`backend/src/archive/paper.ts`

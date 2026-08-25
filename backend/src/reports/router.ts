@@ -26,6 +26,7 @@ import { getIsoWeekId } from "./types";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
 import { decideVisibility, type VisibilityTier } from "../preferences/content_filter";
 import type { InterestCategory, UserPreferences } from "../preferences/types";
+import { isMember } from "../membership/plan";
 
 // 섹션 → 콘텐츠 등급·관심분야 매핑 (개인화 정렬·강조용)
 const SECTION_TIER: Record<ReportSectionKey, { tier: VisibilityTier; category?: InterestCategory }> = {
@@ -84,13 +85,16 @@ async function loadPrefs(c: { env: Env; req: { header: (k: string) => string | u
   try { return await new D1PreferencesRepo(c.env.ARCHIVE_DB).get(uid); } catch { return null; }
 }
 
-// 계정 plan 기반 tier — 유료 플랜(reader/business/org)이면 premium 취급
+// 계정 plan 기반 tier — 유료 회원이면 premium.
+//   ⚠ 판정은 membership/plan.ts 한 곳에서만 한다. 예전엔 여기서 plan!=='free'만 봐서
+//     **만료된 회원도 계속 열렸다**(한 번 결제하면 영원히). isMember가 만료일까지 본다.
 async function planTier(c: { env: Env; req: { header: (k: string) => string | undefined } }): Promise<string | null> {
   const uid = c.req.header("X-Taean-Uid");
   if (!uid || !c.env.ARCHIVE_DB) return null;
   try {
-    const u = await c.env.ARCHIVE_DB.prepare("SELECT plan FROM users WHERE uid=?").bind(uid).first<{ plan: string }>();
-    return u && u.plan !== "free" ? "premium" : null;
+    const u = await c.env.ARCHIVE_DB.prepare("SELECT plan, plan_until FROM users WHERE uid=?").bind(uid)
+      .first<{ plan: string; plan_until: string | null }>();
+    return u && isMember(u) ? "premium" : null;
   } catch { return null; }
 }
 

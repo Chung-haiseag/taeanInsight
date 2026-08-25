@@ -14,7 +14,7 @@ import {
   type ArchiveHit,
 } from "@/lib/api/archive";
 import { archiveToReader, formatDate, LOW_FAITH, OLD_PRINT_UNTIL, type Reader } from "./reader";
-import { getDemoHomeState, setDemoHomeState, isMockMode } from "@/lib/mock/addons";
+import { useMembership } from "@/lib/use-membership";
 import { decodeEntities } from "@/lib/html";
 import { segmentQuotes } from "@/lib/quote-highlight";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
@@ -33,7 +33,11 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
   const [article, setArticle] = useState<Reader | null>(initialArticle ?? null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!initialArticle);
-  const [member, setMember] = useState(false);
+  // 아카이브 기사는 **무료로 유지**한다(유입·검색). 여기 문턱은 결제가 아니라 로그인이다.
+  //   예전엔 localStorage가 이 값을 정했고, '로그인하고 전문 보기' 단추가 로그인 없이
+  //   그 값을 켰다 — 이제 서버 세션이 정한다.
+  const { state: memberState } = useMembership();
+  const loggedIn = memberState === "member" || memberState === "preview";
   // 낭독 재생 위치(초) — 따라읽기 하이라이트가 쓴다. 재생 안 하면 0으로 남아 하이라이트도 없다.
   const [playPos, setPlayPos] = useState(0);
   // 낭독은 '제목 → 본문' 순으로 읽으므로 **제목도 하이라이트 대상**이다(초반 7초가 제목이라
@@ -51,7 +55,6 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
   const seekTo = useCallback((sec: number) => audioCtl.current?.seekAndPlay(sec), []);
 
   useEffect(() => {
-    setMember(getDemoHomeState() === "entitled");
     if (initialArticle) return; // 서버가 이미 제공(SSR) → 클라 fetch 불필요(이중 fetch 제거)
     (async () => {
       try {
@@ -136,13 +139,13 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
         )}
       </header>
 
-      {member && article.hasFullText ? (
+      {loggedIn && article.hasFullText ? (
         <FullBody article={article} idxno={Number(params.id)} active={raActive} hasWords={!!raWords} sentences={raSentences} onSeek={seekTo} />
       ) : (
         <>
           {/* 리드(발췌) */}
           <p className="text-lg leading-relaxed text-foreground"><QuotedText text={article.excerpt} /></p>
-          {member ? (
+          {loggedIn ? (
             <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
               <Icon name="books" /> 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
               {article.url && (
@@ -152,10 +155,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
               )}
             </div>
           ) : (
-            <MemberGate
-              hasFullText={article.hasFullText}
-              onUnlock={() => { setDemoHomeState("entitled"); setMember(true); }}
-            />
+            <MemberGate hasFullText={article.hasFullText} idxno={Number(params.id)} />
           )}
         </>
       )}
@@ -170,15 +170,6 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
 
       <RelatedArticles idxno={Number(params.id)} />
 
-      {isMockMode() && (
-        <DemoMemberToggle
-          member={member}
-          onChange={(v) => {
-            setDemoHomeState(v ? "entitled" : "preview");
-            setMember(v);
-          }}
-        />
-      )}
     </article>
   );
 }
@@ -449,47 +440,23 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
   );
 }
 
-function MemberGate({ hasFullText, onUnlock }: { hasFullText: boolean; onUnlock: () => void }) {
+function MemberGate({ hasFullText, idxno }: { hasFullText: boolean; idxno: number }) {
   return (
     <div className="relative rounded-2xl border border-accent/40 bg-accent-subtle/20 p-7 text-center space-y-4">
-      <p className="eyebrow justify-center"><Icon name="lock" /> 회원 전용</p>
+      <p className="eyebrow justify-center"><Icon name="lock" /> 로그인하면 보입니다</p>
       <h2 className="text-xl font-bold text-brand">
-        {hasFullText ? "이 기사의 전문은 태안 인사이트 회원에게 제공됩니다" : "회원이 되시면 더 많은 기능을 이용하실 수 있어요"}
+        {hasFullText ? "이 기사의 전문은 로그인하시면 보실 수 있습니다" : "로그인하시면 더 많은 기능을 이용하실 수 있어요"}
       </h2>
       <p className="text-sm text-foreground-muted">
-        로그인하시면 전문과 AI 요약·관련 기사까지 한곳에서 보실 수 있어요.
+        아카이브 기사는 회원가입만 하시면 무료입니다. 결제는 필요하지 않습니다.
       </p>
       <div className="flex justify-center gap-3 pt-1">
-        <button type="button" onClick={onUnlock} className="btn-accent">
-          로그인하고 전문 보기
-        </button>
+        <Link href={`/login?redirect=${encodeURIComponent(`/news/${idxno}`)}`} className="btn-accent">
+          로그인하기
+        </Link>
         <Link href="/me/onboarding" className="btn-ghost">
           회원가입
         </Link>
-      </div>
-    </div>
-  );
-}
-
-function DemoMemberToggle({ member, onChange }: { member: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="no-print fixed bottom-4 right-4 z-50 rounded-lg bg-brand p-2 text-xs text-background shadow-lg">
-      <p className="px-1 pb-1 text-background/70">데모: 회원 상태</p>
-      <div className="flex gap-1">
-        {[
-          { v: false, label: "비회원" },
-          { v: true, label: "회원" },
-        ].map((o) => (
-          <button
-            key={o.label}
-            type="button"
-            onClick={() => onChange(o.v)}
-            aria-pressed={member === o.v}
-            className={`rounded px-2 py-1 ${member === o.v ? "bg-accent text-background" : "bg-background/10 text-background/80"}`}
-          >
-            {o.label}
-          </button>
-        ))}
       </div>
     </div>
   );

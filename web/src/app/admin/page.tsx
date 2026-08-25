@@ -49,6 +49,7 @@ import {
   type AdminReport,
 } from "@/lib/api/admin-reports";
 import { CorrectionsSection } from "./corrections-tab";
+import { MembershipSection } from "./membership-tab";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import {
@@ -116,9 +117,10 @@ function AdminGate({ account, onOk }: { account: Account | null; onOk: () => voi
 }
 
 // ⚙️ 자동화는 보고서(/admin/report)로 이동 — 대시보드는 실행·비즈니스 지표 중심.
-type AdminTab = "users" | "roi" | "analytics" | "cost" | "funnel" | "health" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections";
+type AdminTab = "users" | "roi" | "analytics" | "cost" | "funnel" | "health" | "report" | "review" | "citizen" | "governance" | "ebook" | "corrections" | "membership";
 const ADMIN_TABS: { key: AdminTab; label: string }[] = [
   { key: "users", label: "👥 회원" },
+  { key: "membership", label: "💳 멤버십 입금" },
   { key: "roi", label: "💎 성과" },
   { key: "analytics", label: "📊 분석" },
   { key: "cost", label: "💰 비용" },
@@ -213,6 +215,7 @@ export default function AdminPage() {
       <div className={tab === "governance" ? "" : "hidden"}><GovernanceSection /></div>
       <div className={tab === "ebook" ? "" : "hidden"}><EbookReviewSection /></div>
       <div className={tab === "corrections" ? "" : "hidden"}><CorrectionsSection /></div>
+      <div className={tab === "membership" ? "" : "hidden"}><MembershipSection /></div>
     </div>
   );
 }

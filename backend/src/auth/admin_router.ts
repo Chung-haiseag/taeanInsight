@@ -27,7 +27,8 @@ adminUsersRouter.get("/", async (c) => {
 const setSchema = z.object({
   id: z.number().int(),
   role: z.enum(["user", "citizen", "reporter", "admin", "superadmin"]).optional(),
-  plan: z.enum(["free", "reader", "business", "org"]).optional(),
+  // member = 9,900원 유료 회원(계좌이체). reader/business/org 는 예전 수동 부여분 — 그대로 둔다.
+  plan: z.enum(["free", "member", "reader", "business", "org"]).optional(),
   displayName: z.string().max(40).optional(), // 이름 수정
 });
 adminUsersRouter.post("/set", async (c) => {

@@ -1,52 +1,42 @@
 "use client";
 
-// 메인 홈 — 사장님(소상공인) 맞춤 홈 게이트
-//  · anonymous (비로그인)        → 일반 홈 + 사장님 브리핑 안내
-//  · preview   (로그인·미구독)   → 사장님 홈 블러 미리보기 + 페이월 업셀
-//  · entitled  (사장님 Pro 구독) → 사장님 맞춤 홈
-// 데모는 mock 상태를 localStorage로 전환(우하단 토글). 실서비스는 /api/addons/me 로 판정.
+// 메인 홈 — 유료 회원 여부로 갈리는 세 화면
+//  · anonymous (비로그인)      → 일반 홈
+//  · preview   (로그인·미결제)  → 사장님 홈 블러 미리보기 + 멤버십 안내
+//  · member    (유료 회원)      → 사장님 맞춤 홈
+//
+//   ⚠ 판정은 서버(`/api/membership/me`)가 한다. 예전엔 localStorage 값과 우하단 데모 토글이
+//     정해서, 프로덕션에서 아무나 '구독' 상태를 켤 수 있었다(2026-08-25 제거).
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Icon } from "@/components/icon";
 import { GenericHome } from "@/components/home/generic-home";
 import { OwnerHome } from "@/components/home/owner-home";
 import { UpsellPaywall } from "@/components/home/upsell-paywall";
-import {
-  MOCK_ADDON,
-  getDemoHomeState,
-  setDemoHomeState,
-  isMockMode,
-  type DemoHomeState,
-} from "@/lib/mock/addons";
+import { MOCK_ADDON } from "@/lib/mock/addons";
+import { useMembership } from "@/lib/use-membership";
 
 export default function HomePage() {
-  const [state, setState] = useState<DemoHomeState | null>(null);
+  // 유료 화면을 열지 말지는 **서버가 정한다**(세션 → /api/membership/me).
+  //   예전엔 localStorage 값이 정해서 아무나 '구독' 상태가 될 수 있었다.
+  const router = useRouter();
+  const { state } = useMembership();
 
-  useEffect(() => {
-    setState(getDemoHomeState());
-  }, []);
-
-  // 초기 렌더(SSR/하이드레이션 전)는 일반 홈 — 하이드레이션 후 상태와 동일하게 4xl로 감싸 폭 점프 방지
-  if (state === null)
+  // 확인 중에는 일반 홈 — 하이드레이션 전후 폭이 같아야 화면이 튀지 않는다.
+  if (state === "loading")
     return (
       <div className="mx-auto max-w-[1200px] space-y-6">
         <GenericHome />
       </div>
     );
 
-  function subscribe() {
-    // 데모: 결제 성공 가정 → 구독 상태로 전환. 실서비스는 subscribeAddon() 호출.
-    setDemoHomeState("entitled");
-    setState("entitled");
-  }
-
   return (
     <>
-      {state === "entitled" && (
+      {state === "member" && (
         <div className="mx-auto max-w-[1200px] space-y-6">
-          <EntitledBanner onCancel={() => { setDemoHomeState("preview"); setState("preview"); }} />
+          <EntitledBanner />
           <OwnerHome />
         </div>
       )}
@@ -54,7 +44,8 @@ export default function HomePage() {
       {state === "preview" && (
         <div className="mx-auto max-w-[1200px] space-y-6">
           <PreviewBanner />
-          <UpsellPaywall product={MOCK_ADDON} onSubscribe={subscribe}>
+          {/* 결제는 멤버십 화면에서 — 예전엔 이 단추가 localStorage를 바꿔 그냥 열렸다. */}
+          <UpsellPaywall product={MOCK_ADDON} onSubscribe={() => router.push("/membership")}>
             <OwnerHome blurred />
           </UpsellPaywall>
         </div>
@@ -66,19 +57,17 @@ export default function HomePage() {
           <GenericHome />
         </div>
       )}
-
-      {isMockMode() && <DemoToggle state={state} onChange={(s) => { setDemoHomeState(s); setState(s); }} />}
     </>
   );
 }
 
-function EntitledBanner({ onCancel }: { onCancel: () => void }) {
+function EntitledBanner() {
   return (
     <div className="flex items-center justify-between gap-3 bg-accent-subtle/40 border border-accent rounded-lg px-4 py-2 text-sm">
-      <span className="text-brand">✅ 사장님 Pro 구독 중 — 매일 맞춤 수요 예측·실행 제안을 받습니다.</span>
-      <button type="button" onClick={onCancel} className="text-xs text-foreground-muted underline hover:text-brand">
-        구독 해지(데모)
-      </button>
+      <span className="text-brand">✅ 멤버십 이용 중 — 맞춤 수요 예측·실행 제안을 받습니다.</span>
+      <Link href="/membership" className="text-xs text-foreground-muted underline hover:text-brand">
+        멤버십 상태
+      </Link>
     </div>
   );
 }
@@ -100,33 +89,6 @@ function AnonymousBanner() {
       <Link href="/me/onboarding" className="font-semibold text-accent hover:underline">
         시작하기 →
       </Link>
-    </div>
-  );
-}
-
-// 데모 전용: 세 상태 전환 토글
-function DemoToggle({ state, onChange }: { state: DemoHomeState; onChange: (s: DemoHomeState) => void }) {
-  const options: { key: DemoHomeState; label: string }[] = [
-    { key: "anonymous", label: "비로그인" },
-    { key: "preview", label: "미구독" },
-    { key: "entitled", label: "구독" },
-  ];
-  return (
-    <div className="fixed bottom-4 right-4 z-50 bg-brand text-background rounded-lg shadow-lg p-2 text-xs">
-      <p className="px-1 pb-1 text-background/70">데모 상태</p>
-      <div className="flex gap-1">
-        {options.map((o) => (
-          <button
-            key={o.key}
-            type="button"
-            onClick={() => onChange(o.key)}
-            aria-pressed={state === o.key}
-            className={`px-2 py-1 rounded ${state === o.key ? "bg-accent text-background" : "bg-background/10 text-background/80"}`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
