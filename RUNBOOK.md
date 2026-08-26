@@ -72,6 +72,9 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-08-26 · **네이버·빙 색인 요청(IndexNow) + 주간 리포트 발행일 표시** · `tools/seo/indexnow.mjs`·`web/public/<key>.txt`·`web/src/lib/report-date.ts`
+  사이트가 검색에 **한 건도 안 잡히던** 문제(실측). 기술 준비는 다 돼 있었고(사이트맵 10만·SSR·구조화 데이터) 새 도메인에 외부 링크가 0이라 검색엔진이 존재를 몰랐다. IndexNow로 **88,352 URL을 직접 제출**(계정 등록 불필요, 키 파일만 루트에 두면 네이버·빙·얀덱스가 함께 받는다). 최신 연도부터 2,000개씩·체크포인트·429 백오프. ⚠ 구글은 IndexNow 미지원 — 서치 콘솔 등록이나 외부 링크가 따로 필요하다. 본지에 붙일 링크 배너 완제품은 `tools/seo/banner-snippets.html`.
+  주간 리포트 '지난 팟캐스트 다시듣기'에 발행일 추가 — '33주차'만으론 언제 것인지 알 수 없었다(publishedAt은 API가 이미 주고 있었다). 날짜는 **한국 시각 고정**(`lib/report-date.ts`) — 브라우저 시간대에 맡기면 출향 자녀가 해외에서 볼 때 하루 어긋난다.
 - 2026-08-25 · **멤버십 실결제(계좌이체) + 가짜 페이월 제거** · `backend/src/membership/plan.ts`·`membership/router.ts`·`web/src/app/membership`·`admin/membership-tab.tsx`·`db/057`
   옛 화면은 요금제 넷을 늘어놓고 '사전 신청'만 받았다 — 실측 **45명이 보고 클릭 0·신청 0**. 하나(월 9,900원)만 권하고 실제 가입되게 바꿨다. 결제는 **계좌이체**(PG 가맹점 계약 없이 오늘 도는 길, 고령 독자에게 카드보다 익숙): 신청 → 입금 안내(계좌·금액·입금자명·신청번호 `TA-2608-A7K3`) → 관리자가 통장 대조 후 '입금 확인' → 그때 등급이 열린다(`/admin` 💳 멤버십 입금 탭). 12개월은 두 달 무료로 길게 유도(이체 횟수를 줄인다).
   ⚠ **가짜 페이월을 걷어냈다**: 홈·기사 페이월이 localStorage(`taean-demo-home-state`)로 열려 있었고 프로덕션에 데모 토글(`NEXT_PUBLIC_USE_MOCK=true`)까지 노출돼 **누구나 결제 없이 유료 화면을 켤 수 있었다**. 판정을 서버(`/api/membership/me` → `isMember`)로 옮기고 만료일까지 본다 — 예전 `plan!=='free'`는 한 번 결제하면 영원히 열렸다. 아카이브 기사는 계속 무료(로그인 문턱만).
