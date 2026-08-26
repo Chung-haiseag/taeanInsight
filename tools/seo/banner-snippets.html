@@ -1,0 +1,109 @@
+<!--
+  본지(taeannews.co.kr)에 붙일 링크 배너 — 복사해서 CMS에 그대로 넣으면 됩니다.
+
+  왜 이게 필요한가 (2026-08-26 실측):
+    · axtaeannews.co.kr 은 검색에 **한 건도 안 잡힙니다.** 본지는 잘 나오는데요.
+    · 기술적 문제가 아닙니다 — 사이트맵 10만 URL·SSR·구조화 데이터가 모두 갖춰져 있습니다.
+      다만 새 도메인이고 **바깥에서 이 주소를 가리키는 링크가 하나도 없어서**,
+      검색엔진이 사이트가 있다는 사실 자체를 모릅니다.
+    · 본지에서 링크 하나만 걸면 두 가지가 동시에 풀립니다 —
+      ① 기존 독자가 곧바로 넘어오고 ② 크롤러가 그 링크를 타고 들어와 색인을 시작합니다.
+
+  ⚠ 링크에 rel="nofollow" 를 붙이지 마세요. 붙이면 ②가 통째로 사라집니다.
+  ⚠ 스타일은 전부 inline 입니다 — 어느 CMS에 넣어도 본지 디자인과 충돌하지 않습니다.
+-->
+<!doctype html>
+<meta charset="utf-8">
+<title>본지 링크 배너 — 복사용</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+         max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; color: #1c2b33; line-height: 1.7; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.15rem; margin-top: 44px; padding-top: 20px; border-top: 2px solid #e6eced; }
+  .note { background: #f4f8f8; border-left: 4px solid #116e7a; padding: 12px 16px; margin: 16px 0; font-size: .95rem; }
+  .preview { border: 1px dashed #b9c9cc; padding: 20px; margin: 14px 0; border-radius: 10px; }
+  .preview::before { content: "미리보기"; display: block; font-size: .75rem; color: #7d9096; margin-bottom: 10px; letter-spacing: .05em; }
+  pre { background: #10222a; color: #dbe9ec; padding: 16px; border-radius: 10px; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+</style>
+
+<h1>본지에 붙일 링크 배너</h1>
+<p>아래 세 가지 중 자리에 맞는 것을 골라 <strong>코드를 그대로 복사</strong>해 넣으시면 됩니다.</p>
+<div class="note">
+  링크에 <code>rel="nofollow"</code>를 붙이지 마세요. 검색엔진이 링크를 따라오지 못해
+  <strong>색인 효과가 사라집니다.</strong> 아래 코드에는 들어 있지 않으니 그대로 쓰시면 됩니다.
+</div>
+
+<h2>① 큰 배너 — 기사 하단·사이드바</h2>
+<p>가장 권합니다. 기사를 다 읽은 독자에게 “더 읽을 것”을 건네는 자리입니다.</p>
+
+<div class="preview">
+<!-- ↓↓↓ 여기부터 복사 ↓↓↓ -->
+<a href="https://axtaeannews.co.kr/news" style="display:block;text-decoration:none;color:inherit;border:2px solid #116e7a;border-radius:14px;padding:22px 24px;background:linear-gradient(135deg,#f2f8f8,#fdf6ef);font-family:inherit;max-width:640px;">
+  <span style="display:block;font-size:.8rem;font-weight:700;letter-spacing:.08em;color:#116e7a;">태안신문 디지털 아카이브</span>
+  <strong style="display:block;font-size:1.45rem;line-height:1.35;margin-top:8px;color:#12333c;">1990년부터의 태안,<br>이제 검색할 수 있습니다</strong>
+  <span style="display:block;margin-top:10px;font-size:1rem;color:#456;">
+    창간호부터 오늘까지 기사 10만 건. 우리 마을 옛 소식도, 그때 그 사람 이름도 한 번에 찾아보세요.
+  </span>
+  <span style="display:inline-block;margin-top:16px;background:#ea6a17;color:#fff;font-weight:700;font-size:1rem;padding:11px 22px;border-radius:999px;">
+    옛 기사 검색하기 →
+  </span>
+</a>
+<!-- ↑↑↑ 여기까지 복사 ↑↑↑ -->
+</div>
+
+<pre>&lt;a href="https://axtaeannews.co.kr/news" style="display:block;text-decoration:none;color:inherit;border:2px solid #116e7a;border-radius:14px;padding:22px 24px;background:linear-gradient(135deg,#f2f8f8,#fdf6ef);font-family:inherit;max-width:640px;"&gt;
+  &lt;span style="display:block;font-size:.8rem;font-weight:700;letter-spacing:.08em;color:#116e7a;"&gt;태안신문 디지털 아카이브&lt;/span&gt;
+  &lt;strong style="display:block;font-size:1.45rem;line-height:1.35;margin-top:8px;color:#12333c;"&gt;1990년부터의 태안,&lt;br&gt;이제 검색할 수 있습니다&lt;/strong&gt;
+  &lt;span style="display:block;margin-top:10px;font-size:1rem;color:#456;"&gt;
+    창간호부터 오늘까지 기사 10만 건. 우리 마을 옛 소식도, 그때 그 사람 이름도 한 번에 찾아보세요.
+  &lt;/span&gt;
+  &lt;span style="display:inline-block;margin-top:16px;background:#ea6a17;color:#fff;font-weight:700;font-size:1rem;padding:11px 22px;border-radius:999px;"&gt;
+    옛 기사 검색하기 →
+  &lt;/span&gt;
+&lt;/a&gt;</pre>
+
+<h2>② 가로 띠 — 머리글·바닥글</h2>
+<p>모든 페이지에 한 줄로 깔 때 씁니다. 자리를 적게 먹으면서 링크는 전 페이지에 생깁니다.</p>
+
+<div class="preview">
+<!-- ↓↓↓ 여기부터 복사 ↓↓↓ -->
+<a href="https://axtaeannews.co.kr" style="display:block;text-decoration:none;background:#116e7a;color:#fff;padding:13px 18px;border-radius:8px;font-family:inherit;font-size:1rem;text-align:center;">
+  📰 <strong>태안신문 디지털 아카이브</strong> — 1990년부터의 기사 10만 건을 검색하고, 옛 지면을 그대로 넘겨보세요
+  <span style="text-decoration:underline;">바로가기 →</span>
+</a>
+<!-- ↑↑↑ 여기까지 복사 ↑↑↑ -->
+</div>
+
+<pre>&lt;a href="https://axtaeannews.co.kr" style="display:block;text-decoration:none;background:#116e7a;color:#fff;padding:13px 18px;border-radius:8px;font-family:inherit;font-size:1rem;text-align:center;"&gt;
+  📰 &lt;strong&gt;태안신문 디지털 아카이브&lt;/strong&gt; — 1990년부터의 기사 10만 건을 검색하고, 옛 지면을 그대로 넘겨보세요
+  &lt;span style="text-decoration:underline;"&gt;바로가기 →&lt;/span&gt;
+&lt;/a&gt;</pre>
+
+<h2>③ 글 속 링크 — 기사 본문에 자연스럽게</h2>
+<p>
+  옛일을 다루는 기사에 한 줄 덧붙이는 방식입니다. 검색엔진은 <strong>본문 안의 링크</strong>를
+  가장 신뢰하므로, 배너보다 색인에는 이쪽이 낫습니다. 관련 있는 기사에만 쓰세요.
+</p>
+
+<div class="preview">
+<!-- ↓↓↓ 여기부터 복사 ↓↓↓ -->
+<p style="font-family:inherit;font-size:1rem;color:#456;border-left:3px solid #ea6a17;padding-left:14px;margin:18px 0;">
+  ※ 이 사안의 지난 기사는 <a href="https://axtaeannews.co.kr/news" style="color:#116e7a;font-weight:700;">태안신문 디지털 아카이브</a>에서
+  1990년치까지 찾아보실 수 있습니다.
+</p>
+<!-- ↑↑↑ 여기까지 복사 ↑↑↑ -->
+</div>
+
+<pre>&lt;p style="font-family:inherit;font-size:1rem;color:#456;border-left:3px solid #ea6a17;padding-left:14px;margin:18px 0;"&gt;
+  ※ 이 사안의 지난 기사는 &lt;a href="https://axtaeannews.co.kr/news" style="color:#116e7a;font-weight:700;"&gt;태안신문 디지털 아카이브&lt;/a&gt;에서
+  1990년치까지 찾아보실 수 있습니다.
+&lt;/p&gt;</pre>
+
+<h2>붙일 만한 다른 주소</h2>
+<p>배너의 <code>href</code>만 바꾸면 됩니다. 호기심을 자극하는 쪽이 클릭을 더 받습니다.</p>
+<ul>
+  <li><code>https://axtaeannews.co.kr/news</code> — 기사 검색(가장 무난)</li>
+  <li><code>https://axtaeannews.co.kr/paper/prices</code> — 옛날 물가표(1997년 전세 1,400만원… 공유가 잘 됩니다)</li>
+  <li><code>https://axtaeannews.co.kr/paper/ads</code> — 옛 지면 광고 2만 건</li>
+  <li><code>https://axtaeannews.co.kr/people</code> — 인물 검색(내 이름·우리 이장님 찾기)</li>
+</ul>
