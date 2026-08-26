@@ -7,13 +7,9 @@ import { useEffect, useState } from "react";
 
 import { WebAudio } from "@/components/web-audio";
 import { listPodcastEpisodes, type PodcastEpisode } from "@/lib/api/reports";
+import { publishedLabel, weekLabel } from "@/lib/report-date";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
-
-function weekLabel(weekId: string): string {
-  const m = weekId.match(/^(\d{4})-W(\d{2})$/);
-  return m ? `${m[1]}년 ${Number(m[2])}주차` : weekId;
-}
 
 export function PodcastEpisodes({ excludeWeekId }: { excludeWeekId?: string } = {}) {
   const [eps, setEps] = useState<PodcastEpisode[] | null>(null);
@@ -34,7 +30,13 @@ export function PodcastEpisodes({ excludeWeekId }: { excludeWeekId?: string } = 
         {list.map((e) => (
           <li key={e.weekId} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-brand">{weekLabel(e.weekId)}</p>
+              {/* 언제 것인지가 먼저다 — '33주차'는 우리가 파일을 가르는 이름이지 독자의 말이 아니다. */}
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-semibold text-brand">{publishedLabel(e.publishedAt) || weekLabel(e.weekId)}</span>
+                {publishedLabel(e.publishedAt) && (
+                  <span className="text-xs text-foreground-muted">{weekLabel(e.weekId)}</span>
+                )}
+              </p>
               {e.summary && <p className="mt-0.5 line-clamp-1 text-xs text-foreground-muted">{e.summary}</p>}
             </div>
             <WebAudio url={`${API_BASE}/api/audio/podcast/${e.weekId}`} event="podcast_archive" variant="inline" />

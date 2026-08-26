@@ -18,6 +18,7 @@ import { PodcastEpisodes } from "@/components/reports/podcast-episodes";
 import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
+import { publishedLabel, weekLabel } from "@/lib/report-date";
 
 // HTML 엔티티 디코딩 (제목에 &#039; 등 그대로 남는 경우 방지)
 function decodeEntities(s: string): string {
@@ -31,10 +32,7 @@ function decodeEntities(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function formatWeek(weekId: string): string {
-  const m = weekId.match(/^(\d{4})-W(\d{2})$/);
-  return m ? `${m[1]}년 ${Number(m[2])}주차` : weekId;
-}
+
 
 // 섹션 키별 아이콘 (시각적 구분)
 const SECTION_ICON: Record<string, ReactNode> = {
@@ -118,7 +116,7 @@ export function ReportReader({
   return (
     <div className="mx-auto max-w-4xl">
       <Masthead
-        weekLabel={formatWeek(report.weekId)}
+        weekLabel={weekLabel(report.weekId)}
         publishedAt={report.publishedAt}
         aiLabel={report.aiLabel}
         gated={report.gated}
@@ -542,7 +540,7 @@ function Masthead({
         <AILabelBadge kind={aiLabel} />
         {publishedAt && (
           <span className="text-foreground-muted">
-            {new Date(publishedAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })} 발행
+            {publishedLabel(publishedAt)} 발행
           </span>
         )}
         {!gated && weekLabel && (
