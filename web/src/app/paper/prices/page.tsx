@@ -5,6 +5,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
+import { CopilotScreen } from "@/components/copilot/copilot-screen";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 export const revalidate = 86400;
@@ -94,6 +95,16 @@ export default async function PricesPage() {
         표의 값은 그 해 광고들의 <strong className="text-brand">중앙값</strong>(딱 가운데 값)입니다.
         연도를 누르면 근거가 된 실제 광고를 볼 수 있습니다.
       </p>
+
+      {/* 코파일럿이 이 표를 근거로 답할 수 있게 값을 건넨다 — 표는 기사 색인에 없다. */}
+      <CopilotScreen text={
+        labels.length === 0 ? null :
+        "옛날 물가표(1990~2001, 태안신문 지면 광고에서 뽑은 금액, 단위 만원).\n" +
+        labels.map((l) =>
+          `${l.label}(${l.total}건): ` +
+          l.series.map((p) => `${p.year}년 중앙값 ${p.med}만원(${p.p25}~${p.p75}만원, 광고 ${p.n}건)`).join(", ")
+        ).join("\n")
+      } />
 
       {labels.length === 0 && <p className="text-sm text-foreground-muted">아직 정리된 시세가 없습니다.</p>}
 

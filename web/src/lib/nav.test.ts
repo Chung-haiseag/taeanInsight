@@ -13,12 +13,14 @@ describe("hasRole (프런트 미러)", () => {
 
 describe("visibleNav — 등급별 메뉴", () => {
   const hrefs = (role: string | null) => visibleNav(role).map((i) => i.href);
-  it("비로그인은 홈/뉴스/실시간/멤버십 계열만(회원 전용 미노출)", () => {
+  it("비로그인도 아카이브·실시간·멤버십·AI 코파일럿까지 본다(회원 전용만 숨김)", () => {
     const v = hrefs(null);
     expect(v).toContain("/live");
     expect(v).toContain("/news");
     expect(v).toContain("/membership");
-    expect(v).not.toContain("/query");
+    // AI 코파일럿은 **일부러 공개**다. 로그인 뒤에 숨겨 놨더니 방문자 대부분이 있는 줄도 몰라
+    //   2026-08-03 이후 사용이 0건이었다. 답변은 Workers AI(무료)라 열어도 비용이 늘지 않는다.
+    expect(v).toContain("/query");
     expect(v).not.toContain("/reports");
     expect(v).not.toContain("/me");
     expect(v).not.toContain("/reporter");

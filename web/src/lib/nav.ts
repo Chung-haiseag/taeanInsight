@@ -22,7 +22,9 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/beaches", label: "해변", minRole: null },
   { href: "/data", label: "지역경제", minRole: null },
   { href: "/membership", label: "멤버십", minRole: null },
-  { href: "/query", label: "질의응답", minRole: "user" },
+  // 코파일럿은 어느 화면에서든 오른쪽 아래 단추로 열린다. 이 메뉴는 '전체 화면'으로 쓰는 길.
+  //   로그인 뒤에 숨겨 놨더니 방문자 대부분이 있는 줄도 몰랐다(2026-08-03 이후 사용 0건) → 공개로 바꾼다.
+  { href: "/query", label: "AI 코파일럿", minRole: null },
   { href: "/reports", label: "주간 리포트", minRole: "user" },
   { href: "/citizen", label: "시민기자", minRole: "citizen" }, // 시민기자 등급부터. 일반회원은 /me에서 신청
   { href: "/me", label: "내 페이지", minRole: "user" },

@@ -20,6 +20,7 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
 });
 import { SiteFooter } from "@/components/site-footer";
+import { Copilot } from "@/components/copilot/copilot";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
 
 export const metadata: Metadata = {
@@ -112,6 +113,8 @@ export default function RootLayout({
             </main>
             <SiteFooter />
           </div>
+          {/* 어느 화면에서든 옆에 열리는 대화창 — 질의응답이 메뉴 뒤에 숨어 죽었던 것을 되살린다. */}
+          <Copilot />
         </AccessibilityProvider>
       </body>
     </html>

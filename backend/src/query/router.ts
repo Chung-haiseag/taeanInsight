@@ -36,6 +36,7 @@ import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
 import { rrfMerge } from "./rrf";
 import { embedText } from "../lib/embed";
+import { needsRewrite, describePath, trimHistory, standaloneFallback, type Turn } from "./copilot_context";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -176,6 +177,17 @@ const querySchema = z.object({
   domain: z.enum(["tourism", "environment", "realestate", "general"]).optional(),
   location: z.string().max(40).optional(),
   userTier: z.enum(["anon", "b2c", "b2b", "b2g"]).optional(),
+  // ── 코파일럿(화면 옆 대화) ──
+  //   보고 있는 화면과 앞선 대화. 둘 다 **이어지는 질문을 되살릴 때만** 쓰고,
+  //   RAG 파이프라인 자체에는 넣지 않는다(회귀 위험 없이 붙이기 위해).
+  path: z.string().max(200).optional(),
+  /** 지금 화면에 실제로 보이는 값 요약. 화면이 직접 준다 — 표·목록은 기사 색인에 없어서
+   *  이게 없으면 "옆에 답이 있는데 모르겠다"고 답한다(2026-08-26 실측). */
+  screen: z.string().max(2000).optional(),
+  history: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    text: z.string().max(2000),
+  })).max(20).optional(),
 });
 
 // 근거 대조 교열 프롬프트 — fp8이 흘린 숫자·글자를 [근거]에서 찾아 복원. 없는 숫자는 지어내지 않음.
@@ -573,6 +585,38 @@ async function streamAnswer(
   });
 }
 
+/**
+ * 이어지는 질문을 '혼자 서는 질문'으로 되살린다.
+ *   작은 모델 한 번이면 되는 일이라 검색·교열과 달리 비용이 거의 없다(Workers AI 무료).
+ *   ⚠ 실패하면 규칙 기반 대비책으로 내려간다 — 코파일럿이 통째로 멈추면 안 된다.
+ */
+async function rewriteStandalone(env: Env, query: string, history: Turn[], screen: string | null): Promise<string> {
+  const fallback = () => standaloneFallback(query, history, screen);
+  if (!env.AI) return fallback();
+  const convo = history.map((t) => `${t.role === "user" ? "사람" : "도우미"}: ${t.text}`).join("\n");
+  const sys =
+    "너는 검색어를 다듬는 도구다. 이어지는 질문을 **앞뒤 맥락 없이도 뜻이 통하는 한 문장**으로 바꿔라.\n" +
+    "규칙: 대명사·지시어를 실제 이름으로 바꾼다. 새로운 사실을 지어내지 않는다. 답하지 말고 질문만 출력한다.";
+  const user =
+    (screen ? `[보고 있는 화면] ${screen}\n` : "") +
+    (convo ? `[앞선 대화]\n${convo}\n` : "") +
+    `[이어지는 질문] ${query}\n\n바뀐 질문 한 문장만 출력:`;
+  try {
+    const client = new WorkersAiLlmClient({ ai: env.AI });
+    const out = await client.complete({
+      messages: [{ role: "system", content: sys }, { role: "user", content: user }],
+      maxTokens: 120,
+      temperature: 0,
+    });
+    // ⚠ 이 클라이언트는 `content`를 준다(`text` 아님). 잘못 읽으면 조용히 대비책으로만 돈다.
+    const text = String(out.content ?? "").trim().split("\n")[0].replace(/^["'\s]+|["'\s]+$/g, "");
+    // 되살린 결과가 비었거나 터무니없이 길면 믿지 않는다.
+    return text.length >= 4 && text.length <= 200 ? text : fallback();
+  } catch {
+    return fallback();
+  }
+}
+
 queryRouter.post("/", async (c) => {
   if (!c.env.AI) {
     return c.json({ error: "ai_unbound", message: "Workers AI 바인딩이 없습니다" }, 503);
@@ -582,7 +626,17 @@ queryRouter.post("/", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", detail: parsed.error.format() }, 400);
   }
-  const { query, domain, location, userTier } = parsed.data;
+  const { domain, location, userTier } = parsed.data;
+
+  // 이어지는 질문 되살리기 — '그 사람 언제부터 나왔어?'를 혼자 서는 질문으로 바꾼 뒤
+  //   기존 경로에 넘긴다. 혼자 서는 질문은 손대지 않는다(원 질문이 망가지고 호출만 는다).
+  const history = trimHistory(parsed.data.history as Turn[] | undefined);
+  const screen = describePath(parsed.data.path);
+  let query = parsed.data.query;
+  const asked = query;
+  if (needsRewrite(query) && (history.length > 0 || screen)) {
+    query = await rewriteStandalone(c.env, query, history, screen);
+  }
 
   // ── ① RAG: 실시간 관측(날씨·대기질) + 태안뉴스·아카이브를 근거로 답변(출처 표기) ──
   const baseClient = new WorkersAiLlmClient({ ai: c.env.AI });
@@ -600,6 +654,14 @@ queryRouter.post("/", async (c) => {
   const tStart = Date.now();
   try {
     const parts: Array<{ text: string; source: { title: string; url: string | null; publishedAt?: string; kind?: string } }> = [];
+    // 화면이 보내 준 값을 **첫 근거**로 넣는다 — 사용자가 눈으로 보고 있는 것이라
+    //   기사 검색 결과보다 앞선다. 없으면 아무 일도 하지 않는다.
+    if (parsed.data.screen) {
+      parts.push({
+        text: parsed.data.screen,
+        source: { title: screen ? `지금 보는 화면 — ${screen}` : "지금 보는 화면", url: null, kind: "screen" },
+      });
+    }
     const recommend = RECOMMEND_RE.test(query); // 추천 질문 → 오늘 날씨·바다·행사·수요 종합
     // 타지역만 언급(태안 용어 없음) → 태안 실시간 데이터 주입 차단(강남 날씨에 태안값 오표기 방지)
     const offRegion = OTHER_REGION_RE.test(query) && !AREA_RE.test(query);
@@ -713,6 +775,9 @@ queryRouter.post("/", async (c) => {
         llmCalls,
         sources,
         model: client.model,
+        // 이어지는 질문을 되살렸으면 무엇으로 이해했는지 함께 돌려준다 —
+        //   엉뚱하게 이해했을 때 사람이 바로 알아채야 한다.
+        ...(query !== asked ? { rewritten: query } : {}),
         ...(personBrief ? { personBrief } : {}),
         // RAG 투명성 — ?debug=1 또는 evidence=1이면 LLM에 넣은 근거 원문을 그대로 노출
         ...(c.req.query("debug") === "1" || c.req.query("evidence") === "1"
@@ -756,6 +821,7 @@ queryRouter.post("/", async (c) => {
       llmCalls: result.llmCalls ?? 0,
       sources: result.sources ?? [],
       model: (result.metadata?.generationModel ?? result.metadata?.predictionModel ?? client.model) as string,
+      ...(query !== asked ? { rewritten: query } : {}),
     });
   } catch (e) {
     return c.json(

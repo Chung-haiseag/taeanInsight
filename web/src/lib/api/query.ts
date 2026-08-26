@@ -23,6 +23,8 @@ export interface QueryResult {
   model: string;
   evidence?: QueryEvidence[];
   personBrief?: QueryPersonBrief;
+  /** 이어지는 질문을 이렇게 이해했다 — 엉뚱하면 사람이 바로 알아채라고 함께 준다. */
+  rewritten?: string;
 }
 
 export interface AskQueryInput {
@@ -30,6 +32,12 @@ export interface AskQueryInput {
   domain?: QueryDomain;
   location?: string;
   userTier?: "anon" | "b2c" | "b2b" | "b2g";
+  /** 지금 보는 화면 주소 — 이어지는 질문('이 목록에서…')을 되살릴 때 쓴다. */
+  path?: string;
+  /** 앞선 대화. 서버가 최근 몇 마디만 쓴다. */
+  history?: Array<{ role: "user" | "assistant"; text: string }>;
+  /** 지금 화면에 보이는 값 요약 — 표·목록은 기사 색인에 없어 화면이 직접 줘야 한다. */
+  screen?: string;
 }
 
 export async function askQuery(input: AskQueryInput): Promise<QueryResult> {
