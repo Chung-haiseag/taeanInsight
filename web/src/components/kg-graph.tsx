@@ -46,7 +46,8 @@ export default function KgGraph({
   const clickRef = useRef(onNodeClick);
   clickRef.current = onNodeClick;
   const [level, setLevel] = useState(1);        // 0 핵심 · 1 기본 · 2 넓게
-  const [zoom, setZoom] = useState(1);
+  // 확대·초기화 손잡이 — 배율을 리액트 상태로 두면 누를 때마다 배치가 처음부터 다시 돈다.
+  const ctrl = useRef<{ zoomIn: () => void; zoomOut: () => void; reset: () => void } | null>(null);
 
   // 밀도에 따라 **주변 인물 수**를 자른다. 중심과 기관·행사 같은 비인물 노드는 늘 남긴다
   //   (몇 개 안 되고, 그것이 이 사람이 어디 속했는지를 말해주는 정보다).
@@ -79,7 +80,12 @@ export default function KgGraph({
     // 표시 변환 — 물리는 자연 좌표에서 안정적으로 두고, 그릴 때만 캔버스에 꽉 차게 확대(축소 금지→겹침 없음).
     let T = { cx: 0, cy: 0, sx: 1, sy: 1 };
     // 호버 상호작용 — 커서(자연 좌표) 근처 노드를 살짝 밀고, 벗어나면 홈으로 스프링백.
-    let mouse: { x: number; y: number } | null = null, hoverRaf = 0, homesReady = false, fitFrozen = false;
+    let settleRaf = 0, fitFrozen = false;
+    // 끌기·옮기기 상태 — 화면 좌표(pan)와 자연 좌표(dragTarget)를 나눠 둔다.
+    let dragging: Node | null = null, dragTarget = { x: 0, y: 0 };
+    let panning = false, panFrom = { x: 0, y: 0 }, pan = { x: 0, y: 0 };
+    let downAt: { x: number; y: number } | null = null, moved = false;
+    let userZoom = 1;
     let s = 7; const rand = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     function theme() { const a = document.documentElement.getAttribute("data-theme"); if (a === "dark" || a === "light") return a; return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
         // ⚠ 선은 **뒤로 물러나야** 한다. 예전엔 회색 선이 굵고 진해서(alpha .28 · 최대 5px)
@@ -106,9 +112,10 @@ export default function KgGraph({
       for (const n of ns) { mdx = Math.max(mdx, Math.abs(n.x - cx) + n.r); mdy = Math.max(mdy, Math.abs(n.y - cy) + n.r); }
       let sx = Math.max(1, (W / 2 - pad) / mdx), sy = Math.max(1, (H / 2 - pad) / mdy);
       const lo = Math.min(sx, sy); sx = Math.min(sx, lo * 1.7); sy = Math.min(sy, lo * 1.7);
-      T = { cx, cy, sx: sx * zoom, sy: sy * zoom };
+      T = { cx, cy, sx: sx * userZoom, sy: sy * userZoom };
     }
-    const PX = (n: Node) => T.cx + (n.x - T.cx) * T.sx, PY = (n: Node) => T.cy + (n.y - T.cy) * T.sy;
+    // 화면 좌표 = 배율 적용 + 끌어 옮긴 만큼(pan) 이동.
+    const PX = (n: Node) => T.cx + (n.x - T.cx) * T.sx + pan.x, PY = (n: Node) => T.cy + (n.y - T.cy) * T.sy + pan.y;
     function tick(al: number) {
       const cx = W / 2, cy = H / 2;
       const fx: number[] = new Array(ns.length).fill(0), fy: number[] = new Array(ns.length).fill(0);
@@ -170,14 +177,19 @@ export default function KgGraph({
         if (n.center) { ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 6, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 3; ctx!.stroke(); }
         else if (n.id === selected) { ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 5, 0, Math.PI * 2); ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2.5; ctx!.stroke(); }
         // 모두 원으로 그리고 **색으로** 종류를 말한다(네모/동그라미로 나누면 두 가지를 동시에 읽어야 한다).
+        //   바탕색 테두리를 둘러 노드끼리 겹치거나 선 위에 얹혀도 낱개로 또렷하게 읽힌다.
         ctx!.beginPath(); ctx!.arc(nx, ny, n.r, 0, Math.PI * 2);
         ctx!.fillStyle = n.center ? P.nodeC : colorOf(n.kind); ctx!.fill();
-        if (n.id === hovered && !dim) { ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2; ctx!.stroke(); }
+        ctx!.lineWidth = 2; ctx!.strokeStyle = P.bg; ctx!.stroke();
+        if (n.id === hovered && !dim) {
+          ctx!.beginPath(); ctx!.arc(nx, ny, n.r + 3.5, 0, Math.PI * 2);
+          ctx!.strokeStyle = P.ring; ctx!.lineWidth = 2; ctx!.stroke();
+        }
       }
       // 라벨
       ctx!.globalAlpha = 1; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
       for (const n of ns) { const show = n.center || n.kind === "org" || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
-        ctx!.font = (n.center ? "800 13px " : n.id === selected ? "700 12px " : "600 12px ") + FONT; const ly = PY(n) + n.r + 11;
+        ctx!.font = (n.center ? "800 13px " : (n.id === selected || n.id === hovered) ? "700 12px " : "600 12px ") + FONT; const ly = PY(n) + n.r + 11;
         // 이모지를 붙이지 않는다 — 색이 이미 종류를 말하고, 이모지는 이름을 밀어낸다.
         ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(n.name, PX(n), ly);
         ctx!.fillStyle = n.center || !n.kind || n.kind === "person" ? P.label : colorOf(n.kind);
@@ -185,39 +197,39 @@ export default function KgGraph({
       }
     }
     function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
-    function setHomes() { for (const n of ns) { n.hx = n.x; n.hy = n.y; } homesReady = true; }
+    function setHomes() { for (const n of ns) { n.hx = n.x; n.hy = n.y; } }
     function layout() { if (raf) cancelAnimationFrame(raf); if (reduce) { alpha = 1; for (let i = 0; i < 420; i++) { alpha *= 0.985; tick(Math.max(alpha, 0.02)); } setHomes(); draw(); return; } alpha = 1; const frame = () => { alpha *= 0.985; tick(Math.max(alpha, 0.02)); draw(); if (alpha > 0.03) raf = requestAnimationFrame(frame); else { setHomes(); draw(); } }; frame(); }
     // 캔버스(표시) 좌표 → 자연(물리) 좌표
-    function toNatural(mx: number, my: number) { return { x: T.cx + (mx - T.cx) / (T.sx || 1), y: T.cy + (my - T.cy) / (T.sy || 1) }; }
-    // 호버 물리: 커서 반발 + 홈 스프링백. 커서 벗어나고 다 돌아오면 자동 정지.
-    function hoverTick() {
-      const R = 55, damp = 0.72, homeK = 0.10; let moving = false;
-      // 커서에 '홈'이 가장 가까운 노드 = 지금 겨냥 중인 노드 → 항상 고정(클릭 대상). 홈 기준이라 흔들림 없음.
-      let near: Node | null = null, nd = Infinity;
-      if (mouse) for (const n of ns) { if (n.center) continue; const dx = n.hx - mouse.x, dy = n.hy - mouse.y, dd = dx * dx + dy * dy; if (dd < nd) { nd = dd; near = n; } }
-      for (const n of ns) {
-        if (n.center) { n.x = T.cx; n.y = T.cy; continue; }              // 중심 고정
-        const hold = n === near;                                         // 겨냥 노드는 밀지 않고 빠르게 홈 고정
-        const hk = hold ? 0.35 : homeK;
-        let fx = (n.hx - n.x) * hk, fy = (n.hy - n.y) * hk;              // 홈 복귀
-        if (mouse && !hold) {                                            // 나머지만 커서 반발(비켜줌)
-          const dx = n.x - mouse.x, dy = n.y - mouse.y, d2 = dx * dx + dy * dy;
-          if (d2 < R * R) { const d = Math.sqrt(d2) || 0.01, push = 2.6 * (1 - d / R); fx += (dx / d) * push; fy += (dy / d) * push; }
-        }
-        n.vx = (n.vx + fx) * damp; n.vy = (n.vy + fy) * damp;
-        n.x += n.vx; n.y += n.vy;
-        if (Math.abs(n.x - n.hx) > 0.3 || Math.abs(n.y - n.hy) > 0.3 || Math.abs(n.vx) > 0.3 || Math.abs(n.vy) > 0.3) moving = true;
-      }
-      draw();
-      if (mouse || moving) hoverRaf = requestAnimationFrame(hoverTick);
-      else { hoverRaf = 0; fitFrozen = false; draw(); }                  // 정착 완료 → 배율 동결 해제
+    function toNatural(mx: number, my: number) { return { x: T.cx + (mx - pan.x - T.cx) / (T.sx || 1), y: T.cy + (my - pan.y - T.cy) / (T.sy || 1) }; }
+    // ── 손으로 만지는 그래프 ─────────────────────────────────────────────
+    //
+    //   예전엔 커서만 올려도 주변 노드가 밀려났다 스프링백했다. 재미는 있었지만
+    //   화면이 늘 흔들려 차분해 보이지 않았고, 정작 **끌어 옮길 수는 없었다**.
+    //   흔들림을 걷어내고 세 가지를 넣는다 — 노드 끌기 · 바탕 끌어 옮기기(패닝) · 휠 확대.
+    //
+    //   ⚠ 끌면 클릭이 아니다. 조금이라도 끈 뒤 손을 떼면 인물 이동을 하지 않는다
+    //     (안 그러면 그래프를 옮길 때마다 엉뚱한 사람으로 넘어간다).
+
+    /** 끌기 중 주변만 살짝 자리를 내주도록 몇 번 돌리는 완화 루프. */
+    function settle() {
+      if (settleRaf) return;
+      const step = () => {
+        settleRaf = 0;
+        tick(0.35);
+        if (dragging) { dragging.x = dragTarget.x; dragging.y = dragTarget.y; dragging.vx = dragging.vy = 0; }
+        draw();
+        if (dragging) settleRaf = requestAnimationFrame(step);
+        else { for (const n of ns) { n.hx = n.x; n.hy = n.y; } }   // 놓은 자리를 새 홈으로
+      };
+      settleRaf = requestAnimationFrame(step);
     }
+
     // 히트: 원(반경+여유) 또는 이름 라벨 영역(원 아래). 이름 글자를 클릭해도 이동되게.
     function pick(mx: number, my: number) {
       let best: string | null = null, bd = 1e9;
       for (const n of ns) {
         const px = PX(n), py = PY(n), d = Math.hypot(mx - px, my - py);
-        const labelHalf = Math.max(28, n.name.length * 8);   // 대략 라벨 폭 절반
+        const labelHalf = Math.max(28, n.name.length * 8);
         const onCircle = d < n.r + 6;
         const onLabel = Math.abs(mx - px) < labelHalf && my > py + n.r - 2 && my < py + n.r + 22;
         if ((onCircle || onLabel) && d < bd) { bd = d; best = n.id; }
@@ -225,23 +237,83 @@ export default function KgGraph({
       return best;
     }
     function rel(ev: PointerEvent) { const r = cv!.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
-    const onDown = (ev: PointerEvent) => { const p = rel(ev); const n = pick(p.x, p.y); selected = n && n === selected ? null : n; draw(); if (n && clickRef.current && byId[n]?.kind !== "org") clickRef.current(n); };
-    const onMove = (ev: PointerEvent) => {
-      if (ev.pointerType === "touch") return;
-      const p = rel(ev); const n = pick(p.x, p.y); cv!.style.cursor = n ? "pointer" : "default";
-      const hchg = n !== hovered; hovered = n;
-      if (homesReady && !reduce) { fitFrozen = true; mouse = toNatural(p.x, p.y); if (!hoverRaf) hoverRaf = requestAnimationFrame(hoverTick); } // 배율 동결 후 커서 반발(호버 잔움직임)
-      else if (hchg) draw();
+
+    const onDown = (ev: PointerEvent) => {
+      const p = rel(ev);
+      downAt = p; moved = false;
+      const id = pick(p.x, p.y);
+      cv!.setPointerCapture(ev.pointerId);
+      if (id) {
+        // 노드 끌기 — 중심 인물도 끌 수 있게 한다(고정돼 있으면 옮길 수 없어 답답하다).
+        dragging = byId[id]; dragTarget = toNatural(p.x, p.y);
+        fitFrozen = true; cv!.style.cursor = "grabbing"; settle();
+      } else {
+        panning = true; panFrom = { x: p.x - pan.x, y: p.y - pan.y };
+        fitFrozen = true; cv!.style.cursor = "grabbing";
+      }
     };
-    const onLeave = () => { hovered = null; mouse = null; if (!hoverRaf) draw(); }; // 커서 나감 → 홈으로 스프링백 후 정지
-    cv.addEventListener("pointerdown", onDown); cv.addEventListener("pointermove", onMove); cv.addEventListener("pointerleave", onLeave);
+
+    const onMove = (ev: PointerEvent) => {
+      const p = rel(ev);
+      if (downAt && (Math.abs(p.x - downAt.x) > 3 || Math.abs(p.y - downAt.y) > 3)) moved = true;
+      if (dragging) { dragTarget = toNatural(p.x, p.y); return; }
+      if (panning) { pan = { x: p.x - panFrom.x, y: p.y - panFrom.y }; draw(); return; }
+      if (ev.pointerType === "touch") return;
+      const id = pick(p.x, p.y);
+      cv!.style.cursor = id ? "pointer" : "grab";
+      if (id !== hovered) { hovered = id; draw(); }   // 흔들지 않고 강조만 바꾼다
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      const p = rel(ev);
+      const wasDrag = moved;
+      if (dragging) { dragging = null; }
+      panning = false;
+      downAt = null;
+      cv!.style.cursor = "grab";
+      try { cv!.releasePointerCapture(ev.pointerId); } catch { /* 이미 놓였으면 무시 */ }
+      if (wasDrag) { draw(); return; }               // 끈 것은 클릭이 아니다
+      const id = pick(p.x, p.y);
+      selected = id && id === selected ? null : id;
+      draw();
+      if (id && clickRef.current && byId[id]?.kind !== "org") clickRef.current(id);
+    };
+
+    const onLeave = () => { if (!dragging && !panning) { hovered = null; draw(); } };
+
+    // 휠 확대 — 커서를 기준으로 늘리고 줄인다(화면 밖으로 튀지 않게).
+    const onWheel = (ev: WheelEvent) => {
+      ev.preventDefault();
+      const before = userZoom;
+      userZoom = Math.max(1, Math.min(3, userZoom * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      if (userZoom === before) return;
+      fitFrozen = false; computeFit(); fitFrozen = true; draw();
+    };
+
+    // 바깥(＋ − 리셋)에서 부르는 손잡이 — 배율을 리액트 상태로 두면 누를 때마다 배치가 다시 돈다.
+    ctrl.current = {
+      zoomIn: () => { userZoom = Math.min(3, userZoom * 1.25); fitFrozen = false; computeFit(); fitFrozen = true; draw(); },
+      zoomOut: () => { userZoom = Math.max(1, userZoom / 1.25); fitFrozen = false; computeFit(); fitFrozen = true; draw(); },
+      reset: () => { userZoom = 1; pan = { x: 0, y: 0 }; fitFrozen = false; seed(); layout(); },
+    };
+
+    cv.style.cursor = "grab";
+    cv.addEventListener("pointerdown", onDown); cv.addEventListener("pointermove", onMove);
+    cv.addEventListener("pointerup", onUp); cv.addEventListener("pointercancel", onUp);
+    cv.addEventListener("pointerleave", onLeave); cv.addEventListener("wheel", onWheel, { passive: false });
     const onResize = () => resize();
     window.addEventListener("resize", onResize);
     const mq = window.matchMedia("(prefers-color-scheme: dark)"); const onTheme = () => draw(); mq.addEventListener("change", onTheme);
     const mo = new MutationObserver(() => draw()); mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     raf = requestAnimationFrame(resize);
-    return () => { if (raf) cancelAnimationFrame(raf); if (hoverRaf) cancelAnimationFrame(hoverRaf); cv.removeEventListener("pointerdown", onDown); cv.removeEventListener("pointermove", onMove); cv.removeEventListener("pointerleave", onLeave); window.removeEventListener("resize", onResize); mq.removeEventListener("change", onTheme); mo.disconnect(); };
-  }, [view, centerId, zoom]);
+    return () => {
+      if (raf) cancelAnimationFrame(raf); if (settleRaf) cancelAnimationFrame(settleRaf);
+      cv.removeEventListener("pointerdown", onDown); cv.removeEventListener("pointermove", onMove);
+      cv.removeEventListener("pointerup", onUp); cv.removeEventListener("pointercancel", onUp);
+      cv.removeEventListener("pointerleave", onLeave); cv.removeEventListener("wheel", onWheel);
+      window.removeEventListener("resize", onResize); mq.removeEventListener("change", onTheme); mo.disconnect();
+    };
+  }, [view, centerId]);
 
   const btn = "rounded px-2.5 py-1 text-xs font-semibold transition";
   const shown = view.nodes.length, total = nodes.length;
@@ -262,11 +334,11 @@ export default function KgGraph({
           그린 노드 {shown}{total > shown && <> · 전체 {total}</>}
         </span>
         <span className="ml-auto inline-flex gap-1">
-          <button type="button" aria-label="확대" onClick={() => setZoom((z) => Math.min(2.5, z * 1.25))}
+          <button type="button" aria-label="확대" onClick={() => ctrl.current?.zoomIn()}
             className={`${btn} border border-brand/20 text-brand hover:bg-brand/5`}>+</button>
-          <button type="button" aria-label="축소" onClick={() => setZoom((z) => Math.max(1, z / 1.25))}
+          <button type="button" aria-label="축소" onClick={() => ctrl.current?.zoomOut()}
             className={`${btn} border border-brand/20 text-brand hover:bg-brand/5`}>−</button>
-          <button type="button" onClick={() => { setZoom(1); setLevel(1); }}
+          <button type="button" onClick={() => { ctrl.current?.reset(); setLevel(1); }}
             className={`${btn} border border-brand/20 text-foreground-muted hover:bg-brand/5`}>리셋</button>
         </span>
       </div>
