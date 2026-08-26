@@ -16,3 +16,13 @@ export const getPersonBriefPublic = (id: string) =>
 
 // 공개 여부(페이지·네비가 확인)
 export const getKgStatus = () => apiFetch<{ enabled: boolean }>("/api/kg/status");
+
+/** 첫 화면용 인물 후보(등장 많고 바이라인이 아닌 사람). 하루 캐시라 가볍다. */
+export async function getFeaturedPersons(): Promise<PersonSearchResult[]> {
+  try {
+    const r = await apiFetch<{ results?: PersonSearchResult[] }>("/api/kg/persons/featured");
+    return r.results ?? [];
+  } catch {
+    return [];
+  }
+}

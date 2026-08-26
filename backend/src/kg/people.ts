@@ -344,3 +344,22 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     topics,
   };
 }
+
+/**
+ * 첫 화면에 띄울 인물 후보 — 등장 많고 바이라인(기자)이 아닌 사람들.
+ *
+ *   왜: 인물 화면에 들어오면 빈 검색창만 있었다. 무엇을 칠지 모르는 사람은 거기서 되돌아간다.
+ *     들어오자마자 관계망 하나를 보여주면 '이런 걸 볼 수 있구나'가 바로 전해진다(당진 사례).
+ *   ⚠ 바이라인 허브(기자 이름)는 뺀다 — 등장수는 압도적이지만 관계망이 '그 기자가 쓴 기사 전부'라
+ *     인물 관계로는 뜻이 없다.
+ */
+export async function featuredPersons(db: D1Database, limit = 24): Promise<PersonHit[]> {
+  const lim = Math.min(Math.max(1, Math.floor(limit) || 24), 60);
+  const r = await db.prepare(
+    "SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+    "FROM kg_nodes n WHERE n.type='person' AND length(n.name) >= 2 " +
+    "ORDER BY mentions DESC LIMIT ?",
+  ).bind(lim * 3).all<PersonHit>();
+  const hubs = await loadHubIds(db);
+  return (r.results ?? []).filter((x) => !hubs.has(x.id)).slice(0, lim);
+}

@@ -73,6 +73,16 @@ kgPublicRouter.get("/persons/search", async (c) => {
 
 // 인물 프로필 — 관계망(바이라인 제외)·함께등장·나온 기사·시기별 등장·직위(verified).
 //   6개 병렬 D1 + 에고그래프라 매 요청 ~1s → 엣지캐시(15분)로 인기·재조회는 즉시. 새 기사(일 크론)는 15분 내 반영.
+// 첫 화면용 인물 후보 — 프런트가 이 중 하나를 무작위로 골라 관계망을 띄운다.
+//   목록을 통째로 주므로 '다른 인물 보기'를 눌러도 다시 부르지 않는다.
+kgPublicRouter.get("/persons/featured", async (c) => {
+  if (!c.env.ARCHIVE_DB || !(await isOn(c))) return c.json({ results: [], disabled: true });
+  const { featuredPersons } = await import("./people");
+  const res = c.json({ results: await featuredPersons(c.env.ARCHIVE_DB, 24) });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");   // 하루 한 번이면 충분하다
+  return res;
+});
+
 kgPublicRouter.get("/person/:id/profile", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);

@@ -9,7 +9,7 @@ import Link from "next/link";
 
 import KgGraph from "@/components/kg-graph";
 import { PageHeader } from "@/components/page-header";
-import { searchPersonsPublic, getPersonProfilePublic, getPersonBriefPublic, getKgStatus, type WikiSummary } from "@/lib/api/kg-public";
+import { searchPersonsPublic, getPersonProfilePublic, getPersonBriefPublic, getKgStatus, getFeaturedPersons, type WikiSummary } from "@/lib/api/kg-public";
 import { API_BASE_URL } from "@/lib/api/client";
 import type { PersonSearchResult, PersonProfile } from "@/lib/api/kg";
 
@@ -20,7 +20,31 @@ export default function PeoplePage() {
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  // 첫 화면에 띄울 인물 후보 — 빈 검색창만 있으면 무엇을 칠지 모르는 사람은 되돌아간다.
+  //   들어오자마자 관계망 하나를 보여줘 '이런 걸 볼 수 있구나'를 먼저 전한다.
+  const [featured, setFeatured] = useState<PersonSearchResult[]>([]);
   useEffect(() => { getKgStatus().then((s) => setEnabled(s.enabled)).catch(() => setEnabled(true)); }, []);
+
+  // 처음 들어왔을 때 한 번만 — 검색·조회를 이미 했다면 건드리지 않는다.
+  useEffect(() => {
+    if (enabled === false) return;
+    let alive = true;
+    getFeaturedPersons().then((list) => {
+      if (!alive || !list.length) return;
+      setFeatured(list);
+      // 올 때마다 다른 사람이 보이게 무작위로 고른다.
+      void openId(list[Math.floor(Math.random() * list.length)].id, false);
+    });
+    return () => { alive = false; };
+    // enabled가 정해진 뒤 한 번만 돈다(검색 상태를 의존성에 넣으면 검색할 때마다 덮어쓴다).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled]);
+
+  function shuffle() {
+    if (!featured.length) return;
+    const pick = featured[Math.floor(Math.random() * featured.length)];
+    void openId(pick.id, true);
+  }
 
   async function search(e?: FormEvent) {
     e?.preventDefault();
@@ -38,17 +62,19 @@ export default function PeoplePage() {
     }
   }
 
-  async function open(id: string) {
+  async function openId(id: string, scroll: boolean) {
     setBusy(true);
     try {
       setProf(await getPersonProfilePublic(id));
-      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+      // 첫 진입에는 스크롤하지 않는다 — 사용자가 아직 아무것도 안 눌렀는데 화면이 움직이면 놀란다.
+      if (scroll && typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setProf(null);
     } finally {
       setBusy(false);
     }
   }
+  const open = (id: string) => openId(id, true);
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-6">
@@ -167,7 +193,7 @@ export default function PeoplePage() {
             </section>
           )}
 
-          {prof.graph.nodes.length > 0 && <RelationGraph prof={prof} onOpen={open} />}
+          {prof.graph.nodes.length > 0 && <RelationGraph prof={prof} onOpen={open} onShuffle={shuffle} />}
 
           {prof.coappear.length > 0 && (
             <section className="rounded-lg border border-brand/15 bg-background p-4">
@@ -398,7 +424,7 @@ const REL_LEGEND: Record<string, string> = {
 };
 // 미검수(AI 추정)라도 그래프에 노출을 허용하는 '저위험' 관계 유형. 민감한 대립·갈등·가족·인척은 검수된 것만.
 const SAFE_UNVERIFIED = new Set(["협력·동료", "전임·후임", "소속·상하"]);
-function RelationGraph({ prof, onOpen }: { prof: PersonProfile; onOpen: (id: string) => void }) {
+function RelationGraph({ prof, onOpen, onShuffle }: { prof: PersonProfile; onOpen: (id: string) => void; onShuffle: () => void }) {
   const centerId = prof.graph.center?.id;
   // 중심↔이웃: coappear가 verified를 담고 있어 정책 정확 적용 — 검수(전 유형)=실선, 미검수라도 안전 유형=점선(AI 추정).
   const centerRel = new Map(
@@ -418,7 +444,14 @@ function RelationGraph({ prof, onOpen }: { prof: PersonProfile; onOpen: (id: str
   const hasVerified = edges.some((e) => e.reltype && !e.estimated);
   return (
     <section className="rounded-lg border border-brand/15 bg-background p-2">
-      <p className="px-2 pt-1 text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(<strong>원·이름 클릭 시 그 사람으로 이동</strong>). 바이라인 제외.</p>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
+        <p className="text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(<strong>원·이름 클릭 시 그 사람으로 이동</strong>). 바이라인 제외.</p>
+        {/* 처음 들어온 사람이 '다음 것'을 볼 수 있게 — 검색어를 떠올리지 못해도 계속 둘러볼 수 있다. */}
+        <button type="button" onClick={onShuffle}
+          className="shrink-0 rounded-full border border-brand/25 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/5">
+          🔀 다른 인물 보기
+        </button>
+      </div>
       <KgGraph nodes={prof.graph.nodes} edges={edges} centerId={centerId} onNodeClick={onOpen} height={640} />
       {usedRels.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 pb-1 pt-1 text-[0.6875rem]">
