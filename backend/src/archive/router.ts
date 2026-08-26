@@ -136,10 +136,29 @@ const ON_THIS_DAY_MAJOR = `(
   AND title NOT GLOB '[0-9][0-9][0-9][0-9]*면'   -- 'YYYY... NN면' 제목 누락 아티팩트 제외
 )`;
 
-// 아카이브 전체 통계 — 총 건수·연도 범위·카테고리별 건수(엣지 1시간 캐시).
+/**
+ * 아카이브 전체 통계 — 총 건수·연도 범위·카테고리별 건수.
+ *
+ *   ⚠ **반드시 캐시해서 낸다.** 이 두 질의는 표 전체를 훑는다(실측 2026-08-27: 110,276행 + 88,304행).
+ *     홈 화면이 방문마다 부르고 있어서 D1 읽기가 하루 2억 2,665만 행까지 올라갔다 —
+ *     방문자 수십 명인 사이트에서 나올 수치가 아니고, 검색 크롤러가 붙으면 그대로 요금이 된다.
+ *     `cache-control: max-age`는 **브라우저용**이라 엣지·D1을 지켜주지 못한다(그래서 안 막혔다).
+ *     기사 수는 하루 한 번 수집 때만 바뀌므로 6시간이면 충분하다.
+ */
+const STATS_TTL_MS = 6 * 3600_000;
+
 archiveRouter.get("/stats", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ total: 0, minYear: null, maxYear: null, categories: {} });
+
+  const cached = await db.prepare("SELECT v, ts FROM kv_cache WHERE k='archive_stats'")
+    .first<{ v: string; ts: number }>().catch(() => null);
+  if (cached && Date.now() - Number(cached.ts) < STATS_TTL_MS) {
+    return new Response(cached.v, {
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=3600, s-maxage=21600" },
+    });
+  }
+
   try {
     const [agg, cats] = await Promise.all([
       db
@@ -149,16 +168,25 @@ archiveRouter.get("/stats", async (c) => {
         .prepare("SELECT category, COUNT(*) AS n FROM archive_articles WHERE category IS NOT NULL AND COALESCE(is_ad,0)=0 GROUP BY category")
         .all<{ category: string; n: number }>(),
     ]);
-    return c.json(
-      {
-        total: agg?.total ?? 0,
-        minYear: agg?.minYear ?? null,
-        maxYear: agg?.maxYear ?? null,
-        categories: toCategoryCounts(cats.results ?? []),
-      },
-      { headers: { "cache-control": "public, max-age=3600" } },
+    const body = JSON.stringify({
+      total: agg?.total ?? 0,
+      minYear: agg?.minYear ?? null,
+      maxYear: agg?.maxYear ?? null,
+      categories: toCategoryCounts(cats.results ?? []),
+    });
+    // 다음 요청부터는 표를 훑지 않는다. 저장 실패해도 응답은 그대로 낸다.
+    c.executionCtx.waitUntil(
+      db.prepare("INSERT INTO kv_cache (k,v,ts) VALUES ('archive_stats',?1,?2) ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts")
+        .bind(body, Date.now()).run().then(() => {}).catch(() => {}),
     );
+    return new Response(body, {
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=3600, s-maxage=21600" },
+    });
   } catch {
+    // 옛 캐시라도 있으면 그것을 낸다 — 0건으로 보이면 화면이 "아카이브 없음"처럼 보인다.
+    if (cached) {
+      return new Response(cached.v, { headers: { "content-type": "application/json; charset=utf-8" } });
+    }
     return c.json({ total: 0, minYear: null, maxYear: null, categories: {} });
   }
 });
