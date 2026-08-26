@@ -127,7 +127,7 @@ export function ReportReader({
       </div>
 
       <div className="mt-6 space-y-4">
-        <PodcastAudio weekId={report.weekId} />
+        <PodcastAudio weekId={report.weekId} publishedAt={report.publishedAt} />
         <PodcastEpisodes excludeWeekId={report.weekId} />
       </div>
 
