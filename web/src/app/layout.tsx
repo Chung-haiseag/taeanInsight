@@ -20,7 +20,6 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
 });
 import { SiteFooter } from "@/components/site-footer";
-import { Copilot } from "@/components/copilot/copilot";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
 
 export const metadata: Metadata = {
@@ -113,8 +112,10 @@ export default function RootLayout({
             </main>
             <SiteFooter />
           </div>
-          {/* 어느 화면에서든 옆에 열리는 대화창 — 질의응답이 메뉴 뒤에 숨어 죽었던 것을 되살린다. */}
-          <Copilot />
+          {/* AI 코파일럿(화면 옆 대화창)은 **꺼 둔다**(2026-08-27, 사용자 판단).
+              되살리려면 이 자리에 <Copilot /> 한 줄을 다시 넣으면 된다 —
+              컴포넌트(components/copilot/)와 서버 쪽(문맥·대화 이어짐·근거 판정)은 그대로 살아 있다.
+              AI 질의응답 자체는 /query 전체 화면으로 남아 있고, 홈 히어로의 '무엇이든 질문하기'가 그리로 간다. */}
         </AccessibilityProvider>
       </body>
     </html>
