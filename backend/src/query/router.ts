@@ -696,7 +696,16 @@ queryRouter.post("/", async (c) => {
   }
 
   // ── ① RAG: 실시간 관측(날씨·대기질) + 태안뉴스·아카이브를 근거로 답변(출처 표기) ──
-  const baseClient = new WorkersAiLlmClient({ ai: c.env.AI });
+  // 모델 비교용 임시 스위치 — ?model=8b 로 가벼운 모델을 태워 같은 질문의 답을 견줘 본다.
+  //   비용 차이가 6배라 품질을 눈으로 보고 정해야 한다(추측으로 정할 일이 아니다).
+  const MODEL_ALIAS: Record<string, string> = {
+    "8b": "@cf/meta/llama-3.1-8b-instruct-fp8-fast",
+    "8b-awq": "@cf/meta/llama-3.1-8b-instruct-awq",
+    "3b": "@cf/meta/llama-3.2-3b-instruct",
+    "70b": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  };
+  const modelOverride = MODEL_ALIAS[c.req.query("model") ?? ""];
+  const baseClient = new WorkersAiLlmClient({ ai: c.env.AI, ...(modelOverride ? { model: modelOverride } : {}) });
   // 진단용 LLM 호출 카운터/타이밍 — ?debug=1일 때만 응답에 노출.
   let llmCalls = 0;
   let llmMs = 0;
@@ -825,7 +834,16 @@ queryRouter.post("/", async (c) => {
       const rawAnswer = res.content;
       // 완성본만 표시하므로(스트리밍 끔) 서버에서 근거 대조 교열까지 끝낸 '정확본'을 반환.
       // fp8이 흘린 연도 숫자를 [근거]로 복원 → 화면·PDF 모두 처음부터 정확(눈앞 스왑 없음).
-      const polished = await polishDraft(client, rawAnswer, context);
+      // 근거 대조 교열은 **기본으로 끈다**(2026-08-27).
+      //   원래 저품질 모델이 흘린 숫자를 근거에서 되살리려고 넣은 단계인데, 지금 쓰는
+      //   70B에서는 켜나 끄나 숫자가 온전했다(실측: 인구 58,839·33,438세대 3/3 유지,
+      //   물가표 매매 5,000→2,500만원 정확). 오히려 교열이 다듬으며 '광고 43건' 같은
+      //   부속 수치를 깎는 일이 있었다.
+      //   반면 비용은 문답당 약 253뉴런 — **전체의 45%**다. 품질을 안 잃고 절반을 아낀다.
+      //   ⚠ 되돌릴 길은 남긴다: ?polish=1 이면 예전처럼 교열한다.
+      const polished = c.req.query("polish") === "1"
+        ? await polishDraft(client, rawAnswer, context)
+        : rawAnswer;
       const sources = selectSources(parts, rawAnswer);
       const personBrief = await briefPromise;
       // 판정이 '아니오'면 지어낸 듯 그럴듯한 딴 이야기 대신 못 찾았다고 말한다.
@@ -1070,7 +1088,13 @@ queryRouter.post("/graph", async (c) => {
         return { context, raw };
       },
     },
-    { name: "refine", label: "근거 대조 교열 중", run: async (s) => ({ answer: await polishDraft(client, s.raw, s.context) }) },
+    // 교열은 기본으로 건너뛴다(메인 경로와 동일한 이유). ?polish=1 이면 예전대로 돈다.
+    //   건너뛸 땐 진행 단계도 안 보여준다 — 하지도 않은 일을 하는 척하면 안 된다.
+    {
+      name: "refine", label: "근거 대조 교열 중",
+      when: () => c.req.query("polish") === "1",
+      run: async (s) => ({ answer: await polishDraft(client, s.raw, s.context) }),
+    },
     { name: "finalize", label: "정리 중", run: (s) => ({ sources: selectSources(s.parts, s.raw) }) },
   ];
 
