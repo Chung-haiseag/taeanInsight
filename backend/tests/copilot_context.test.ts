@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { needsRewrite, standaloneFallback, describePath, trimHistory } from "../src/query/copilot_context";
+import { needsRewrite, standaloneFallback, describePath, trimHistory, subjectOf } from "../src/query/copilot_context";
 
 describe("이어지는 질문인지 — 앞말을 받아야 뜻이 서는가", () => {
   it("지시어로 시작하면 앞말이 필요하다", () => {
@@ -77,5 +77,25 @@ describe("되살린 질문 — LLM이 없을 때의 대비책", () => {
   });
   it("붙일 것이 없으면 원 질문 그대로 — 지어내지 않는다", () => {
     expect(standaloneFallback("그거 뭐야?", [], null)).toBe("그거 뭐야?");
+  });
+});
+
+// 판정기에 넘길 질문 다듬기 — 실측(2026-08-27)에서 '최근 소식' 한 마디에 막혔다.
+describe("판정용 질문 — 시의성 수식어를 뗀다", () => {
+  it("'최근 소식'이 붙으면 대상만 남긴다 — 이것 때문에 해상풍력 기사 10건이 막혔다", () => {
+    expect(subjectOf("태안 해상풍력 최근 소식")).toBe("태안 해상풍력");
+  });
+  it("'요즘·지금·올해'도 뗀다", () => {
+    expect(subjectOf("태안 해상풍력 요즘 어때")).toBe("태안 해상풍력 어때");
+    expect(subjectOf("지금 태안 인구")).toBe("태안 인구");
+  });
+  it("대상은 그대로 남아야 한다 — 없는 것은 여전히 없다고 나와야 하니까", () => {
+    expect(subjectOf("안면도 백반집 26년인 지금도 운영하고 있나")).toContain("백반집");
+  });
+  it("뗄 것이 없으면 원문 그대로", () => {
+    expect(subjectOf("만리포 해수욕장 어디에 있어")).toBe("만리포 해수욕장 어디에 있어");
+  });
+  it("다 떼어 내용이 없어지면 원문을 쓴다 — 빈 질문으로 판정하면 안 된다", () => {
+    expect(subjectOf("최근 소식")).toBe("최근 소식");
   });
 });

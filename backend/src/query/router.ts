@@ -36,7 +36,7 @@ import { needsWeb } from "./web/gate";
 import { searchWeb } from "./web/search";
 import { rrfMerge } from "./rrf";
 import { embedText } from "../lib/embed";
-import { needsRewrite, describePath, trimHistory, standaloneFallback, type Turn } from "./copilot_context";
+import { needsRewrite, describePath, trimHistory, standaloneFallback, subjectOf, type Turn } from "./copilot_context";
 
 // 날씨·대기질 관련 질문인지 — 그러면 실시간 관측값을 근거로 추가
 const WEATHER_RE = /날씨|기상|예보|기온|온도|미세먼지|초미세|대기질|미세|오존|황사|습도|비\b|강수|맑음|흐림|공기|먼지|폭염|한파|태풍|장마/;
@@ -496,13 +496,17 @@ function answerSystemPrompt(todayKst: string): string {
     `너는 태안 지역정보 도우미다. 오늘은 ${todayKst}(한국 시간)이다. 아래 [근거](실시간 관측값·국토부 실거래·관광 수요·축제·태안신문 기사)를 근거로 한국어로 충실히 답하라.\n` +
     "- 오늘보다 이전의 연도·월·기간은 이미 '지난 일'이다. 과거에 대해 '예측·전망·~할 가능성' 같은 표현을 쓰지 말고 근거의 실제 수치로 '사실'로 서술하라. 과거 기간의 데이터가 근거에 없으면 '해당 기간의 실제 데이터를 찾지 못했습니다'라고 명확히 밝히고 지어내거나 추정·예측하지 마라. '예측·전망'은 오직 오늘 이후의 미래에 대해서만 하라.\n" +
     "- 답변은 오직 한글·아라비아 숫자·필요한 영문 약어만 사용하라. 한자·중국어·일본어 등 외국 문자를 절대 쓰지 마라(예: '施设'가 아니라 '시설', '国内'가 아니라 '국내').\n" +
-    "- 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 한 줄로 끝내지 마라.\n" +
+    "- **답을 아는 경우에만** 근거의 수치를 최대한 활용해 구체적이고 충분한 분량(3~6문장)으로 답하라. 모르는 경우까지 분량을 채우려 하지 마라.\n" +
     "- 표(마크다운 파이프 '|')나 아스키 차트를 본문에 직접 그리지 마라. 수치는 문장·불릿으로 자연스럽게 설명하라(차트 시각화는 화면이 담당한다).\n" +
     "- 가독성을 위해 답을 2~4개의 짧은 문단으로 나누고(문단 사이 빈 줄 한 줄), 여러 항목을 나열할 때는 각 줄 앞에 '- '를 붙여 목록으로 제시하라. 핵심 수치·이름·날짜는 **굵게** 강조하라. 문장 하나하나를 줄바꿈으로 쪼개지 말고 의미 단위로 문단을 묶어라.\n" +
     "- 부동산 질문이면 ㎡당 평균 단가·거래 건수·기간·월별 추이·태안군 전체 대비를 종합해 '시세 흐름'을 설명하라.\n" +
     "- 표본이 적으면 '거래가 N건으로 적어 추세 단정은 어렵다'처럼 한계를 함께 밝히되, 있는 데이터는 모두 활용하라.\n" +
     "- 실시간 관측값이 있으면 그 수치를 우선 사용하라.\n" +
-    "- 근거가 질문과 '완전히' 무관할 때만 '해당 정보를 찾지 못했습니다'라고 하라.\n" +
+    // ⚠ 예전엔 "'완전히' 무관할 때만"이었다. '안면도 백반집'을 물으면 안면도 기사가 근거로 딸려 오니
+    //   '완전히 무관'은 아니라고 보고, 위의 분량 지시를 채우려 반핵항쟁·농협·세트장을 늘어놓았다
+    //   (실측 2026-08-26, 같은 질문 4번 중 2번). 판단 기준을 '주제가 겹치는가'가 아니라
+    //   '질문이 묻는 그것이 근거에 있는가'로 바꾼다.
+    "- 근거에 **질문이 묻는 바로 그 대상**에 관한 내용이 없으면, 지역·주제가 겹친다는 이유로 다른 이야기를 늘어놓지 말고 '해당 정보를 찾지 못했습니다'라고만 짧게 답하라. 그다음 한 문장으로 근거에 무엇이 있었는지만 알려라.\n" +
     "- 근거에 없는 사실을 지어내지 마라. 답변 끝에 사용한 출처를 [번호]로 표기하라.\n" +
     "- 웹 출처(공식 .go.kr·관광공사·지역언론)는 최신 정보다. 원문을 그대로 베끼지 말고 요약하며, 공식 출처를 우선하라.\n" +
     "- '[근거]', '근거를 토대로', '제공된 정보' 같은 표현을 쓰지 말고 바로 본문 내용으로 자연스럽게 답하라.\n" +
@@ -614,6 +618,59 @@ async function rewriteStandalone(env: Env, query: string, history: Turn[], scree
     return text.length >= 4 && text.length <= 200 ? text : fallback();
   } catch {
     return fallback();
+  }
+}
+
+/** 판정용 근거 요약 — 모든 출처를 제목 + 앞머리만으로 훑게 한다(넓이 우선). */
+function judgeDigest(parts: SourcePart[]): string {
+  return parts
+    .slice(0, 14)
+    .map((p, i) => `[${i + 1}] ${p.source.title}\n${p.text.replace(/\s+/g, " ").slice(0, 220)}`)
+    .join("\n\n");
+}
+
+/**
+ * 이 근거로 질문에 답할 수 있는가(예/아니오).
+ *
+ *   ⚠ 왜 따로 묻나: 본답 프롬프트에 "없으면 모른다고 하라"를 아무리 강하게 써도 지키지 않는다.
+ *     실측(2026-08-26~27) '안면도 백반집…' 질문에 근거는 반핵항쟁·농협·수협뿐이었는데
+ *     지시를 고친 뒤에도 6번 중 6번을 늘어놓았다. 길게 답하라는 지시와 싸워서 진다.
+ *     **예/아니오 하나만 고르는 일**은 훨씬 잘한다 — 판정을 분리한다.
+ *
+ *   본답 생성과 **나란히** 돌린다(무료 모델·병렬이라 지연이 늘지 않는다).
+ *   판정이 실패하면 답을 그대로 내보낸다 — 판정기 고장으로 서비스가 막히면 안 된다.
+ */
+async function judgeAnswerable(env: Env, query: string, parts: SourcePart[], dbg?: { raw?: string }): Promise<boolean> {
+  if (!env.AI) return true;
+  try {
+    const client = new WorkersAiLlmClient({ ai: env.AI });
+    const out = await client.complete({
+      maxTokens: 4,
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content:
+            "너는 판정기다. 판단 기준은 **오직 하나** — 질문이 묻는 그 대상이 자료에 나오는가.\n" +
+            "'아니오'는 자료에 그 대상이 **아예 없을 때만**이다. 같은 지역·비슷한 주제라는 이유로 '예'라고 하지 마라.\n" +
+            // ⚠ 시의성·완전성으로 판단하면 안 된다. '해상풍력 최근 소식'에 2021~2025년 기사가
+            //   10건이나 있는데 '최근'이 아니라며 '아니오'를 냈다(실측 2026-08-27).
+            //   오래됨·일부뿐임은 답에서 밝힐 일이지 못 답할 이유가 아니다.
+            "자료가 오래되었거나 일부만 있어도 그 대상이 나오면 '예'다. 시의성·완전성은 따지지 마라.\n" +
+            "'예' 또는 '아니오' 한 낱말만 출력하라.",
+        },
+        // ⚠ 근거를 통째로 잘라 넣으면 안 된다. 첫 근거 하나가 1만 자를 넘는 일이 있어
+        //   (군청 주간행사계획) 6천 자 창에 그것만 담기고 정작 해상풍력 기사 9건이 통째로
+        //   잘려 나갔다 — 판정기는 못 본 것을 없다고 답했다(실측 2026-08-27).
+        //   판정에는 깊이가 아니라 **넓이**가 필요하다: 모든 근거의 제목 + 앞머리만 보여준다.
+        { role: "user", content: `[자료]\n${judgeDigest(parts)}\n\n[질문] ${query}\n\n답할 수 있는가?` },
+      ],
+    });
+    const raw = String(out.content ?? "");
+    if (dbg) dbg.raw = raw;
+    return !/아니/.test(raw);
+  } catch {
+    return true;
   }
 }
 
@@ -758,15 +815,25 @@ queryRouter.post("/", async (c) => {
         return streamAnswer(c, baseClient, llmReq, parts, briefPromise);
       }
 
+      // 근거가 질문과 맞는지 판정 — 본답과 **나란히** 돌린다(지연 증가 없음).
+      const judgeDbg: { raw?: string } = {};
+      // 판정에는 시의성 수식어를 뗀 질문을 준다 — '최근 소식' 한 마디에 막히던 것을 막는다.
+      const answerablePromise = judgeAnswerable(c.env, subjectOf(query), parts, judgeDbg);
       // 무료 fp8 모델이 간헐적으로 토큰 붕괴(salad)를 뱉으므로, 붕괴 감지 시 1회 재시도.
       const res = await completeAvoidingGarble(client, llmReq);
       // 출처·notFound는 '원문'([번호] 인용) 기준으로 계산 — 교열이 표현을 바꿔도 근거 선택이 안 흔들린다.
       const rawAnswer = res.content;
       // 완성본만 표시하므로(스트리밍 끔) 서버에서 근거 대조 교열까지 끝낸 '정확본'을 반환.
       // fp8이 흘린 연도 숫자를 [근거]로 복원 → 화면·PDF 모두 처음부터 정확(눈앞 스왑 없음).
-      const answer = await polishDraft(client, rawAnswer, context);
+      const polished = await polishDraft(client, rawAnswer, context);
       const sources = selectSources(parts, rawAnswer);
       const personBrief = await briefPromise;
+      // 판정이 '아니오'면 지어낸 듯 그럴듯한 딴 이야기 대신 못 찾았다고 말한다.
+      //   화면이 무엇을 찾았는지는 출처로 그대로 보여주니 사람이 직접 확인할 수 있다.
+      const answerable = await answerablePromise;
+      const answer = answerable
+        ? polished
+        : "해당 정보를 찾지 못했습니다. 아카이브에서 이 질문에 답할 만한 기사를 찾지 못했어요. 아래 출처는 찾아본 자료입니다.";
       return c.json({
         answer,
         intent: "archive_rag",
@@ -782,6 +849,7 @@ queryRouter.post("/", async (c) => {
         // RAG 투명성 — ?debug=1 또는 evidence=1이면 LLM에 넣은 근거 원문을 그대로 노출
         ...(c.req.query("debug") === "1" || c.req.query("evidence") === "1"
           ? {
+              judge: { answerable, raw: judgeDbg.raw ?? null },
               evidence: parts.map((p, i) => ({ n: i + 1, source: p.source.title, text: p.text })),
               _timing: {
                 totalMs: Date.now() - tStart,

@@ -76,3 +76,32 @@ export function standaloneFallback(query: string, history: Turn[], screen: strin
   if (screen) return `${screen}에 대해: ${query}`;
   return query;
 }
+
+/** 시의성 수식어 — 답할 수 있는가를 가를 때는 방해만 된다. */
+const RECENCY = new Set(["최근", "요즘", "근래", "최신", "근황", "소식"]);
+/** 조사가 붙는 시간말('지금도·오늘은·올해의'). */
+const RECENCY_STEM = /^(지금|오늘|올해|현재|최근|요즘)(도|은|는|의|에|이|가)?$/;
+
+const isRecency = (tok: string): boolean => {
+  const t = tok.replace(/[?!.,·]/g, "");
+  return RECENCY.has(t) || RECENCY_STEM.test(t);
+};
+
+/**
+ * 판정기에 넘길 질문(순수) — **대상만** 남긴다.
+ *
+ *   ⚠ 왜: '태안 해상풍력 최근 소식'을 물었을 때 해상풍력 기사가 10건이나 있는데도
+ *     판정기가 '아니오'를 냈다(실측 2026-08-27, 4/4). '최근 소식'을 시의성 요구로 읽고
+ *     2021~2025년 기사를 낡았다고 본 것이다. 프롬프트로 "시의성 따지지 마라"라고 해도 안 통했다.
+ *     ⇒ 아예 그 말을 빼고 묻는다. **답변 생성에는 원문을 그대로** 넘긴다(오래됨은 답에서 밝히면 된다).
+ *
+ *   ⚠ 정규식 경계로 지우면 '최근 소식'처럼 붙어 있는 둘 중 하나만 지워진다(경계가 겹친다).
+ *     낱말 단위로 걸러야 한다.
+ */
+export function subjectOf(query: string): string {
+  const q = (query ?? "").trim();
+  const kept = q.split(/\s+/).filter(Boolean).filter((t) => !isRecency(t));
+  const stripped = kept.join(" ");
+  // 다 떼어 남은 게 없으면 원문으로 판정한다 — 빈 질문을 넘기면 아무 뜻이 없다.
+  return stripped.length >= 2 ? stripped : q;
+}
