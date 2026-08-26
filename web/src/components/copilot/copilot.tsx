@@ -13,6 +13,7 @@
 //     답변은 Workers AI(무료)라 열어도 비용이 늘지 않는다.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { askQuery, type QuerySource } from "@/lib/api/query";
@@ -116,9 +117,16 @@ export function Copilot() {
                 <p className="font-bold text-brand">💬 AI 코파일럿</p>
                 <p className="text-xs text-foreground-muted">아카이브 근거 · 대화 이어짐</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)}
-                className="rounded px-2 py-1 text-lg leading-none text-foreground-muted hover:bg-brand/5 hover:text-brand"
-                aria-label="닫기">✕</button>
+              <span className="flex shrink-0 items-center gap-1">
+                {/* 상단 메뉴에서 뺐으니 전체 화면으로 가는 길은 여기 둔다. */}
+                <Link href="/query" onClick={() => setOpen(false)}
+                  className="rounded px-2 py-1 text-xs text-foreground-muted underline hover:text-brand">
+                  전체 화면
+                </Link>
+                <button type="button" onClick={() => setOpen(false)}
+                  className="rounded px-2 py-1 text-lg leading-none text-foreground-muted hover:bg-brand/5 hover:text-brand"
+                  aria-label="닫기">✕</button>
+              </span>
             </header>
 
             <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
