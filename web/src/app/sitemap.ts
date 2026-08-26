@@ -16,9 +16,10 @@ export async function generateSitemaps(): Promise<{ id: number }[]> {
   try {
     const res = await fetch(`${API_BASE}/api/news/sitemap-years`, { next: { revalidate: 86400 } });
     const years: number[] = res.ok ? ((await res.json()).years ?? []) : [];
-    return [{ id: 0 }, ...years.map((y) => ({ id: y }))];
+    // id=1 = 인물 페이지 묶음. 연도는 1990 이상이라 번호가 겹치지 않는다.
+    return [{ id: 0 }, { id: 1 }, ...years.map((y) => ({ id: y }))];
   } catch {
-    return [{ id: 0 }];
+    return [{ id: 0 }, { id: 1 }];
   }
 }
 
@@ -37,6 +38,22 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     } catch { /* 정적만 */ }
     const yearHubs = years.map((y) => ({ url: `${SITE}/archive/${y}`, changeFrequency: "monthly" as const, priority: 0.5 }));
     return [...staticEntries, ...yearHubs];
+  }
+  // 인물 페이지 — '사람 이름 검색'은 지역 언론의 가장 큰 유입 통로인데 그동안 한 쪽도
+  //   색인되지 않았다(인물 화면이 /people 안의 상태로만 있었다). 개별 주소가 생겨 이제 넣는다.
+  //   ⚠ 3만 4천 명을 다 넣지 않는다 — 기사 몇 건뿐인 이름은 내용이 얇아 색인에 되레 해가 된다.
+  //     백엔드가 등장 10회 이상·바이라인 제외로 걸러 3천여 명만 준다.
+  if (Number(id) === 1) {
+    try {
+      const res = await fetch(`${API_BASE}/api/kg/persons/sitemap`, { next: { revalidate: 86400 } });
+      if (!res.ok) return [];
+      const ids = ((await res.json()) as { ids?: string[] }).ids ?? [];
+      return ids.map((pid) => ({
+        url: `${SITE}/people/${encodeURIComponent(pid)}`,
+        changeFrequency: "monthly" as const,
+        priority: 0.6,
+      }));
+    } catch { return []; }
   }
   try {
     const res = await fetch(`${API_BASE}/api/news/sitemap-ids?year=${id}`, { next: { revalidate: 86400 } });

@@ -83,6 +83,25 @@ kgPublicRouter.get("/persons/featured", async (c) => {
   return res;
 });
 
+/**
+ * 사이트맵용 인물 목록 — 검색엔진이 인물 페이지를 찾아오게 한다.
+ *   ⚠ 3만 4천 명을 다 넣지 않는다. 기사 몇 건뿐인 이름은 내용이 얇아 색인에 해가 된다
+ *     (구글이 'thin content'로 본다). 등장 10회 이상 + 바이라인 제외만 낸다.
+ */
+kgPublicRouter.get("/persons/sitemap", async (c) => {
+  if (!c.env.ARCHIVE_DB || !(await isOn(c))) return c.json({ ids: [] });
+  const r = await c.env.ARCHIVE_DB.prepare(
+    "SELECT n.id AS id FROM kg_nodes n WHERE n.type='person' AND length(n.name) >= 2 " +
+    "AND (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) >= 10 LIMIT 20000",
+  ).all<{ id: string }>().catch(() => null);
+  const { loadHubIds } = await import("./people");
+  const hubs = await loadHubIds(c.env.ARCHIVE_DB);
+  const ids = (r?.results ?? []).map((x) => x.id).filter((id) => !hubs.has(id));
+  const res = c.json({ ids });
+  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  return res;
+});
+
 kgPublicRouter.get("/person/:id/profile", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);

@@ -72,6 +72,11 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-08-27 · **인물 한 사람 = 주소 하나(/people/&lt;id&gt;) + 검색 색인** · `web/src/app/people/[id]/`·`people/person-view.tsx`·`backend/src/kg/public_router.ts`·`app/sitemap.ts`
+  인물 화면이 `/people` 안의 **상태로만** 있어서 ①사람을 가리켜 보낼 주소가 없었고(공유·뒤로가기 불가) ②검색엔진이 인물을 **한 쪽도 색인하지 못했다**. '사람 이름 검색'은 지역 언론의 최대 유입 통로인데 그 자리가 통째로 비어 있었다(우리가 nav.ts에 적어둔 말이기도 하다).
+  상세 화면을 `person-view.tsx`로 갈라내 검색 결과·개별 주소가 같은 것을 쓰게 하고, `/people/[id]`를 **서버 렌더**로 만들었다(제목·설명이 HTML에 실려야 검색엔진이 읽는다). 요약 한 줄 = 직위·활동연도·기사수·자주 함께 등장한 사람.
+  ⚠ **주소 조각 이중 인코딩**으로 처음엔 전 인물이 404였다 — `params.id`가 환경에 따라 `person:가세로`로도, `person%3A...`로도 온다. 한 번 풀고 다시 감싼다(`decodeId`).
+  사이트맵에 인물 묶음(id=1) 추가 — 등장 10회 이상·바이라인 제외로 **3,241명만**(3.4만을 다 넣으면 얇은 페이지로 색인에 되레 해가 된다). `sitemap.ts`와 `sitemap-index.xml/route.ts` **둘 다** 고쳐야 한다(인덱스에 안 넣으면 만들어도 못 찾아온다). IndexNow로 3,241쪽 제출 완료.
 - 2026-08-27 · **인물 화면 첫 진입에 관계망을 먼저** · `backend/src/kg/people.ts`(featuredPersons)·`kg/public_router.ts`·`web/src/app/people/page.tsx`
   빈 검색창만 있으면 무엇을 칠지 모르는 사람은 되돌아간다. 들어오자마자 **무작위 인물의 관계망**을 띄워 '이런 걸 볼 수 있구나'를 먼저 전한다(당진 사례). `GET /api/kg/persons/featured`가 등장 많고 **바이라인(기자)이 아닌** 인물 24명을 하루 캐시로 주고, 화면이 그중 하나를 무작위로 연다. 목록을 통째로 받아 두므로 '🔀 다른 인물 보기'는 다시 부르지 않는다. ⚠ 첫 진입에는 스크롤하지 않는다(사용자가 아무것도 안 눌렀는데 화면이 움직이면 놀란다).
 - 2026-08-27 · **인물 관계망 시각 개편(당진 사례 참고)** · `web/src/components/kg-graph.tsx`
