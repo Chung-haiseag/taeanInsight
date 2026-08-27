@@ -102,13 +102,18 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
   //   ⚠ 사전에 있는 또렷한 이름만 쓴다. 짧은 부서명('건설과')은 '해안도로 건설과 숙박시설'의
   //     조사에 걸려 507건이 전부 오탐이었다(실측 2026-08-27).
   try {
-    const orgRows = await db.prepare(
+    // ⚠ 질의는 **한 번만** 돈다. 종류별로 두 번 돌렸더니 28초가 걸렸다(실측 2026-08-27) —
+    //   기사 공유 수를 세는 조인이 무거워서 두 배가 그대로 지연이 된다.
+    //   넉넉히(60개) 받아 놓고 갈래는 코드에서 나눈다 — 집계가 끝난 뒤 자르는 것이라 폭을 넓혀도 값이 거의 안 든다. 한 번에 상위 몇 개만 뽑으면 기관이 다 차지해
+    //   행사가 끼지 못한다(가세로: 태안군의회 598건·태안군청 348건).
+    const rows = (await db.prepare(
       `SELECT m2.node_id AS id, n.name AS name, n.type AS kind, COUNT(*) AS w
        FROM kg_mentions m1 JOIN kg_mentions m2 ON m2.article_idxno = m1.article_idxno
        JOIN kg_nodes n ON n.id = m2.node_id AND n.type IN ('org','event')
-       WHERE m1.node_id = ? GROUP BY m2.node_id ORDER BY w DESC LIMIT 6`,
-    ).bind(center).all<{ id: string; name: string; kind: string; w: number }>();
-    for (const o of orgRows.results ?? []) {
+       WHERE m1.node_id = ? GROUP BY m2.node_id ORDER BY w DESC LIMIT 60`,
+    ).bind(center).all<{ id: string; name: string; kind: string; w: number }>()).results ?? [];
+    const take = (kind: string, n: number) => rows.filter((r) => r.kind === kind).slice(0, n);
+    for (const o of [...take("org", 4), ...take("event", 2)]) {
       if (!keep.has(o.id)) { nodes.push({ id: o.id, name: o.name, mentions: o.w, kind: o.kind }); keep.add(o.id); }
       outEdges.push({ a: center, b: o.id, weight: o.w });
     }
