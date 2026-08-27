@@ -95,7 +95,7 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
     const meshKept = resolveCanonical([], meshRaw, map).edges.filter((e) => keep.has(e.a) && keep.has(e.b) && e.a !== center && e.b !== center);
     outEdges.push(...meshKept);
   }
-  // 같은 기사에 함께 나온 **기관**을 노드로 추가 — 인물만 있으면 '누구와 어울렸나'까지만 보이고
+  // 같은 기사에 함께 나온 **기관·행사**를 노드로 추가 — 인물만 있으면 '누구와 어울렸나'까지만 보이고
   //   '어디서 일했나'가 안 보인다(당진 사례의 기관·사업 노드가 하는 일).
   //   ⚠ 기관은 coappears 엣지가 없다(그건 인물끼리만이다). 기사 공유 수를 그때그때 센다 —
   //     kg_mentions(article_idxno) 인덱스가 있어 감당된다.
@@ -103,13 +103,13 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
   //     조사에 걸려 507건이 전부 오탐이었다(실측 2026-08-27).
   try {
     const orgRows = await db.prepare(
-      `SELECT m2.node_id AS id, n.name AS name, COUNT(*) AS w
+      `SELECT m2.node_id AS id, n.name AS name, n.type AS kind, COUNT(*) AS w
        FROM kg_mentions m1 JOIN kg_mentions m2 ON m2.article_idxno = m1.article_idxno
-       JOIN kg_nodes n ON n.id = m2.node_id AND n.type='org'
-       WHERE m1.node_id = ? GROUP BY m2.node_id ORDER BY w DESC LIMIT 5`,
-    ).bind(center).all<{ id: string; name: string; w: number }>();
+       JOIN kg_nodes n ON n.id = m2.node_id AND n.type IN ('org','event')
+       WHERE m1.node_id = ? GROUP BY m2.node_id ORDER BY w DESC LIMIT 6`,
+    ).bind(center).all<{ id: string; name: string; kind: string; w: number }>();
     for (const o of orgRows.results ?? []) {
-      if (!keep.has(o.id)) { nodes.push({ id: o.id, name: o.name, mentions: o.w, kind: "org" }); keep.add(o.id); }
+      if (!keep.has(o.id)) { nodes.push({ id: o.id, name: o.name, mentions: o.w, kind: o.kind }); keep.add(o.id); }
       outEdges.push({ a: center, b: o.id, weight: o.w });
     }
   } catch { /* 기관은 곁들이는 것이라 실패해도 인물 관계망은 그대로 낸다 */ }
