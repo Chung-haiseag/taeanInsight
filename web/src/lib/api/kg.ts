@@ -143,7 +143,7 @@ export interface PersonProfile {
   coappear: { id: string; name: string; count: number; reltype?: string; edgeId?: string; verified?: number; reason?: string }[];
   articles: { idxno: number; title: string; published_at: string }[];
   offices: { office: string; start: string | null; end: string | null; ordinal: number | null }[];
-  affiliations?: { org: string; orgId: string; role: string; years: string; evidence: string; fromArticles?: boolean }[];
+  affiliations?: { org: string; orgId: string; role: string; years: string; evidence: string; fromArticles?: boolean; count?: number }[];
   timeline: { year: number; count: number }[];
   topics: { term: string; count: number }[];
 }

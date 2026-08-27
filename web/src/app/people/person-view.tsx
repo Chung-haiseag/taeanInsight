@@ -85,14 +85,14 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
         {!!prof.affiliations?.length && (
           <section className="rounded-lg border border-brand/15 bg-background p-4">
             <h3 className="mb-2 text-sm font-bold text-brand">
-              소속 <span className="font-normal text-foreground-muted">(검증됨)</span>
+              소속
             </h3>
-            {/* 소속·직함은 검증됐지만 옆의 연도는 기사에서 센 것이다 — 재임 기간으로 읽히면 안 된다. */}
-            {prof.affiliations.some((a) => a.fromArticles) && (
-              <p className="mb-2 text-[0.6875rem] text-foreground-muted">
-                ‘기사 ○○년’은 그 소속으로 <strong>기사에 나온 해</strong>입니다. 재임 기간은 위 ‘직위·소속’을 보세요.
-              </p>
-            )}
+            {/* ⚠ 예전엔 '(검증됨)'이라고만 적어, 기사 한 줄에서 잘못 뽑힌 직함까지 확정 사실로 읽혔다
+                 (김영인 군의원에게 '태안군청 군수'가 붙었다). 무엇을 근거로 한 줄인지 줄마다 밝힌다. */}
+            <p className="mb-2 text-[0.6875rem] text-foreground-muted">
+              ‘기사 N건’은 그 직함으로 나온 <strong>기사 수</strong>, 연도는 <strong>기사에 나온 해</strong>입니다.
+              재임 기간은 위 ‘직위·소속’을, 정당은 ‘출마 이력’을 보세요.
+            </p>
             <ul className="space-y-1 text-sm">
               {prof.affiliations.map((a) => (
                 <li key={a.orgId}>
@@ -100,11 +100,11 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
                   {a.role && <span className="text-foreground-muted"> {a.role}</span>}
                   {/* 기사에서 뽑은 연도는 **재임 기간이 아니라 기사에 나온 해**다.
                        그냥 '2006~2025'로 찍었더니 19년 재임처럼 읽혔다(한상기 실제 재임 2014~2018). */}
-                  {a.years && (
-                    <span className="text-xs text-foreground-muted">
-                      {" · "}{a.fromArticles && <span>기사 </span>}{a.years}
-                    </span>
-                  )}
+                  <span className="text-xs text-foreground-muted">
+                    {a.fromArticles
+                      ? <>{" · 기사 "}{(a.count ?? 0).toLocaleString()}건{a.years && <>{" · "}{a.years}</>}</>
+                      : <>{" · 선관위"}{a.years && <>{" "}{a.years}</>}</>}
+                  </span>
                 </li>
               ))}
             </ul>

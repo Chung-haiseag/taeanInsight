@@ -32,3 +32,32 @@ describe("소속 연도 표기", () => {
     expect(formatYears(["2014","2018"])).toBe("2014~2018");
   });
 });
+
+// ── 기사 1건짜리 소속은 안 보여준다 ──────────────────────────────────
+// 김영인(군의원) 페이지에 '태안군청 군수'와 '경제진흥과 과장'이 떴다(사용자 제보 2026-08-27).
+//   근거는 각각 기사 1건 — "…기자브리핑 연 가 군수 김영인…"(원문은 '가세로 군수, 김영인'인데 앞이 잘렸다),
+//   "위원장 김영인 경제진흥과장 수고하셨습니"(회의록에서 위원장이 과장을 부르는 대목).
+//   검증된 소속 799건 중 235건(29%)이 기사 1건짜리였다.
+import { keepWellSupported } from "../src/kg/people";
+
+describe("근거 부족한 소속 걸러내기", () => {
+  const rows = [
+    { org: "태안군의회", orgId: "o1", role: "군의원", years: "", evidence: "", fromArticles: true, count: 87 },
+    { org: "태안군청", orgId: "o2", role: "군수", years: "", evidence: "", fromArticles: true, count: 1 },
+    { org: "경제진흥과", orgId: "o3", role: "과장", years: "", evidence: "", fromArticles: true, count: 1 },
+    { org: "더불어민주당", orgId: "o4", role: "소속 정당", years: "", evidence: "", fromArticles: false },
+  ];
+
+  it("기사 1건짜리는 뺀다", () => {
+    expect(keepWellSupported(rows).map((r) => r.orgId)).toEqual(["o1", "o4"]);
+  });
+
+  it("선관위에서 온 것은 기사 수가 없어도 남긴다 — 공식 자료다", () => {
+    expect(keepWellSupported([rows[3]])).toHaveLength(1);
+  });
+
+  it("기사 2건이면 남긴다", () => {
+    const two = [{ ...rows[1], count: 2 }];
+    expect(keepWellSupported(two)).toHaveLength(1);
+  });
+});

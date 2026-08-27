@@ -137,7 +137,9 @@ export async function detectPersonInQuery(db: D1Database, query: string): Promis
 
 export interface Affiliation { org: string; orgId: string; role: string; years: string; evidence: string;
   /** 연도가 '기사에 나온 해'인가(선관위 공식 연도가 아니라). 화면이 표기를 달리해야 한다. */
-  fromArticles?: boolean }
+  fromArticles?: boolean;
+  /** 이 직함으로 나온 기사 수. 선관위에서 온 것은 없다(공식 자료라 셀 필요가 없다). */
+  count?: number }
 
 /**
  * 연도 표기 정리(순수).
@@ -173,6 +175,20 @@ export function yearRuns(years: string | string[] | undefined | null, maxRuns = 
 }
 
 /**
+ * 근거가 한 건뿐인 소속을 뺀다(순수).
+ *
+ *   ⚠ 기사 한 줄에서 뽑은 직함은 자주 틀린다. 김영인(군의원) 페이지에 '태안군청 군수'가 떴는데
+ *     근거가 `"…기자브리핑 연 가 군수 김영인…"` 하나였다 — 원문은 '가세로 군수, 김영인'인데 앞이 잘렸다.
+ *     '경제진흥과 과장'도 회의록에서 위원장이 과장을 부르는 대목 하나였다.
+ *     검증된 소속 799건 중 **235건(29%)이 기사 1건짜리**다(2026-08-27 실측).
+ *   두 건 이상이면 대체로 맞는다(백정흠 사무국장·서용관 소장·최승우 군수 표본 확인).
+ *   선관위에서 온 것은 기사 수가 없어도 남긴다 — 공식 자료다.
+ */
+export function keepWellSupported(rows: Affiliation[], minCount = 2): Affiliation[] {
+  return rows.filter((r) => !r.fromArticles || (r.count ?? 0) >= minCount);
+}
+
+/**
  * 같은 조직이 두 줄로 들어온 것을 합친다(순수).
  *
  *   ⚠ 엣지 id 형식이 둘이다 — 기사에서 뽑은 소속은 `e:belongs:<이름>__<조직>`,
@@ -188,6 +204,7 @@ export function mergeAffiliations(rows: Affiliation[]): Affiliation[] {
     const roles = [...new Set([...cur.role.split("·"), ...r.role.split("·")].map((x) => x.trim()).filter(Boolean))];
     cur.role = roles.join("·");
     if (!cur.years) { cur.years = r.years; cur.fromArticles = r.fromArticles; }
+    cur.count = Math.max(cur.count ?? 0, r.count ?? 0) || undefined;
     if (!cur.evidence) cur.evidence = r.evidence;
   }
   return [...by.values()];
@@ -449,8 +466,8 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     coappear,
     articles: arts.results ?? [],
     offices,
-    affiliations: orderAffiliations(mergeAffiliations((aff.results ?? []).map((r) => {
-      let a: { role?: string; roles?: string[]; years?: string | string[]; evidence?: string } = {};
+    affiliations: orderAffiliations(keepWellSupported(mergeAffiliations((aff.results ?? []).map((r) => {
+      let a: { role?: string; roles?: string[]; years?: string | string[]; evidence?: string; count?: number } = {};
       try { a = r.attrs_json ? JSON.parse(r.attrs_json) : {}; } catch { /* 깨진 값은 빈 것으로 */ }
       // 여러 대수에 걸쳐 직함이 달랐으면 함께 적는다 — 대표 직함만 보이면 의장을 지낸 사실이 묻힌다.
       const role = a.roles?.length ? a.roles.join("·") : (a.role ?? "");
@@ -459,8 +476,9 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
       //   선관위에서 온 것(`…--belongs_to--…`)은 실제 연도라 그대로 둔다.
       const fromArticles = r.edgeId.startsWith("e:belongs:");
       return { org: r.org, orgId: r.orgId, role, evidence: a.evidence ?? "", fromArticles,
+               count: typeof a.count === "number" ? a.count : undefined,
                years: fromArticles ? yearRuns(a.years) : formatYears(a.years) };
-    }))),
+    })))),
     timeline,
     topics,
   };
