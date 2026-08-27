@@ -3,6 +3,8 @@
   "name": "taean-insight-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-27",
+  // 배포 판번호 — 엣지 캐시 열쇠에 섞어, 배포하면 모든 colo가 저절로 새로 받게 한다.
+  "version_metadata": { "binding": "CF_VERSION" },
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,

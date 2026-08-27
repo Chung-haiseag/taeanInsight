@@ -1,6 +1,7 @@
 // 태안뉴스 HTTP API — RSS 수집 결과를 카테고리별로 제공.
 // 공개 엔드포인트(읽기 전용). 원문 링크 포함, 발췌만 노출.
 
+import { edgeCacheKey } from "../cache/key_normalizer";
 import { Hono } from "hono";
 
 import type { Env } from "../types";
@@ -156,7 +157,7 @@ function decodeXmlEntities(s: string): string {
 
 newsRouter.get("/tv", async (c) => {
   const cache = caches.default;
-  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const cacheKey = new Request(edgeCacheKey(c.req.url, c.env.CF_VERSION?.id), { method: "GET" });
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
 

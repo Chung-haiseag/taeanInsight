@@ -8,6 +8,7 @@
 // LLM: Workers AI 무료 모델(운영 Worker는 Claude API 미사용). 게이팅은 ?tier= 쿼리로 판별
 //   (다른 라우터와 동일한 PoC 방식 — 운영 시 JWT auth.sub/플랜으로 대체).
 
+import { edgeCacheKey } from "../cache/key_normalizer";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -170,7 +171,7 @@ reportsRouter.get("/latest", async (c) => {
 // 엣지 캐시(Cache API) 5분: 외부 API 10여 개 팬아웃을 colo당 5분 1회로 제한(요청 간 재사용).
 reportsRouter.get("/metrics", async (c) => {
   const cache = caches.default;
-  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const cacheKey = new Request(edgeCacheKey(c.req.url, c.env.CF_VERSION?.id), { method: "GET" });
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
   // 1) cron이 미리 채운 D1 스냅샷이 신선하면 즉시 서빙(외부 API 팬아웃 회피)

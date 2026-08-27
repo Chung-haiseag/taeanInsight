@@ -124,3 +124,20 @@ export class InMemoryCacheStore implements CacheStore {
     return this.map.size;
   }
 }
+
+/**
+ * 엣지 캐시(Cache API) 열쇠에 **배포 판번호**를 섞는다(순수).
+ *
+ *   ⚠ Cache API 항목은 colo마다 따로 살아 있고 **배포는 그것을 깨지 않는다.**
+ *     인물 프로필의 소속 연도를 고쳐 배포했더니 같은 주소가 옛 값과 새 값을
+ *     번갈아 냈다(2026-08-27, s-maxage=900이라 최대 15분). 관계망을 고쳤을 때도
+ *     "동일하게 보인다"는 말이 나온 원인이 이것이었다.
+ *   판번호를 열쇠에 넣으면 배포하는 순간 모든 colo가 저절로 새로 받아 간다.
+ *   판번호를 모르면(바인딩 없음) 옛 동작 그대로 주소만 쓴다.
+ */
+export function edgeCacheKey(url: string, version: string | undefined | null): string {
+  if (!version) return url;
+  const u = new URL(url);
+  u.searchParams.set("__v", version);   // 캐시 열쇠 전용 — 실제 처리에는 안 쓴다
+  return u.toString();
+}

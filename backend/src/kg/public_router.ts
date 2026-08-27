@@ -2,6 +2,7 @@
 //   기존 people.ts를 재사용하되 검색·프로필만 노출(수정 불가). 초허브·바이라인은 people.ts에서 제외됨.
 //   ⚠️ 데이터는 AI 자동추출·미검증(verified=0). 관계 라벨은 프런트가 verified만 노출.
 //   공개 여부는 app_settings.public_people 플래그로 superadmin이 즉시 토글(배포 불필요).
+import { edgeCacheKey } from "../cache/key_normalizer";
 import { Hono } from "hono";
 import type { Env } from "../types";
 import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed, isPersonHub, isWikiPhotoAllowed } from "./people";
@@ -107,7 +108,7 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
   const cache = caches.default;
-  const cacheKey = new Request(new URL(c.req.url).toString(), { method: "GET" });
+  const cacheKey = new Request(edgeCacheKey(c.req.url, c.env.CF_VERSION?.id), { method: "GET" });
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
   const prof = await buildPersonProfile(c.env.ARCHIVE_DB, c.req.param("id"), 12);

@@ -6,6 +6,8 @@ export interface RateLimit {
 }
 
 export interface Env {
+  /** 배포 판번호(version_metadata 바인딩). 엣지 캐시 열쇠에 섞는다. */
+  CF_VERSION?: { id: string; tag?: string };
   // 환경변수
   MONTHLY_COST_LIMIT_KRW: string;       // "300000"
   ALERT_THRESHOLDS: string;             // "0.7,0.9,1.0"
