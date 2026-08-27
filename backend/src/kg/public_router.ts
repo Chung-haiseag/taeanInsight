@@ -91,12 +91,13 @@ kgPublicRouter.get("/persons/featured", async (c) => {
 kgPublicRouter.get("/persons/sitemap", async (c) => {
   if (!c.env.ARCHIVE_DB || !(await isOn(c))) return c.json({ ids: [] });
   const r = await c.env.ARCHIVE_DB.prepare(
-    "SELECT n.id AS id FROM kg_nodes n WHERE n.type='person' AND length(n.name) >= 2 " +
+    "SELECT n.id AS id, n.name AS name FROM kg_nodes n WHERE n.type='person' AND length(n.name) >= 2 " +
     "AND (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) >= 10 LIMIT 20000",
-  ).all<{ id: string }>().catch(() => null);
-  const { loadHubIds } = await import("./people");
+  ).all<{ id: string; name: string }>().catch(() => null);
+  const { loadHubIds, isAnonymizedName } = await import("./people");
   const hubs = await loadHubIds(c.env.ARCHIVE_DB);
-  const ids = (r?.results ?? []).map((x) => x.id).filter((id) => !hubs.has(id));
+  // 익명 표기는 색인에 올리지 않는다 — '김모' 페이지가 검색에 잡히면 서로 무관한 323건이 한 사람이 된다.
+  const ids = (r?.results ?? []).filter((x) => !hubs.has(x.id) && !isAnonymizedName(x.name)).map((x) => x.id);
   const res = c.json({ ids });
   res.headers.set("Cache-Control", "public, s-maxage=86400");
   return res;

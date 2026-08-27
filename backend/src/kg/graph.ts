@@ -1,5 +1,6 @@
 // 기사 인물 관계도 조회 — 순수 rankNeighbors + 얇은 D1(그래프 조회 전용, verified 무관).
 
+import { isAnonymizedName } from "./people";
 import { resolveCanonical, loadCanonicalMap, getMembers } from "./merge";
 
 export interface Edge { a: string; b: string; weight: number; reltype?: string }
@@ -79,12 +80,16 @@ export async function personEgo(db: D1Database, id: string, limit = 12, excludeH
     `SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions km WHERE km.node_id=n.id) AS mentions FROM kg_nodes n WHERE n.type='person' AND n.id IN (${kph})`,
   ).bind(...keepIds).all<GraphNode>();
   const nmap = new Map((nrows.results ?? []).map((n) => [n.id, n] as const));
-  const nodes: GraphNode[] = keepIds.map((kid) => nmap.get(kid) ?? { id: kid, name: kid === center ? centerNode.name : kid, mentions: 0 });
+  // 익명 표기('김모'·'김OO')는 사람이 아니라 가림말이다 — 관계망에 두면 서로 무관한 수백 명이 한 점이 된다.
+  //   중심 인물 자신은 남긴다(그 페이지로 직접 들어온 사람에게 빈 화면을 주지 않으려고).
+  for (const [id, n] of nmap) if (id !== center && isAnonymizedName(n.name)) { nmap.delete(id); keep.delete(id); }
+  const shown = keepIds.filter((k) => keep.has(k));
+  const nodes: GraphNode[] = shown.map((kid) => nmap.get(kid) ?? { id: kid, name: kid === center ? centerNode.name : kid, mentions: 0 });
   const outEdges = edges.filter((e) => keep.has(e.a) && keep.has(e.b));
   // 이웃끼리(중심 제외)의 coappears도 실어 별(star)이 아닌 진짜 관계망으로 만든다. 위 outEdges가 중심 엣지를
   // 이미 보유하므로 resolveCanonical의 weight 합산 중복을 피하려 이웃-이웃만 조회한다.
   // D1 바인딩 100개 한도(양변 IN 2회) → 이웃 45명까지만 mesh, 초과 시 star 유지.
-  const neighborIds = keepIds.filter((k) => k !== center);
+  const neighborIds = shown.filter((k) => k !== center);
   if (neighborIds.length > 1 && neighborIds.length <= 45) {
     const nph = neighborIds.map(() => "?").join(",");
     const mesh = await db.prepare(

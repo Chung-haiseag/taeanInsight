@@ -48,6 +48,24 @@ export async function loadHubIds(db: D1Database): Promise<Set<string>> {
   return ids;
 }
 
+// 기사의 **익명 표기**를 인물에서 걸러낸다.
+//   '김 모 씨'·'A씨'·'김OO'가 인물 노드로 잡혀 있었다 — '김모'는 기사 323건, '이모'는 174건.
+//   서로 무관한 수백 명이 한 사람처럼 묶여, 사건·재판 기사가 많은 만큼 **한 사람이 저 일을 다 한 것처럼**
+//   읽힌다. 지우지 않고 화면에서만 감춘다(추출 근거는 남겨 둔다).
+const ANON_PATTERNS = [
+  /^[가-힣A-Za-z]모$/,            // 김모 · K모
+  /^[가-힣A-Za-z]모(씨|군|양|옹)$/, // 김모씨 · A모씨 · 김모군 · 김모양(미성년 익명)
+  //   ⚠ 세 글자 '○○모'(이정모·배광모·구창모)는 진짜 이름이다 — 두 글자 성+모만 익명이다.
+  /^[가-힣A-Za-z]씨$/,            // 김씨 · A씨
+  /^[가-힣][0OoＯ○●◯XxＸ*]+$/,    // 김O · 곽00 · 김OO · 이○○
+  /^[A-Za-z]$/,                   // A · B (한 글자 알파벳은 이름이 아니다)
+];
+export function isAnonymizedName(name: string): boolean {
+  const n = String(name ?? "").trim();
+  if (!n) return false;
+  return ANON_PATTERNS.some((re) => re.test(n));
+}
+
 // 같은 이름의 다른 인물 — 한 노드에 두 사람이 섞여 있던 것을 쪼갠 결과를 서로 잇는다.
 //   ('박정희' = 소원면 주민자치위원장 114건 + 전 대통령 58건. db/060 참고)
 export interface SameNamePerson {
@@ -98,7 +116,8 @@ export async function searchPersons(db: D1Database, q: string, limit: number): P
     "FROM kg_nodes n WHERE n.type='person' AND n.name LIKE ? ESCAPE '\\' ORDER BY mentions DESC LIMIT ?",
   ).bind(term, lim).all<PersonHit & { attrs_json: string | null }>();
   // 이름이 같은 두 사람이 나란히 뜨면 고를 수가 없다 — 갈래('전 대통령')를 함께 내려준다.
-  return (r.results ?? []).map(({ attrs_json, ...x }) => ({ ...x, qualifier: qualifierOf(attrs_json) }));
+  return (r.results ?? []).filter((x) => !isAnonymizedName(x.name))
+    .map(({ attrs_json, ...x }) => ({ ...x, qualifier: qualifierOf(attrs_json) }));
 }
 
 // 질의 문장에 '등장 많은 KG 인물명'이 통째로 포함되면 그 인물을 반환(브리핑 첨부용). 바이라인·저빈도·짧은 이름은 제외.
@@ -357,7 +376,8 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     return top.map((t) => {
       const meta = emap.get(t.otherId);
       return { id: t.otherId, name: nmap.get(t.otherId) ?? t.otherId, count: t.count, reltype: rmap.get(t.otherId), edgeId: meta?.edgeId, verified: meta?.verified, reason: meta?.reason };
-    });
+      // 익명 표기는 '함께 등장'에 뜻이 없다 — '김모'와 함께 나왔다는 건 아무 말도 아니다.
+    }).filter((x) => !isAnonymizedName(x.name));
   })();
   // 나온 기사(최신순 30)
   const artsP = db.prepare(
@@ -434,5 +454,5 @@ export async function featuredPersons(db: D1Database, limit = 24): Promise<Perso
     "ORDER BY mentions DESC LIMIT ?",
   ).bind(lim * 3).all<PersonHit>();
   const hubs = await loadHubIds(db);
-  return (r.results ?? []).filter((x) => !hubs.has(x.id)).slice(0, lim);
+  return (r.results ?? []).filter((x) => !hubs.has(x.id) && !isAnonymizedName(x.name)).slice(0, lim);
 }
