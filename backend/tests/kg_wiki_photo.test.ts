@@ -54,3 +54,27 @@ describe("전국 인물 제외", () => {
     expect(nationalToExclude(national, "person:문재인").size).toBe(0);
   });
 });
+
+// ── 같은 이름의 다른 인물 ────────────────────────────────────────────────
+// 한 노드에 두 사람이 섞여 있던 '박정희'를 지역/전국으로 쪼갰다(114건 + 58건).
+//   지역지라 지역 인물이 본문의 주인공이고, 전국 인물은 옆 카드로 잇는다.
+import { qualifierOf, sortSameName } from "../src/kg/people";
+
+describe("같은 이름 카드", () => {
+  it("attrs에서 갈래 이름을 꺼낸다", () => {
+    expect(qualifierOf('{"qualifier":"전 대통령"}')).toBe("전 대통령");
+  });
+
+  it("attrs가 없거나 깨져도 터지지 않는다", () => {
+    expect(qualifierOf(null)).toBeNull();
+    expect(qualifierOf("{망가진")).toBeNull();
+  });
+
+  it("기사 많은 사람이 먼저 — 갈래 이름 없는 쪽도 섞여 정렬된다", () => {
+    const rows = [
+      { id: "a", name: "박정희", qualifier: "전 대통령", mentions: 58 },
+      { id: "b", name: "박정희", qualifier: null, mentions: 114 },
+    ];
+    expect(sortSameName(rows).map((r) => r.id)).toEqual(["b", "a"]);
+  });
+});

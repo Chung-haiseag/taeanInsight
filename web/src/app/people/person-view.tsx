@@ -38,6 +38,12 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
             <div>
               <h2 className="text-2xl font-bold text-brand">
                 {prof.person.name}
+                {prof.person.qualifier && (
+                  // 이름만으로는 누구인지 알 수 없는 갈래(동명이인 분리) — 이름 옆에 바로 붙인다.
+                  <span className="ml-2 rounded bg-brand/10 px-2 py-0.5 align-middle text-sm font-semibold text-brand">
+                    {prof.person.qualifier}
+                  </span>
+                )}
                 {prof.nec?.hanja && <span className="ml-2 text-lg font-normal text-foreground-muted">{prof.nec.hanja}</span>}
                 {prof.nec?.birthYear && <span className="ml-2 text-sm font-normal text-foreground-muted">({prof.nec.birthYear}년생)</span>}
               </h2>
@@ -60,6 +66,8 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
         </div>
 
         <PersonIntro prof={prof} />
+
+        <SameNameCard prof={prof} onOpen={onOpen} />
 
         {prof.nec && prof.nec.total > 0 && <CandidacyTable nec={prof.nec} />}
 
@@ -141,6 +149,45 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
           </section>
         )}
       </div>
+  );
+}
+
+// ── 같은 이름의 다른 인물 ───────────────────────────────────────
+// 지역지에서 동명이인은 흔하다. 소원면 주민자치위원장 '박정희'와 전 대통령이 한 사람으로 묶여
+//   전직 대통령 얼굴이 지역 인물에게 걸렸던 사고에서 나왔다(2026-08-27).
+//   본문은 **지역 인물**이 주인공이고, 겹치는 다른 사람은 얼굴·한 줄 소개로 여기서 갈라 준다.
+function SameNameCard({ prof, onOpen }: { prof: PersonProfile; onOpen?: (id: string) => void }) {
+  const alts = prof.sameName ?? [];
+  if (!alts.length) return null;
+  return (
+    <section className="rounded-lg border border-brand/20 bg-brand/[0.03] p-4">
+      <h3 className="mb-2 text-sm font-bold text-brand">같은 이름의 다른 인물</h3>
+      <ul className="space-y-2">
+        {alts.map((a) => (
+          <li key={a.id}>
+            <button type="button" onClick={() => onOpen?.(a.id)}
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-brand/5">
+              {a.photo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={a.photo} alt="" className="h-11 w-11 shrink-0 rounded-full border border-brand/15 object-cover"
+                    loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                : <span aria-hidden className="h-11 w-11 shrink-0 rounded-full border border-brand/15 bg-brand/5" />}
+              <span className="min-w-0">
+                <span className="block text-sm">
+                  <strong className="text-brand">{a.name}</strong>
+                  <span className="ml-1.5 text-foreground-muted">— {a.qualifier ?? "지역 인물"}</span>
+                </span>
+                {a.extract && <span className="mt-0.5 line-clamp-2 block text-xs text-foreground-muted">{a.extract}</span>}
+                <span className="mt-0.5 block text-xs text-foreground-muted">기사 {a.mentions.toLocaleString()}건 보기 →</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 px-2 text-[0.6875rem] text-foreground-muted">
+        이름이 같을 뿐 <strong>다른 사람</strong>입니다. 기사 본문의 쓰임으로 갈랐으며, 애매한 기사는 지역 인물 쪽에 남겨 둡니다.
+      </p>
+    </section>
   );
 }
 

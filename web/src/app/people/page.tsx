@@ -122,7 +122,11 @@ export default function PeoplePage() {
             {hits.map((h) => (
               <li key={h.id}>
                 <button type="button" onClick={() => void open(h.id)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-brand/5">
-                  <span className="font-semibold text-brand">{h.name}</span>
+                  <span className="font-semibold text-brand">
+                    {h.name}
+                    {/* 이름이 같은 두 사람이 나란히 뜨면 고를 수가 없다 — 갈래를 이름 옆에 붙인다. */}
+                    {h.qualifier && <span className="ml-1.5 rounded bg-brand/10 px-1.5 py-0.5 text-xs font-semibold">{h.qualifier}</span>}
+                  </span>
                   <span className="text-xs text-foreground-muted">기사 {h.mentions.toLocaleString()}건</span>
                 </button>
               </li>

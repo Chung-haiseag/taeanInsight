@@ -118,6 +118,13 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
     const w = await getWikiCached(c.env.ARCHIVE_DB, prof.person.name);
     if (w.summary?.thumbnail) prof.photo = w.summary.thumbnail; // 절대 URL(upload.wikimedia.org)
   }
+  // '같은 이름의 다른 인물' 카드에 얼굴과 한 줄 소개를 붙인다 — 이름만 같은 두 사람을
+  //   구별하는 건 결국 얼굴과 한 줄이다. 여기서도 승인된 인물만 사진이 붙는다(wiki_cache라 D1 1회).
+  for (const alt of prof.sameName) {
+    if (!(await isWikiPhotoAllowed(c.env.ARCHIVE_DB, alt.id))) continue;
+    const w = await getWikiCached(c.env.ARCHIVE_DB, alt.name);
+    if (w.summary) { alt.photo = w.summary.thumbnail ?? null; alt.extract = w.summary.extract; }
+  }
   const res = c.json(prof);
   res.headers.set("Cache-Control", "public, s-maxage=900");
   c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));

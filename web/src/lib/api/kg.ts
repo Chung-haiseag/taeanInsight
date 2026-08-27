@@ -111,7 +111,7 @@ export async function unmergeNode(merged_id: string, a_id?: string, b_id?: strin
 }
 
 // 인물 탐색(취재 지원) — backend people.ts
-export interface PersonSearchResult { id: string; name: string; mentions: number }
+export interface PersonSearchResult { id: string; name: string; mentions: number; qualifier?: string | null }
 export function searchPersons(q: string): Promise<{ results: PersonSearchResult[] }> {
   return apiFetch(`/api/admin/kg/persons/search?q=${encodeURIComponent(q)}`);
 }
@@ -133,7 +133,10 @@ export interface NecInfo {
 }
 
 export interface PersonProfile {
-  person: { id: string; name: string; mentions: number; isHub: boolean } | null;
+  person: { id: string; name: string; mentions: number; isHub: boolean; qualifier?: string | null } | null;
+  /** 같은 이름의 다른 인물(노드 분리 결과) — 지역 인물 ↔ 전국 인물처럼 이름만 겹치는 경우. */
+  sameName?: { id: string; name: string; qualifier: string | null; mentions: number;
+               extract?: string | null; photo?: string | null }[];
   nec?: NecInfo | null;
   photo?: string | null; // 역대 군수·현직 군의원 공식 사진 URL(백엔드 상대경로), 없으면 null
   graph: { center: { id: string; name: string } | null; nodes: KgGraphNode[]; edges: KgGraphEdge[] };

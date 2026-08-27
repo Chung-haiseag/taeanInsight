@@ -48,6 +48,24 @@ export async function loadHubIds(db: D1Database): Promise<Set<string>> {
   return ids;
 }
 
+// 같은 이름의 다른 인물 — 한 노드에 두 사람이 섞여 있던 것을 쪼갠 결과를 서로 잇는다.
+//   ('박정희' = 소원면 주민자치위원장 114건 + 전 대통령 58건. db/060 참고)
+export interface SameNamePerson {
+  id: string; name: string; qualifier: string | null; mentions: number;
+  extract?: string | null; photo?: string | null;
+}
+
+// 갈래 이름('전 대통령')은 노드 attrs에 둔다 — name은 '박정희' 그대로여야 검색·위키 조회가 통한다.
+export function qualifierOf(attrsJson: string | null | undefined): string | null {
+  try { const a = JSON.parse(attrsJson ?? "{}"); return typeof a.qualifier === "string" && a.qualifier ? a.qualifier : null; }
+  catch { return null; }
+}
+
+// 기사 많은 쪽이 먼저 — 지역지라 대개 지역 인물이 위로 온다.
+export function sortSameName<T extends { mentions: number }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => b.mentions - a.mentions);
+}
+
 // 전국 인물(대통령·당대표 등)을 '함께 등장'에서 뺄지 — 지역 인물이 가운데일 때만 뺀다.
 //   소원면 주민자치위원장 '박정희' 페이지에 "함께 등장 이승만·박근혜·전두환"이 떴다(2026-08-27).
 //   이들은 칼럼·역사 인용으로 아무 기사에나 나온다 — 바이라인 기자와 똑같은 잡음 허브라 같은 이유로 뺀다.
@@ -70,15 +88,17 @@ export async function loadNationalIds(db: D1Database): Promise<Set<string>> {
 
 function likeEscape(q: string): string { return String(q).replace(/[\\%_]/g, (ch) => "\\" + ch); }
 
-export interface PersonHit { id: string; name: string; mentions: number }
+export interface PersonHit { id: string; name: string; mentions: number; qualifier?: string | null }
 export async function searchPersons(db: D1Database, q: string, limit: number): Promise<PersonHit[]> {
   const term = "%" + likeEscape(q.trim()) + "%";
   const lim = Math.min(Math.max(1, Math.floor(limit) || 20), 50);
   const r = await db.prepare(
-    "SELECT n.id AS id, n.name AS name, (SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+    "SELECT n.id AS id, n.name AS name, n.attrs_json AS attrs_json, " +
+    "(SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
     "FROM kg_nodes n WHERE n.type='person' AND n.name LIKE ? ESCAPE '\\' ORDER BY mentions DESC LIMIT ?",
-  ).bind(term, lim).all<PersonHit>();
-  return r.results ?? [];
+  ).bind(term, lim).all<PersonHit & { attrs_json: string | null }>();
+  // 이름이 같은 두 사람이 나란히 뜨면 고를 수가 없다 — 갈래('전 대통령')를 함께 내려준다.
+  return (r.results ?? []).map(({ attrs_json, ...x }) => ({ ...x, qualifier: qualifierOf(attrs_json) }));
 }
 
 // 질의 문장에 '등장 많은 KG 인물명'이 통째로 포함되면 그 인물을 반환(브리핑 첨부용). 바이라인·저빈도·짧은 이름은 제외.
@@ -146,7 +166,9 @@ export function orderAffiliations(rows: Affiliation[]): Affiliation[] {
 }
 
 export interface PersonProfile {
-  person: { id: string; name: string; mentions: number; isHub: boolean } | null;
+  person: { id: string; name: string; mentions: number; isHub: boolean; qualifier?: string | null } | null;
+  /** 같은 이름의 다른 인물(노드 분리 결과). 없으면 빈 배열. */
+  sameName: SameNamePerson[];
   photo?: string | null; // 역대 군수·현직 군의원이면 공식 사진 URL(/api/archive/photo/...), 없으면 null
   /** 선관위 후보자·당선인 자료(출마 이력·생년·한자). 선관위에 없는 인물이면 null. */
   nec?: NecInfo | null;
@@ -303,6 +325,17 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
 
   // 관계망·함께등장·기사·직위·추이·주제를 병렬 조회 — 서로 독립이라 순차 D1 왕복 대신 동시 실행으로 지연 단축.
   const graphP = personEgo(db, id, limit, hubIds);
+  // 같은 이름의 다른 인물 — 이름은 같고 id가 다른 노드(분리된 갈래). 대개 0건이라 비용은 거의 없다.
+  const sameNameP = (async (): Promise<SameNamePerson[]> => {
+    const r = await db.prepare(
+      "SELECT n.id AS id, n.name AS name, n.attrs_json AS attrs_json, " +
+      "(SELECT COUNT(*) FROM kg_mentions m WHERE m.node_id=n.id) AS mentions " +
+      "FROM kg_nodes n WHERE n.type='person' AND n.name=? AND n.id<>?",
+    ).bind(p.name, id).all<{ id: string; name: string; attrs_json: string | null; mentions: number }>();
+    return sortSameName((r.results ?? []).map((x) => ({
+      id: x.id, name: x.name, qualifier: qualifierOf(x.attrs_json), mentions: Number(x.mentions) || 0,
+    })));
+  })();
   const coappearP = (async (): Promise<PersonProfile["coappear"]> => {
     // 함께등장: 인접 coappears의 상대·weight → 바이라인 제외·상위 → 이름 조회. 검수용 엣지 id·verified·relreason 포함.
     const inc = await db.prepare(
@@ -364,7 +397,9 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   const topics = topTopics((tt.results ?? []).map((x) => x.title), p.name);
 
   return {
-    person: { id: p.id, name: p.name, mentions: Number(p.mentions) || 0, isHub: isHub(Number(p.mentions) || 0) },
+    person: { id: p.id, name: p.name, mentions: Number(p.mentions) || 0, isHub: isHub(Number(p.mentions) || 0),
+              qualifier: qualifierOf(p.attrs_json) },
+    sameName: await sameNameP,
     photo: mayorPhotoFor(p.name) ?? councilPhotoFor(p.name), // 군수·현직 군의원 공식 사진
     nec: readNecInfo(p.attrs_json),                          // 선관위 출마 이력(없으면 null)
     graph,
