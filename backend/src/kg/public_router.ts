@@ -4,7 +4,7 @@
 //   공개 여부는 app_settings.public_people 플래그로 superadmin이 즉시 토글(배포 불필요).
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed, isPersonHub } from "./people";
+import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed, isPersonHub, isWikiPhotoAllowed } from "./people";
 import { getSetting, SETTING_PUBLIC_PEOPLE } from "../settings";
 
 export const kgPublicRouter = new Hono<{ Bindings: Env }>();
@@ -111,9 +111,10 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
   if (hit) return hit;
   const prof = await buildPersonProfile(c.env.ARCHIVE_DB, c.req.param("id"), 12);
   if (!prof) return c.json({ error: "not_found" }, 404);
-  // R2 공식 사진(군수·의원)이 없으면, 위키백과에 인물 사진이 있을 때 아바타로 사용(도지사·국회의원 등).
-  //   단 초허브(바이라인)는 위키 오매칭 위험이 있어 위키 사진을 붙이지 않는다.
-  if (!prof.photo && prof.person && !prof.person.isHub) {
+  // R2 공식 사진(군수·의원)이 없으면, 위키백과 사진을 아바타로 쓴다 — 단 **승인된 인물만**.
+  //   이름만 맞으면 붙이던 탓에 소원면 주민자치위원장 '박정희'가 전직 대통령 얼굴을 달고 있었다.
+  if (!prof.photo && prof.person && !prof.person.isHub
+      && await isWikiPhotoAllowed(c.env.ARCHIVE_DB, c.req.param("id"))) {
     const w = await getWikiCached(c.env.ARCHIVE_DB, prof.person.name);
     if (w.summary?.thumbnail) prof.photo = w.summary.thumbnail; // 절대 URL(upload.wikimedia.org)
   }

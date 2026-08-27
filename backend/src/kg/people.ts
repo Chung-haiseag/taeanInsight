@@ -48,6 +48,26 @@ export async function loadHubIds(db: D1Database): Promise<Set<string>> {
   return ids;
 }
 
+// 전국 인물(대통령·당대표 등)을 '함께 등장'에서 뺄지 — 지역 인물이 가운데일 때만 뺀다.
+//   소원면 주민자치위원장 '박정희' 페이지에 "함께 등장 이승만·박근혜·전두환"이 떴다(2026-08-27).
+//   이들은 칼럼·역사 인용으로 아무 기사에나 나온다 — 바이라인 기자와 똑같은 잡음 허브라 같은 이유로 뺀다.
+//   전국 인물 본인 페이지에서는 빼지 않는다(서로가 유일하게 뜻 있는 관계다).
+export function nationalToExclude(national: Set<string>, centerId: string): Set<string> {
+  return national.has(centerId) ? new Set<string>() : national;
+}
+
+// 전국 인물 목록 — kg_bio_suppressed가 이미 curate한 것을 재사용. 5분 캐시.
+let _natCache: { at: number; ids: Set<string> } | null = null;
+export async function loadNationalIds(db: D1Database): Promise<Set<string>> {
+  if (_natCache && Date.now() - _natCache.at < 300_000) return _natCache.ids;
+  try {
+    const r = await db.prepare("SELECT node_id AS id FROM kg_bio_suppressed").all<{ id: string }>();
+    const ids = new Set((r.results ?? []).map((x) => x.id));
+    _natCache = { at: Date.now(), ids };
+    return ids;
+  } catch { return new Set<string>(); } // 표가 없으면 아무도 안 뺀다
+}
+
 function likeEscape(q: string): string { return String(q).replace(/[\\%_]/g, (ch) => "\\" + ch); }
 
 export interface PersonHit { id: string; name: string; mentions: number }
@@ -170,6 +190,22 @@ export async function isBioSuppressed(db: D1Database, id: string): Promise<boole
   catch { return false; } // 테이블 없으면(마이그레이션 전) 억제 안 함
 }
 
+// 위키백과 사진을 아바타로 쓸지 — **승인된 인물만**.
+//   예전엔 이름만 맞으면 붙였다. 태안 소원면 주민자치위원장 '박정희'에게 전직 대통령 얼굴이 걸렸고
+//   김옥·황광성·최규옥·태민·한승수도 같은 식으로 남의 얼굴을 달고 있었다(2026-08-27 실측 6명).
+//   동명이인은 지역지에서 흔하다 — 기본값은 **안 붙임**이고, 사람이 확인한 것만 붙인다.
+//   두 갈래를 본다: 전국 인물 억제 목록(대통령·당대표 등)과, 지역에서 실제로 취재되는
+//   인물만 따로 승인하는 표(충남지사·지역 국회의원 — 이들은 지역 AI 소개가 더 쓸모 있어 억제하지 않는다).
+export async function isWikiPhotoAllowed(db: D1Database, id: string): Promise<boolean> {
+  try {
+    const [sup, ok] = await Promise.all([
+      db.prepare("SELECT 1 AS x FROM kg_bio_suppressed WHERE node_id=?").bind(id).first(),
+      db.prepare("SELECT 1 AS x FROM kg_wiki_photo_ok WHERE node_id=?").bind(id).first().catch(() => null),
+    ]);
+    return !!(sup || ok);
+  } catch { return false; } // 표가 없으면(마이그레이션 전) 안 붙인다 — 틀린 얼굴보다 빈 자리가 낫다
+}
+
 // AI 인물 브리핑 — 직위·나온 기사 제목·주요 관계를 Workers AI로 3~4문장 요약(무료, 제목 근거로만).
 export async function buildPersonBrief(db: D1Database, ai: unknown, id: string): Promise<string | null> {
   const prof = await buildPersonProfile(db, id, 10);
@@ -261,7 +297,9 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   ).bind(id).first<{ id: string; name: string; attrs_json: string | null; mentions: number }>();
   if (!p) return null;
 
-  const hubIds = await loadHubIds(db);
+  // 바이라인 기자 + (지역 인물일 때) 전국 인물 — 둘 다 아무 기사에나 나오는 잡음 허브다.
+  const [rawHubs, national] = await Promise.all([loadHubIds(db), loadNationalIds(db)]);
+  const hubIds = new Set([...rawHubs, ...nationalToExclude(national, id)]);
 
   // 관계망·함께등장·기사·직위·추이·주제를 병렬 조회 — 서로 독립이라 순차 D1 왕복 대신 동시 실행으로 지연 단축.
   const graphP = personEgo(db, id, limit, hubIds);
