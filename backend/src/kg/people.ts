@@ -135,7 +135,9 @@ export async function detectPersonInQuery(db: D1Database, query: string): Promis
   return cand.length ? { id: cand[0].id, name: cand[0].name } : null;
 }
 
-export interface Affiliation { org: string; orgId: string; role: string; years: string; evidence: string }
+export interface Affiliation { org: string; orgId: string; role: string; years: string; evidence: string;
+  /** 연도가 '기사에 나온 해'인가(선관위 공식 연도가 아니라). 화면이 표기를 달리해야 한다. */
+  fromArticles?: boolean }
 
 /**
  * 연도 표기 정리(순수).
@@ -147,6 +149,27 @@ export function formatYears(years: string | string[] | undefined | null): string
     .map((y) => String(y).trim()).filter(Boolean).sort();
   if (!list.length) return "";
   return list[0] === list[list.length - 1] ? list[0] : `${list[0]}~${list[list.length - 1]}`;
+}
+
+/**
+ * 기사에서 뽑은 소속의 연도 표기(순수).
+ *
+ *   ⚠ 이 연도는 **재임 기간이 아니라 '그 소속으로 기사에 나온 해'**다. 처음~끝으로 줄이면
+ *     한상기가 '태안군청 군수 2006~2025'가 된다 — 실제 재임은 2014-07~2018-06이다(2026-08-27 제보).
+ *     이어진 해만 묶고 **끊긴 자리는 나눠** 보여주면 2006 · 2014~2018 · 2020~2025로 실제가 드러난다.
+ *   구간이 잘게 쪼개지면(4개 초과) 되레 읽기 어려워 처음~끝으로 되돌린다.
+ */
+export function yearRuns(years: string | string[] | undefined | null, maxRuns = 4): string {
+  const list = [...new Set((Array.isArray(years) ? years : String(years ?? "").split(/[·,\s]+/))
+    .map((y) => parseInt(String(y).trim(), 10)).filter((n) => Number.isInteger(n) && n > 1800))].sort((a, b) => a - b);
+  if (!list.length) return "";
+  const runs: [number, number][] = [];
+  for (const y of list) {
+    const last = runs[runs.length - 1];
+    if (last && y === last[1] + 1) last[1] = y; else runs.push([y, y]);
+  }
+  if (runs.length > maxRuns) return `${list[0]}~${list[list.length - 1]}`;
+  return runs.map(([a, b]) => (a === b ? `${a}` : `${a}~${b}`)).join(" · ");
 }
 
 /**
@@ -164,7 +187,7 @@ export function mergeAffiliations(rows: Affiliation[]): Affiliation[] {
     if (!cur) { by.set(r.orgId, { ...r }); continue; }
     const roles = [...new Set([...cur.role.split("·"), ...r.role.split("·")].map((x) => x.trim()).filter(Boolean))];
     cur.role = roles.join("·");
-    if (!cur.years) cur.years = r.years;
+    if (!cur.years) { cur.years = r.years; cur.fromArticles = r.fromArticles; }
     if (!cur.evidence) cur.evidence = r.evidence;
   }
   return [...by.values()];
@@ -392,9 +415,9 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
   ).bind(id).all<{ office: string; attrs_json: string | null }>();
   // 소속(검수된 belongs_to만) — 화면에 '어디 소속인가'를 보여주기 위해.
   const affP = db.prepare(
-    "SELECT o.id AS orgId, o.name AS org, e.attrs_json AS attrs_json FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id " +
+    "SELECT e.id AS edgeId, o.id AS orgId, o.name AS org, e.attrs_json AS attrs_json FROM kg_edges e JOIN kg_nodes o ON o.id=e.dst_id " +
     "WHERE e.src_id=? AND e.rel='belongs_to' AND e.verified=1 AND o.verified=1",
-  ).bind(id).all<{ orgId: string; org: string; attrs_json: string | null }>();
+  ).bind(id).all<{ edgeId: string; orgId: string; org: string; attrs_json: string | null }>();
   // 시기별 추이(연도별 기사 수)
   const tlP = db.prepare(
     "SELECT CAST(strftime('%Y', a.published_at) AS INTEGER) AS year, COUNT(*) AS count " +
@@ -431,7 +454,12 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
       try { a = r.attrs_json ? JSON.parse(r.attrs_json) : {}; } catch { /* 깨진 값은 빈 것으로 */ }
       // 여러 대수에 걸쳐 직함이 달랐으면 함께 적는다 — 대표 직함만 보이면 의장을 지낸 사실이 묻힌다.
       const role = a.roles?.length ? a.roles.join("·") : (a.role ?? "");
-      return { org: r.org, orgId: r.orgId, role, years: formatYears(a.years), evidence: a.evidence ?? "" };
+      // 기사에서 뽑은 소속(`e:belongs:…`)의 연도는 **재임 기간이 아니라 기사에 나온 해**다.
+      //   처음~끝으로 줄이면 한상기가 '군수 2006~2025'가 된다 — 끊긴 자리를 살려 보여준다.
+      //   선관위에서 온 것(`…--belongs_to--…`)은 실제 연도라 그대로 둔다.
+      const fromArticles = r.edgeId.startsWith("e:belongs:");
+      return { org: r.org, orgId: r.orgId, role, evidence: a.evidence ?? "", fromArticles,
+               years: fromArticles ? yearRuns(a.years) : formatYears(a.years) };
     }))),
     timeline,
     topics,
