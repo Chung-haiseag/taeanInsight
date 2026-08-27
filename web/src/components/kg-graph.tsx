@@ -188,7 +188,9 @@ export default function KgGraph({
       }
       // 라벨
       ctx!.globalAlpha = 1; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
-      for (const n of ns) { const show = n.center || n.kind === "org" || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
+      for (const n of ns) { // 비인물(기관·행사·사업·장소)은 **늘** 이름을 쓴다. 예전엔 org만 넣어 둬서
+        //   행사가 이름 없는 보라 점으로만 떴다(진태구의 꽃박람회 31건·황토축제 8건이 등장수 40 미만이라 잘렸다).
+        const show = n.center || (n.kind && n.kind !== "person") || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
         ctx!.font = (n.center ? "800 13px " : (n.id === selected || n.id === hovered) ? "700 12px " : "600 12px ") + FONT; const ly = PY(n) + n.r + 11;
         // 이모지를 붙이지 않는다 — 색이 이미 종류를 말하고, 이모지는 이름을 밀어낸다.
         ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(n.name, PX(n), ly);
