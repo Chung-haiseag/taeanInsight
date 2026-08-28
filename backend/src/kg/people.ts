@@ -60,9 +60,34 @@ const ANON_PATTERNS = [
   /^[가-힣][0OoＯ○●◯XxＸ*]+$/,    // 김O · 곽00 · 김OO · 이○○
   /^[A-Za-z]$/,                   // A · B (한 글자 알파벳은 이름이 아니다)
 ];
+/**
+ * AI 인물 소개가 **공식 직위 표와 어긋나는지**(순수).
+ *
+ *   ⚠ 소개를 지우고 다시 만들면 같은 답이 나온다 — 원인은 캐시가 아니라 모델이 공동등장을
+ *     직함으로 읽는 것이다. 그래서 만든 뒤 사실표와 대조해, 어긋나면 **내보내지 않는다**.
+ *     '이종일은 8년간 태안군수를 지낸 인물이다'(옥파 이종일 선생과 뒤섞임), 문석호·변웅전(국회의원),
+ *     박풍수·김선주·이용욱이 같은 문장을 달고 있었다(2026-08-28 감사).
+ *   ⚠ '부군수'와 다른 지자체 군수('서천군수')는 우리 사실표와 무관하니 막지 않는다.
+ *     틀린 소개보다 없는 소개가 낫지만, 맞는 소개까지 지우면 그것도 손해다.
+ */
+export function contradictsOffice(bio: string, offices: { office: string }[]): boolean {
+  const b = String(bio ?? "");
+  // '태안군수' 바로 앞이 한글이면 '부군수'·'서천군수'처럼 다른 말의 일부다.
+  const claim = /(^|[^가-힣])태안군수(를 지낸|를 역임|였|이다|로 재직|를 맡)/.test(b);
+  if (!claim) return false;
+  return !offices.some((o) => (o.office ?? "").includes("태안군수"));
+}
+
+// 사람 아닌 이름 — 본문의 낱말이 인물이 된 것. 규칙으로 잡히지 않아 **확인된 것만** 적는다.
+//   김부·최부 ← "김 부군수"·"최 부군수"를 붙여 쓴 표기에서 성+'부'가 떨어져 나왔다.
+//   권한 ← "군수 권한 대행". 장은 ← "교육장은"(직함+조사).
+//   ⚠ 완전일치로만 본다 — 김부겸·권한나·장은숙 같은 진짜 이름을 지우면 안 된다.
+const NOT_PERSON = new Set(["권한", "김부", "최부", "장은"]);
+
 export function isAnonymizedName(name: string): boolean {
   const n = String(name ?? "").trim();
   if (!n) return false;
+  if (NOT_PERSON.has(n)) return true;
   return ANON_PATTERNS.some((re) => re.test(n));
 }
 
@@ -342,11 +367,14 @@ export async function buildPersonBrief(db: D1Database, ai: unknown, id: string):
       });
       const raw = (res.content ?? "").replace(/\s+/g, " ").trim();
       if (raw.length <= 10) continue;
+      // 사실표와 어긋나면 버린다 — '태안군수를 지낸'인데 공식 직위 표에 없는 사람.
+      //   틀린 소개보다 없는 소개가 낫다(사진과 같은 원칙).
+      if (contradictsOffice(raw, prof.offices)) { contaminated = null; continue; }
       if (!hasForeignScript(raw) && !/[A-Za-z]{4,}/.test(raw)) return stripHanja(raw);   // 깨끗(외국문자·로마자 오출력 없음) → 반환
       contaminated = raw;                                    // 오염 → 재작성
     }
     const cleaned = stripHanja(contaminated ?? "");          // 재시도도 오염 → 최후 방어(토큰 제거)
-    return cleaned.length > 10 ? cleaned : null;
+    return cleaned.length > 10 && !contradictsOffice(cleaned, prof.offices) ? cleaned : null;
   } catch { return null; }
 }
 

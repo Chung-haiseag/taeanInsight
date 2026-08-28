@@ -25,7 +25,19 @@ export const MAYORS: MayorInfo[] = [
   { name: "조철행", terms: "1대(1989.1~1989.11)", photo: "01" },
 ];
 
+// 신문이 쓰는 표기 → 공식 명부 이름. 모순 감사(2026-08-28)에서 갈린 것만 적는다.
+//   신문 표기 쪽이 기사를 다 갖고 있어(류응상 16건·송성헌 101건) 그 노드가 사진·직위를 못 받고 있었다.
+//   ⚠ '송성현'(16건)은 군수와 붙은 기사가 0건이라 5대 군수와 **다른 사람**이다 — 별칭이지 병합이 아니다.
+const NAME_ALIASES: Record<string, string> = {
+  류응상: "유응상",   // 2대 · 신문 표기
+  송성헌: "송성현",   // 5대 · 신문 표기
+};
+
 const BY_NAME = new Map(MAYORS.map((m) => [m.name, m]));
+for (const [alias, official] of Object.entries(NAME_ALIASES)) {
+  const m = BY_NAME.get(official);
+  if (m) BY_NAME.set(alias, m);
+}
 
 // 이름으로 역대 군수 공개 사진 URL. 군수가 아니면 null.
 export function mayorPhotoFor(name: string): string | null {

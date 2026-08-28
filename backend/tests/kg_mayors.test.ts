@@ -25,3 +25,22 @@ describe("역대 군수 사진·정보 매핑", () => {
     expect(new Set(MAYORS.map((m) => m.photo)).size).toBe(12);
   });
 });
+
+// 모순 감사(2026-08-28): 공식 명부와 신문 표기가 갈렸다.
+//   명부 '유응상'(2대)·'송성현'(5대) ↔ 신문은 '류응상'(군수와 붙은 기사 8건)·'송성헌'(51건).
+//   신문 표기 노드가 기사를 다 갖고 있는데 사진·직위가 안 붙었다.
+//   ※ '송성현'은 따로 16건 있으나 군수와 붙은 기사가 **0건**이라 동일인이 아니라 다른 사람이다.
+describe("역대 군수 — 신문 표기로도 찾아진다", () => {
+  it.each(["류응상", "송성헌"])("'%s'로도 공식 사진이 나온다", (n) => {
+    expect(mayorPhotoFor(n)).toBeTruthy();
+  });
+
+  it("명부 표기도 그대로 찾아진다", () => {
+    expect(mayorPhotoFor("유응상")).toBeTruthy();
+    expect(mayorPhotoFor("송성현")).toBeTruthy();
+  });
+
+  it("군수가 아닌 사람은 여전히 null", () => {
+    expect(mayorPhotoFor("김영인")).toBeNull();
+  });
+});

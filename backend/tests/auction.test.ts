@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregateByFish } from "../src/tour/auction";
+import { aggregateByFish, parseAuctionResponse } from "../src/tour/auction";
 
 describe("aggregateByFish", () => {
   const recs = [
@@ -37,4 +37,53 @@ describe("aggregateByFish", () => {
   });
 
   it("빈 입력은 빈 배열", () => expect(aggregateByFish([])).toEqual([]));
+});
+
+// 상류(해수부) 응답 봉투 — 2026-08에 두 번 바뀌었다.
+//   · JSON 요청 파라미터 resultType=json 이 무시되고 XML이 오기 시작
+//   · JSON 봉투가 {header,body} → {responseJson:{header,body}}
+//   파서가 조용히 죽어 08-04 스냅샷이 20일간 시세로 나갔다. 그래서 이 층에 테스트를 둔다.
+describe("parseAuctionResponse", () => {
+  const item = { csmtmktNm: "안흥판매사업소", mprcStdCodeNm: "꽃게", kdfshSttusNm: "활어", csmtWt: "100", csmtUntpc: "12000", csmtAmount: "1200000" };
+
+  it("새 봉투(responseJson으로 감싼 형태)를 읽는다", () => {
+    const body = JSON.stringify({ responseJson: { header: { resultMsg: "정상", totalCount: 453 }, body: { item: [item] } } });
+    const r = parseAuctionResponse(body);
+    expect(r.items).toHaveLength(1);
+    expect(r.total).toBe(453);
+    expect(r.message).toBeUndefined();
+  });
+
+  it("옛 봉투(최상위 header/body)도 그대로 읽는다", () => {
+    const body = JSON.stringify({ header: { resultMsg: "정상", totalCount: "2" }, body: { item: [item, item] } });
+    const r = parseAuctionResponse(body);
+    expect(r.items).toHaveLength(2);
+    expect(r.total).toBe(2);
+  });
+
+  it("item이 객체 하나면 배열로 감싼다", () => {
+    const body = JSON.stringify({ responseJson: { header: { totalCount: 1 }, body: { item } } });
+    expect(parseAuctionResponse(body).items).toHaveLength(1);
+  });
+
+  it("XML이 오면 빈 배열이되 '왜'를 남긴다 — 조용히 0건이면 안 된다", () => {
+    const r = parseAuctionResponse('<?xml version="1.0"?><responseXml><header><resultMsg>정상</resultMsg></header></responseXml>');
+    expect(r.items).toEqual([]);
+    expect(r.total).toBe(0);
+    expect(r.message).toMatch(/JSON/);
+  });
+
+  it("데이터 없는 날은 정상 — 경고 메시지를 남기지 않는다", () => {
+    const body = JSON.stringify({ responseJson: { header: { resultCode: "00", resultMsg: "조회된 데이터가 없습니다.", totalCount: 0 }, body: {} } });
+    const r = parseAuctionResponse(body);
+    expect(r.items).toEqual([]);
+    expect(r.message).toBeUndefined();
+  });
+
+  it("서비스키 오류 같은 상류 에러는 이유를 남긴다", () => {
+    const body = JSON.stringify({ OpenAPI_ServiceResponse: { cmmMsgHeader: { errMsg: "SERVICE_KEY_IS_NOT_REGISTERED_ERROR", returnAuthMsg: "등록되지 않은 서비스키" } } });
+    const r = parseAuctionResponse(body);
+    expect(r.items).toEqual([]);
+    expect(r.message).toMatch(/서비스키/);
+  });
 });
