@@ -329,6 +329,26 @@ export default {
     } catch (e) {
       console.warn("[cron] 예보 적중률 실패:", e instanceof Error ? e.message : e);
     }
+    // 지식그래프 논리 감사 — **논리적으로 불가능한 것**만 세어 kv_cache에 남긴다.
+    //   2026-08-28에 부군수 23명이 '태안군수'로 8일간 떠 있었다. 추출 코드는 이미 고쳐졌는데
+    //   데이터가 안 따라온 것이었다 — 사람이 생각날 때만 도는 감사로는 이런 어긋남을 못 잡는다.
+    //   결과는 /admin 지식그래프 화면이 읽는다. 위반이 있으면 로그에 크게 남긴다.
+    try {
+      const db = env.ARCHIVE_DB;
+      if (!db) throw new Error("ARCHIVE_DB 없음");
+      const { runLogicAudit } = await import("./kg/logic_audit");
+      const a = await runLogicAudit(db);
+      await db.prepare(
+        "INSERT INTO kv_cache(k, v, ts) VALUES('kg_logic_audit', ?, ?) " +
+        "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
+      ).bind(JSON.stringify(a), Date.now()).run();
+      if (a.ok) console.log("[cron] 지식그래프 논리 감사: 이상 없음");
+      else console.warn(`[cron] ⚠ 지식그래프 논리 위반 ${a.total}건 — ` +
+        a.failed.map((f) => `${f.label} ${f.count}`).join(" · ") +
+        (a.errored.length ? ` (질의 실패 ${a.errored.length}건)` : ""));
+    } catch (e) {
+      console.warn("[cron] 논리 감사 실패:", e instanceof Error ? e.message : e);
+    }
     // 관광 수요지수 로그 — 다가오는 주말 지수를 누적 저장(예보 갱신 추적·백테스트 기반)
     try {
       const { logDemand } = await import("./tour/demand_log");

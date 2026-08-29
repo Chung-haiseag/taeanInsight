@@ -28,6 +28,21 @@ const NEC_OPS: Record<string, string> = {
   candidates: "PofelcddInfoInqireService/getPofelcddRegistSttusInfoInqire",
   winners: "WinnerInfoInqireService2/getWinnerInfoInqire",
 };
+// 논리 감사 — 저장된 최근 결과(크론이 매일 00:00 KST에 남긴다)와, 지금 즉시 돌리기.
+//   `?run=1`이면 그 자리에서 다시 돌린다(질의가 무거우니 기본은 저장분을 읽는다).
+router.get("/audit/logic", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const { runLogicAudit } = await import("./logic_audit");
+  if (c.req.query("run") === "1") return c.json({ ...(await runLogicAudit(c.env.ARCHIVE_DB)), fresh: true });
+  const row = await c.env.ARCHIVE_DB
+    .prepare("SELECT v, ts FROM kv_cache WHERE k='kg_logic_audit'")
+    .first<{ v: string; ts: number }>()
+    .catch(() => null);
+  if (!row) return c.json({ ok: null, note: "아직 감사 기록이 없습니다(크론 미실행). ?run=1로 즉시 실행하세요." });
+  // ⚠ 언제 잰 값인지 함께 준다 — 묵은 캐시를 '지금 정상'으로 읽는 사고가 있었다(수산물 시세 3주 캐시).
+  return c.json({ ...JSON.parse(row.v), checkedAt: new Date(row.ts).toISOString(), ageHours: Math.round((Date.now() - row.ts) / 36e5) });
+});
+
 router.get("/nec/probe", async (c) => {
   const op = c.req.query("op") ?? "elections";
   const path = NEC_OPS[op];
