@@ -285,6 +285,11 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
     if (!isLikelyName(name)) return;
     if (aliasSet.has(name)) return; // 조직 별칭 자체는 인명 아님
     if (!roleFitsOrg(orgId, role)) return;
+    // ⚠ 후보·출마예정자는 **재임 직함이 아니다**. '강철민 태안군수 후보'가 군수 소속으로 들어가
+    //   4선 도의원이 군수로 읽혔다(2026-08-28 감사). '당선'은 막지 않는다 — 실제로 그 자리에 간다.
+    //   ⚠ 창 안 아무 데나 '후보'가 있다고 막으면 안 된다 — 선거 기사의 창에는 무관한 '후보'가
+    //     늘 섞여 있어 멀쩡한 과장·회장까지 299건이 거부됐다. **직함에 바로 붙은 것만** 본다.
+    if (new RegExp(`${escapeRe(role)}\\s*(후보|출마|예정자|경선|입후보)`).test(evidence)) return;
     const k = `${name}|${orgId}`;
     if (!out.has(k)) out.set(k, { personName: name, orgId, role, evidence: snippet(evidence) });
   };
@@ -298,6 +303,12 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
       //   더 긴 직함의 꼬리면 건너뛴다 — 그 긴 직함은 따로 처리된다.
       if (Object.keys(IMPLIED_ORG).some((o) =>
         o !== title && o.endsWith(title) && body.slice(pos - (o.length - title.length), pos + title.length) === o)) continue;
+      // ⚠ 직함은 **낱말 첫머리**에서 시작해야 한다. '전라도 고부군수 조병갑'에서 '고부군수' 속
+      //   '부군수'가 걸려 1894년 고부군수가 태안 부군수가 됐다(2026-08-28 감사).
+      //   앞 글자가 한글이면 더 긴 말의 일부다 — 단 '태안군수'·'태안부군수'는 우리 것이다.
+      //   덤으로 '서산군수'·'당진군수'도 여기서 걸린다(NON_NAME 목록에 없어도 된다).
+      const before = body.slice(0, pos);
+      if (/[가-힣]$/.test(before) && !before.endsWith("태안")) continue;
       const w0 = Math.max(0, pos - 20), w1 = Math.min(body.length, pos + title.length + 12);
       const window = body.slice(w0, w1);
       // (a) 이름 → (지역) → 직함 순서: 사이에 낀 지역명이 '태안'이 아니면 그 지역의 직함이다.
@@ -327,17 +338,22 @@ export function extractAffiliations(body: string, orgs: OrgDef[] = ORGS): Candid
 
       // (b) 직함 → 이름 순서('군의원 김영인'): 지역이 낄 자리가 없으므로 그대로 채택.
       //     단 '홍성군(군수 이용록)'처럼 괄호 주인이 다른 지자체면 그 지자체의 직함이다.
-      const afterRe = new RegExp(`([가-힣]{2,6})?\\s*[(（]?\\s*${escapeRe(title)}\\s?([가-힣]{2,4})`, "g");
+      const afterRe = new RegExp(`([가-힣]{2,6})?(\\s*)[(（]?\\s*${escapeRe(title)}\\s?([가-힣]{2,4})`, "g");
       for (const m of ownedBefore ? [] : window.matchAll(afterRe)) {
         const owner = (m[1] ?? "").trim();
         if (owner && /(군|시|구)$/.test(owner) && !owner.startsWith("태안")) continue;
         // '서산군수 박정기'처럼 지역명이 직함에 바로 붙는 형태 — owner가 '서산'으로만 잡힌다.
         if (owner && NON_NAME.has(owner.slice(-2)) && owner.slice(-2) !== "태안") continue;
+        // ⚠ 직함에 **띄어쓰기 없이 붙은** 앞말은 그 직함의 지역이다 — '고부군수'·'서산군수'.
+        //   NON_NAME 목록에 없는 고장이 계속 나온다('전라도 고부군수 조병갑'이 태안군수가 됐다).
+        //   붙어 있으면 '태안'일 때만 우리 것으로 본다. 띄어 있으면(‘…회의실에서 군수 김영인’)
+        //   앞말은 지역이 아니라 그냥 앞 문장이라 건드리지 않는다.
+        if (owner && m[2] === "" && !owner.endsWith("태안")) continue;
         // 명단 어순('이용복 군의원 조한식 면장')에서는 직함 뒤 이름이 **다음 사람**이다.
         //   그 이름 바로 뒤에 다른 기관의 직함이 붙어 있으면 그 사람은 그쪽 소속이다(2026-08-20 실측).
         //   '김영인 의장'처럼 같은 기관에서 함께 쓰이는 직함은 막지 않는다.
         if (followedByOtherTitle(window, (m.index ?? 0) + m[0].length)) continue;
-        add(m[2], orgId, title, window);
+        add(m[3], orgId, title, window);
       }
     }
   }
