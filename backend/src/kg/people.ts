@@ -53,8 +53,14 @@ export async function loadHubIds(db: D1Database): Promise<Set<string>> {
 //   서로 무관한 수백 명이 한 사람처럼 묶여, 사건·재판 기사가 많은 만큼 **한 사람이 저 일을 다 한 것처럼**
 //   읽힌다. 지우지 않고 화면에서만 감춘다(추출 근거는 남겨 둔다).
 const ANON_PATTERNS = [
-  /^[가-힣A-Za-z]모$/,            // 김모 · K모
-  /^[가-힣A-Za-z]모(씨|군|양|옹)$/, // 김모씨 · A모씨 · 김모군 · 김모양(미성년 익명)
+  //   ⚠ 성 자리엔 한자도 온다('金모씨'·'李모씨'). 한글·영문만 보면 그대로 새어 나간다.
+  /^[가-힣A-Za-z\u4E00-\u9FFF]모$/,            // 김모 · K모 · 金모
+  /^[가-힣A-Za-z\u4E00-\u9FFF]모(씨|군|양|옹)$/, // 김모씨 · A모씨 · 金모씨 · 김모군 · 김모양(미성년 익명)
+  // '아무개' 꼴 — 2026-09-01 정합성 점검에서 84개 노드·언급 1,100건이 **검색에 그대로 떠 있었다**.
+  //   김아무개 282건이 이아무개·박아무개·신아무개와 관계망을 이루고 있었다(뜻 없는 화면).
+  //   성이 없는 '아무개', 공백 낀 '박 아무개', 뒤에 씨가 붙은 '한아무개씨'까지 한 꼴로 잡는다.
+  //   ⚠ 어디서나 '아무개'를 지우면 안 된다 — 이름 안에 든 진짜 사람까지 죽는다. 통째로 맞을 때만.
+  /^[가-힣A-Za-z\u4E00-\u9FFF]?\s?아무개(씨|군|양|옹)?$/,
   //   ⚠ 세 글자 '○○모'(이정모·배광모·구창모)는 진짜 이름이다 — 두 글자 성+모만 익명이다.
   /^[가-힣A-Za-z]씨$/,            // 김씨 · A씨
   /^[가-힣][0OoＯ○●◯XxＸ*]+$/,    // 김O · 곽00 · 김OO · 이○○
@@ -176,7 +182,9 @@ export interface Affiliation { org: string; orgId: string; role: string; years: 
   /** 연도가 '기사에 나온 해'인가(선관위 공식 연도가 아니라). 화면이 표기를 달리해야 한다. */
   fromArticles?: boolean;
   /** 이 직함으로 나온 기사 수. 선관위에서 온 것은 없다(공식 자료라 셀 필요가 없다). */
-  count?: number }
+  count?: number;
+  /** 기사 말고 **공식 자료**(선관위 등) 근거가 있는가. 기사 한 건짜리와 합쳐져도 살아남아야 한다. */
+  official?: boolean }
 
 /**
  * 연도 표기 정리(순수).
@@ -222,7 +230,7 @@ export function yearRuns(years: string | string[] | undefined | null, maxRuns = 
  *   선관위에서 온 것은 기사 수가 없어도 남긴다 — 공식 자료다.
  */
 export function keepWellSupported(rows: Affiliation[], minCount = 2): Affiliation[] {
-  return rows.filter((r) => !r.fromArticles || (r.count ?? 0) >= minCount);
+  return rows.filter((r) => r.official || !r.fromArticles || (r.count ?? 0) >= minCount);
 }
 
 /**
@@ -234,17 +242,32 @@ export function keepWellSupported(rows: Affiliation[], minCount = 2): Affiliatio
  *     근본 정리(한 형식으로 모으기)는 따로 하고, 우선 보이는 것부터 합친다.
  */
 export function mergeAffiliations(rows: Affiliation[]): Affiliation[] {
-  const by = new Map<string, Affiliation>();
-  for (const r of rows) {
-    const cur = by.get(r.orgId);
-    if (!cur) { by.set(r.orgId, { ...r }); continue; }
-    const roles = [...new Set([...cur.role.split("·"), ...r.role.split("·")].map((x) => x.trim()).filter(Boolean))];
-    cur.role = roles.join("·");
-    if (!cur.years) { cur.years = r.years; cur.fromArticles = r.fromArticles; }
-    cur.count = Math.max(cur.count ?? 0, r.count ?? 0) || undefined;
-    if (!cur.evidence) cur.evidence = r.evidence;
-  }
-  return [...by.values()];
+  const by = new Map<string, Affiliation[]>();
+  for (const r of rows) { const g = by.get(r.orgId) ?? []; g.push(r); by.set(r.orgId, g); }
+  return [...by.values()].map((g) => {
+    const art = g.find((r) => r.fromArticles);
+    const off = g.find((r) => !r.fromArticles);
+    // 여러 대수에 걸쳐 직함이 달랐으면 함께 적는다 — 대표 직함만 보이면 의장을 지낸 사실이 묻힌다.
+    //   ⚠ 단 **기사 한 건짜리 직함은 합치지 않는다.** 대표 근거로도 안 삼는 것을 직함으로만
+    //     끼워 넣으면 '더불어민주당 · 의장·소속 정당' 같은 줄이 나온다(그 '의장'은 군의회 의장이다).
+    //     기사 근거밖에 없으면 그대로 쓴다 — 그 줄은 keepWellSupported가 통째로 걸러낸다.
+    const strong = g.filter((r) => !r.fromArticles || (r.count ?? 0) >= 2);
+    const roleSrc = strong.length ? strong : g;
+    const role = [...new Set(roleSrc.flatMap((r) => r.role.split("·")).map((x) => x.trim()).filter(Boolean))].join("·");
+    // ⚠ 대표 근거는 **들어온 순서가 아니라 규칙**으로 고른다. 예전엔 먼저 온 줄이 이겨서
+    //   같은 사람이 새로고침마다 '기사 215건'과 '선관위 2018·2022' 사이를 오갔다.
+    //   기사 근거는 **두 건 이상일 때만** 공식 자료를 제친다 — 한 건짜리는 오추출이 흔하다.
+    const lead = art && (art.count ?? 0) >= 2 ? art : (off ?? art ?? g[0]);
+    return {
+      org: g[0].org, orgId: g[0].orgId, role,
+      // 근거 문장도 대표 근거의 것을 쓴다 — 여기서 첫 줄을 집으면 순서 의존이 그대로 남는다.
+      evidence: lead.evidence || g.find((r) => r.evidence)?.evidence || "",
+      years: lead.years,
+      fromArticles: lead.fromArticles,
+      count: art?.count,
+      official: g.some((r) => !r.fromArticles),
+    };
+  });
 }
 
 /**
