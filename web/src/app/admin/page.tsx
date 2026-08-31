@@ -254,7 +254,9 @@ function FunnelStat({ label, value, accent }: { label: string; value: number | s
   );
 }
 
-// ── 📈 전환·구독: 멤버십 사전신청 퍼널(방문→CTA→신청) ──
+// ── 📈 전환·구독: 멤버십 퍼널(도달 → 신청 시도 → 신청 완료 → 입금 확인) ──
+//   ⚠ 예전 화면은 '사전신청'으로 subscription_leads를 셌다. 실결제로 바꾼 뒤 주문은
+//     membership_orders에 들어가는데 그대로여서, 주문이 와도 영원히 0으로 보였다(2026-09-01).
 function FunnelSection() {
   const [d, setD] = useState<MembershipFunnel | null>(null);
   const [err, setErr] = useState(false);
@@ -262,28 +264,68 @@ function FunnelSection() {
   if (err) return <p className="text-sm text-foreground-muted">불러오지 못했습니다.</p>;
   if (!d) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
   const pct = d.conversion != null ? `${(d.conversion * 100).toFixed(1)}%` : "—";
-  const rate = (n: number) => (d.views ? `${((n / d.views) * 100).toFixed(1)}%` : "—");
-  const planLabel: Record<string, string> = { reader: "독자", business: "사장님", org: "기관" };
   const maxView = Math.max(1, ...d.viewsDaily.map((x) => x.n));
+  const ctaLabel = (r: string) => (r === "login" ? "로그인 필요" : `${r}개월`);
+  const stageName: Record<string, string> = { views: "화면 도달", ctaClicks: "신청 시도", orders: "신청 완료", paid: "입금 확인" };
   return (
     <div className="space-y-5">
-      <p className="text-sm text-foreground-muted">멤버십 사전신청 전환 퍼널 — <b>방문 → CTA 클릭 → 사전신청</b>. (첫 달 무료 → 유료 유지는 결제 연동 후 측정)</p>
+      <p className="text-sm text-foreground-muted">
+        멤버십 전환 퍼널 — <b>화면 도달 → 신청 시도 → 신청 완료 → 입금 확인</b>. 계좌이체라 <b>입금 확인</b>이 돼야 돈이 들어온 것입니다.
+      </p>
+
+      {/* 어디서 끊기는지 한 줄로 — 숫자 넷을 눈으로 견주게 하지 않는다. */}
+      {d.worstDrop && (
+        <div className="rounded-xl border-2 border-accent/30 bg-accent-subtle/20 p-4">
+          <p className="text-sm">
+            가장 많이 빠지는 곳은 <strong className="text-brand">{stageName[d.worstDrop.from] ?? d.worstDrop.from} → {stageName[d.worstDrop.to] ?? d.worstDrop.to}</strong>
+            입니다 — <strong className="text-brand">{d.worstDrop.lost}명</strong>이 여기서 떠났습니다.
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-4">
-        <FunnelStat label="방문" value={d.views} />
-        <FunnelStat label={`CTA 클릭 · ${rate(d.ctaClicks)}`} value={d.ctaClicks} />
-        <FunnelStat label={`사전신청 · ${rate(d.leads)}`} value={d.leads} />
-        <FunnelStat label="방문→신청 전환율" value={pct} accent />
+        {d.stages.map((st) => (
+          <FunnelStat key={st.key}
+            label={st.rateFromPrev != null ? `${st.label} · 앞 단계의 ${(st.rateFromPrev * 100).toFixed(0)}%` : st.label}
+            value={st.count} />
+        ))}
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FunnelStat label="도달 → 입금 확인" value={pct} accent />
+        <FunnelStat label="입금 대기 중" value={Math.max(0, d.orders - d.paid)} />
+      </div>
+
+      {/* 눌렀는데 막힌 이유 — 비어 있으면 '안 눌렀다'와 '누르다 막혔다'를 못 가른다. */}
       <div className="rounded-xl border border-brand/10 p-4">
-        <p className="text-sm font-semibold text-brand">플랜별 사전신청</p>
+        <p className="text-sm font-semibold text-brand">신청하다 막힌 이유</p>
         <div className="mt-2 flex flex-wrap gap-2 text-sm">
-          {d.leadsByPlan.length ? d.leadsByPlan.map((p) => (
-            <span key={p.plan} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{planLabel[p.plan] ?? p.plan} <strong className="text-brand">{p.n}</strong></span>
-          )) : <span className="text-foreground-muted">아직 신청 없음</span>}
+          {d.failReasons.length ? d.failReasons.map((f) => (
+            <span key={f.reason} className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-700">{f.reason} <strong>{f.n}</strong></span>
+          )) : <span className="text-foreground-muted">막힌 기록 없음</span>}
         </div>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-brand/10 p-4">
+          <p className="text-sm font-semibold text-brand">기간별 신청</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-sm">
+            {d.ordersByTerm.length ? d.ordersByTerm.map((p) => (
+              <span key={p.plan} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{p.plan} <strong className="text-brand">{p.n}</strong></span>
+            )) : <span className="text-foreground-muted">아직 신청 없음</span>}
+          </div>
+        </div>
+        <div className="rounded-xl border border-brand/10 p-4">
+          <p className="text-sm font-semibold text-brand">신청 시도 갈래</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-sm">
+            {d.ctaByPlan.length ? d.ctaByPlan.map((p) => (
+              <span key={p.plan} className="rounded-full border border-brand/15 bg-brand/5 px-3 py-1">{ctaLabel(p.plan)} <strong className="text-brand">{p.n}</strong></span>
+            )) : <span className="text-foreground-muted">아직 없음</span>}
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-brand/10 p-4">
-        <p className="text-sm font-semibold text-brand">방문 출처 Top</p>
+        <p className="text-sm font-semibold text-brand">도달 출처 Top</p>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           {d.viewsBySource.length ? d.viewsBySource.map((s) => (
             <span key={s.src} className="rounded-full border border-brand/15 bg-brand/5 px-2.5 py-1">{s.src} <strong className="text-brand">{s.n}</strong></span>
@@ -292,7 +334,7 @@ function FunnelSection() {
       </div>
       {d.viewsDaily.length > 0 && (
         <div className="rounded-xl border border-brand/10 p-4">
-          <p className="text-sm font-semibold text-brand">최근 14일 방문</p>
+          <p className="text-sm font-semibold text-brand">최근 14일 도달</p>
           <div className="mt-3 flex items-end gap-1" style={{ height: 64 }}>
             {d.viewsDaily.map((x) => (
               <div key={x.day} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${x.day} · ${x.n}`}>
@@ -303,10 +345,6 @@ function FunnelSection() {
           </div>
         </div>
       )}
-      <div className="rounded-xl border border-dashed border-brand/20 bg-brand/[0.02] p-4">
-        <p className="text-sm font-semibold text-brand">첫 달 무료 → 유료 전환·유지율</p>
-        <p className="mt-1 text-xs text-foreground-muted">결제(PG) 연동 후 측정 — 현재는 결제가 PoC(실청구 없음)라 데이터가 없습니다. 결제 연동 시 무료체험→유료 전환율·N개월 유지율이 여기 표시됩니다.</p>
-      </div>
     </div>
   );
 }

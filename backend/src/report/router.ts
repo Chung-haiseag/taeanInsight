@@ -2,6 +2,7 @@
 //   각 집계는 방어적(실패 시 null). config는 시크릿 '설정 여부'(불리언)만 — 값은 절대 노출하지 않는다.
 import { Hono } from "hono";
 import type { Env } from "../types";
+import { summarizeFunnel } from "./funnel";
 
 export const reportRouter = new Hono<{ Bindings: Env }>();
 
@@ -15,29 +16,33 @@ async function rows<T = Record<string, unknown>>(db: D1Database, sql: string): P
   try { const r = await db.prepare(sql).all<T>(); return r.results ?? []; } catch { return []; }
 }
 
-// 멤버십 사전신청 전환 퍼널 — 방문(usage_events membership_view)→CTA→신청(subscription_leads)→전환율.
-//   첫달무료→유료 전환/유지는 결제(PG) 연동 후 채워짐(현재 PoC라 데이터 없음).
+// 멤버십 전환 퍼널 — 도달 → 신청 시도 → 신청 완료 → **입금 확인**.
+//   ⚠ 예전엔 '신청'으로 `subscription_leads`를 셌다. 2026-08-25 실결제 전환 뒤 주문은
+//     `membership_orders`로 들어가는데도 그대로여서, 주문이 들어와도 화면엔 영원히 0이었다
+//     (`submitLead`는 웹 어디서도 부르지 않는 죽은 경로다). 실제 주문 표를 본다.
+//   ⚠ 마지막 단계는 신청이 아니라 입금 확인이다 — 계좌이체라 신청만으로는 돈이 안 들어온다.
 reportRouter.get("/membership-funnel", async (c) => {
   const db = c.env.ARCHIVE_DB;
   if (!db) return c.json({ error: "no_db" }, 503);
-  const [views, ctaClicks, leads] = await Promise.all([
+  const [views, ctaClicks, orders, paid] = await Promise.all([
     scalar(db, "SELECT COUNT(*) n FROM usage_events WHERE type='membership_view'"),
     scalar(db, "SELECT COUNT(*) n FROM usage_events WHERE type='membership_cta'"),
-    scalar(db, "SELECT COUNT(*) n FROM subscription_leads"),
+    scalar(db, "SELECT COUNT(*) n FROM membership_orders"),
+    scalar(db, "SELECT COUNT(*) n FROM membership_orders WHERE status='paid'"),
   ]);
-  const [leadsByPlan, ctaByPlan, viewsBySource, viewsDaily, leadsDaily] = await Promise.all([
-    rows(db, "SELECT plan, COUNT(*) n FROM subscription_leads GROUP BY plan"),
+  const [ordersByTerm, ctaByPlan, viewsBySource, viewsDaily, ordersDaily, failReasons] = await Promise.all([
+    rows(db, "SELECT months || '개월' plan, COUNT(*) n FROM membership_orders GROUP BY months ORDER BY months"),
     rows(db, "SELECT ref plan, COUNT(*) n FROM usage_events WHERE type='membership_cta' AND ref IS NOT NULL GROUP BY ref"),
     rows(db, "SELECT COALESCE(NULLIF(ref,''),'direct') src, COUNT(*) n FROM usage_events WHERE type='membership_view' GROUP BY src ORDER BY n DESC LIMIT 8"),
     rows(db, "SELECT substr(created_at,1,10) day, COUNT(*) n FROM usage_events WHERE type='membership_view' AND created_at >= date('now','-14 day') GROUP BY day ORDER BY day"),
-    rows(db, "SELECT substr(created_at,1,10) day, COUNT(*) n FROM subscription_leads WHERE created_at >= date('now','-14 day') GROUP BY day ORDER BY day"),
+    rows(db, "SELECT substr(created_at,1,10) day, COUNT(*) n FROM membership_orders WHERE created_at >= date('now','-14 day') GROUP BY day ORDER BY day"),
+    // 눌렀는데 못 넘어간 이유 — 이게 비어 있으면 '안 눌렀다'와 '누르다 막혔다'를 못 가른다.
+    rows(db, "SELECT COALESCE(ref,'(없음)') reason, COUNT(*) n FROM usage_events WHERE type='membership_order_fail' GROUP BY reason ORDER BY n DESC LIMIT 8"),
   ]);
-  const conversion = views && views > 0 ? (leads ?? 0) / views : null;
-  return c.json({
-    views: views ?? 0, ctaClicks: ctaClicks ?? 0, leads: leads ?? 0, conversion,
-    leadsByPlan, ctaByPlan, viewsBySource, viewsDaily, leadsDaily,
-    paid: null, // 첫달무료→유료 전환/유지: 결제 연동 후
-  });
+  const counts = { views: views ?? 0, ctaClicks: ctaClicks ?? 0, orders: orders ?? 0, paid: paid ?? 0 };
+  const { stages, conversion, worstDrop } = summarizeFunnel(counts);
+  return c.json({ ...counts, conversion, stages, worstDrop,
+                  ordersByTerm, ctaByPlan, viewsBySource, viewsDaily, ordersDaily, failReasons });
 });
 
 reportRouter.get("/summary", async (c) => {

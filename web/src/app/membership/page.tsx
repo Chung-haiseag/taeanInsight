@@ -109,7 +109,7 @@ export default function MembershipPage() {
         <JoinCard
           terms={terms}
           loggedIn={!!me}
-          onNeedLogin={() => { trackEvent("membership_cta", "login"); router.push("/login?redirect=%2Fmembership"); }}
+          onNeedLogin={() => router.push("/login?redirect=%2Fmembership")}
           onOrdered={(o) => { trackEvent("membership_order", String(o.months)); setOrder({ ...o, bank: o.bank ?? pay.bank, phone: o.phone ?? pay.phone }); }}
         />
       )}
@@ -189,12 +189,18 @@ function JoinCard({ terms, loggedIn, onNeedLogin, onOrdered }: {
   const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
-    if (!depositor.trim()) { setErr("입금하실 분 성함을 적어 주세요."); return; }
+    // ⚠ 누른 사실을 **먼저** 남긴다. 예전엔 성공(주문 생성)만 찍혀서, 누르다 막힌 사람과
+    //   아예 안 누른 사람을 구별할 수 없었다(2026-09-01 퍼널 점검).
+    trackEvent("membership_cta", String(months));
+    if (!depositor.trim()) {
+      setErr("입금하실 분 성함을 적어 주세요."); trackEvent("membership_order_fail", "no_depositor"); return;
+    }
     setBusy(true); setErr(null);
     const r = await createOrder({ months, depositor: depositor.trim(), contact: contact.trim() || undefined });
     setBusy(false);
-    if (r.ok) onOrdered(r.order);
-    else if (r.error === "unauthorized") onNeedLogin();
+    if (r.ok) { onOrdered(r.order); return; }
+    trackEvent("membership_order_fail", r.error || "unknown");
+    if (r.error === "unauthorized") onNeedLogin();   // 세션 만료 — 여기선 CTA를 다시 찍지 않는다
     else setErr(r.error === "already_pending" ? "이미 입금 대기 중인 신청이 있습니다. 새로고침해 주세요." : "신청에 실패했습니다. 잠시 후 다시 시도해 주세요.");
   }
 
@@ -246,7 +252,7 @@ function JoinCard({ terms, loggedIn, onNeedLogin, onOrdered }: {
         </div>
       ) : (
         <div className="mt-6 space-y-3">
-          <button type="button" onClick={onNeedLogin}
+          <button type="button" onClick={() => { trackEvent("membership_cta", "login"); onNeedLogin(); }}
             className="w-full rounded-xl bg-accent px-6 py-4 text-lg font-bold text-background hover:brightness-95">
             로그인하고 시작하기
           </button>

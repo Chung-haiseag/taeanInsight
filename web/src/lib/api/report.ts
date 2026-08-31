@@ -44,15 +44,19 @@ export interface ReportSummary {
 
 export const getReportSummary = () => apiFetch<ReportSummary>("/api/admin/report/summary");
 
-// 멤버십 사전신청 전환 퍼널(방문→CTA→신청). 유료전환/유지(paid)는 결제 연동 후.
+// 멤버십 전환 퍼널 — 도달 → 신청 시도 → 신청 완료 → 입금 확인.
+//   ⚠ '신청'은 이제 membership_orders다. 예전엔 아무도 안 쓰는 subscription_leads를 세어
+//     주문이 들어와도 0으로 보였다(2026-09-01 점검).
 export interface MembershipFunnel {
-  views: number; ctaClicks: number; leads: number; conversion: number | null;
-  leadsByPlan: { plan: string; n: number }[];
+  views: number; ctaClicks: number; orders: number; paid: number; conversion: number | null;
+  stages: { key: string; label: string; count: number; rateFromPrev: number | null }[];
+  worstDrop: { from: string; to: string; lost: number } | null;
+  ordersByTerm: { plan: string; n: number }[];
   ctaByPlan: { plan: string; n: number }[];
   viewsBySource: { src: string; n: number }[];
   viewsDaily: { day: string; n: number }[];
-  leadsDaily: { day: string; n: number }[];
-  paid: null;
+  ordersDaily: { day: string; n: number }[];
+  failReasons: { reason: string; n: number }[];
 }
 export const getMembershipFunnel = () => apiFetch<MembershipFunnel>("/api/admin/report/membership-funnel");
 
