@@ -25,7 +25,7 @@ export function SiteFooter() {
             <li>발행: 태안신문</li>
             <li>개발: (주)엔씨투</li>
             <li>문의: taeannews@taeannews.co.kr</li>
-            <li>전화: 041-670-1234</li>
+            <li>전화: 041-673-7762</li>
           </ul>
         </div>
         <div>
