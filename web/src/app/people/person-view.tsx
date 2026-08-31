@@ -8,6 +8,7 @@
 //   사람 이름 검색은 지역 언론의 가장 큰 유입 통로라, 이게 통째로 비어 있었다.
 
 import { useState, useEffect } from "react";
+import { formatTermRange } from "@/lib/term-date";
 import Link from "next/link";
 
 import KgGraph from "@/components/kg-graph";
@@ -76,7 +77,7 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
             <h3 className="mb-2 text-sm font-bold text-brand">직위·소속 <span className="font-normal text-foreground-muted">(검증됨)</span></h3>
             <ul className="space-y-1 text-sm">
               {prof.offices.map((o, i) => (
-                <li key={i}>· {o.office}{o.ordinal ? ` (${o.ordinal}대)` : ""}{o.start ? ` · ${o.start}${o.end ? `~${o.end}` : "~"}` : ""}</li>
+                <li key={i}>· {o.office}{o.ordinal ? ` (${o.ordinal}대)` : ""}{formatTermRange(o.start, o.end) ? ` · ${formatTermRange(o.start, o.end)}` : ""}</li>
               ))}
             </ul>
           </section>

@@ -82,6 +82,26 @@ export const LOGIC_CHECKS: LogicCheck[] = [
       "AND EXISTS(SELECT 1 FROM kg_edges e WHERE (e.src_id=n.id OR e.dst_id=n.id) AND e.rel='coappears'))",
   },
   {
+    key: "office_term_overlap",
+    label: "같은 자리를 두 사람이 겹쳐 맡음",
+    why:
+      "한 자리에 두 사람이 동시에 앉을 수는 없다. " +
+      "db/064가 월 단위 공식 명부(`1대(1989.1~1989.11)`)를 '그 달 1일~말일'로 펼치는 바람에 " +
+      "1대 종료(1989-11-30)와 2대 시작(1989-11-01)이 30일 겹쳤다(4쌍). " +
+      "⚠ 인수인계 **달**만 겹치는 것은 위반이 아니다 — 월 정밀도로 적힌 두 기간은 " +
+      "그 달 안에서 안 겹치게 나눌 수 있다. 어떻게 나눠도 겹치는 것만 센다.",
+    sql:
+      "WITH t AS (SELECT e.dst_id AS office, CAST(json_extract(e.attrs_json,'$.ordinal') AS INTEGER) AS ord, " +
+      "json_extract(e.attrs_json,'$.start') AS s, json_extract(e.attrs_json,'$.end') AS en " +
+      "FROM kg_edges e WHERE e.rel='held'), " +
+      // 월 정밀도('1989-11')는 폭이 있다 — 시작은 그 달 **말일**까지 늦출 수 있고, 종료는 **1일**까지 당길 수 있다.
+      "n AS (SELECT office, ord, " +
+      "CASE WHEN length(s)=7 THEN date(s||'-01','+1 month','-1 day') ELSE s END AS max_start, " +
+      "CASE WHEN length(en)=7 THEN en||'-01' ELSE en END AS min_end FROM t) " +
+      "SELECT COUNT(*) c FROM n a JOIN n b ON a.office=b.office AND a.ord < b.ord " +
+      "WHERE a.min_end IS NOT NULL AND b.max_start IS NOT NULL AND a.min_end > b.max_start",
+  },
+  {
     key: "person_is_org",
     label: "같은 이름이 인물이자 조직으로 등록",
     why: "이원면·원북면·건설과가 인물 노드로도 있었다. 조직이 사람이 될 수는 없다.",

@@ -16,6 +16,17 @@ describe("논리 감사 정의", () => {
     }
   });
 
+  // 2026-08-31 정합성 점검에서 찾은 것: 태안군수 1~5대 재임 기간이 4쌍 겹쳐 있었다.
+  //   ⚠ 이 검사는 **어떻게 나눠도 겹치는 것**만 센다 — 월 단위로 적힌 두 기간이 인수인계 달을
+  //     공유하는 것은 정상이다(그 달 안에서 나누면 된다). 그래서 질의가 두 정밀도를 함께 다룬다.
+  it("재임 겹침 검사는 월 단위와 일 단위를 함께 다룬다", () => {
+    const c = LOGIC_CHECKS.find((x) => x.key === "office_term_overlap");
+    expect(c).toBeTruthy();
+    expect(c!.sql).toContain("length(s)=7");   // 월 정밀도 시작 → 그 달 말일까지 늦출 수 있다
+    expect(c!.sql).toContain("length(en)=7");  // 월 정밀도 종료 → 그 달 1일까지 당길 수 있다
+    expect(c!.sql).toContain("a.ord < b.ord"); // 같은 쌍을 두 번 세지 않는다
+  });
+
   it("열쇠가 겹치지 않는다", () => {
     expect(new Set(LOGIC_CHECKS.map((c) => c.key)).size).toBe(LOGIC_CHECKS.length);
   });
