@@ -6,11 +6,13 @@ import { edgeCacheKey } from "../cache/key_normalizer";
 import { Hono } from "hono";
 import type { Env } from "../types";
 import { searchPersons, buildPersonProfile, buildPersonBrief, isBioSuppressed, isPersonHub, isWikiPhotoAllowed } from "./people";
-import { getSetting, SETTING_PUBLIC_PEOPLE } from "../settings";
+import { getSetting, SETTING_PUBLIC_PEOPLE, SETTING_PUBLIC_PERSON_BIO } from "../settings";
 
 export const kgPublicRouter = new Hono<{ Bindings: Env }>();
 
 const isOn = (c: { env: Env }) => getSetting(c.env.ARCHIVE_DB, SETTING_PUBLIC_PEOPLE, "on").then((v) => v === "on");
+// ⚠ AI 인물 소개는 **기본 off**. 집계·기사 목록과 달리 생성문은 근거를 댈 수 없다(2026-09-01 결정).
+const isBioOn = (c: { env: Env }) => getSetting(c.env.ARCHIVE_DB, SETTING_PUBLIC_PERSON_BIO, "off").then((v) => v === "on");
 
 // 전국 인물처럼 지역 AI 소개를 억제한 경우, 최소한의 정확·출처있는 소개로 한국어 위키백과 요약을 붙인다.
 //   무료·키 불필요(REST summary API). 동음이의·미존재는 null. 라이선스(CC BY-SA) 준수 위해 프런트에서 출처·링크 표기.
@@ -140,6 +142,8 @@ kgPublicRouter.get("/person/:id/profile", async (c) => {
 kgPublicRouter.get("/person/:id/brief", async (c) => {
   if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
   if (!(await isOn(c))) return c.json({ error: "disabled" }, 403);
+  // 생성문을 끈 상태면 여기서 끝낸다 — 화면은 집계 한 문장으로 갈음한다(팩트·관계망은 그대로).
+  if (!(await isBioOn(c))) { c.header("Cache-Control", "public, max-age=300"); return c.json({ brief: null, bioOff: true }); }
   const id = c.req.param("id");
   const db = c.env.ARCHIVE_DB;
   // 초허브(바이라인=기자·편집인): 본인이 쓴 기사가 등장으로 잡혀 AI 소개가 기사 주제를 본인 행위로 오인 → 억제.

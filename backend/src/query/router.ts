@@ -280,6 +280,9 @@ async function buildRealtimeEvidence(env: Env, query: string): Promise<SourcePar
 async function buildPersonBriefCard(env: Env, query: string, offRegion: boolean): Promise<{ id: string; name: string; text: string; photo?: string } | null> {
   try {
     if (!env.ARCHIVE_DB || !env.AI || offRegion) return null;
+    // ⚠ 인물 소개 공개 스위치를 여기서도 따른다. 화면만 끄고 질의 답변에 그대로 붙으면 끈 게 아니다.
+    const { getSetting, SETTING_PUBLIC_PERSON_BIO } = await import("../settings");
+    if ((await getSetting(env.ARCHIVE_DB, SETTING_PUBLIC_PERSON_BIO, "off")) !== "on") return null;
     const { detectPersonInQuery, buildPersonBrief, isBioSuppressed } = await import("../kg/people");
     const hit = await detectPersonInQuery(env.ARCHIVE_DB, query);
     if (!hit) return null;

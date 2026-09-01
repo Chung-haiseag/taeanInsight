@@ -116,7 +116,8 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack }: {
 
         {prof.coappear.length > 0 && (
           <section className="rounded-lg border border-brand/15 bg-background p-4">
-            <h3 className="mb-2 text-sm font-bold text-brand">함께 등장한 인물</h3>
+            <h3 className="text-sm font-bold text-brand">같은 기사에 함께 나온 인물</h3>
+            <p className="mb-2 mt-0.5 text-[0.6875rem] text-foreground-muted">숫자는 <strong>같은 기사에 이름이 함께 나온 기사 수</strong>입니다. 친분·소속 관계를 뜻하지 않습니다.</p>
             <ul className="flex flex-wrap gap-2 text-sm">
               {prof.coappear.map((c) => (
                 <li key={c.id}>
@@ -282,13 +283,16 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
   const pid = prof.graph.center?.id;
   const [brief, setBrief] = useState<string | null | undefined>(undefined); // undefined=로딩, null=근거부족
   const [suppressed, setSuppressed] = useState(false); // 전국 인물 등 AI 소개 억제
+  // AI 소개를 통째로 끈 상태(app_settings.public_person_bio=off). 생성문만 빠지고
+  //   집계 한 문장·팩트 스트립·관계망은 그대로 남는다 — 세어 보여주는 것은 반박이 곧 확인이다.
+  const [bioOff, setBioOff] = useState(false);
   const [wiki, setWiki] = useState<WikiSummary | null>(null); // 억제 시 위키백과 요약 대체
   const [byline, setByline] = useState(false); // 초허브(기자·편집인) — 소개 억제
   useEffect(() => {
     let alive = true;
     setBrief(undefined); setSuppressed(false); setWiki(null); setByline(false);
     if (!pid) { setBrief(null); return; }
-    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); setWiki(r.wiki ?? null); setByline(!!r.byline); } }).catch(() => { if (alive) setBrief(null); });
+    getPersonBriefPublic(pid).then((r) => { if (alive) { setBrief(r.brief); setSuppressed(!!r.suppressed); setWiki(r.wiki ?? null); setByline(!!r.byline); setBioOff(!!r.bioOff); } }).catch(() => { if (alive) setBrief(null); });
     return () => { alive = false; };
   }, [pid]);
 
@@ -309,7 +313,9 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
         <h3 className="text-sm font-bold text-brand">인물 소개</h3>
         {suppressed
           ? (wiki && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[0.625rem] font-semibold text-brand">위키백과 요약</span>)
-          : <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[0.625rem] font-semibold text-brand">AI 요약 · 기사 근거</span>}
+          : bioOff
+            ? <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[0.625rem] font-semibold text-brand">기사 집계</span>
+            : <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[0.625rem] font-semibold text-brand">AI 요약 · 기사 근거</span>}
       </div>
       {/* AI 전기 — 지연 로드. 전국 인물 등 억제 대상은 로컬 AI 소개 대신 위키백과 요약(있으면)·안내. 팩트·관계망은 유지. */}
       {suppressed ? (
@@ -363,7 +369,8 @@ function PersonIntro({ prof }: { prof: PersonProfile }) {
           {topics.map((t) => <span key={t} className="rounded-full bg-brand/10 px-2 py-0.5 text-[0.6875rem] text-brand">{t}</span>)}
         </div>
       )}
-      {!suppressed && <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>}
+      {!suppressed && !bioOff && <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ AI가 기사 제목·본문에서 자동 작성(미검증). 정확한 내용은 아래 ‘나온 기사’ 원문을 확인하세요.</p>}
+      {bioOff && <p className="mt-2 text-[0.6875rem] text-foreground-muted">※ 위 내용은 아카이브 기사를 <strong>센 값</strong>입니다. 인물평·이력 서술은 제공하지 않습니다 — 아래 ‘나온 기사’ 원문을 확인하세요.</p>}
     </section>
   );
 }
@@ -399,7 +406,7 @@ function RelationGraph({ prof, onOpen, onShuffle }: { prof: PersonProfile; onOpe
   return (
     <section className="rounded-lg border border-brand/15 bg-background p-2">
       <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
-        <p className="text-xs text-foreground-muted">관계망 — 가운데가 이 인물, 주변은 함께 등장한 사람(<strong>원·이름 클릭 시 그 사람으로 이동</strong>). 바이라인 제외.</p>
+        <p className="text-xs text-foreground-muted">가운데가 이 인물, 주변은 <strong>같은 기사에 함께 나온 사람</strong>입니다 — 친분·소속 관계가 아니라 <strong>기사에 이름이 함께 나온 횟수</strong>로 이었습니다(원·이름 클릭 시 그 사람으로 이동). 바이라인 제외.</p>
         {/* 처음 들어온 사람이 '다음 것'을 볼 수 있게 — 검색어를 떠올리지 못해도 계속 둘러볼 수 있다. */}
         {onShuffle && (
           <button type="button" onClick={onShuffle}

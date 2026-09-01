@@ -459,42 +459,55 @@ function OperationsInfo() {
 }
 
 // ── 공개 기능 토글(superadmin 전용) ───────────────────────────
+//   ⚠ 두 스위치는 위험이 다르다. 인물 탐색은 **아카이브를 세어 보여주는 것**이라 논란이 나도
+//     "우리 기사 N건에 이렇게 나온다"고 답할 수 있다. AI 인물 소개는 **모델이 쓴 서술**이라
+//     근거를 댈 수 없다 — 지역 실명 인물이라 켜는 쪽이 결정이어야 한다(2026-09-01, 기본 off).
 function PublicPeopleToggle() {
   const [on, setOn] = useState<boolean | null>(null);
+  const [bio, setBio] = useState<boolean | null>(null);
   const [role, setRole] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<null | "people" | "bio">(null);
   useEffect(() => {
     getSession().then((a) => setRole(a?.role ?? null)).catch(() => {});
-    getAdminSettings().then((s) => setOn(s.publicPeople)).catch(() => {});
+    getAdminSettings().then((s) => { setOn(s.publicPeople); setBio(s.publicPersonBio); }).catch(() => {});
   }, []);
   if (role !== "superadmin") return null; // 최종관리자만 노출
-  async function toggle() {
-    if (on === null) return;
-    setBusy(true);
-    try { const r = await setAdminSettings({ publicPeople: !on }); setOn(r.publicPeople); }
-    catch { /* 권한/네트워크 오류 무시 */ } finally { setBusy(false); }
+  async function toggle(which: "people" | "bio") {
+    const cur = which === "people" ? on : bio;
+    if (cur === null) return;
+    setBusy(which);
+    try {
+      const r = await setAdminSettings(which === "people" ? { publicPeople: !cur } : { publicPersonBio: !cur });
+      setOn(r.publicPeople); setBio(r.publicPersonBio);
+    } catch { /* 권한/네트워크 오류 무시 */ } finally { setBusy(null); }
   }
-  return (
-    <section className="rounded-lg border border-accent/30 bg-accent/5 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-bold text-brand">공개 기능 — 인물 탐색(/people)</h2>
-          <p className="mt-0.5 text-xs text-foreground-muted">
-            독자에게 {on === null ? "…" : on ? <strong className="text-green-700">공개 중</strong> : <strong className="text-foreground">감춤</strong>}.
-            데이터는 유지되고 노출만 즉시 제어됩니다(배포 불필요, 네비 반영 ~30초).
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={busy || on === null}
-          className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
-            on ? "bg-green-600 text-white hover:bg-green-700" : "bg-foreground-muted/20 text-foreground hover:bg-foreground-muted/30"
-          }`}
-        >
-          {busy ? "…" : on ? "끄기(감추기)" : "켜기(공개)"}
-        </button>
+  const Row = ({ title, note, value, which }: { title: string; note: React.ReactNode; value: boolean | null; which: "people" | "bio" }) => (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-bold text-brand">{title}</h2>
+        <p className="mt-0.5 text-xs text-foreground-muted">
+          독자에게 {value === null ? "…" : value ? <strong className="text-green-700">공개 중</strong> : <strong className="text-foreground">감춤</strong>}. {note}
+        </p>
       </div>
+      <button
+        type="button"
+        onClick={() => toggle(which)}
+        disabled={busy !== null || value === null}
+        className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+          value ? "bg-green-600 text-white hover:bg-green-700" : "bg-foreground-muted/20 text-foreground hover:bg-foreground-muted/30"
+        }`}
+      >
+        {busy === which ? "…" : value ? "끄기(감추기)" : "켜기(공개)"}
+      </button>
+    </div>
+  );
+  return (
+    <section className="space-y-4 rounded-lg border border-accent/30 bg-accent/5 p-4">
+      <Row which="people" value={on} title="공개 기능 — 인물 탐색(/people)"
+        note="데이터는 유지되고 노출만 즉시 제어됩니다(배포 불필요, 네비 반영 ~30초)." />
+      <div className="border-t border-brand/10" />
+      <Row which="bio" value={bio} title="공개 기능 — AI 인물 소개"
+        note={<>모델이 쓴 인물 서술입니다. 꺼도 <strong>등장 기사 수·기사 목록·관계망·공식 직위</strong>는 그대로 나옵니다. 질의 답변에 붙는 인물 카드도 함께 꺼집니다.</>} />
     </section>
   );
 }

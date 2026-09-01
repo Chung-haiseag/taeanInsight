@@ -71,6 +71,6 @@ export interface ForecastAccuracy {
 export const getForecastAccuracy = () => apiFetch<ForecastAccuracy>("/api/reports/forecast-accuracy");
 
 // 공개 기능 설정(관리자) — 조회는 관리자, 변경은 superadmin(백엔드 강제).
-export const getAdminSettings = () => apiFetch<{ publicPeople: boolean }>("/api/admin/settings");
-export const setAdminSettings = (patch: { publicPeople: boolean }) =>
-  apiFetch<{ ok: boolean; publicPeople: boolean }>("/api/admin/settings", { method: "POST", body: JSON.stringify(patch) });
+export const getAdminSettings = () => apiFetch<{ publicPeople: boolean; publicPersonBio: boolean }>("/api/admin/settings");
+export const setAdminSettings = (patch: { publicPeople?: boolean; publicPersonBio?: boolean }) =>
+  apiFetch<{ ok: boolean; publicPeople: boolean; publicPersonBio: boolean }>("/api/admin/settings", { method: "POST", body: JSON.stringify(patch) });
