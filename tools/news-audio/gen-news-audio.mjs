@@ -12,7 +12,7 @@ import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
-import { classifyTtsFailure, TTS_PROMPT } from "../lib/tts-failure.mjs";
+import { classifyTtsFailure, interpretExistsProbe, TTS_PROMPT } from "../lib/tts-failure.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
@@ -54,11 +54,17 @@ function writeStatus(patch) {
 //   ⚠ 예전엔 `wrangler r2 object get`을 기사마다 띄웠는데(1회 ~10초, 프로세스 기동 비용),
 //     45건 고르려면 90회가 필요해 매일 15분 타임아웃으로 죽었다(2026-08-15~18 나흘 연속).
 //     HTTP HEAD는 ~0.2초라 같은 일이 20초 안에 끝난다.
-async function audioExists(idxno) {
-  try {
-    const r = await fetch(`${API_BASE}/api/audio/news/${idxno}`, { method: "HEAD", signal: AbortSignal.timeout(8000) });
-    return r.ok;
-  } catch { return false; }
+// 반환: "exists" | "missing" | "unknown". ⚠ unknown을 missing으로 읽으면 있는 것을 또 만든다(2026-09-05).
+async function audioProbe(idxno) {
+  for (let t = 1; t <= 3; t++) {
+    let status = null, err = null;
+    try { status = (await fetch(`${API_BASE}/api/audio/news/${idxno}`, { method: "HEAD", signal: AbortSignal.timeout(8000) })).status; }
+    catch (e) { err = e; }
+    const k = interpretExistsProbe(status, err);
+    if (k !== "unknown") return k;
+    if (t < 3) await sleep(1500 * t);
+  }
+  return "unknown";
 }
 
 const exhausted = new Set(); // 429/한도 도달 키
@@ -150,7 +156,7 @@ async function main() {
     WHERE length(COALESCE(body,''))>300 AND title NOT LIKE '%광고%'
     ORDER BY published_at DESC, idxno DESC LIMIT ${win}`);
   const picked = [];
-  let checked = 0;
+  let checked = 0, unknown = 0;
   for (const r of idRows) {
     const id = String(r.idxno);
     if (!FORCE) {
@@ -159,13 +165,18 @@ async function main() {
         // 폴백 경로에도 상한을 둔다 — 목록을 못 받은 날 무한정 훑다 타임아웃 나는 것을 막는다.
         if (checked >= MAX * 6) { console.log(`  폴백 확인 상한(${checked}건) 도달 — 여기까지로 진행`); break; }
         checked++;
-        if (await audioExists(id)) continue;
+        const k = await audioProbe(id);
+        if (k === "exists") continue;
+        // 세 번 물어도 모르면 **건너뛴다** — 있는데 또 만드는 것이 없는데 안 만드는 것보다 비싸다(키 한도).
+        if (k === "unknown") { unknown++; continue; }
       }
     }
     picked.push(r);
     if (picked.length >= MAX) break;
   }
-  console.log(`  대상 ${picked.length}건 (최신 ${picked[0]?.published_at?.slice(0, 10) ?? "-"} ~ ${picked[picked.length - 1]?.published_at?.slice(0, 10) ?? "-"})`);
+  console.log(`  대상 ${picked.length}건 (최신 ${picked[0]?.published_at?.slice(0, 10) ?? "-"} ~ ${picked[picked.length - 1]?.published_at?.slice(0, 10) ?? "-"})${unknown ? ` · 확인 불가 ${unknown}건 건너뜀(네트워크)` : ""}`);
+  // 확인 불가가 절반을 넘으면 네트워크가 죽은 것이다 — 이 상태로 D1·TTS·R2를 더 두드려 봐야 다 실패한다.
+  if (unknown > Math.max(5, checked / 2)) { console.warn(`  ⚠ 네트워크 불안정(확인 불가 ${unknown}/${checked}) — 오늘은 여기서 멈춘다. 다음 실행에서 이어간다.`); return; }
   if (DRY) { console.log("  --dry: 생성 없이 종료. idxno:", picked.map((p) => p.idxno).join(",")); return; }
   if (!picked.length) { console.log("완료 — 대상 없음(전부 gem2 보유)"); return; }
 

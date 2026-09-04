@@ -38,3 +38,27 @@ describe("TTS 프롬프트", () => {
     expect(TTS_PROMPT).toMatch(/읽/);
   });
 });
+
+// ── '있다/없다/모른다'를 가른다 ──────────────────────────────────────────────
+import { interpretExistsProbe } from "../../tools/lib/tts-failure.mjs";
+
+// 2026-09-05: 네트워크가 흔들리던 날 audioExists가 fetch 실패·타임아웃을 전부 '없음'으로 읽어,
+//   **이미 오디오가 있는 45건**을 대상으로 골라 키 한도를 다시 만드는 데 태우려 했다.
+//   '모른다'를 '없다'로 읽으면 있는 것을 또 만든다. 셋을 갈라야 한다.
+describe("오디오 존재 확인 응답 해석", () => {
+  it("200·206은 있음", () => {
+    expect(interpretExistsProbe(200, null)).toBe("exists");
+    expect(interpretExistsProbe(206, null)).toBe("exists");
+  });
+  it("503(서버가 '파일 없음'으로 쓰는 코드)·404는 없음", () => {
+    expect(interpretExistsProbe(503, null)).toBe("missing");
+    expect(interpretExistsProbe(404, null)).toBe("missing");
+  });
+  it("네트워크 오류·타임아웃·429·5xx(503 제외)는 모름 — 없음으로 읽지 않는다", () => {
+    expect(interpretExistsProbe(null, new Error("fetch failed"))).toBe("unknown");
+    expect(interpretExistsProbe(null, Object.assign(new Error("aborted"), { name: "TimeoutError" }))).toBe("unknown");
+    expect(interpretExistsProbe(429, null)).toBe("unknown");
+    expect(interpretExistsProbe(500, null)).toBe("unknown");
+    expect(interpretExistsProbe(502, null)).toBe("unknown");
+  });
+});

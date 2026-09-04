@@ -22,3 +22,17 @@ export function classifyTtsFailure(status, message) {
   if (status === 400 && /tried to generate text|only be used for TTS/i.test(m)) return "retry";
   return "skip";
 }
+
+/**
+ * '오디오가 있나' HEAD 응답을 셋으로 가른다 — exists · missing · unknown.
+ *   ⚠ 2026-09-05: 네트워크가 흔들리던 날 fetch 실패·타임아웃을 전부 '없음'으로 읽어
+ *     **이미 오디오가 있는 45건**을 대상으로 골라 키 한도를 다시 만드는 데 태우려 했다.
+ *     '모른다'를 '없다'로 읽으면 있는 것을 또 만든다.
+ *   서버는 파일이 없을 때 503을 준다(/api/audio/news/:idxno). 그 밖의 5xx·429·오류는 모름이다.
+ */
+export function interpretExistsProbe(status, err) {
+  if (err || status == null) return "unknown";
+  if (status === 200 || status === 206) return "exists";
+  if (status === 404 || status === 503) return "missing";
+  return "unknown";
+}
