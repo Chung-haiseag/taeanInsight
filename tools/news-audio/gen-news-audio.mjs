@@ -86,7 +86,15 @@ async function geminiTts(text) {
     try {
       const res = await ttsOnce(KEYS[ki], text);
       if (res.status === 429) { console.warn(`  키#${ki + 1} 429 일일한도 도달`); exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; } // 한도 → 다음 키
-      if (!res.ok) { console.warn(`  키#${ki + 1} ${res.status} 재시도`); await sleep(1200); continue; } // 일시 오류 → 재시도
+      if (!res.ok) {
+        // ⚠ 오류 본문을 **반드시** 남긴다. 2026-08-29~09-04 엿새를 '400 재시도'만 찍고 죽었는데,
+        //   이유를 안 남겨서 키·모델·기사 전문을 하나씩 손으로 다시 쳐 봐야 했다(전부 200이었다).
+        //   상태 코드만 있는 로그는 진단이 아니다.
+        let why = ""; try { why = (JSON.parse(await res.text()).error?.message ?? "").slice(0, 200); } catch { /* 본문 없음 */ }
+        // 4xx(429 제외)는 **요청이 잘못된 것**이라 다시 보내도 같다 — 재시도로 키만 태운다. 이 기사만 건너뛴다.
+        if (res.status >= 400 && res.status < 500) { console.warn(`  키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} → 이 기사 건너뜀`); return { skip: true, why: `${res.status} ${why}` }; }
+        console.warn(`  키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} 재시도`); await sleep(1200); continue; // 5xx → 일시 오류
+      }
       const j = await res.json();
       const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
       if (!part) { console.warn(`  키#${ki + 1} 오디오 없음 재시도`); await sleep(1200); continue; }
@@ -123,7 +131,9 @@ async function loadGem2Set() {
   if (!token) return null;
   try {
     const res = await fetch(`${API_BASE}/api/audio/manifest?keys=1`, { headers: { "X-Admin-Token": token } });
-    if (!res.ok) return null;
+    // ⚠ 실패 이유를 남긴다. 401이면 로컬 .dev.vars의 토큰이 배포된 Worker 시크릿과 **다른 것**이다 —
+    //   그 상태로 몇 주를 매일 폴백(HEAD 270회)으로 돌면서 아무도 몰랐다(2026-09-05).
+    if (!res.ok) { console.warn(`  manifest ${res.status}${res.status === 401 ? " — ADMIN_TOKEN이 배포 시크릿과 다름(.dev.vars 갱신 필요)" : ""} → 폴백`); return null; }
     const j = await res.json();
     return new Set((j.keysByFormat?.gem2 || []).map((k) => k.match(/\/(\d+)-gem2\.(?:wav|mp3)$/)?.[1]).filter(Boolean));
   } catch { return null; }
@@ -174,8 +184,21 @@ async function main() {
     const putKey = `audio/news/${a.idxno}-gem2.wav`;
     const tmp = join(tmpdir(), `news-${a.idxno}.wav`);
     writeFileSync(tmp, r.audio);
-    try { wrangler(["r2", "object", "put", `${BUCKET}/${putKey}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]); }
-    finally { rmSync(tmp, { force: true }); }
+    // ⚠ 업로드는 네트워크 일시오류(fetch failed)로 죽을 수 있다. 여기서 throw하면 방금 만든 12MB
+    //   낭독과 키 사용량을 버리고 **전체 실행이 죽는다**(2026-09-05 실제 발생). 지수 백오프로 3번 시도하고,
+    //   그래도 안 되면 이 기사만 건너뛰고 계속 간다.
+    let uploaded = false;
+    try {
+      for (let t = 1; t <= 3 && !uploaded; t++) {
+        try { wrangler(["r2", "object", "put", `${BUCKET}/${putKey}`, "--file", tmp, "--content-type", "audio/wav", "--remote"]); uploaded = true; }
+        catch (e) {
+          const msg = String(e.stderr || e.message || "").split("\n").find((l) => /error|fail/i.test(l)) ?? "";
+          console.warn(`  업로드 ${t}/3 실패 ${a.idxno} — ${msg.trim().slice(0, 120)}`);
+          if (t < 3) await sleep(3000 * t * t);
+        }
+      }
+    } finally { rmSync(tmp, { force: true }); }
+    if (!uploaded) { fail++; console.warn(`  ⤼ ${a.idxno} 건너뜀(업로드 실패) — 다음 실행에서 다시 만든다`); continue; }
     done++;
     console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(r.audio.length / 1024).toFixed(0)}KB wav)`);
     await sleep(1500); // rate 여유

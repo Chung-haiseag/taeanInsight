@@ -105,7 +105,20 @@ audioRouter.get("/status", async (c) => {
     week = rep?.week_id ?? "";
     if (week) podcastLive = !!(await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${week}-gem.wav`));
   }
-  return c.json({ ...status, podcastLive, week, checkedAt: new Date().toISOString() });
+  // 기사 듣기 건강 — 크론이 매일 남긴 판정. status.json은 마지막 성공만 적어 실패를 못 보여준다(2026-09-05).
+  //   ⚠ `news.exhausted:false`·`generated:0`만 보고 "정상"이라 읽은 것이 두 번째 사고의 시작이었다.
+  let health: unknown = null;
+  if (c.env.ARCHIVE_DB) {
+    if (c.req.query("check") === "1") {
+      // 지금 바로 잰다 — 복구 직후 "됐나?"를 내일 자정까지 기다릴 수 없다. R2 head 24회라 가볍다.
+      const { checkAudioHealth } = await import("./health");
+      health = { ...(await checkAudioHealth(c.env.ARCHIVE_DB, c.env.ARCHIVE_PHOTOS)), checkedAt: new Date().toISOString(), ageHours: 0 };
+    } else {
+      const h = await c.env.ARCHIVE_DB.prepare("SELECT v, ts FROM kv_cache WHERE k='audio_health'").first<{ v: string; ts: number }>().catch(() => null);
+      if (h) { try { health = { ...JSON.parse(h.v), checkedAt: new Date(h.ts).toISOString(), ageHours: Math.round((Date.now() - h.ts) / 36e5) }; } catch { /* */ } }
+    }
+  }
+  return c.json({ ...status, podcastLive, week, health, checkedAt: new Date().toISOString() });
 });
 
 // GET /api/audio/manifest — R2 오디오 파일 포맷별 집계(관리자, 읽기 전용). 저품질·구버전 정리용.

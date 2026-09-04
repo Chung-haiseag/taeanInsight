@@ -349,6 +349,24 @@ export default {
     } catch (e) {
       console.warn("[cron] 논리 감사 실패:", e instanceof Error ? e.message : e);
     }
+    // 기사 듣기 건강 — 최신 기사에 오디오가 붙어 있는지 서버가 직접 센다.
+    //   두 번 죽었고 두 번 다 독자가 먼저 알았다(08-08~19 11일 · 08-29~09-04 6일). 생성기는
+    //   로컬 launchd라 로그가 서버에 없고 status.json은 마지막 성공만 남긴다. 결과물을 본다.
+    try {
+      const db = env.ARCHIVE_DB, r2 = env.ARCHIVE_PHOTOS;
+      if (!db || !r2) throw new Error("ARCHIVE_DB/ARCHIVE_PHOTOS 없음");
+      const { checkAudioHealth } = await import("./audio/health");
+      const h = await checkAudioHealth(db, r2);
+      await db.prepare(
+        "INSERT INTO kv_cache(k, v, ts) VALUES('audio_health', ?, ?) " +
+        "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
+      ).bind(JSON.stringify(h), Date.now()).run();
+      if (h.ok === true) console.log(`[cron] 기사 듣기: 정상 (최신 ${h.checked}건 확인, 대기 ${h.pending})`);
+      else if (h.ok === false) console.warn(`[cron] ⚠ 기사 듣기 죽음 — 하루 넘은 기사 ${h.missing}건에 오디오 없음, 최장 ${h.oldestMissingDays}일째. 로컬 생성기(launchd com.taean.newsaudio) 로그를 볼 것`);
+      else console.warn("[cron] 기사 듣기: 검사할 기사 없음");
+    } catch (e) {
+      console.warn("[cron] 기사 듣기 건강 검사 실패:", e instanceof Error ? e.message : e);
+    }
     // 관광 수요지수 로그 — 다가오는 주말 지수를 누적 저장(예보 갱신 추적·백테스트 기반)
     try {
       const { logDemand } = await import("./tour/demand_log");
