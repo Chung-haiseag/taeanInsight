@@ -12,6 +12,7 @@ import { writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean as normalize } from "../lib/tts-normalize.mjs";
+import { classifyTtsFailure, TTS_PROMPT } from "../lib/tts-failure.mjs";
 
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const BUCKET = "taean-archive-photos";
@@ -69,7 +70,8 @@ async function ttsOnce(key, text) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${key}`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `다음 뉴스 기사를 아나운서처럼 차분하고 또렷하게 읽어줘. 띄어쓰기가 어색한 부분은 자연스럽게 교정해서 읽되 내용은 그대로 둬:\n\n${normalize(text)}` }] }],
+      // ⚠ 말투만. '교정해서 읽되' 같은 작업 지시가 모델을 글쓰기로 유도해 400을 냈다(tools/lib/tts-failure.mjs).
+      contents: [{ parts: [{ text: TTS_PROMPT + normalize(text) }] }],
       generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } },
     }),
   });
@@ -85,15 +87,14 @@ async function geminiTts(text) {
     if (!keyAvail(ki)) return { exhausted: true };
     try {
       const res = await ttsOnce(KEYS[ki], text);
-      if (res.status === 429) { console.warn(`  키#${ki + 1} 429 일일한도 도달`); exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; } // 한도 → 다음 키
       if (!res.ok) {
-        // ⚠ 오류 본문을 **반드시** 남긴다. 2026-08-29~09-04 엿새를 '400 재시도'만 찍고 죽었는데,
-        //   이유를 안 남겨서 키·모델·기사 전문을 하나씩 손으로 다시 쳐 봐야 했다(전부 200이었다).
-        //   상태 코드만 있는 로그는 진단이 아니다.
+        // ⚠ 오류 본문을 **반드시** 남긴다. 엿새를 '400 재시도'만 찍고 죽었는데 이유를 안 남겨서
+        //   키·모델·기사 전문을 손으로 다시 쳐 봐야 했다. 상태 코드만 있는 로그는 진단이 아니다.
         let why = ""; try { why = (JSON.parse(await res.text()).error?.message ?? "").slice(0, 200); } catch { /* 본문 없음 */ }
-        // 4xx(429 제외)는 **요청이 잘못된 것**이라 다시 보내도 같다 — 재시도로 키만 태운다. 이 기사만 건너뛴다.
-        if (res.status >= 400 && res.status < 500) { console.warn(`  키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} → 이 기사 건너뜀`); return { skip: true, why: `${res.status} ${why}` }; }
-        console.warn(`  키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} 재시도`); await sleep(1200); continue; // 5xx → 일시 오류
+        const kind = classifyTtsFailure(res.status, why);
+        if (kind === "exhausted") { console.warn(`  키#${ki + 1} 429 일일한도 도달`); exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; }
+        if (kind === "skip") { console.warn(`  키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} → 이 기사 건너뜀`); return { skip: true, why: `${res.status} ${why}` }; }
+        console.warn(`  키#${ki + 1} ${res.status} — ${why.slice(0, 60) || "(본문 없음)"} 재시도 ${attempt + 1}/3`); await sleep(1200); continue;
       }
       const j = await res.json();
       const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
