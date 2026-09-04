@@ -220,6 +220,41 @@ export function yearRuns(years: string | string[] | undefined | null, maxRuns = 
 }
 
 /**
+ * 공식 재임 표(`held`)가 있는 직함은 기사 연도를 그 기간으로 바꾼다(순수).
+ *
+ *   왜: 김세호 페이지가 직위 표엔 '2010-07 ~ 2011-03'(9개월)인데 바로 아래 소속엔
+ *     '태안군청 군수 · 1991~2026'이었다(2026-09-05 정합성 점검). 기사에 나온 해 14개가
+ *     덩어리 4개를 넘어 yearRuns가 처음~끝으로 접은 것이다 — **35년 군수**로 읽힌다.
+ *     같은 사실이 위에 공식으로 있으면 아래 기사 집계는 정보를 더하는 게 아니라 **반대되는 신호**다.
+ *   어디까지: 직함이 정확히 그 공식 자리일 때만('군수' ↔ '태안군수'). '군수·회장'처럼 합쳐진 것은
+ *     회장 연도까지 군수 임기로 덮으면 거짓이 되므로 손대지 않는다. 부군수·회장은 표가 없어 그대로.
+ */
+export function overrideYearsWithOffice(
+  rows: Affiliation[],
+  offices: { office: string; start: string | null; end: string | null }[],
+): Affiliation[] {
+  if (!offices.length) return rows;
+  const OFFICE_ROLE: Record<string, string> = { 태안군수: "군수" };
+  return rows.map((r) => {
+    const terms = offices.filter((o) => OFFICE_ROLE[o.office] === r.role && o.start);
+    if (!terms.length) return r;
+    // 임기마다 시작~끝 연도를 펼쳐 yearRuns로 이어 붙인다 — 연임(2018~2022, 2022~2026)은 한 구간이 된다.
+    //   ⚠ 재임 중인 임기는 따로 뗀다. 끝난 임기들과 섞어 '~현재'를 뒤에 붙이면
+    //     '2010~2011 · 2026~현재'가 아니라 '2010~2011 · 2026~현재'처럼 붙을 자리를 못 찾는다.
+    const closed: string[] = [];
+    let current: number | null = null;
+    for (const t of terms) {
+      const a = parseInt(t.start!.slice(0, 4), 10);
+      if (!t.end) { current = a; continue; }
+      const b = parseInt(t.end.slice(0, 4), 10);
+      for (let y = a; y <= b; y++) closed.push(String(y));
+    }
+    const parts = [yearRuns(closed, 99), current !== null ? `${current}~현재` : ""].filter(Boolean);
+    return { ...r, years: parts.join(" · "), fromArticles: false };
+  });
+}
+
+/**
  * 근거가 한 건뿐인 소속을 뺀다(순수).
  *
  *   ⚠ 기사 한 줄에서 뽑은 직함은 자주 틀린다. 김영인(군의원) 페이지에 '태안군청 군수'가 떴는데
@@ -529,7 +564,7 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
     coappear,
     articles: arts.results ?? [],
     offices,
-    affiliations: orderAffiliations(keepWellSupported(mergeAffiliations((aff.results ?? []).map((r) => {
+    affiliations: orderAffiliations(overrideYearsWithOffice(keepWellSupported(mergeAffiliations((aff.results ?? []).map((r) => {
       let a: { role?: string; roles?: string[]; years?: string | string[]; evidence?: string; count?: number } = {};
       try { a = r.attrs_json ? JSON.parse(r.attrs_json) : {}; } catch { /* 깨진 값은 빈 것으로 */ }
       // 여러 대수에 걸쳐 직함이 달랐으면 함께 적는다 — 대표 직함만 보이면 의장을 지낸 사실이 묻힌다.
@@ -541,7 +576,7 @@ export async function buildPersonProfile(db: D1Database, id: string, limit = 12)
       return { org: r.org, orgId: r.orgId, role, evidence: a.evidence ?? "", fromArticles,
                count: typeof a.count === "number" ? a.count : undefined,
                years: fromArticles ? yearRuns(a.years) : formatYears(a.years) };
-    })))),
+    }))), offices)),
     timeline,
     topics,
   };
