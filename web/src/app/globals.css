@@ -159,9 +159,22 @@ html {
   outline-color: var(--ti-focus);
 }
 
-/* 제목 글꼴(Pretendard) — 큰 고딕 제목은 자간을 좁혀야 단단해 보인다. 900은 Pretendard에서 너무 뭉쳐 800으로. */
-.font-head { letter-spacing: -0.025em; }
-.font-head.font-black { font-weight: 800; }
+/* 제목 글꼴 — 마루부리(네이버 한글한글 아름답게, SIL OFL). 네이버 CDN(CORS 허용·30일 캐시)에서 받는다.
+   굵기는 SemiBold(600)·Bold(700) 두 벌만 — 800·900(font-black)도 Bold 파일을 쓰게 범위로 묶어 가짜 굵게를 막는다.
+   swap: 글꼴이 오기 전엔 Pretendard로 먼저 보여 준다(빈 화면 없음). */
+@font-face {
+  font-family: "MaruBuri";
+  font-weight: 600;
+  font-display: swap;
+  src: url(https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-SemiBold.woff2) format("woff2");
+}
+@font-face {
+  font-family: "MaruBuri";
+  font-weight: 700 900;
+  font-display: swap;
+  src: url(https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-Bold.woff2) format("woff2");
+}
+.font-head { letter-spacing: -0.02em; }
 
 /* 홈 조위 곡선 — 처음 한 번 그려지는 선(모션 줄임이면 생략) */
 @media (prefers-reduced-motion: no-preference) {

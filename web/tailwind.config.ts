@@ -58,8 +58,9 @@ export default {
           "Roboto",
           "sans-serif",
         ],
-        // 제목 — Pretendard 굵게(2026-10: 명조·Fraunces가 촌스럽다는 의견으로 고딕 하나로 통일). 자간은 globals.css .font-head
-        head: ["var(--font-sans)", "Pretendard", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        // 제목 — 마루부리(네이버, OFL). 단정한 현대 명조라 신문 느낌은 남기고 촌스러움은 덜다(2026-10 사용자 선택).
+        //   본문·숫자는 Pretendard. 글꼴은 globals.css @font-face 가 네이버 한글 CDN에서 받는다(swap).
+        head: ['"MaruBuri"', "var(--font-sans)", "Pretendard", "serif"],
         // 숫자·디스플레이 — 예전 Fraunces 자리. 같은 Pretendard에 tabular-nums(사용처에서)로 자릿수를 맞춘다.
         display: ["var(--font-sans)", "Pretendard", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
       },

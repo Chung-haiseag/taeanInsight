@@ -60,6 +60,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" className={pretendard.variable}>
+      <head>
+        {/* 제목 글꼴(마루부리) CDN에 미리 연결 — globals.css @font-face 가 여기서 받는다 */}
+        <link rel="preconnect" href="https://hangeul.pstatic.net" crossOrigin="anonymous" />
+      </head>
       <body>
         <a href="#main" className="skip-link">
           본문으로 건너뛰기

@@ -75,6 +75,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-10-03 · **해변·지역경제·인물·뉴스아카이브 리디자인 + 글꼴 Pretendard 통일** · `web/src/app/{beaches,data,people,news,archive}`·`components/editorial.tsx`·`page-header.tsx`·`report-charts.tsx`·`kg-graph.tsx`
   홈·지금 태안과 같은 체계로 네 메뉴 전부(공용 조각은 editorial.tsx, 공용 머리·카드·버튼 클래스도 ti 토큰). 제목 명조(Noto Serif KR)·숫자 Fraunces는 "촌스럽다"는 의견으로 빼고 **Pretendard 하나**(제목 800·자간 -0.025em, 숫자 tabular-nums) — 구글 글꼴 두 벌을 더는 받지 않는다. 클래스 이름은 `font-head`. 인물 관계망: 글 목록 대체·휠은 Ctrl/⌘일 때만 확대(쪽 스크롤 갇힘 해소)·함께 나온 인물 단추가 window.open을 부르던 버그 수정.
   배포 2026-10-03 production 버전 `98151a1d-5190-4568-af5b-dc88a6fdfdbb`(직전 31f4a566), 스모크 12경로 200.
+  ↳ 같은 날 사용자 선택(2번)으로 **제목만 마루부리**(네이버, OFL — hangeul.pstatic.net CDN, @font-face SemiBold 600·Bold 700~900, swap), 본문·숫자는 Pretendard. CSP 없음 확인. 
 - 2026-10-03 · **지금 태안(/live) 리디자인 — 가독성** · `web/src/app/live/page.tsx`·`web/src/components/live/live-sections.tsx`·`cctv-player.tsx`·`today-brief-banner.tsx`·`live-clock.tsx`
   홈과 같은 체계(ti 토큰·세리프 제목·섹션 머리). 글자는 0.85rem 아래로 안 내림(예전 핵심지표 0.6rem대), 이모지 장식 제거, 상태는 쉬운 말 알약(좋음·주의), 미세먼지 예보는 표→날짜별 카드, 바다는 홈의 '오늘의 바다'(조위 곡선) 재사용, 지난주 대비는 '늘었음/줄었음' 글로. 데이터 함수·출처는 그대로. 공용 report-charts 는 리포트 화면이 쓰므로 손대지 않고 /live 전용 섹션을 새로 만들었다.
   배포 2026-10-03 production 버전 `31f4a566-7307-4d2d-9f5a-86d0486f08dd`(직전 1d201739), 스모크 9경로 200.
