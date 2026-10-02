@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { initialLoginMode, type LoginMode } from "./login-mode";
 import Link from "next/link";
 import { login, signup, startKakaoLogin, consumeKakaoCallback } from "@/lib/api/auth";
 
@@ -22,7 +23,7 @@ export function LoginClient() {
     rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") && !rawRedirect.includes("\\")
       ? rawRedirect
       : "/me";
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<LoginMode>(() => initialLoginMode(params.get("mode")));
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [name, setName] = useState("");

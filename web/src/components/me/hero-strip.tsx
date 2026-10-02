@@ -36,7 +36,7 @@ export function MeHeroStrip({ preferences }: { preferences: UserPreferences }) {
 
   const tiles: { emoji: ReactNode; label: string; value: string; sub?: string; tone: string }[] = [];
   if (live?.temp != null) tiles.push({ emoji: "🌡", label: "지금 기온", value: `${Math.round(live.temp)}°`, sub: live.sky ?? undefined, tone: "text-brand" });
-  if (live?.grade) tiles.push({ emoji: "🌫", label: "대기질", value: live.grade, sub: `PM10 ${live.pm10 ?? "—"}`, tone: live.grade === "좋음" ? "text-green-600" : live.grade?.includes("나쁨") ? "text-red-600" : "text-brand" });
+  if (live?.grade) tiles.push({ emoji: "🌫", label: "대기질", value: live.grade, sub: `미세먼지 ${live.pm10 ?? "—"}`, tone: live.grade === "좋음" ? "text-green-600" : live.grade?.includes("나쁨") ? "text-red-600" : "text-brand" });
   if (demand?.available) tiles.push({ emoji: "🧳", label: "주말 관광수요", value: `${demand.index}`, sub: demand.level, tone: "text-accent" });
   if (newsCount != null) tiles.push({ emoji: <Icon name="news" />, label: "내 관심 새 기사", value: `${newsCount}`, sub: "관심 분야", tone: "text-brand" });
 

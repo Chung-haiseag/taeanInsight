@@ -69,24 +69,54 @@ function toIso(compact: string): string {
   return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
 }
 
+// 상류 응답 파싱 — 2026-08에 형식이 두 번 바뀌었다.
+//   ① JSON 요청 파라미터가 resultType=json → type=json (옛 이름은 무시되고 XML이 온다)
+//   ② JSON 봉투가 {header,body} → {responseJson:{header,body}}
+//   예전 코드는 res.json()이 XML에 걸려 예외 → catch로 삼켜 '데이터 0건'과 구분되지 않았고,
+//   그 사이 20일치 갱신이 조용히 실패했다. 그래서 봉투를 둘 다 받고, 실패엔 반드시 이유를 남긴다.
+interface Envelope {
+  header?: { totalCount?: string | number; resultMsg?: string };
+  body?: { item?: AuctionRecord | AuctionRecord[] };
+}
+export function parseAuctionResponse(text: string): { items: AuctionRecord[]; total: number; message?: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { items: [], total: 0, message: `JSON 아님 — 상류 응답 형식 변경 의심: ${text.trim().slice(0, 80)}` };
+  }
+  // 공공데이터포털 공통 에러 봉투(서비스키·트래픽 등)
+  const cmm = (raw as { OpenAPI_ServiceResponse?: { cmmMsgHeader?: { errMsg?: string; returnAuthMsg?: string } } })?.OpenAPI_ServiceResponse?.cmmMsgHeader;
+  if (cmm) return { items: [], total: 0, message: `${cmm.returnAuthMsg ?? ""} (${cmm.errMsg ?? ""})`.trim() };
+
+  const env = ((raw as { responseJson?: Envelope }).responseJson ?? raw) as Envelope;
+  let items = env?.body?.item ?? [];
+  if (!Array.isArray(items)) items = items ? [items] : [];
+  const total = Number(env?.header?.totalCount ?? 0);
+  // '조회된 데이터가 없습니다'는 위판 없는 날일 뿐 — 경고가 아니다.
+  const msg = env?.header?.resultMsg;
+  const abnormal = msg && msg !== "정상" && !msg.includes("없습니다") ? msg : undefined;
+  return { items, total, message: abnormal };
+}
+
 // 한 조합·한 날짜의 전 위판 레코드(numOfRows 상한 100 → 페이지네이션). 추세 예측에서도 재사용.
 export async function fetchOrgDay(key: string, baseDt: string, org: string): Promise<AuctionRecord[]> {
   const out: AuctionRecord[] = [];
   for (let page = 1; page <= 12; page++) {
+    // type·resultType 둘 다 보낸다 — 지금은 type이 먹고, 상류가 되돌리면 resultType이 받는다.
     const qs = new URLSearchParams({
-      serviceKey: key, baseDt, numOfRows: "100", pageNo: String(page), resultType: "json", mxtrNm: org,
+      serviceKey: key, baseDt, numOfRows: "100", pageNo: String(page), type: "json", resultType: "json", mxtrNm: org,
     });
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 12000);
     try {
       const res = await fetch(`${BASE}?${qs}`, { signal: ctrl.signal });
-      const j = (await res.json()) as { header?: { totalCount?: string }; body?: { item?: AuctionRecord | AuctionRecord[] } };
-      let items = j?.body?.item ?? [];
-      if (!Array.isArray(items)) items = items ? [items] : [];
+      const { items, total, message } = parseAuctionResponse(await res.text());
+      if (message) console.warn(`[auction] ${baseDt} ${org} p${page}: ${message}`);
       out.push(...items);
-      const total = Number(j?.header?.totalCount ?? 0);
       if (out.length >= total || items.length < 100) break;
-    } catch {
+    } catch (e) {
+      console.warn(`[auction] 호출 실패 ${baseDt} ${org} p${page}: ${(e as Error).message}`);
       break;
     } finally {
       clearTimeout(t);

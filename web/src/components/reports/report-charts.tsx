@@ -47,7 +47,7 @@ export function SummaryInfographic({ metrics, govCount = 0 }: { metrics: ReportM
   }
   // 대기질
   if (env.live?.grade) {
-    tiles.push({ icon: "🌫", value: env.live.grade, label: "대기질", sub: `PM10 ${env.live.pm10 ?? "—"}·PM2.5 ${env.live.pm25 ?? "—"}`, color: AIR_COLOR[env.live.grade] });
+    tiles.push({ icon: "🌫", value: env.live.grade, label: "대기질", sub: `미세먼지 ${env.live.pm10 ?? "—"}·초미세먼지 ${env.live.pm25 ?? "—"}`, color: AIR_COLOR[env.live.grade] });
   }
   // 자외선지수
   if (metrics.uv && metrics.uv.todayMax != null) {
@@ -175,12 +175,12 @@ export function AirQualityTrend({ env }: { env: ReportMetrics["environment"] }) 
       </figcaption>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <AirMetric label="미세먼지" sub="PM10" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
-        <AirMetric label="초미세먼지" sub="PM2.5" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
+        <AirMetric label="미세먼지" sub="지름 10㎛ 이하" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
+        <AirMetric label="초미세먼지" sub="2.5㎛ 이하" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
       </div>
 
       <p className="mt-3 border-t border-brand/10 pt-3 text-[0.6875rem] leading-relaxed text-foreground-muted">
-        <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
+        <b className="text-foreground">미세먼지</b>는 지름 10㎛ 이하, <b className="text-foreground">초미세먼지</b>는 2.5㎛ 이하로 더 작아 폐 깊숙이 들어갑니다 · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
       </p>
     </figure>
   );
@@ -237,11 +237,11 @@ export function WeatherAirCard({ env }: { env: ReportMetrics["environment"] }) {
       {hasAir && (
         <>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <AirMetric label="미세먼지" sub="PM10" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
-            <AirMetric label="초미세먼지" sub="PM2.5" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
+            <AirMetric label="미세먼지" sub="지름 10㎛ 이하" v={l.pm10} g={pmGrade("pm10", l.pm10)} />
+            <AirMetric label="초미세먼지" sub="2.5㎛ 이하" v={l.pm25} g={pmGrade("pm25", l.pm25)} />
           </div>
           <p className="mt-3 border-t border-brand/10 pt-3 text-[0.6875rem] leading-relaxed text-foreground-muted">
-            <b className="text-foreground">PM10</b> 미세먼지(지름 10㎛ 이하) · <b className="text-foreground">PM2.5</b> 초미세먼지(2.5㎛ 이하로 더 작아 폐 깊숙이 침투) · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
+            <b className="text-foreground">미세먼지</b>는 지름 10㎛ 이하, <b className="text-foreground">초미세먼지</b>는 2.5㎛ 이하로 더 작아 폐 깊숙이 들어갑니다 · 단위 ㎍/㎥, 수치가 <b className="text-foreground">낮을수록</b> 깨끗합니다.
           </p>
         </>
       )}
@@ -898,11 +898,11 @@ export function DustCard({ dust }: { dust: DustBoardView | null }) {
           </thead>
           <tbody>
             <tr className="border-t border-brand/10">
-              <td className="py-1.5 text-foreground-muted">미세먼지(PM10)</td>
+              <td className="py-1.5 text-foreground-muted">미세먼지</td>
               {dust.days.map((d) => <td key={d.date} className="py-1.5 text-center"><DustPill grade={d.pm10} /></td>)}
             </tr>
             <tr className="border-t border-brand/10">
-              <td className="py-1.5 text-foreground-muted">초미세(PM2.5)</td>
+              <td className="py-1.5 text-foreground-muted">초미세먼지</td>
               {dust.days.map((d) => <td key={d.date} className="py-1.5 text-center"><DustPill grade={d.pm25} /></td>)}
             </tr>
           </tbody>

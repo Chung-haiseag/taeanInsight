@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 const TIMELINE = [
   { phase: "준비", date: "2026-07", task: "공고문·지원서·평가 기준 확정" },
   { phase: "모집·선발", date: "2026-08 중", task: "8명 선발 (읍·면 균형·연령 다양성)" },
-  { phase: "교육", date: "2026-08 말", task: "6회 교육 + AI Co-Pilot 실습" },
-  { phase: "활동·발행", date: "2026-09 ~ 11", task: "1인당 총 4편 (편당 5만원·총 20만원)" },
+  { phase: "교육", date: "2026-10 초·중순", task: "2회 교육 — ①계정 만들고 첫 글 올리기 ②AI와 같이 쓰기 (자습 안내 /citizen/guide)" },
+  { phase: "활동·발행", date: "2026-10 ~ 11", task: "1인당 총 4편 (편당 5만원·총 20만원)" },
 ];
 
 export default function CitizenPage() {
@@ -30,10 +30,12 @@ export default function CitizenPage() {
           태안의 이야기를 가장 잘 아는 사람은 태안에 사는 사람입니다. AI는 사실 확인·요약·문장
           다듬기를 보조하고, 편집부가 모든 발행물을 검토합니다.
         </p>
-        <div className="pt-2">
+        <div className="flex flex-wrap gap-2 pt-2">
           <Link href="/citizen/write" className="btn-accent">
             <Icon name="pen" /> 시민기자 에디터 열기 (코파일럿)
           </Link>
+          <Link href="/citizen/articles" className="rounded-lg border border-brand/30 px-4 py-2 font-semibold text-brand hover:bg-brand/5">내 기사</Link>
+          <Link href="/citizen/guide" className="rounded-lg border border-brand/30 px-4 py-2 font-semibold text-brand hover:bg-brand/5">시작 안내 (7단계)</Link>
         </div>
       </header>
 
@@ -47,7 +49,7 @@ export default function CitizenPage() {
         <ul className="text-sm text-foreground-muted space-y-1">
           <li>· 모집 시기: 2026년 8월 중 (공고)</li>
           <li>· 선발 인원: 8명 (읍·면별 균형, 20~60대 연령 다양성)</li>
-          <li>· 활동 기간: 2026년 9월 ~ 11월 (3개월)</li>
+          <li>· 활동 기간: 2026년 10월 ~ 11월 (교육 10월 초·중순 2회)</li>
           <li>· 발행량: 1인당 총 4편</li>
           <li>· 원고료: 편당 5만원 · 1인당 총 20만원 (매월 말 자동 정산)</li>
         </ul>
@@ -83,15 +85,17 @@ export default function CitizenPage() {
         className="bg-brand/5 rounded-lg p-6"
       >
         <h2 id="copilot-heading" className="text-xl font-bold text-brand mb-3">
-          AI Co-Pilot 5종 보조 기능
+          에디터가 도와주는 것
         </h2>
+        {/* 에디터(components/write/copilot-editor.tsx)에 실제로 있는 것만 적는다 — 교육 자료(/citizen/guide)와 같은 목록 */}
         <div className="grid gap-3 md:grid-cols-2">
           {[
-            ["사실 확인 검색", "공공 데이터·자체 기사 아카이브에서 근거 자료를 찾아줍니다"],
-            ["문단 요약", "긴 자료를 핵심만 추려 요약"],
-            ["문장 다듬기", "맞춤법·어색한 표현을 자연스럽게 정리"],
-            ["제목 후보 5종", "기사 본문을 분석해 매력적인 제목 5개 제안"],
-            ["인용 출처 검색", "주장한 사실의 출처를 추적해 제공"],
+            ["실시간 점검", "쓰는 동안 개인정보·민감주제가 들어가면 바로 알려줍니다"],
+            ["다듬기", "쓴 문장을 사실은 그대로 두고 자연스럽게 고쳐 보여줍니다"],
+            ["요약", "긴 글의 핵심 3줄 — 리드 문단을 쓸 때"],
+            ["제목 추천", "본문을 읽고 제목 후보를 냅니다"],
+            ["사실 점검", "본문에서 확인해야 할 숫자·이름·날짜를 뽑아줍니다(맞는지는 기자가 확인)"],
+            ["관련 과거 보도", "같은 주제의 태안신문 옛 기사를 찾아 배경을 잇게 합니다"],
           ].map(([title, desc]) => (
             <div key={title} className="border-l-4 border-accent pl-3">
               <p className="font-semibold text-brand">{title}</p>
@@ -100,7 +104,7 @@ export default function CitizenPage() {
           ))}
         </div>
         <p className="text-xs text-foreground-muted mt-4">
-          <Icon name="wrench" /> 시민기자 전용 에디터 UI 구현 예정 — REQ-CITIZEN-001 / TaskMaster #25
+          키워드 몇 개로 초안을 만드는 기능도 있습니다. AI가 만든 글은 반드시 읽고 고치고, 라벨을 ‘AI 생성’으로 둡니다.
         </p>
       </section>
     </div>

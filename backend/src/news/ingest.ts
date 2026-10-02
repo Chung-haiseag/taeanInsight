@@ -67,7 +67,7 @@ function extractTag(block: string, tag: string): string {
   return m ? unwrapCdata(m[1]) : "";
 }
 
-function stripHtml(s: string): string {
+export function stripHtml(s: string): string {
   return s
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
@@ -202,11 +202,12 @@ export function categoryCounts(items: NewsItem[]): Record<string, number> {
 
 // ── 회원 로그인 + 전문 추출 (taeannews는 본문을 회원 게이트 뒤에 둠) ──────────
 // 세션 바인딩 때문에 실제 브라우저 UA 사용. 비밀번호는 시크릿으로만 받고 로그/저장 안 함.
-const BROWSER_UA =
+export const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const LOGIN_URL = "https://www.taeannews.co.kr/member/login.php";
 
-async function login(id: string, pw: string): Promise<string> {
+// 태안신문 회원 로그인 → 쿠키 문자열. 크론 수집과 사진 보강(archive/refetch_images)이 같이 쓴다.
+export async function loginTaean(id: string, pw: string): Promise<string> {
   const form = new URLSearchParams({ user_id: id, user_pw: pw, backUrl: "", id_save: "N" });
   const res = await fetch(LOGIN_URL, {
     method: "POST",
@@ -218,7 +219,7 @@ async function login(id: string, pw: string): Promise<string> {
   return setCookie.map((c) => c.split(";")[0]).join("; ");
 }
 
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   return s
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
@@ -226,16 +227,47 @@ function decodeEntities(s: string): string {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
 }
 
-// 기사 페이지 HTML에서 전문 추출 (백필과 동일 규칙). 게이트(회원전용 안내)면 "" 반환.
-function extractFullBody(html: string): string {
+// 본문 영역의 사진 URL 수집 — 백필 도구(tools/backfill/backfill.mjs extractImages)와 같은 규칙.
+// ⚠ 2026-09-11까지 크론 수집기는 og:image 1장만 저장해 최근 3개월 기사(265건)가 전부 사진 1장이었다.
+//   글자를 지우기 전의 HTML 조각에서 뽑아야 한다(본문 텍스트에는 사진이 없다).
+export function extractImages(htmlChunk: string): string[] {
+  const urls: string[] = [];
+  const re = /<img[^>]+src=["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(htmlChunk))) {
+    let u = m[1].trim();
+    if (!u || u.startsWith("data:")) continue;
+    if (u.startsWith("//")) u = "https:" + u;
+    else if (u.startsWith("/")) u = "https://www.taeannews.co.kr" + u;
+    // 사진은 cdn 호스트로 통일 — og:image(대표)가 cdn이라 같은 사진이 두 주소로 남지 않게(둘 다 공개 서빙 확인 2026-09-11)
+    u = u.replace(/^https?:\/\/(?:www\.)?taeannews\.co\.kr(?=\/news\/(?:photo|thumbnail)\/)/, "https://cdn.taeannews.co.kr");
+    if (/logo|icon|btn|blank|spacer|sns|ndsoft/i.test(u)) continue; // 장식 이미지 제외
+    urls.push(u);
+  }
+  return [...new Set(urls)];
+}
+
+// 대표 사진(og:image 원본)과 본문 사진을 한 목록으로. 본문 순서가 곧 표시 순서(첫 장이 리드).
+// og가 본문에 없으면 편집자가 고른 대표이므로 맨 앞에 둔다. 둘 다 없으면 빈 배열(예전 동작).
+export function pickImages(bodyImages: string[], ogFull: string | null | undefined): string[] {
+  const list = [...bodyImages];
+  if (ogFull && !list.includes(ogFull)) list.unshift(ogFull);
+  return list;
+}
+
+// 기사 페이지 HTML에서 전문·사진 추출 (백필과 동일 규칙). 게이트(회원전용 안내)면 둘 다 비운다.
+// 본문과 사진을 **같은 HTML**에서 뽑는 것이 요점 — 비로그인 응답은 게이트라 사진도 없다.
+export function extractArticle(html: string): { body: string; images: string[] } {
+  const none = { body: "", images: [] as string[] };
   const anchor = html.indexOf('id="article-view-content-div"');
-  if (anchor === -1) return "";
+  if (anchor === -1) return none;
   const gt = html.indexOf(">", anchor);
   let chunk = html.slice(gt + 1, gt + 1 + 60000);
   // 본문 끝(저작권 푸터/공유버튼)에서 자른다. <script는 제외 — 본문 앞 인라인 스크립트(광고)에
-  // 잘려 본문이 비는 경우 방지. 스크립트 블록은 아래 bodyText가 통째로 제거.
+  // 잘려 본문이 비는 경우 방지. 스크립트 블록은 아래에서 통째로 제거.
   const cut = chunk.search(/저작권자|무단전재|id="dn_btn"|이 기사를 공유/);
   if (cut !== -1) chunk = chunk.slice(0, cut);
+  const images = extractImages(chunk); // 글자를 지우기 전에
   const text = decodeEntities(
     chunk
       .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
@@ -247,8 +279,28 @@ function extractFullBody(html: string): string {
     .replace(/ *\n */g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  if (/회원전용기사|회원만 열람|로그인 또는 회원가입/.test(text)) return ""; // 비로그인 게이트
-  return text;
+  if (/회원전용기사|회원만 열람|로그인 또는 회원가입/.test(text)) return none; // 비로그인 게이트
+  return { body: text, images };
+}
+
+// 기사 1건의 페이지를 받아 본문·사진·대표사진을 돌려준다. 익명 먼저(공개 기사는 그대로 전문),
+// 게이트면 로그인 쿠키로 재시도. 크론 수집과 관리자 '사진 다시 받기'가 같이 쓴다.
+export async function fetchArticleAssets(
+  url: string,
+  cookie: string,
+): Promise<{ body: string; images: string[]; leadImage: string | null; ogDescription: string | null }> {
+  const baseHdr = { "User-Agent": BROWSER_UA, Referer: "https://www.taeannews.co.kr/" };
+  const html = await (await fetch(url, { headers: baseHdr })).text();
+  const og = /property="og:image"\s+content="([^"]+)"/.exec(html)?.[1];
+  const ogFull = og && !og.includes("/logo/") ? og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "") : null;
+  const desc = /property="og:description"\s+content="([^"]*)"/.exec(html)?.[1];
+  let art = extractArticle(html);
+  if (!art.body && cookie) {
+    const html2 = await (await fetch(url, { headers: { ...baseHdr, Cookie: cookie } })).text();
+    art = extractArticle(html2);
+  }
+  const images = pickImages(art.images, ogFull);
+  return { body: art.body, images, leadImage: images[0] ?? null, ogDescription: desc ? stripHtml(desc) : null };
 }
 
 // ── RSS → D1 아카이브 자동 적재 (cron) ─────────────────────────────────────
@@ -263,7 +315,7 @@ export async function ingestToArchive(
   // 회원 로그인(전문 수집용) — 자격증명 있을 때만. 실패해도 발췌로 폴백.
   let cookie = "";
   if (env.TAEAN_ID && env.TAEAN_PW) {
-    try { cookie = await login(env.TAEAN_ID, env.TAEAN_PW); } catch { /* 발췌 폴백 */ }
+    try { cookie = await loginTaean(env.TAEAN_ID, env.TAEAN_PW); } catch { /* 발췌 폴백 */ }
   }
   // getNews가 RSS + 기사목록을 병합 제공 (RSS 정체 시에도 최신 포함)
   const items = await getNews(true).catch(() => [] as NewsItem[]);
@@ -280,25 +332,16 @@ export async function ingestToArchive(
     if (existing && !(isStub && cookie)) continue;
 
     const publishedAt = it.publishedAt.replace(" ", "T") + "+09:00";
-    const baseHdr = { "User-Agent": BROWSER_UA, Referer: "https://www.taeannews.co.kr/" };
     let leadImage: string | null = null;
+    let images: string[] = [];
     let body = "";
     let excerpt = it.excerpt;
     try {
-      // 익명으로 먼저 — 공개 기사는 그대로 전문 추출(로그인 세션이 일부 공개 기사를 깨뜨림)
-      const html = await (await fetch(it.url, { headers: baseHdr })).text();
-      const og = /property="og:image"\s+content="([^"]+)"/.exec(html)?.[1];
-      if (og && !og.includes("/logo/")) leadImage = og.replace("/thumbnail/", "/photo/").replace(/_v\d+(?=\.\w+$)/, "");
-      if (!excerpt) {
-        const desc = /property="og:description"\s+content="([^"]*)"/.exec(html)?.[1];
-        if (desc) excerpt = stripHtml(desc);
-      }
-      body = extractFullBody(html);
-      // 익명이 회원전용 게이트면 로그인 쿠키로 재시도
-      if (!body && cookie) {
-        const html2 = await (await fetch(it.url, { headers: { ...baseHdr, Cookie: cookie } })).text();
-        body = extractFullBody(html2);
-      }
+      const a = await fetchArticleAssets(it.url, cookie);
+      body = a.body;
+      images = a.images;
+      leadImage = a.leadImage;
+      if (!excerpt && a.ogDescription) excerpt = a.ogDescription;
     } catch { /* 사진/본문 없이 진행 */ }
     // 발췌: 전문 있으면 전문 앞부분, 없으면 메타 설명
     const excSource = body || excerpt;
@@ -308,7 +351,7 @@ export async function ingestToArchive(
     if (existing && isStub) {
       const r = await db
         .prepare("UPDATE archive_articles SET body=?, excerpt=?, lead_image=COALESCE(?,lead_image), images=? WHERE idxno=?")
-        .bind(storeBody, excerpt, leadImage, leadImage ? JSON.stringify([leadImage]) : "[]", idxno)
+        .bind(storeBody, excerpt, leadImage, JSON.stringify(images), idxno)
         .run();
       if (r.meta.changes && body) upgraded++;
     } else {
@@ -321,7 +364,7 @@ export async function ingestToArchive(
         .bind(
           idxno, it.title, publishedAt, Number(it.publishedAt.slice(0, 4)),
           it.category, it.author ?? null, excerpt, storeBody,
-          leadImage ? JSON.stringify([leadImage]) : "[]", leadImage, it.url,
+          JSON.stringify(images), leadImage, it.url,
         )
         .run();
       if (r.meta.changes) inserted++;

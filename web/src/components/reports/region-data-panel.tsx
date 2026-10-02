@@ -30,7 +30,7 @@ export function RegionDataPanel() {
     <div className="space-y-6">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="주말 관광 수요지수" value={metrics?.tourism.demand?.index?.toString() ?? "—"} sub={metrics?.tourism.demand?.level ?? ""} />
-        <Kpi label="대기질" value={metrics?.environment.live?.grade ?? "—"} sub={metrics?.environment.live ? `PM10 ${metrics.environment.live.pm10 ?? "—"}·PM2.5 ${metrics.environment.live.pm25 ?? "—"}` : ""} />
+        <Kpi label="대기질" value={metrics?.environment.live?.grade ?? "—"} sub={metrics?.environment.live ? `미세먼지 ${metrics.environment.live.pm10 ?? "—"}·초미세먼지 ${metrics.environment.live.pm25 ?? "—"}` : ""} />
         <Kpi label="아파트 평균 실거래" value={won(apt?.avgManwon)} sub={apt ? `최근 ${apt.count}건` : ""} />
         <Kpi label="충남 휘발유" value={metrics?.oil?.gasoline ? `${metrics.oil.gasoline.chungnam.toLocaleString()}원` : "—"} sub={metrics?.uv?.todayMax != null ? `자외선 ${metrics.uv.level}` : ""} />
       </section>
@@ -45,9 +45,9 @@ export function RegionDataPanel() {
         ))}
       </div>
 
-      <Panel title="미세먼지 추이 (PM10 · PM2.5)" csv={dashboardCsvUrl("environment", days)}>
+      <Panel title="미세먼지·초미세먼지 추이 (㎍/㎥)" csv={dashboardCsvUrl("environment", days)}>
         {series && series.environment.length > 1 ? (
-          <LineChart series={series.environment} keys={[{ k: "pm10", color: "#c2622d", label: "PM10" }, { k: "pm25", color: "#2f6f4f", label: "PM2.5" }]} />
+          <LineChart series={series.environment} keys={[{ k: "pm10", color: "#c2622d", label: "미세먼지" }, { k: "pm25", color: "#2f6f4f", label: "초미세먼지" }]} />
         ) : <Empty />}
       </Panel>
 

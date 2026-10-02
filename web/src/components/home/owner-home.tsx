@@ -123,7 +123,7 @@ function OwnerLive() {
         <h2 id="cond-heading" className="text-xl font-bold text-brand">오늘 태안 현황</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {brief.weather?.temp != null && <Stat label="기온" value={`${brief.weather.temp}℃`} sub={brief.weather.sky ?? undefined} />}
-          {brief.weather?.grade && <Stat label="대기질" value={brief.weather.grade} sub={`PM10 ${brief.weather.pm10 ?? "—"}`} />}
+          {brief.weather?.grade && <Stat label="대기질" value={brief.weather.grade} sub={`미세먼지 ${brief.weather.pm10 ?? "—"}`} />}
           {brief.uv?.todayMax != null && <Stat label="자외선" value={brief.uv.level} sub={`지수 ${brief.uv.todayMax}`} />}
           {brief.tide && brief.tide.events[0] && <Stat label="다음 물때" value={nextTide(brief.tide.events)} sub={`${brief.tide.station} 기준`} />}
         </div>

@@ -150,8 +150,8 @@ export function TodayConditions({ preferences }: { preferences: UserPreferences 
   ];
   if (a) {
     const dust = (a.grade ?? "").includes("나쁨");
-    cards.push({ emoji: dust ? "😷" : "🌫", label: "미세먼지", value: a.grade, sub: `PM10 ${a.pm10}`, bg: dust ? "bg-red-50" : "bg-green-50" });
-    cards.push({ emoji: "🫧", label: "초미세", value: `${a.pm25}`, sub: "PM2.5 ㎍/㎥", bg: "bg-teal-50" });
+    cards.push({ emoji: dust ? "😷" : "🌫", label: "미세먼지", value: a.grade, sub: `${a.pm10}㎍/㎥`, bg: dust ? "bg-red-50" : "bg-green-50" });
+    cards.push({ emoji: "🫧", label: "초미세먼지", value: `${a.pm25}`, sub: "㎍/㎥", bg: "bg-teal-50" });
   }
 
   return (

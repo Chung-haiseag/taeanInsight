@@ -20,6 +20,7 @@ import { dashboardRouter } from "./dashboard/router";
 import { newsRouter } from "./news/router";
 import { archiveRouter } from "./archive/router";
 import { correctionsRouter, adminCorrectionsRouter } from "./archive/corrections";
+import { archiveAdminRouter } from "./archive/admin_router";
 import { ebookReviewRouter } from "./archive/ebook_review";
 import { copilotRouter } from "./copilot/router";
 import { queryRouter } from "./query/router";
@@ -90,6 +91,7 @@ app.route("/api/news", newsRouter);
 app.route("/api/archive/corrections", correctionsRouter); // archiveRouter보다 먼저(경로 겹침 방지)
 app.route("/api/archive", archiveRouter);
 app.route("/api/admin/corrections", adminCorrectionsRouter);
+app.route("/api/admin/archive", archiveAdminRouter); // 사진 보강 수동 실행 등
 app.route("/api/dashboard", dashboardRouter);
 app.route("/api/copilot", copilotRouter);
 app.route("/api/query", queryRouter);
@@ -173,6 +175,19 @@ export default {
         const r = await ingestToArchive(env);
         if (r.inserted || r.upgraded) console.log(`[cron3h] 뉴스: 신규 ${r.inserted}·전문화 ${r.upgraded}/${r.fetched}`);
       } catch (e) { console.warn("[cron3h] 뉴스 실패:", e instanceof Error ? e.message : e); }
+      // 사진 보강 — og:image 1장만 저장하던 기간(6-12~9-04)의 기사 사진을 60건씩 다시 받는다.
+      // 커서가 바닥(68301)에 닿으면 done → 이후엔 kv_cache 조회 1번으로 끝. 끝나면 이 블록은 지워도 된다.
+      try {
+        const { refetchMissingImages } = await import("./archive/refetch_images");
+        const x = await refetchMissingImages(env, { batch: 60 });
+        if (x.scanned) console.log(`[cron3h] 사진 보강: 확인 ${x.scanned}·갱신 ${x.updated}·실패 ${x.failed}·커서 ${x.before}${x.done ? " (완료)" : ""}`);
+      } catch (e) { console.warn("[cron3h] 사진 보강 실패:", e instanceof Error ? e.message : e); }
+      // 번호 순차 수집 — RSS(고장)·목록(25건)이 못 보는 기사를 idxno로 직접 두드린다. 앞 40칸 + 뒤 150칸 빈 칸 + 백필 60칸.
+      try {
+        const { sweepMissingArticles } = await import("./news/sweep");
+        const s = await sweepMissingArticles(env);
+        if (s.probed) console.log(`[cron3h] 순차 수집: 두드림 ${s.probed}·있음 ${s.found}·신규 ${s.inserted}·보류 ${s.skipped}·실패 ${s.failed}·frontier ${s.frontier}·백필커서 ${s.back}${s.backDone ? " (백필 완료)" : ""}`);
+      } catch (e) { console.warn("[cron3h] 순차 수집 실패:", e instanceof Error ? e.message : e); }
       return;
     }
 
