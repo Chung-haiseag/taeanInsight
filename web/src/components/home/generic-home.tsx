@@ -4,7 +4,7 @@
 //   흐름: 1면(머리기사·오늘의 브리핑 | 오늘의 바다) → 이번 주 태안(기사 4 + 더 보기 4) → 숫자로 보는 태안
 //         → 멤버 전용 인사이트(주말 수요 예측 맛보기) → 태안의 기억과 사람(아카이브·인물) → 멤버십.
 //   방침: 시안의 예시 수치 대신 **실데이터**만 쓴다. 값이 없으면 그 칸을 지운다(지어낸 숫자를 보이지 않는다).
-//         유일한 정적 내용은 멤버십 요금 카드(PLANS) — 아래 주석 참고.
+//         유일한 정적 내용은 멤버십 칸(PLANS) — /membership 과 같은 말만 쓴다.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -390,14 +390,13 @@ function MemoryAndPeople({ stats, onThisDay, people }: { stats: ArchiveStats | n
   );
 }
 
-// ── 멤버십 — 2026-10 시안의 네 요금 카드 그대로.
-//   ⚠ 지금 /membership 은 월 9,900원 한 상품만 판다(2026-08-25 개편). '인사이트 독자 3,000원'·'효도 구독'·'기관'은
-//     아직 결제 길이 없으니, 배포 전에 요금·혜택 문구를 /membership 과 맞추거나 그쪽 상품을 먼저 연다. ──
-const PLANS: Array<{ name: string; tag: string; price: string; unit?: string; perks: string[]; cta: string; best?: boolean }> = [
-  { name: "인사이트 독자", tag: "태안 소식을 깊이 읽고 싶은 분", price: "3,000", unit: "원 / 월", perks: ["모든 기사와 브리핑", "아카이브 전체 검색", "광고 없는 화면"], cta: "독자로 시작" },
-  { name: "비즈니스", tag: "펜션·식당·낚시점·카페 사장님", price: "9,900", unit: "원 / 월", perks: ["주말 수요 예측", "위판 시세와 사입 시점 알림", "업종별 준비 체크리스트", "독자 혜택 모두 포함"], cta: "비즈니스 시작", best: true },
-  { name: "효도 구독", tag: "자녀가 결제하고 부모님이 읽기", price: "9,900", unit: "원 / 월", perks: ["큰 글씨와 낭독 듣기", "부모님 계정 따로 만들기", "명절·생신 선물하기"], cta: "선물하기" },
-  { name: "기관", tag: "군청·협회·공공기관", price: "연간 계약", perks: ["부서 단위 계정", "정책 모니터링 리포트", "데이터 내려받기"], cta: "도입 문의" },
+// ── 멤버십 — 지금 실제로 파는 것만 적는다(/membership 과 같은 말).
+//   시안의 네 요금(3,000 독자·9,900 비즈니스·효도·기관) 중 결제 길이 있는 것은 월 9,900원 하나뿐이라
+//   '늘 무료 / 멤버십 / 기관·단체 문의' 세 칸으로 바꿨다. 없는 상품을 약속하면 환불 요구가 된다(membership/page.tsx). ──
+const PLANS: Array<{ name: string; tag: string; price: string; unit?: string; perks: string[]; cta: string; href: string; best?: boolean }> = [
+  { name: "늘 무료", tag: "누구나, 가입 없이", price: "0", unit: "원", perks: ["1990년부터의 태안신문 기사 검색", "AI에게 태안에 대해 묻기", "날씨·미세먼지·물때·낙조", "옛 지면 광고와 옛날 물가표"], cta: "기사 둘러보기", href: "/news" },
+  { name: "태안 인사이트 멤버십", tag: "주간 리포트와 사장님 보드가 필요한 분", price: "9,900", unit: "원 / 월", perks: ["주간 인사이트 리포트 전문", "사장님 보드 — 업종별 주말 손님 예측과 준비", "계좌이체로 바로 가입"], cta: "멤버십 시작", href: "/membership", best: true },
+  { name: "기관·단체", tag: "군청·협회·공공기관", price: "별도 문의", perks: ["부서·단체 단위 이용", "태안신문으로 문의해 주세요"], cta: "도입 문의", href: "/membership" },
 ];
 
 function Membership() {
@@ -408,9 +407,9 @@ function Membership() {
         dark
         eyebrow="태안 인사이트 멤버십"
         title="태안을 먼저 읽는 사람들"
-        note="커피 한 잔 값으로 매일의 브리핑, 주말 예측, 아카이브를 모두 엽니다. 언제든 해지할 수 있습니다."
+        note="기사 검색과 AI 질문은 늘 무료입니다. 월 9,900원 멤버십은 주간 리포트 전문과 사장님 보드를 엽니다."
       />
-      <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="m-0 grid list-none gap-4 p-0 md:grid-cols-3">
         {PLANS.map((p) => (
           <li
             key={p.name}
@@ -427,7 +426,7 @@ function Membership() {
               {p.perks.map((k) => <li key={k}>{k}</li>)}
             </ul>
             <Link
-              href="/membership"
+              href={p.href}
               className={`inline-flex min-h-11 w-full items-center justify-center rounded-full px-5 font-bold transition-colors ${p.best ? "bg-ti-gold text-ti-on-gold hover:opacity-90" : "border-[1.5px] border-white/50 text-ti-on-navy hover:bg-ti-on-navy hover:text-ti-navy"}`}
             >
               {p.cta}
