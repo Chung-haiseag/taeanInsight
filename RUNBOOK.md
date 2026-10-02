@@ -74,6 +74,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
 - 2026-10-03 · **지금 태안(/live) 리디자인 — 가독성** · `web/src/app/live/page.tsx`·`web/src/components/live/live-sections.tsx`·`cctv-player.tsx`·`today-brief-banner.tsx`·`live-clock.tsx`
   홈과 같은 체계(ti 토큰·세리프 제목·섹션 머리). 글자는 0.85rem 아래로 안 내림(예전 핵심지표 0.6rem대), 이모지 장식 제거, 상태는 쉬운 말 알약(좋음·주의), 미세먼지 예보는 표→날짜별 카드, 바다는 홈의 '오늘의 바다'(조위 곡선) 재사용, 지난주 대비는 '늘었음/줄었음' 글로. 데이터 함수·출처는 그대로. 공용 report-charts 는 리포트 화면이 쓰므로 손대지 않고 /live 전용 섹션을 새로 만들었다.
+  배포 2026-10-03 production 버전 `31f4a566-7307-4d2d-9f5a-86d0486f08dd`(직전 1d201739), 스모크 9경로 200.
 - 2026-10-02 · **홈 리디자인 — 신문 1면(머리기사·오늘의 브리핑·오늘의 바다·이번 주 태안·숫자로 보는 태안·주말 예측 맛보기·기억과 사람·멤버십)** · `web/src/components/home`·`site-header.tsx`·`site-footer.tsx`·`lib/tide-curve.ts`
   시안의 예시 수치는 전부 실데이터로 바꿨다(최신 기사·today-brief·metrics 물때/수온/파고/미세먼지·fog·위판 예측·아파트·유가·주말 수요·아카이브·인물). 값이 없으면 그 칸을 지운다. 멤버십 칸은 시안의 네 요금 대신 실제로 파는 것만(늘 무료 / 월 9,900원 / 기관·단체 문의). 다크 모드는 사이트 전체에 없어 홈만 넣지 않았다.
   배포 2026-10-02 production(axtaeannews.co.kr) 버전 `325bdf87-81d9-411b-bf7c-bdc7a9bbcd2f` — 브랜치 커밋 + main의 미커밋 web 변경(시민기자 안내 등, 운영 중)을 얹어 빌드. 스모크 통과(/, /citizen/guide, /membership, /query, /login, /news, /beaches, /people = 200). 직전 버전 df4f4342.
