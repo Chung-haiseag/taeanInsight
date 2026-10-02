@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import KgGraph from "@/components/kg-graph";
+import { Pill, SecHead } from "@/components/editorial";
 import { getArticleGraph, getPersonEgo, type KgGraphNode, type KgGraphEdge } from "@/lib/api/kg";
 
 export default function ArticleGraph({ idxno }: { idxno: number }) {
@@ -31,18 +32,18 @@ export default function ArticleGraph({ idxno }: { idxno: number }) {
 
   if (!ok) return null;
   return (
-    <section className="no-print mt-10">
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-lg font-semibold text-brand">이 기사 인물 관계도</h2>
-        <span className="rounded-full border border-brand/20 px-2 py-0.5 text-xs text-foreground-muted">자동 추출 · 검수 전 (베타)</span>
+    <section aria-labelledby="article-graph-title" className="no-print">
+      <SecHead id="article-graph-title" title="이 기사 인물 관계도" note="기사에서 자동으로 뽑은 시험판입니다. 관리자에게만 보입니다." />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Pill tone="warn">검수 전</Pill>
         {ego && (
-          <button onClick={reset} className="ml-auto rounded-full border border-brand/20 px-3 py-0.5 text-xs text-brand hover:bg-brand/5">← 기사 관계도</button>
+          <button type="button" onClick={reset} className="ml-auto inline-flex min-h-11 items-center rounded-full border border-ti-line bg-ti-surface px-4 text-[0.95rem] font-semibold text-ti-ink hover:border-ti-petrol">← 기사 관계도로</button>
         )}
       </div>
-      <div className="card overflow-hidden rounded-2xl">
+      <div className="card overflow-hidden">
         <KgGraph nodes={nodes} edges={edges} onNodeClick={onNodeClick} height={420} />
       </div>
-      <p className="mt-2 text-xs text-foreground-muted">인물을 클릭하면 함께 자주 등장한 인물로 확장됩니다. 관리자에게만 표시됩니다.</p>
+      <p className="mt-3 text-[0.9rem] text-ti-muted">인물을 누르면 함께 자주 나온 인물까지 넓혀 보여줍니다.</p>
     </section>
   );
 }

@@ -19,6 +19,7 @@ import { getTvNews, type TvNewsResponse } from "@/lib/api/news";
 import { getMe } from "@/lib/api/me";
 import { decodeEntities } from "@/lib/html";
 import { PageHeader } from "@/components/page-header";
+import { SecHead, Source } from "@/components/editorial";
 import { TvVideoGrid } from "@/components/tv-video-grid";
 import { Icon } from "@/components/icon";
 import { CATEGORY_ORDER, sortCategoryTabs, listUrl, listStateFrom } from "./newsarchive-helpers";
@@ -142,65 +143,81 @@ function NewsArchive() {
     <div className="mx-auto max-w-[1200px] space-y-8">
       <div>
         <PageHeader
-          eyebrow="News · Archive"
+          eyebrow="뉴스아카이브"
           title="뉴스아카이브"
           description="태안신문 최신 기사부터 1990년 창간호까지 한 곳에서 보고 검색하세요."
         />
         {stats && stats.total > 0 && (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand/[0.03] px-4 py-1.5 text-sm">
-            <span className="font-semibold text-brand">총 {stats.total.toLocaleString()}건</span>
-            <span className="text-foreground-muted">· {stats.minYear}~{stats.maxYear}년 디지털 아카이브</span>
+          <p className="mt-4 text-[1rem] text-ti-ink2">
+            모두 <strong className="font-display text-[1.35rem] font-bold tabular-nums text-ti-ink">{stats.total.toLocaleString()}</strong>건
+            <span className="text-ti-muted"> · {stats.minYear}~{stats.maxYear}년 기사를 디지털로 옮겼습니다</span>
           </p>
         )}
       </div>
 
       {/* 보는 방식 — 기사와 옛 광고를 갈라 놓았으니 오가는 길을 여기 둔다.
-          상단 메뉴를 늘리는 대신 아카이브라는 한 우산 아래 묶는다. */}
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-background">기사 검색</span>
-        <Link href="/paper/ads"
-          className="rounded-full border border-brand/25 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5">
-          🏷 옛 광고
-          <span className="ml-1.5 font-normal text-foreground-muted">그 시절 집값·품삯</span>
-        </Link>
-        <Link href="/paper/prices"
-          className="rounded-full border border-brand/25 px-4 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5">
-          💰 옛날 물가
-          <span className="ml-1.5 font-normal text-foreground-muted">광고로 만든 30년 시세표</span>
-        </Link>
-      </div>
+          상단 메뉴를 늘리는 대신 아카이브라는 한 우산 아래 묶는다. 설명은 줄바꿈해 큰 글씨로. */}
+      <nav aria-label="아카이브 보는 방식">
+        <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-3">
+          <li>
+            <span aria-current="page" className="flex min-h-11 flex-col justify-center rounded-xl border-2 border-ti-ink bg-ti-surface px-4 py-2.5">
+              <span className="font-bold text-ti-ink">기사 검색</span>
+              <span className="text-[0.9rem] text-ti-ink2">지금 보고 있는 화면</span>
+            </span>
+          </li>
+          <li>
+            <Link href="/paper/ads" className="flex min-h-11 flex-col justify-center rounded-xl border border-ti-line bg-ti-surface px-4 py-2.5 hover:border-ti-petrol">
+              <span className="font-bold text-ti-petrol-ink underline underline-offset-4">옛 광고</span>
+              <span className="text-[0.9rem] text-ti-ink2">그 시절 집값·품삯</span>
+            </Link>
+          </li>
+          <li>
+            <Link href="/paper/prices" className="flex min-h-11 flex-col justify-center rounded-xl border border-ti-line bg-ti-surface px-4 py-2.5 hover:border-ti-petrol">
+              <span className="font-bold text-ti-petrol-ink underline underline-offset-4">옛날 물가</span>
+              <span className="text-[0.9rem] text-ti-ink2">광고로 만든 30년 시세표</span>
+            </Link>
+          </li>
+        </ul>
+      </nav>
 
-      {/* 검색 폼 — 키워드 + 연도 */}
-      <form onSubmit={runSearch} className="space-y-3 rounded-2xl border border-brand/15 bg-background p-5 shadow-card">
-        <input
-          value={qInput}
-          onChange={(e) => setQInput(e.target.value)}
-          placeholder="1990~현재 전체 검색 (예: 적조, 가로림만, 안면도 관광)"
-          aria-label="검색어"
-          className="w-full rounded-lg border border-brand/20 px-3 py-2.5 outline-none focus:border-accent"
-        />
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={year}
-            onChange={(e) => onYearChange(e.target.value)}
-            aria-label="연도"
-            className="rounded-lg border border-brand/20 px-3 py-2 text-sm"
-          >
-            <option value="">전체 연도</option>
-            {YEARS.map((y) => (
-              <option key={y} value={y}>{y}년</option>
-            ))}
-          </select>
-          <button type="submit" className="btn-accent" disabled={loading}>
+      {/* 검색 폼 — 키워드 + 연도. 라벨을 눈에 보이게 둔다(자리표시 글자만으론 어르신이 놓친다). */}
+      <form onSubmit={runSearch} role="search" aria-label="기사 검색" className="rounded-[18px] border border-ti-line bg-ti-surface p-5">
+        <div className="grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end">
+          <label className="block min-w-0">
+            <span className="mb-1.5 block font-bold text-ti-ink">검색어</span>
+            <input
+              type="search"
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              placeholder="예: 적조, 가로림만, 안면도 관광"
+              className="min-h-12 w-full rounded-xl border border-ti-line bg-ti-surface px-4 text-[1.05rem] text-ti-ink placeholder:text-ti-muted focus:border-ti-petrol"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block font-bold text-ti-ink">연도</span>
+            <select
+              value={year}
+              onChange={(e) => onYearChange(e.target.value)}
+              className="min-h-12 w-full rounded-xl border border-ti-line bg-ti-surface px-3 text-[1.02rem] text-ti-ink md:w-auto"
+            >
+              <option value="">전체 연도</option>
+              {YEARS.map((y) => (
+                <option key={y} value={y}>{y}년</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="btn-primary min-h-12 w-full md:w-auto" disabled={loading}>
             {loading ? "검색 중…" : "검색"}
           </button>
         </div>
+        <p className="mt-3 text-[0.9rem] text-ti-muted">1990년부터 지금까지 전체 기사에서 찾습니다.</p>
       </form>
 
-      {/* 상단 카테고리 탭(전체 아카이브 건수) + 태안군TV */}
-      <div className="flex flex-wrap gap-2 border-b border-brand/10 pb-3">
+      {/* 분류 탭(전체 아카이브 건수) + 태안군TV — 큰 단추, 줄바꿈으로 가로 스크롤 없이 */}
+      <div role="group" aria-label="기사 분류" className="flex flex-wrap gap-2 border-b border-ti-line pb-4">
         <Tab
-          label={<>전체{stats && stats.total > 0 ? ` ${stats.total.toLocaleString()}` : ""}</>}
+          label="전체"
+          count={stats && stats.total > 0 ? stats.total : undefined}
           active={category === "all"}
           onClick={() => setCategory("all")}
         />
@@ -209,139 +226,162 @@ function NewsArchive() {
             key={c}
             label={
               <>
-                {interests.includes(c) ? <><Icon name="star" /> </> : null}
+                {interests.includes(c) ? <><Icon name="star" weight="fill" label="관심 분야" /> </> : null}
                 {ARCHIVE_CATEGORY_LABELS[c] ?? c}
-                {stats?.categories ? ` ${(stats.categories[c] ?? 0).toLocaleString()}` : ""}
               </>
             }
+            count={stats?.categories ? stats.categories[c] ?? 0 : undefined}
             active={category === c}
             onClick={() => setCategory(c)}
           />
         ))}
-        <Tab label={<>📺 태안군TV</>} active={category === "tv"} onClick={() => setCategory("tv")} />
+        <Tab label="태안군TV 영상" active={category === "tv"} onClick={() => setCategory("tv")} />
       </div>
 
-      {category !== "tv" && error && (
-        <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error}</p>
-      )}
+      {category !== "tv" && error && <ErrorBox>{error}</ErrorBox>}
 
       {/* 태안군TV 탭 */}
       {category === "tv" ? (
         <TvVideoSection tv={tv} error={tvError} />
       ) : (
         <>
-          {loading && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
+          {loading && <p role="status" className="text-ti-ink2">기사를 불러오는 중입니다…</p>}
           {hits !== null && (
-            <section className="space-y-1">
-              <p className="text-sm">
-                <span className="font-semibold text-brand">{q ? "검색 결과 " : "기사 "}{total.toLocaleString()}건</span>
-                {totalPages > 1 && (
-                  <span className="text-foreground-muted"> · {page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
-                )}
-              </p>
+            <section aria-labelledby="news-results-title">
+              <SecHead
+                id="news-results-title"
+                title={q ? `‘${q}’ 검색 결과` : "최신 기사"}
+                note={`${q ? "찾은 기사" : "기사"} ${total.toLocaleString()}건${totalPages > 1 ? ` · ${page.toLocaleString()} / ${totalPages.toLocaleString()}쪽` : ""}`}
+              />
               {hits.length === 0 ? (
-                <p className="rounded-lg border border-brand/15 p-6 text-center text-sm text-foreground-muted">
-                  결과가 없습니다. (아카이브 백필이 아직 적재 중이면 결과가 비어 있을 수 있어요.)
+                <p className="rounded-[18px] border border-ti-line bg-ti-sunk p-6 text-center text-ti-ink2">
+                  찾는 기사가 없습니다. 다른 낱말이나 연도로 다시 찾아보세요.
+                  <span className="mt-1 block text-[0.9rem] text-ti-muted">옛 기사를 아직 옮기는 중이면 결과가 비어 있을 수 있습니다.</span>
                 </p>
               ) : (
-                <ul className="divide-y divide-brand/10">
-                  {hits.map((h) => (
-                    <li key={h.idxno}>
-                      <Link
-                        href={`/news/${h.idxno}`}
-                        className="group flex gap-4 py-5 -mx-3 px-3 rounded-lg transition-colors hover:bg-brand/[0.02]"
-                      >
-                        {h.lead_image && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={h.lead_image}
-                            alt={decodeEntities(h.title)}
-                            className="h-20 w-28 shrink-0 rounded object-cover bg-brand/5"
-                            loading="lazy"
-                            onError={(e) => { e.currentTarget.style.display = "none"; }}
-                          />
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="rounded-full bg-accent/15 px-2 py-0.5 font-semibold text-accent">
-                              {ARCHIVE_CATEGORY_LABELS[h.category] ?? h.category}
-                            </span>
-                            <span className="text-foreground-muted">{(h.published_at ?? "").slice(0, 10)}</span>
-                            {h.author && <span className="text-foreground-muted">· {h.author}</span>}
+                <ul className="m-0 list-none divide-y divide-ti-line p-0">
+                  {hits.map((h) => {
+                    const date = (h.published_at ?? "").slice(0, 10);
+                    return (
+                      <li key={h.idxno}>
+                        <Link
+                          href={`/news/${h.idxno}`}
+                          className="group -mx-3 flex gap-4 rounded-xl px-3 py-5 transition-colors hover:bg-ti-sunk"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.9rem]">
+                              <span className="font-bold text-ti-petrol-ink">{ARCHIVE_CATEGORY_LABELS[h.category] ?? h.category}</span>
+                              {date && <time dateTime={date} className="tabular-nums text-ti-muted">{date.replace(/-/g, ".")}</time>}
+                              {h.author && <span className="text-ti-muted">· {h.author}</span>}
+                            </p>
+                            <h3 className="mt-1.5 font-serif text-[1.15rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">
+                              {decodeEntities(h.title)}
+                            </h3>
+                            {h.excerpt && (
+                              <p className="mt-1.5 line-clamp-2 text-[0.98rem] leading-relaxed text-ti-ink2">{decodeEntities(h.excerpt)}</p>
+                            )}
                           </div>
-                          <h2 className="mt-1 font-bold text-brand group-hover:underline">{decodeEntities(h.title)}</h2>
-                          {h.excerpt && (
-                            <p className="mt-1 text-sm text-foreground-muted line-clamp-2">{decodeEntities(h.excerpt)}</p>
+                          {h.lead_image && (
+                            // 사진은 제목 오른쪽 — 글을 먼저 읽게(제목이 alt와 겹치니 장식 처리)
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={h.lead_image}
+                              alt=""
+                              className="h-20 w-24 shrink-0 rounded-lg bg-ti-sunk object-cover md:h-24 md:w-36"
+                              loading="lazy"
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
                           )}
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
 
               {(page > 1 || hasMore) && (
-                <div className="flex items-center justify-center gap-3 pt-6">
+                <nav aria-label="기사 목록 쪽 이동" className="flex flex-wrap items-center justify-center gap-3 border-t border-ti-line pt-6">
                   <button
                     type="button"
                     onClick={() => load(page - 1)}
                     disabled={page <= 1 || loading}
-                    className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
+                    className="btn-ghost disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    ← 이전
+                    ← 이전 쪽
                   </button>
-                  <span className="text-sm text-foreground-muted tabular-nums">{page.toLocaleString()} / {totalPages.toLocaleString()}페이지</span>
+                  <span className="tabular-nums text-ti-ink2">
+                    <span className="font-display font-bold text-ti-ink">{page.toLocaleString()}</span> / {totalPages.toLocaleString()}쪽
+                  </span>
                   <button
                     type="button"
                     onClick={() => load(page + 1)}
                     disabled={!hasMore || loading}
-                    className="rounded-lg border border-brand/20 px-4 py-2 text-sm font-semibold text-brand disabled:opacity-40 enabled:hover:border-accent"
+                    className="btn-ghost disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    다음 →
+                    다음 쪽 →
                   </button>
-                </div>
+                </nav>
               )}
             </section>
           )}
         </>
       )}
 
-      <p className="text-xs text-foreground-muted">
-        출처: 주간태안신문 · 최신 기사는 매일 자동 수집 · 1990~현재 디지털 아카이브 · 전문은 회원 전용
-      </p>
+      <Source>출처: 주간태안신문 · 최신 기사는 매일 자동으로 모읍니다 · 1990년부터의 디지털 아카이브 · 전문은 회원 전용</Source>
     </div>
+  );
+}
+
+// 오류 안내 — 붉은 바탕 + 짙은 글자(AA), 아이콘 대신 '알림' 말로
+function ErrorBox({ children }: { children: ReactNode }) {
+  return (
+    <p role="alert" className="rounded-xl border border-[#8A1C14]/30 bg-[#FAD4D1] p-4 text-[#8A1C14]">
+      <strong className="mr-1">불러오지 못했습니다.</strong>{children}
+    </p>
   );
 }
 
 // 태안군TV 탭 본문 — 공용 클릭-투-플레이 그리드 + 출처 표기
 function TvVideoSection({ tv, error }: { tv: TvNewsResponse | null; error: string | null }) {
-  if (error) {
-    return <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error}</p>;
-  }
-  if (!tv) return <p className="text-sm text-foreground-muted">영상을 불러오는 중…</p>;
-
   return (
-    <>
-      <TvVideoGrid videos={tv.items} />
-      <p className="text-xs text-foreground-muted">
-        출처: {tv.source} · 영상은 유튜브에서 직접 재생(자체 저장 없음) ·{" "}
-        <a href={tv.channelUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">채널 바로가기 ↗</a>
-      </p>
-    </>
+    <section aria-labelledby="news-tv-title">
+      <SecHead id="news-tv-title" title="태안군TV" note="태안군이 올린 영상 소식입니다. 사진을 누르면 이 자리에서 재생됩니다." />
+      {error ? (
+        <ErrorBox>{error}</ErrorBox>
+      ) : !tv ? (
+        <p role="status" className="text-ti-ink2">영상을 불러오는 중입니다…</p>
+      ) : (
+        <>
+          <TvVideoGrid videos={tv.items} />
+          <Source>
+            출처: {tv.source} · 영상은 유튜브에서 직접 재생합니다(따로 저장하지 않음) ·{" "}
+            <a href={tv.channelUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-ti-petrol-ink underline underline-offset-4">
+              유튜브 채널 바로가기<span className="sr-only"> (새 창)</span>
+            </a>
+          </Source>
+        </>
+      )}
+    </section>
   );
 }
 
-function Tab({ label, active, onClick }: { label: ReactNode; active: boolean; onClick: () => void }) {
+// 분류 탭 — 44px 이상 누르기 영역, 선택 상태는 aria-pressed + 짙은 바탕으로(색만이 아니라 굵기도)
+function Tab({ label, count, active, onClick }: { label: ReactNode; count?: number; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-        active ? "bg-brand text-background" : "text-foreground-muted hover:bg-brand/5"
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-[0.98rem] transition-colors ${
+        active
+          ? "border-ti-navy bg-ti-navy font-bold text-ti-on-navy"
+          : "border-ti-line bg-ti-surface font-semibold text-ti-ink hover:border-ti-petrol"
       }`}
     >
-      {label}
+      <span>{label}</span>
+      {count !== undefined && (
+        <span className={`tabular-nums text-[0.9rem] font-normal ${active ? "text-ti-on-navy-muted" : "text-ti-muted"}`}>{count.toLocaleString()}</span>
+      )}
     </button>
   );
 }

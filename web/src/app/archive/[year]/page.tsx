@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { decodeEntities } from "@/lib/html";
+import { PageHeader } from "@/components/page-header";
+import { SecHead } from "@/components/editorial";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
@@ -41,44 +43,61 @@ export default async function YearArchive({
   const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 1;
 
+  const total = data?.total ?? 0;
+  const lastYear = new Date().getFullYear(); // 다음 해 링크 상한 — 하드코딩하면 해마다 손봐야 한다
+
+  // 2026-10 리디자인: 뉴스아카이브와 같은 세리프 머리·먹선 목록. 날짜는 제목 위로 올려 폰에서도 제목이 넓게.
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1">
-        <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden /> 아카이브</p>
-        <h1 className="text-2xl font-bold text-brand md:text-3xl">{year}년 태안 뉴스</h1>
-        <p className="text-sm text-foreground-muted">
-          태안신문이 기록한 {year}년 기사{data?.total ? ` ${data.total.toLocaleString()}건` : ""} ·{" "}
-          <Link href="/news" className="text-accent hover:underline">검색·카테고리는 뉴스아카이브에서 →</Link>
-        </p>
-      </header>
+    <div className="mx-auto max-w-[48rem] space-y-8">
+      <PageHeader
+        eyebrow="뉴스아카이브"
+        title={`${year}년 태안 뉴스`}
+        description={<>태안신문이 기록한 {year}년 기사{total ? <> <strong className="font-display font-bold tabular-nums text-ti-ink">{total.toLocaleString()}</strong>건</> : ""}을 날짜순으로 모았습니다.</>}
+      />
+      <p>
+        <Link href="/news" className="inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">검색·분류로 찾으려면 뉴스아카이브로 →</Link>
+      </p>
 
-      {items.length === 0 ? (
-        <p className="rounded-lg border border-brand/10 bg-background p-6 text-center text-sm text-foreground-muted">이 해의 기사를 불러오지 못했습니다. <Link href="/news" className="text-accent">뉴스아카이브</Link>에서 찾아보세요.</p>
-      ) : (
-        <ul className="divide-y divide-brand/10">
-          {items.map((h) => (
-            <li key={h.idxno}>
-              <Link href={`/news/${h.idxno}`} className="flex items-baseline gap-3 py-3 transition-colors hover:bg-brand/5">
-                <span className="w-24 shrink-0 text-xs tabular-nums text-accent">{(h.published_at || "").slice(0, 10)}</span>
-                <span className="flex-1 leading-snug text-foreground hover:text-brand">{decodeEntities(h.title)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <section aria-labelledby="year-list-title">
+        <SecHead
+          id="year-list-title"
+          title={`${year}년 기사`}
+          note={totalPages > 1 ? `${page.toLocaleString()} / ${totalPages.toLocaleString()}쪽` : undefined}
+        />
+        {items.length === 0 ? (
+          <p className="rounded-[18px] border border-ti-line bg-ti-sunk p-6 text-center text-ti-ink2">
+            이 해의 기사를 불러오지 못했습니다.{" "}
+            <Link href="/news" className="font-bold text-ti-petrol-ink underline underline-offset-4">뉴스아카이브</Link>에서 찾아보세요.
+          </p>
+        ) : (
+          <ul className="m-0 list-none divide-y divide-ti-line p-0">
+            {items.map((h) => {
+              const d = (h.published_at || "").slice(0, 10);
+              return (
+                <li key={h.idxno}>
+                  <Link href={`/news/${h.idxno}`} className="group -mx-3 block rounded-xl px-3 py-3.5 transition-colors hover:bg-ti-sunk">
+                    {d && <time dateTime={d} className="block text-[0.9rem] font-semibold tabular-nums text-ti-petrol-ink">{d.replace(/-/g, ".")}</time>}
+                    <span className="mt-0.5 block font-serif text-[1.1rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">{decodeEntities(h.title)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-      {totalPages > 1 && (
-        <nav aria-label="페이지" className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={`/archive/${yr}?page=${page - 1}`} className="font-semibold text-accent hover:underline">← 이전</Link> : <span />}
-          <span className="text-foreground-muted tabular-nums">{page} / {totalPages}</span>
-          {page < totalPages ? <Link href={`/archive/${yr}?page=${page + 1}`} className="font-semibold text-accent hover:underline">다음 →</Link> : <span />}
-        </nav>
-      )}
+        {totalPages > 1 && (
+          <nav aria-label="쪽 이동" className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-ti-line pt-5">
+            {page > 1 ? <Link href={`/archive/${yr}?page=${page - 1}`} className="btn-ghost">← 이전 쪽</Link> : <span />}
+            <span className="tabular-nums text-ti-ink2"><span className="font-display font-bold text-ti-ink">{page}</span> / {totalPages}쪽</span>
+            {page < totalPages ? <Link href={`/archive/${yr}?page=${page + 1}`} className="btn-ghost">다음 쪽 →</Link> : <span />}
+          </nav>
+        )}
+      </section>
 
-      <nav aria-label="연도 이동" className="flex flex-wrap gap-x-4 gap-y-2 border-t border-brand/10 pt-4 text-sm">
-        {yr > 1990 && <Link href={`/archive/${yr - 1}`} className="text-accent hover:underline">← {yr - 1}년</Link>}
-        {yr < 2026 && <Link href={`/archive/${yr + 1}`} className="text-accent hover:underline">{yr + 1}년 →</Link>}
-        <Link href="/news" className="ml-auto text-foreground-muted hover:text-brand">전체 아카이브 검색 →</Link>
+      <nav aria-label="연도 이동" className="flex flex-wrap items-center gap-3 border-t-2 border-ti-ink pt-5">
+        {yr > 1990 && <Link href={`/archive/${yr - 1}`} className="btn-ghost">← {yr - 1}년</Link>}
+        {yr < lastYear && <Link href={`/archive/${yr + 1}`} className="btn-ghost">{yr + 1}년 →</Link>}
+        <Link href="/news" className="ml-auto inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">전체 아카이브 검색 →</Link>
       </nav>
     </div>
   );

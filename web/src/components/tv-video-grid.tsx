@@ -21,49 +21,55 @@ export function TvVideoGrid({ videos, columns = 2, compact = false }: {
 }) {
   const [playing, setPlaying] = useState<string | null>(null);
 
+  // 2026-10 리디자인: 여러 단은 md(768px)부터 — sm은 320px(모든 휴대폰)이라 폰에서 칸이 좁아진다.
   return (
-    <div className={columns === 3 ? "grid gap-4 sm:grid-cols-3" : "grid gap-6 sm:grid-cols-2"}>
+    <ul className={`m-0 grid list-none p-0 ${columns === 3 ? "gap-4 md:grid-cols-2 lg:grid-cols-3" : "gap-6 md:grid-cols-2"}`}>
       {videos.map((v) => (
-        <figure key={v.id} className="overflow-hidden rounded-2xl border border-brand/15">
-          {playing === v.id ? (
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1`}
-              title={v.title}
-              className="aspect-video w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setPlaying(v.id)}
-              className="group relative block w-full"
-              aria-label={`재생: ${v.title}`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={v.thumbnail} alt="" className="aspect-video w-full object-cover" loading="lazy" />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/35">
-                <span className={`flex items-center justify-center rounded-full bg-black/60 text-white ${compact ? "h-10 w-10 text-sm" : "h-14 w-14 text-2xl"}`} aria-hidden>▶</span>
-              </span>
-            </button>
-          )}
-          {compact ? (
-            <figcaption className="bg-background p-3">
-              <p className="text-sm font-semibold leading-snug text-brand">{v.title}</p>
-            </figcaption>
-          ) : (
-            <figcaption className="space-y-1 bg-background p-4">
-              {v.publishedAt && <p className="text-xs text-foreground-muted">{formatTvDate(v.publishedAt)}</p>}
-              <p className="font-bold leading-snug text-brand">{v.title}</p>
-              {v.description && <p className="text-sm text-foreground-muted line-clamp-2">{v.description}</p>}
-              <a href={v.url} target="_blank" rel="noopener noreferrer" className="inline-block pt-1 text-xs font-semibold text-accent hover:underline">
-                유튜브에서 보기 ↗
-              </a>
-            </figcaption>
-          )}
-        </figure>
+        <li key={v.id} className="min-w-0">
+          <figure className="m-0 overflow-hidden rounded-[18px] border border-ti-line bg-ti-surface">
+            {playing === v.id ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1`}
+                title={v.title}
+                className="aspect-video w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPlaying(v.id)}
+                className="group relative block w-full"
+                aria-label={`재생: ${v.title}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={v.thumbnail} alt="" className="aspect-video w-full bg-ti-sunk object-cover" loading="lazy" />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/35">
+                  {/* 재생 표시는 기호 + '재생' 글자 — 기호만으론 뜻이 안 읽힌다 */}
+                  <span className={`inline-flex items-center gap-2 rounded-full bg-black/75 font-bold text-white ${compact ? "px-3 py-1.5 text-[0.9rem]" : "px-5 py-2.5 text-[1.02rem]"}`} aria-hidden>
+                    <span>▶</span> 재생
+                  </span>
+                </span>
+              </button>
+            )}
+            {compact ? (
+              <figcaption className="p-3">
+                <p className="text-[0.95rem] font-semibold leading-snug text-ti-ink">{v.title}</p>
+              </figcaption>
+            ) : (
+              <figcaption className="space-y-1.5 p-4">
+                {v.publishedAt && <p className="text-[0.9rem] tabular-nums text-ti-muted">{formatTvDate(v.publishedAt)}</p>}
+                <p className="font-serif text-[1.1rem] font-bold leading-snug text-ti-ink">{v.title}</p>
+                {v.description && <p className="line-clamp-2 text-[0.95rem] text-ti-ink2">{v.description}</p>}
+                <a href={v.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-[0.95rem] font-bold text-ti-petrol-ink underline underline-offset-4">
+                  유튜브에서 보기<span className="sr-only"> (새 창)</span>
+                </a>
+              </figcaption>
+            )}
+          </figure>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

@@ -60,27 +60,27 @@ export function CorrectionRequest({ idxno }: { idxno: number }) {
 
   return (
     <>
-      <div className="no-print rounded-lg border border-brand/15 bg-brand/[0.03] px-4 py-3 text-sm">
-        <span className="text-foreground-muted">
-          옛 지면을 자동 인식(OCR)한 본문이라 오탈자가 있을 수 있습니다. 틀린 부분을 드래그한 뒤{" "}
-        </span>
+      {/* 안내 + 단추를 떼어 둔다 — 문장 속 작은 글자 단추는 어르신이 누르기 어렵다 */}
+      <div className="no-print mx-auto flex max-w-[40em] flex-wrap items-center justify-between gap-3 rounded-xl border border-ti-line bg-ti-sunk px-4 py-3">
+        <p className="min-w-0 flex-1 text-[0.95rem] text-ti-ink2">
+          옛 지면을 자동으로 글자로 옮긴(OCR) 본문이라 틀린 글자가 있을 수 있습니다. 틀린 부분을 끌어서 고른 뒤 단추를 눌러 알려주세요.
+        </p>
         <button
           type="button"
           onClick={openForm}
-          className="font-semibold text-accent hover:underline"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-ti-petrol bg-ti-surface px-4 text-[0.95rem] font-bold text-ti-petrol-ink hover:bg-ti-petrol-soft"
         >
-          ✏️ 수정 요청
+          틀린 글자 알리기
         </button>
-        <span className="text-foreground-muted">을 눌러 알려주세요.</span>
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="기사 수정 요청">
-          <div className="w-full max-w-lg space-y-4 rounded-2xl bg-background p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="correction-title">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg space-y-4 overflow-y-auto rounded-[18px] border border-ti-line bg-ti-surface p-6 shadow-lift">
             {done ? (
               <>
-                <h3 className="text-lg font-bold text-brand">요청이 접수됐습니다</h3>
-                <p className="text-sm text-foreground-muted">
+                <h2 id="correction-title" className="font-serif text-[1.3rem] font-bold text-ti-ink">요청이 접수됐습니다</h2>
+                <p role="status" className="text-ti-ink2">
                   관리자가 원본 지면과 대조해 확인 후 반영합니다. 처리 결과는 <strong>내 페이지 → 내 수정 요청</strong>에서 볼 수 있어요.
                 </p>
                 <div className="flex justify-end">
@@ -89,41 +89,41 @@ export function CorrectionRequest({ idxno }: { idxno: number }) {
               </>
             ) : (
               <>
-                <h3 className="text-lg font-bold text-brand">✏️ 기사 수정 요청</h3>
-                <label className="block space-y-1 text-sm">
-                  <span className="font-semibold text-brand">틀린 부분 (본문에서 드래그하면 자동 입력)</span>
+                <h2 id="correction-title" className="font-serif text-[1.3rem] font-bold text-ti-ink">기사 수정 요청</h2>
+                <label className="block space-y-1.5">
+                  <span className="block font-bold text-ti-ink">틀린 부분 (본문에서 드래그하면 자동 입력)</span>
                   <textarea
                     value={selected}
                     onChange={(e) => setSelected(e.target.value)}
                     rows={2}
                     maxLength={500}
-                    className="w-full rounded-lg border border-brand/20 bg-background p-2.5 text-sm"
+                    className="min-h-12 w-full rounded-xl border border-ti-line bg-ti-surface p-3 text-[1rem] text-ti-ink placeholder:text-ti-muted focus:border-ti-petrol"
                     placeholder="예: 이중밭 대책은"
                   />
                 </label>
-                <label className="block space-y-1 text-sm">
-                  <span className="font-semibold text-brand">이렇게 고쳐주세요</span>
+                <label className="block space-y-1.5">
+                  <span className="block font-bold text-ti-ink">이렇게 고쳐주세요</span>
                   <textarea
                     value={suggestion}
                     onChange={(e) => setSuggestion(e.target.value)}
                     rows={2}
                     maxLength={500}
-                    className="w-full rounded-lg border border-brand/20 bg-background p-2.5 text-sm"
+                    className="min-h-12 w-full rounded-xl border border-ti-line bg-ti-surface p-3 text-[1rem] text-ti-ink placeholder:text-ti-muted focus:border-ti-petrol"
                     placeholder="예: 이상반 대책은"
                   />
                 </label>
-                <label className="block space-y-1 text-sm">
-                  <span className="font-semibold text-brand">사유 (선택)</span>
+                <label className="block space-y-1.5">
+                  <span className="block font-bold text-ti-ink">사유 (선택)</span>
                   <input
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     maxLength={300}
-                    className="w-full rounded-lg border border-brand/20 bg-background p-2.5 text-sm"
+                    className="min-h-12 w-full rounded-xl border border-ti-line bg-ti-surface p-3 text-[1rem] text-ti-ink placeholder:text-ti-muted focus:border-ti-petrol"
                     placeholder="원본 지면 2단 3행 참고 등"
                   />
                 </label>
-                {error && <p className="text-sm text-red-600">⚠️ {error}</p>}
-                <div className="flex justify-end gap-2">
+                {error && <p role="alert" className="rounded-xl bg-[#FAD4D1] p-3 font-semibold text-[#8A1C14]">{error}</p>}
+                <div className="flex flex-wrap justify-end gap-2">
                   <button type="button" onClick={() => setOpen(false)} className="btn-ghost" disabled={busy}>취소</button>
                   <button type="button" onClick={submit} className="btn-accent" disabled={busy}>
                     {busy ? "제출 중…" : "요청 제출"}

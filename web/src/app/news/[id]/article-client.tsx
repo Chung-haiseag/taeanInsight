@@ -27,6 +27,7 @@ import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
 import ArticleGraph from "./article-graph";
 import { MembershipNudge } from "@/components/membership-nudge";
+import { SecHead } from "@/components/editorial";
 
 export default function ArticleClient({ initialArticle }: { initialArticle?: Reader }) {
   const params = useParams<{ id: string }>();
@@ -85,56 +86,57 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
     })();
   }, [params.id, initialArticle]);
 
-  if (loading) return <p className="text-sm text-foreground-muted">불러오는 중…</p>;
+  if (loading) return <p role="status" className="mx-auto max-w-[48rem] text-ti-ink2">기사를 불러오는 중입니다…</p>;
   if (error || !article)
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-red-600 border border-red-200 rounded-lg p-4 bg-red-50">⚠️ {error ?? "없음"}</p>
-        <Link href="/news" className="text-sm font-semibold text-brand">
-          ← 태안뉴스로
+      <div className="mx-auto max-w-[48rem] space-y-4">
+        <p role="alert" className="rounded-xl border border-[#8A1C14]/30 bg-[#FAD4D1] p-4 text-[#8A1C14]">
+          <strong className="mr-1">기사를 불러오지 못했습니다.</strong>{error ?? ""}
+        </p>
+        <Link href="/news" className="inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">
+          ← 뉴스아카이브로
         </Link>
       </div>
     );
 
+  const date = (article.publishedAt ?? "").slice(0, 10);
+
+  // 2026-10 리디자인: 읽는 폭을 한 줄 40em 안팎으로 묶는다(어르신 눈이 줄 끝에서 다음 줄을 잃지 않게).
   return (
-    <article className="mx-auto max-w-4xl space-y-6">
+    <article className="mx-auto max-w-[48rem] space-y-8">
       {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
       <ReadingTracker idxno={Number(params.id)} category={article.category} />
-      <div className="no-print flex gap-4 text-sm text-foreground-muted">
+      <nav aria-label="이전 목록" className="no-print">
         {/* 광고는 기사 검색에 없다 — 왔던 곳으로 돌려보내야 맞다. */}
         {article.isAd
-          ? <Link href="/paper/ads" className="hover:text-brand">← 옛 광고</Link>
-          : <Link href="/news" className="hover:text-brand">← 뉴스아카이브</Link>}
-      </div>
+          ? <Link href="/paper/ads" className="inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">← 옛 광고 목록</Link>
+          : <Link href="/news" className="inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">← 뉴스아카이브 목록</Link>}
+      </nav>
 
-      <header className="space-y-3 border-b border-brand/10 pb-6">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-accent/15 px-2 py-0.5 font-semibold text-accent">
-            {article.categoryLabel}
-          </span>
-          <span className="text-foreground-muted">{formatDate(article.publishedAt)}</span>
-          {article.author && <span className="text-foreground-muted">· {article.author}</span>}
-        </div>
-        <h1 className="text-display-sm font-bold text-brand">
+      {/* 제목 머리 — 분류 → 큰 세리프 제목 → 날짜·기자(신문 1면과 같은 순서) */}
+      <header className="space-y-4 border-b-2 border-ti-ink pb-6">
+        {article.categoryLabel && <p className="text-[0.95rem] font-bold tracking-[0.06em] text-ti-petrol-ink">{article.categoryLabel}</p>}
+        <h1 className="break-keep font-serif text-[clamp(1.75rem,4.4vw,2.6rem)] font-black leading-[1.28] tracking-[-0.02em] text-ti-ink">
           {raWords
             ? <ReadAlongParagraph text={article.title} offset={0} active={raActive} sentences={raSentences} onSeek={seekTo} />
             : article.title}
         </h1>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[1rem] text-ti-ink2">
+          {date ? <time dateTime={date}>{formatDate(article.publishedAt)}</time> : <span>{formatDate(article.publishedAt)}</span>}
+          {article.author && <span><span className="sr-only">기자 </span>{article.author}</span>}
+          <span className="text-ti-muted">주간태안신문</span>
+        </p>
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
           <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} controlsRef={audioCtl} durationHint={raWords?.duration} />
           <ShareBar idxno={Number(params.id)} title={article.title} />
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-background px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5"
-          >
+          <button type="button" onClick={() => window.print()} className={TOOL_PILL}>
             <Icon name="print" /> PDF로 저장
           </button>
         </div>
         {raWords && (
-          <p className="no-print text-xs text-foreground-muted">
-            기사 본문을 요약 없이 그대로 읽습니다. 읽는 위치가 본문에 표시되고,{" "}
-            <strong className="font-semibold text-brand">문장을 클릭하면 그 지점부터</strong> 들을 수 있습니다.
+          <p className="no-print rounded-xl bg-ti-sunk px-4 py-3 text-[0.95rem] text-ti-ink2">
+            기사 본문을 요약 없이 그대로 읽어 드립니다. 읽는 곳이 본문에 노랗게 표시되고,{" "}
+            <strong className="font-bold text-ti-ink">문장을 누르면 그 문장부터</strong> 들을 수 있습니다.
           </p>
         )}
       </header>
@@ -142,22 +144,22 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
       {loggedIn && article.hasFullText ? (
         <FullBody article={article} idxno={Number(params.id)} active={raActive} hasWords={!!raWords} sentences={raSentences} onSeek={seekTo} />
       ) : (
-        <>
+        <div className="mx-auto max-w-[40em] space-y-6">
           {/* 리드(발췌) */}
-          <p className="text-lg leading-relaxed text-foreground"><QuotedText text={article.excerpt} /></p>
+          <p className="text-[1.12rem] leading-[1.85] text-ti-ink"><QuotedText text={article.excerpt} /></p>
           {loggedIn ? (
-            <div className="rounded-lg border border-brand/15 bg-brand/[0.03] p-4 text-sm text-foreground-muted">
-              <Icon name="books" /> 전체 본문은 아카이브에 적재되면 이 자리에 표시됩니다. 지금은 발췌만 제공됩니다.
+            <div className="rounded-xl border border-ti-line bg-ti-sunk p-4 text-ti-ink2">
+              <Icon name="books" /> 전체 본문은 아카이브에 옮겨지면 이 자리에 나옵니다. 지금은 앞부분만 보여 드립니다.
               {article.url && (
-                <a href={article.url} target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-brand hover:underline">
-                  원문 보기 ↗
+                <a href={article.url} target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-ti-petrol-ink underline underline-offset-4">
+                  태안신문 원문 보기<span className="sr-only"> (새 창)</span>
                 </a>
               )}
             </div>
           ) : (
             <MemberGate hasFullText={article.hasFullText} idxno={Number(params.id)} />
           )}
-        </>
+        </div>
       )}
 
       <MembershipNudge
@@ -173,6 +175,9 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
     </article>
   );
 }
+
+// 기사 도구 단추(듣기 옆 공유·오디오·PDF) — 44px 높이, 흰 바탕 + 먹선
+const TOOL_PILL = "inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ti-line bg-ti-surface px-4 text-[0.95rem] font-semibold text-ti-ink hover:border-ti-petrol";
 
 // 공유 + 오디오(나레이션) 링크·임베드 복사. 나레이션 URL은 공개·CORS 전면개방이라 어디서든 재생/임베드 가능.
 function ShareBar({ idxno, title }: { idxno: number; title: string }) {
@@ -191,18 +196,18 @@ function ShareBar({ idxno, title }: { idxno: number; title: string }) {
     if (typeof nav.share === "function") { try { await nav.share({ title, url }); } catch { /* 사용자 취소 */ } return; }
     await copy(url, "링크가 복사됐어요");
   };
-  const pill = "inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-background px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/5";
+  const pill = TOOL_PILL;
   return (
-    <div className="relative inline-flex items-center gap-2">
+    <div className="relative inline-flex flex-wrap items-center gap-2">
       <button type="button" onClick={share} className={pill}><Icon name="link" /> 공유</button>
       <button type="button" onClick={() => setMenu((v) => !v)} aria-expanded={menu} aria-haspopup="menu" className={pill}><Icon name="speaker" /> 오디오</button>
       {menu && (
-        <div className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-xl border border-brand/15 bg-background py-1 shadow-lift" role="menu">
-          <button type="button" role="menuitem" onClick={() => copy(audioUrl, "오디오 링크 복사됨")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-brand/5"><Icon name="link" /> 오디오 링크 복사</button>
-          <button type="button" role="menuitem" onClick={() => copy(embed, "임베드 코드 복사됨")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-brand/5"><Icon name="doc" /> 임베드 코드 복사</button>
+        <div className="absolute left-0 top-full z-30 mt-1 w-60 overflow-hidden rounded-xl border border-ti-line bg-ti-surface py-1 shadow-lift" role="menu">
+          <button type="button" role="menuitem" onClick={() => copy(audioUrl, "오디오 링크 복사됨")} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[0.95rem] text-ti-ink hover:bg-ti-sunk"><Icon name="link" /> 오디오 링크 복사</button>
+          <button type="button" role="menuitem" onClick={() => copy(embed, "임베드 코드 복사됨")} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[0.95rem] text-ti-ink hover:bg-ti-sunk"><Icon name="doc" /> 임베드 코드 복사</button>
         </div>
       )}
-      {msg && <span className="whitespace-nowrap text-xs font-semibold text-accent">{msg}</span>}
+      {msg && <span role="status" className="whitespace-nowrap text-[0.9rem] font-bold text-ti-petrol-ink">{msg}</span>}
     </div>
   );
 }
@@ -235,29 +240,29 @@ function RelatedArticles({ idxno }: { idxno: number }) {
   const pages = Math.ceil(total / pageSize);
 
   return (
-    <section className="no-print border-t border-brand/10 pt-6 space-y-3">
-      <div className="flex items-baseline justify-between">
-        <p className="eyebrow"><span className="inline-block h-px w-6 bg-accent" aria-hidden />관련 뉴스</p>
-        {total > 0 && <span className="text-xs text-foreground-muted">총 {total}건 · 최근순</span>}
-      </div>
-      <ul className="grid gap-2 sm:grid-cols-2">
-        {items.map((it) => (
-          <li key={it.idxno}>
-            <Link
-              href={`/news/${it.idxno}`}
-              className="flex gap-3 rounded-lg border border-brand/12 p-3 hover:border-brand/30 hover:bg-brand/[0.02]"
-            >
-              {it.lead_image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={it.lead_image} alt="" className="h-12 w-16 shrink-0 rounded object-cover bg-brand/5" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-              )}
-              <div className="min-w-0">
-                <p className="text-xs text-foreground-muted">{(it.published_at ?? "").slice(0, 10)}</p>
-                <p className="text-sm font-semibold text-brand line-clamp-2">{decodeEntities(it.title)}</p>
-              </div>
-            </Link>
-          </li>
-        ))}
+    <section aria-labelledby="related-news-title" className="no-print">
+      <SecHead id="related-news-title" title="관련 뉴스" note={total > 0 ? `모두 ${total.toLocaleString()}건 · 최근 기사부터` : undefined} />
+      <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2">
+        {items.map((it) => {
+          const d = (it.published_at ?? "").slice(0, 10);
+          return (
+            <li key={it.idxno} className="min-w-0">
+              <Link
+                href={`/news/${it.idxno}`}
+                className="group flex h-full gap-3 rounded-xl border border-ti-line bg-ti-surface p-3.5 hover:border-ti-petrol"
+              >
+                {it.lead_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={it.lead_image} alt="" className="h-16 w-20 shrink-0 rounded-lg bg-ti-sunk object-cover" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                )}
+                <div className="min-w-0">
+                  {d && <time dateTime={d} className="block text-[0.88rem] tabular-nums text-ti-muted">{d.replace(/-/g, ".")}</time>}
+                  <p className="mt-0.5 line-clamp-2 font-serif text-[1.02rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">{decodeEntities(it.title)}</p>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
       {pages > 1 && <Pager page={page} pages={pages} onGo={setPage} />}
     </section>
@@ -270,14 +275,14 @@ function Pager({ page, pages, onGo }: { page: number; pages: number; onGo: (p: n
   const nums: number[] = [];
   for (let p = Math.max(1, page - win); p <= Math.min(pages, page + win); p++) nums.push(p);
   return (
-    <nav className="flex flex-wrap items-center justify-center gap-1 pt-2 text-sm" aria-label="관련 뉴스 페이지">
-      <PagerBtn disabled={page <= 1} onClick={() => onGo(page - 1)}>
-        ←
+    <nav className="flex flex-wrap items-center justify-center gap-1.5 pt-4" aria-label="관련 뉴스 쪽 이동">
+      <PagerBtn disabled={page <= 1} onClick={() => onGo(page - 1)} label="이전 쪽">
+        ← 이전
       </PagerBtn>
       {nums[0] > 1 && (
         <>
           <PagerBtn onClick={() => onGo(1)}>1</PagerBtn>
-          {nums[0] > 2 && <span className="px-1 text-foreground-muted">…</span>}
+          {nums[0] > 2 && <span className="px-1 text-ti-muted" aria-hidden>…</span>}
         </>
       )}
       {nums.map((p) => (
@@ -287,12 +292,12 @@ function Pager({ page, pages, onGo }: { page: number; pages: number; onGo: (p: n
       ))}
       {nums[nums.length - 1] < pages && (
         <>
-          {nums[nums.length - 1] < pages - 1 && <span className="px-1 text-foreground-muted">…</span>}
+          {nums[nums.length - 1] < pages - 1 && <span className="px-1 text-ti-muted" aria-hidden>…</span>}
           <PagerBtn onClick={() => onGo(pages)}>{pages}</PagerBtn>
         </>
       )}
-      <PagerBtn disabled={page >= pages} onClick={() => onGo(page + 1)}>
-        →
+      <PagerBtn disabled={page >= pages} onClick={() => onGo(page + 1)} label="다음 쪽">
+        다음 →
       </PagerBtn>
     </nav>
   );
@@ -303,11 +308,13 @@ function PagerBtn({
   active,
   disabled,
   onClick,
+  label,
 }: {
   children: React.ReactNode;
   active?: boolean;
   disabled?: boolean;
   onClick: () => void;
+  label?: string; // 숫자 단추는 'N쪽'으로 읽히게
 }) {
   return (
     <button
@@ -315,9 +322,10 @@ function PagerBtn({
       onClick={onClick}
       disabled={disabled}
       aria-current={active ? "page" : undefined}
-      className={`min-w-8 rounded px-2.5 py-1 ${
-        active ? "bg-brand text-background font-semibold" : "text-foreground-muted hover:bg-brand/5"
-      } disabled:opacity-40`}
+      aria-label={label ?? (typeof children === "number" ? `${children}쪽` : undefined)}
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-3 text-[0.95rem] tabular-nums ${
+        active ? "border-ti-navy bg-ti-navy font-bold text-ti-on-navy" : "border-ti-line bg-ti-surface font-semibold text-ti-ink hover:border-ti-petrol"
+      } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {children}
     </button>
@@ -344,7 +352,7 @@ function QuotedText({ text }: { text: string }) {
     <>
       {segmentQuotes(text).map((s, i) =>
         s.quote ? (
-          <span key={i} className="font-medium text-accent">{s.t}</span>
+          <span key={i} className="font-semibold text-ti-petrol-ink">{s.t}</span>
         ) : (
           <span key={i}>{s.t}</span>
         ),
@@ -370,19 +378,19 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
   const paras = hasCaption ? allParas.slice(1) : allParas;
   const restImages = leadImg ? article.images.slice(1) : article.images;
   return (
-    <div className="space-y-5">
-      {/* 리드 사진 — 맨 위 + 사진설명(중앙) */}
+    <div className="space-y-8">
+      {/* 리드 사진 — 맨 위 + 사진설명(가운데) */}
       {leadImg && (
-        <figure className="space-y-2">
+        <figure className="m-0 space-y-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={leadImg} alt={hasCaption ? allParas[0] : article.title} className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 720px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-          {hasCaption && <figcaption className="text-center text-sm text-foreground-muted">{allParas[0]}</figcaption>}
+          <img src={leadImg} alt={hasCaption ? allParas[0] : article.title} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: "min(100%, 720px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          {hasCaption && <figcaption className="mx-auto max-w-[40em] text-center text-[0.95rem] text-ti-ink2">{allParas[0]}</figcaption>}
         </figure>
       )}
 
-      {/* 본문 — 줄간격·문단간격은 가독성 기준(과도한 여백 방지) */}
+      {/* 본문 — 한 줄 40em·글자 1.08rem·줄간격 1.85: 어르신이 줄을 놓치지 않는 폭과 숨 */}
       {/*   따라읽기: 정렬 원문이 `제목.\n본문`이라 본문 문단의 순번은 제목 글자 수부터 시작한다. */}
-      <div ref={bodyRef as React.RefObject<HTMLDivElement>} className="space-y-4 text-[1.02rem] leading-[1.7] text-foreground">
+      <div ref={bodyRef as React.RefObject<HTMLDivElement>} className="mx-auto max-w-[40em] space-y-[1.1em] break-keep text-[1.08rem] leading-[1.85] text-ti-ink">
         {(() => {
           let off = nsLen(`${article.title}.`);
           if (hasCaption) off += nsLen(allParas[0]);
@@ -402,11 +410,11 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
 
       {/* 나머지 본문 사진(리드 외) */}
       {restImages.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-5">
           {restImages.map((src) => (
             // 자연 크기 표시(작으면 작게), 단 본문 폭·높이 상한만 둠 — 작은 사진이 흐릿하게 늘어나지 않게
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt={`${article.title} 본문 사진`} className="mx-auto block h-auto rounded-lg bg-brand/5" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img key={src} src={src} alt={`${article.title} 본문 사진`} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
       )}
@@ -416,8 +424,8 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
         (typeof article.faithfulness === "number" && article.faithfulness < LOW_FAITH) ||
         Number((article.publishedAt || "").slice(0, 4)) <= OLD_PRINT_UNTIL
       ) && (
-        <p className="rounded-md border-l-4 border-amber-600 bg-amber-100 px-4 py-3 text-sm font-bold text-amber-900">
-          ⚠ 완벽하게 OCR이 되지 않아, 기사 내용을 확인하려면 아래 <span className="underline">원본 지면</span>을 확인하세요.
+        <p className="mx-auto max-w-[40em] rounded-xl border-l-4 border-[#6B3F00] bg-[#FCE3B5] px-4 py-3 font-semibold text-[#6B3F00]">
+          <strong className="mr-1 font-black">알림</strong>옛 지면을 글자로 옮기는 과정이 완벽하지 않습니다. 정확한 내용은 아래 <span className="underline underline-offset-4">원본 지면</span>에서 확인하세요.
         </p>
       )}
 
@@ -428,11 +436,11 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
       {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} boxes={article.pageBoxes ?? undefined} date={(article.publishedAt ?? "").slice(0, 10)} />}
 
       {/* 출처 표기 */}
-      <div className="flex items-center justify-between border-t border-brand/10 pt-4 text-sm">
-        <span className="text-foreground-muted">출처 · 주간태안신문</span>
+      <div className="mx-auto flex max-w-[40em] flex-wrap items-center justify-between gap-2 border-t border-ti-line pt-4">
+        <span className="text-[0.95rem] text-ti-muted">출처: 주간태안신문</span>
         {article.url && (
-          <a href={article.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">
-            원문 보기 ↗
+          <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">
+            태안신문 원문 보기<span className="sr-only"> (새 창)</span>
           </a>
         )}
       </div>
@@ -442,15 +450,15 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
 
 function MemberGate({ hasFullText, idxno }: { hasFullText: boolean; idxno: number }) {
   return (
-    <div className="relative rounded-2xl border border-accent/40 bg-accent-subtle/20 p-7 text-center space-y-4">
+    <div aria-labelledby="member-gate-title" role="region" className="space-y-4 rounded-[18px] border-2 border-ti-petrol bg-ti-petrol-soft p-6 text-center md:p-8">
       <p className="eyebrow justify-center"><Icon name="lock" /> 로그인하면 보입니다</p>
-      <h2 className="text-xl font-bold text-brand">
+      <h2 id="member-gate-title" className="break-keep font-serif text-[1.35rem] font-bold leading-snug text-ti-ink">
         {hasFullText ? "이 기사의 전문은 로그인하시면 보실 수 있습니다" : "로그인하시면 더 많은 기능을 이용하실 수 있어요"}
       </h2>
-      <p className="text-sm text-foreground-muted">
+      <p className="text-ti-ink2">
         아카이브 기사는 회원가입만 하시면 무료입니다. 결제는 필요하지 않습니다.
       </p>
-      <div className="flex justify-center gap-3 pt-1">
+      <div className="flex flex-wrap justify-center gap-3 pt-1">
         <Link href={`/login?redirect=${encodeURIComponent(`/news/${idxno}`)}`} className="btn-accent">
           로그인하기
         </Link>
@@ -468,38 +476,40 @@ function OriginalPage({ src, label, boxes, date }: { src: string; label: string;
   const [viewer, setViewer] = useState(false);
   const fullSrc = src.replace(/\.jpg(\?|$)/, "full.jpg$1"); // page_03.jpg → page_03full.jpg
   return (
-    <section className="rounded-lg border border-brand/15 bg-brand/[0.03]">
+    <section aria-label="원본 지면" className="rounded-[18px] border border-ti-line bg-ti-sunk">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-brand"
+        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left font-bold text-ti-ink"
         aria-expanded={open}
       >
-        <span>원본 지면 보기 <span className="ml-1 font-normal text-foreground-muted">({label})</span></span>
-        <span aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span>원본 지면 보기 {label && <span className="ml-1 font-normal text-ti-ink2">({label})</span>}</span>
+        <span className="shrink-0 text-[0.95rem] font-semibold text-ti-petrol-ink">{open ? "접기" : "펼치기"}</span>
       </button>
       {open && (
-        <div className="space-y-2 px-4 pb-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-foreground-muted">
-              주간태안신문 원본 지면 스캔 — ＋− 버튼으로 확대하고 드래그로 이동하세요.
-              {boxes?.length ? <span className="ml-1 font-semibold text-red-600">붉게 칠한 곳이 이 기사입니다.</span> : null}
+        <div className="space-y-3 px-4 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0 flex-1 text-[0.95rem] text-ti-ink2">
+              주간태안신문 원본 지면 스캔입니다. ＋ − 단추로 키우고 끌어서 움직이세요.
+              {boxes?.length ? <strong className="ml-1 font-bold text-[#8A1C14]">붉게 칠한 곳이 이 기사입니다.</strong> : null}
             </p>
-            <span className="flex shrink-0 items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
               {/* 지면 넘겨보기는 상단 메뉴가 아니라 **여기서 이어진다** — 기사를 읽다
                   '이 날 신문 전체를 보고 싶다'가 자연스러운 흐름이다. */}
               {/^\d{4}-\d{2}-\d{2}$/.test(date ?? "") && (
                 <Link
                   href={`/paper/${date!.slice(0, 4)}/${date}`}
-                  className="rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
+                  className={TOOL_PILL}
                 >
                   이 날 신문 전체 보기 →
                 </Link>
               )}
               <button
+                type="button"
                 onClick={() => setViewer(true)}
-                className="rounded border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand hover:text-background"
+                className={TOOL_PILL}
               >
-                <Icon name="search" /> 전체화면
+                <Icon name="expand" /> 크게 보기
               </button>
             </span>
           </div>
