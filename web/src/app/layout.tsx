@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { Fraunces } from "next/font/google";
+import { Fraunces, Noto_Serif_KR } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 
@@ -18,6 +18,14 @@ const fraunces = Fraunces({
   display: "swap",
   weight: ["400", "600", "700"],
   style: ["normal", "italic"],
+});
+// 신문 1면 제목 — 한글 세리프(2026-10 홈 리디자인). 한글 글꼴은 크므로 미리 받지 않고(preload:false)
+//   구글이 나눠 둔 글자 묶음(unicode-range) 중 화면에 쓰인 것만 내려받게 둔다.
+const notoSerifKr = Noto_Serif_KR({
+  weight: ["700", "900"],
+  variable: "--font-serif-kr",
+  display: "swap",
+  preload: false,
 });
 import { SiteFooter } from "@/components/site-footer";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
@@ -68,7 +76,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={`${pretendard.variable} ${fraunces.variable}`}>
+    <html lang="ko" className={`${pretendard.variable} ${fraunces.variable} ${notoSerifKr.variable}`}>
       <body>
         <a href="#main" className="skip-link">
           본문으로 건너뛰기

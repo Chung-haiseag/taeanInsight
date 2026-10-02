@@ -21,6 +21,27 @@ export default {
           DEFAULT: "#F5F7F7", // 쿨 페이퍼(페트롤 액센트와 조화, 크림=AI클러스터 탈피)
           highcontrast: "#FFFFFF",
         },
+        // 2026-10 홈 리디자인(신문 1면) 토큰 — 값은 globals.css 의 --ti-* 변수(고대비에서 바뀜).
+        ti: {
+          paper: "var(--ti-paper)",
+          surface: "var(--ti-surface)",
+          sunk: "var(--ti-sunk)",
+          ink: "var(--ti-ink)",
+          ink2: "var(--ti-ink-2)",
+          muted: "var(--ti-muted)",
+          line: "var(--ti-line)",
+          navy: "var(--ti-navy)",
+          "navy-deep": "var(--ti-navy-deep)",
+          "on-navy": "var(--ti-on-navy)",
+          "on-navy-muted": "var(--ti-on-navy-muted)",
+          petrol: "var(--ti-petrol)",
+          "petrol-ink": "var(--ti-petrol-ink)",
+          "petrol-soft": "var(--ti-petrol-soft)",
+          gold: "var(--ti-gold)",
+          "gold-ink": "var(--ti-gold-ink)",
+          "gold-soft": "var(--ti-gold-soft)",
+          "on-gold": "var(--ti-on-gold)",
+        },
         foreground: {
           DEFAULT: "#1F2A44",
           highcontrast: "#000000",
@@ -37,6 +58,8 @@ export default {
           "Roboto",
           "sans-serif",
         ],
+        // 신문 1면 제목용 한글 세리프(Noto Serif KR)
+        serif: ["var(--font-serif-kr)", '"Nanum Myeongjo"', "Georgia", "serif"],
         // 에디토리얼 디스플레이 — 라틴 숫자·헤드라인용 세리프(Fraunces), 한글은 sans로 폴백
         display: ["var(--font-display)", "var(--font-sans)", "Georgia", '"Times New Roman"', "serif"],
       },

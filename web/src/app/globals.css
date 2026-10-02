@@ -51,11 +51,60 @@
 html {
   scroll-behavior: smooth;
 }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
 
 /* CSS 변수로 사용자 글자 크기·고대비 옵션 동적 제어 (REQ-PLATFORM-001 접근성) */
 :root {
   --font-size-base: 1rem;        /* 기본 (16px) */
   --line-height-base: 1.6;
+}
+
+/* 2026-10 홈 리디자인 토큰(신문 1면) — tailwind `ti-*` 색이 이 변수를 쓴다.
+   대비(WCAG AA): muted/paper 6.6:1, on-navy-muted/navy 8.4:1, gold-ink/gold-soft 5.9:1, petrol-ink/petrol-soft 6.3:1.
+   다크 모드는 아직 사이트 전체에 없어서 홈만 따로 어둡게 하지 않는다(헤더·다른 화면과 어긋남). */
+:root {
+  --ti-paper: #F4F6F6;
+  --ti-surface: #FFFFFF;
+  --ti-sunk: #E9EEEF;
+  --ti-ink: #16213A;
+  --ti-ink-2: #3A4660;
+  --ti-muted: #4D586C;
+  --ti-line: #D3DADD;
+  --ti-navy: #1F2A44;
+  --ti-navy-deep: #0E1730;
+  --ti-on-navy: #F1F4F8;
+  --ti-on-navy-muted: #B9C3D4;
+  --ti-petrol: #116E7A;
+  --ti-petrol-ink: #0B5761;
+  --ti-petrol-soft: #D4E7E9;
+  --ti-gold: #B8862B;
+  --ti-gold-ink: #7A5714;
+  --ti-gold-soft: #F3E7CC;
+  --ti-on-gold: #1A1203;
+  --ti-focus: #C2410C;
+}
+:root[data-theme="highcontrast"] {
+  --ti-paper: #FFFFFF;
+  --ti-surface: #FFFFFF;
+  --ti-sunk: #FFFFFF;
+  --ti-ink: #000000;
+  --ti-ink-2: #000000;
+  --ti-muted: #000000;
+  --ti-line: #000000;
+  --ti-navy: #000000;
+  --ti-navy-deep: #000000;
+  --ti-on-navy: #FFFFFF;
+  --ti-on-navy-muted: #FFFFFF;
+  --ti-petrol: #004A55;
+  --ti-petrol-ink: #003A43;
+  --ti-petrol-soft: #FFFFFF;
+  --ti-gold: #5C3D00;
+  --ti-gold-ink: #5C3D00;
+  --ti-gold-soft: #FFFFFF;
+  --ti-on-gold: #FFFFFF;
+  --ti-focus: #D00000;
 }
 
 :root[data-font-size="large"] {
@@ -85,14 +134,41 @@ html {
 }
 
 .skip-link:focus {
-  left: 0;
+  left: 16px;
+  top: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  outline-color: #FFB067;
 }
 
 /* 포커스 가시성 강화 — WCAG 2.4.7 */
 :focus-visible {
-  outline: 3px solid #1F2A44;
+  outline: 3px solid var(--ti-focus);
   outline-offset: 2px;
   border-radius: 0.25rem;
+}
+/* 네이비 바탕(상단 띠·바다 패널·멤버십·푸터) 위에서는 밝은 포커스 링 — 주황은 네이비 위 3:1 미만 */
+.on-dark :focus-visible {
+  outline-color: #FFB067;
+}
+:root[data-theme="highcontrast"] .on-dark :focus-visible {
+  outline-color: #FFFF00;
+}
+/* 네이비 띠 안의 흰 카드(멤버십 추천 요금)는 다시 기본 포커스 색 */
+.on-dark .on-light :focus-visible {
+  outline-color: var(--ti-focus);
+}
+
+/* 홈 조위 곡선 — 처음 한 번 그려지는 선(모션 줄임이면 생략) */
+@media (prefers-reduced-motion: no-preference) {
+  .tide-draw {
+    stroke-dasharray: 900;
+    animation: tide-draw 1.6s ease-out both;
+  }
+  @keyframes tide-draw {
+    from { stroke-dashoffset: 900; }
+    to { stroke-dashoffset: 0; }
+  }
 }
 
 /* 모션 줄임 선호 사용자 (WCAG 2.3.3) */
