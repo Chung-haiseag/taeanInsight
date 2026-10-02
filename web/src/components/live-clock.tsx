@@ -21,11 +21,11 @@ export function LiveClock() {
 
   // 마운트 전에는 자리만 유지(레이아웃 흔들림 방지)
   return (
-    <div className="text-right leading-tight tabular-nums" aria-live="off">
-      <div className="text-xs font-medium text-foreground-muted">
+    <div className="leading-tight tabular-nums md:text-right" aria-live="off">
+      <div className="text-[0.9rem] font-medium text-ti-muted">
         {now ? DATE_FMT.format(now) : " "}
       </div>
-      <div className="font-display text-lg text-brand" suppressHydrationWarning>
+      <div className="font-display text-[1.5rem] font-semibold text-ti-ink" suppressHydrationWarning>
         {now ? TIME_FMT.format(now) : " "}
       </div>
     </div>

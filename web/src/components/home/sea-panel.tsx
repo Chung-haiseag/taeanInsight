@@ -40,7 +40,7 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
   return (
     <aside aria-labelledby="sea-title" className="on-dark flex flex-col gap-4 self-start rounded-[20px] bg-ti-navy p-5 text-ti-on-navy md:p-6">
       <div>
-        <p className="text-[0.78rem] font-bold tracking-[0.14em] text-ti-on-navy-muted">
+        <p className="text-[0.85rem] font-bold tracking-[0.14em] text-ti-on-navy-muted">
           지금 태안{tide?.station ? ` · ${tide.station} 기준` : ""}
         </p>
         <h2 id="sea-title" className="mt-1 font-serif text-[1.35rem] font-bold">오늘의 바다</h2>
@@ -90,7 +90,7 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
       )}
 
       {loaded && events.length > 0 && (
-        <ul aria-label="오늘 물때 시각" className="grid grid-cols-2 gap-1.5 text-center text-[0.78rem] text-ti-on-navy-muted sm:grid-cols-4">
+        <ul aria-label="오늘 물때 시각" className="grid grid-cols-2 gap-1.5 text-center text-[0.88rem] text-ti-on-navy-muted sm:grid-cols-4">
           {events.map((e) => (
             <li key={`${e.type}-${e.time}`} className="rounded-[10px] bg-white/[0.06] px-2 py-1.5">
               {e.type === "고조" ? "만조" : "간조"}
@@ -108,13 +108,13 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
         <dl className="m-0 grid grid-cols-2 gap-2.5">
           {waterTemp != null && (
             <div className="border-t border-white/15 pt-2">
-              <dt className="text-[0.78rem] text-ti-on-navy-muted">수온</dt>
+              <dt className="text-[0.88rem] text-ti-on-navy-muted">수온</dt>
               <dd className="m-0 font-semibold"><span className="mr-0.5 font-display text-[1.3rem] tabular-nums">{waterTemp.toFixed(1)}</span>℃</dd>
             </div>
           )}
           {wave != null && (
             <div className="border-t border-white/15 pt-2">
-              <dt className="text-[0.78rem] text-ti-on-navy-muted">파고</dt>
+              <dt className="text-[0.88rem] text-ti-on-navy-muted">파고</dt>
               <dd className="m-0 font-semibold">
                 <span className="mr-0.5 font-display text-[1.3rem] tabular-nums">{wave.toFixed(1)}</span>m
                 <Pill tone={wave <= 0.5 ? "ok" : wave <= 1.5 ? "plain" : "warn"}>{wave <= 0.5 ? "잔잔" : wave <= 1.5 ? "보통" : "높음"}</Pill>
@@ -123,7 +123,7 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
           )}
           {fogToday && (
             <div className="border-t border-white/15 pt-2">
-              <dt className="text-[0.78rem] text-ti-on-navy-muted">해무</dt>
+              <dt className="text-[0.88rem] text-ti-on-navy-muted">해무</dt>
               <dd className="m-0 font-semibold">
                 오늘 <Pill tone={fogToday.grade === "양호" ? "ok" : "warn"}>{fogToday.grade}</Pill>
               </dd>
@@ -131,7 +131,7 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
           )}
           {live?.pm10 != null && (
             <div className="border-t border-white/15 pt-2">
-              <dt className="text-[0.78rem] text-ti-on-navy-muted">미세먼지</dt>
+              <dt className="text-[0.88rem] text-ti-on-navy-muted">미세먼지</dt>
               <dd className="m-0 font-semibold">
                 <span className="mr-0.5 font-display text-[1.3rem] tabular-nums">{live.pm10}</span>㎍/㎥
                 {live.grade && <Pill tone={live.grade === "좋음" ? "ok" : live.grade === "보통" ? "plain" : "warn"}>{live.grade}</Pill>}

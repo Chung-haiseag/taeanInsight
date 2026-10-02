@@ -110,7 +110,7 @@ export function GenericHome() {
       {grid.length > 0 && (
         <section aria-labelledby="news-title">
           <SecHead id="news-title" title="이번 주 태안" link={{ href: "/news", label: "뉴스아카이브 전체 보기" }} />
-          <ul className="m-0 grid list-none gap-x-7 gap-y-6 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="m-0 grid list-none gap-x-7 gap-y-6 p-0 md:grid-cols-2 lg:grid-cols-4">
             {grid.map((it) => (
               <li key={it.id} className="group flex min-w-0 flex-col gap-2">
                 <div className="aspect-[4/3] overflow-hidden rounded-xl bg-ti-sunk">
@@ -131,7 +131,7 @@ export function GenericHome() {
             ))}
           </ul>
           {more.length > 0 && (
-            <ul aria-label="더 많은 기사" className="mt-7 grid list-none gap-x-8 gap-y-2.5 border-t border-ti-line p-0 pt-4 sm:grid-cols-2">
+            <ul aria-label="더 많은 기사" className="mt-7 grid list-none gap-x-8 gap-y-2.5 border-t border-ti-line p-0 pt-4 md:grid-cols-2">
               {more.map((it) => (
                 <li key={it.id}>
                   <Link href={`/news/${it.id}`} className="relative block pl-3.5 font-semibold text-ti-ink2 before:absolute before:left-0 before:top-[0.7em] before:h-[5px] before:w-[5px] before:rounded-full before:bg-ti-petrol hover:text-ti-ink hover:underline hover:underline-offset-4">

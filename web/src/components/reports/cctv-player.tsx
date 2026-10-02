@@ -46,29 +46,29 @@ export function CctvPlayer({ cameras, updatedAt }: { cameras: CctvCamera[]; upda
 
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-2xl border border-brand/15 bg-black">
+      <div className="overflow-hidden rounded-[18px] border border-ti-line bg-black">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video ref={videoRef} className="aspect-video w-full bg-black" autoPlay muted playsInline controls />
+        <video ref={videoRef} className="aspect-video w-full bg-black" autoPlay muted playsInline controls aria-label={`도로 실시간 CCTV — ${cam?.name?.replace(/^\[[^\]]+\]\s*/, "") ?? "선택한 지점"} (소리 없음)`} />
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-brand">{cam?.name?.replace(/^\[[^\]]+\]\s*/, "") ?? "도로 CCTV"}</p>
-        {err && <span className="text-xs text-red-600">재생 오류 — 다른 지점을 선택해 보세요</span>}
+        <p className="text-[1.05rem] font-bold text-ti-ink">{cam?.name?.replace(/^\[[^\]]+\]\s*/, "") ?? "도로 CCTV"}</p>
+        {err && <span role="status" className="font-semibold text-[#8A1C14]">재생 오류 — 다른 지점을 골라 보세요</span>}
       </div>
       {/* 카메라 선택 */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="CCTV 지점 고르기">
         {cameras.map((c, i) => (
           <button
             key={c.name + i}
             type="button"
             onClick={() => setIdx(i)}
             aria-pressed={i === idx}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${i === idx ? "bg-brand text-background" : "bg-brand/5 text-foreground-muted hover:bg-brand/10"}`}
+            className={`min-h-11 rounded-full border px-4 text-[0.95rem] font-semibold transition-colors ${i === idx ? "border-ti-navy bg-ti-navy text-ti-on-navy" : "border-ti-line bg-ti-surface text-ti-ink2 hover:border-ti-petrol hover:text-ti-ink"}`}
           >
             {c.name.replace(/^\[[^\]]+\]\s*태안\s*/, "").replace(/^\[[^\]]+\]\s*/, "")}
           </button>
         ))}
       </div>
-      <p className="text-xs text-foreground-muted">
+      <p className="text-[0.9rem] text-ti-muted">
         국가교통정보센터(ITS) 실시간 · 총 {cameras.length}곳
         {updatedAt && ` · 갱신 ${new Date(updatedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`}
       </p>
