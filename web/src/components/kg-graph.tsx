@@ -40,8 +40,14 @@ const DENSITY = [
 ] as const;
 
 export default function KgGraph({
-  nodes, edges, onNodeClick, centerId, height = 420,
-}: { nodes: N[]; edges: E[]; onNodeClick?: (id: string) => void; centerId?: string; height?: number }) {
+  nodes, edges, onNodeClick, centerId, height = 420, ariaLabel, textList = true,
+}: {
+  nodes: N[]; edges: E[]; onNodeClick?: (id: string) => void; centerId?: string; height?: number;
+  /** 그림 요약(화면낭독기용). 없으면 노드 수로 만든다. */
+  ariaLabel?: string;
+  /** 그림 아래 '목록으로 보기' — 캔버스를 못 보거나 못 누르는 사람에게 같은 내용·같은 링크를 준다. */
+  textList?: boolean;
+}) {
   const cvRef = useRef<HTMLCanvasElement>(null);
   const clickRef = useRef(onNodeClick);
   clickRef.current = onNodeClick;
@@ -87,11 +93,12 @@ export default function KgGraph({
     let downAt: { x: number; y: number } | null = null, moved = false;
     let userZoom = 1;
     let s = 7; const rand = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    function theme() { const a = document.documentElement.getAttribute("data-theme"); if (a === "dark" || a === "light") return a; return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
+    function theme() { const a = document.documentElement.getAttribute("data-theme"); if (a === "dark" || a === "light" || a === "highcontrast") return a; return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
         // ⚠ 선은 **뒤로 물러나야** 한다. 예전엔 회색 선이 굵고 진해서(alpha .28 · 최대 5px)
     //   가운데가 실뭉치가 됐고 정작 사람 이름이 안 읽혔다. 흐리고 가늘게 두면
     //   노드와 이름이 앞으로 나온다(당진 사례의 가장 큰 차이).
-    function pal() { const d = theme() === "dark"; return d ? { bg: "#141C28", edge: "rgba(231,235,237,.13)", edgeDim: "rgba(231,235,237,.04)", node: "#3E6B72", nodeC: "#57B2BC", ring: "#7FC9D2", label: "#E7EBED", halo: "#141C28" } : { bg: "#FBFCFC", edge: "rgba(27,36,54,.11)", edgeDim: "rgba(27,36,54,.035)", node: "#7FB0B5", nodeC: "#0E5860", ring: "#0E5860", label: "#1B2436", halo: "#FBFCFC" }; }
+    // 고대비 모드에선 흰 바탕·검은 글자·진한 선 — 흐린 선은 고대비에서 안 보인다.
+    function pal() { const t = theme(); if (t === "highcontrast") return { bg: "#FFFFFF", edge: "rgba(0,0,0,.45)", edgeDim: "rgba(0,0,0,.15)", node: "#000000", nodeC: "#003A43", ring: "#000000", label: "#000000", halo: "#FFFFFF" }; const d = t === "dark"; return d ? { bg: "#141C28", edge: "rgba(231,235,237,.13)", edgeDim: "rgba(231,235,237,.04)", node: "#3E6B72", nodeC: "#57B2BC", ring: "#7FC9D2", label: "#E7EBED", halo: "#141C28" } : { bg: "#FBFCFC", edge: "rgba(27,36,54,.11)", edgeDim: "rgba(27,36,54,.035)", node: "#7FB0B5", nodeC: "#0E5860", ring: "#0E5860", label: "#1B2436", halo: "#FBFCFC" }; }
     const FONT = '-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
 
     function resize() { const r = cv!.getBoundingClientRect(); W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2); cv!.width = W * dpr; cv!.height = H * dpr; ctx!.setTransform(dpr, 0, 0, dpr, 0, 0); fitFrozen = false; if (!seeded) { seed(); layout(); seeded = true; } else { clampAll(); draw(); } }
@@ -164,12 +171,12 @@ export default function KgGraph({
       for (const e of es) { if (!e.reltype || e.reltype === "기타") continue; if (!focus || !(e.a === focus || e.b === focus)) continue;
         const a = byId[e.a], b = byId[e.b];
         const relC = REL_COLOR[e.reltype] ?? P.label; const mx = (PX(a) + PX(b)) / 2, my = (PY(a) + PY(b)) / 2;
-        ctx!.font = "700 10px " + FONT; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
+        ctx!.font = "700 13px " + FONT; ctx!.textAlign = "center"; ctx!.textBaseline = "middle";
         const tw = ctx!.measureText(e.reltype).width; ctx!.fillStyle = P.halo; ctx!.globalAlpha = e.estimated ? 0.8 : 0.92;
-        roundRect(ctx!, mx - tw / 2 - 5, my - 8, tw + 10, 16, 8); ctx!.fill(); ctx!.globalAlpha = 1;
+        roundRect(ctx!, mx - tw / 2 - 6, my - 10, tw + 12, 20, 10); ctx!.fill(); ctx!.globalAlpha = 1;
         ctx!.lineWidth = 1.2; ctx!.strokeStyle = relC;
         if (e.estimated) ctx!.setLineDash([3, 2]);             // 미검수 pill 테두리도 점선
-        roundRect(ctx!, mx - tw / 2 - 5, my - 8, tw + 10, 16, 8); ctx!.stroke(); ctx!.setLineDash([]);
+        roundRect(ctx!, mx - tw / 2 - 6, my - 10, tw + 12, 20, 10); ctx!.stroke(); ctx!.setLineDash([]);
         ctx!.globalAlpha = e.estimated ? 0.85 : 1; ctx!.fillStyle = relC; ctx!.fillText(e.reltype, mx, my); ctx!.globalAlpha = 1;
       }
       // 노드
@@ -191,7 +198,8 @@ export default function KgGraph({
       for (const n of ns) { // 비인물(기관·행사·사업·장소)은 **늘** 이름을 쓴다. 예전엔 org만 넣어 둬서
         //   행사가 이름 없는 보라 점으로만 떴다(진태구의 꽃박람회 31건·황토축제 8건이 등장수 40 미만이라 잘렸다).
         const show = n.center || (n.kind && n.kind !== "person") || ns.length <= 16 || n.mentions >= 40 || n.id === selected || n.id === hovered || (eg && eg.has(n.id)); if (!show) continue;
-        ctx!.font = (n.center ? "800 13px " : (n.id === selected || n.id === hovered) ? "700 12px " : "600 12px ") + FONT; const ly = PY(n) + n.r + 11;
+        // 이름 글자는 14px 이상(어르신 가독성) — 예전 12px은 작았다.
+        ctx!.font = (n.center ? "800 16px " : (n.id === selected || n.id === hovered) ? "700 14px " : "600 14px ") + FONT; const ly = PY(n) + n.r + 13;
         // 이모지를 붙이지 않는다 — 색이 이미 종류를 말하고, 이모지는 이름을 밀어낸다.
         ctx!.lineWidth = 3.4; ctx!.strokeStyle = P.halo; ctx!.strokeText(n.name, PX(n), ly);
         ctx!.fillStyle = n.center || !n.kind || n.kind === "person" ? P.label : colorOf(n.kind);
@@ -231,9 +239,9 @@ export default function KgGraph({
       let best: string | null = null, bd = 1e9;
       for (const n of ns) {
         const px = PX(n), py = PY(n), d = Math.hypot(mx - px, my - py);
-        const labelHalf = Math.max(28, n.name.length * 8);
+        const labelHalf = Math.max(28, n.name.length * 9);
         const onCircle = d < n.r + 6;
-        const onLabel = Math.abs(mx - px) < labelHalf && my > py + n.r - 2 && my < py + n.r + 22;
+        const onLabel = Math.abs(mx - px) < labelHalf && my > py + n.r - 2 && my < py + n.r + 26;
         if ((onCircle || onLabel) && d < bd) { bd = d; best = n.id; }
       }
       return best;
@@ -284,7 +292,10 @@ export default function KgGraph({
     const onLeave = () => { if (!dragging && !panning) { hovered = null; draw(); } };
 
     // 휠 확대 — 커서를 기준으로 늘리고 줄인다(화면 밖으로 튀지 않게).
+    //   Ctrl/⌘(트랙패드 오므리기 포함)를 누른 휠만 확대한다. 그냥 휠까지 가로채면 640px 그림 위에서
+    //   쪽이 내려가지 않아 갇힌 것처럼 된다(고령 독자). 그냥 확대는 위 ＋ − 단추로.
     const onWheel = (ev: WheelEvent) => {
+      if (!ev.ctrlKey && !ev.metaKey) return;
       ev.preventDefault();
       const before = userZoom;
       userZoom = Math.max(1, Math.min(3, userZoom * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
@@ -317,43 +328,98 @@ export default function KgGraph({
     };
   }, [view, centerId]);
 
-  const btn = "rounded px-2.5 py-1 text-xs font-semibold transition";
+  // 단추는 손가락 크기(44px) 이상 — 어르신·터치 화면에서 눌리지 않으면 기능이 없는 것과 같다.
+  const btn = "inline-flex min-h-11 min-w-11 items-center justify-center px-3.5 text-[0.95rem] font-bold transition";
   const shown = view.nodes.length, total = nodes.length;
+
+  // ── 글로 보는 관계망 ──
+  //   캔버스는 화면낭독기·키보드로 읽을 수 없다. 그림이 주는 것(누구·어떤 관계·몇 건·누르면 이동)을
+  //   같은 순서로 목록에 담는다. 이동 규칙도 그림과 같다(기관은 누르지 않는다).
+  const center = centerId ? nodes.find((n) => n.id === centerId) : undefined;
+  const toCenter = new Map<string, E>();
+  if (centerId) for (const e of edges) { if (e.a === centerId) toCenter.set(e.b, e); else if (e.b === centerId) toCenter.set(e.a, e); }
+  const listed = nodes
+    .filter((n) => n.id !== centerId)
+    .map((n) => ({ n, e: toCenter.get(n.id) }))
+    .sort((x, y) => (y.e?.weight ?? 0) - (x.e?.weight ?? 0) || y.n.mentions - x.n.mentions);
+  const personCount = view.nodes.filter((n) => n.id !== centerId && (!n.kind || n.kind === "person")).length;
+  const otherCount = view.nodes.filter((n) => n.id !== centerId && n.kind && n.kind !== "person").length;
+  const summary = ariaLabel ?? [
+    "관계망 그림",
+    center ? `가운데 ${center.name}` : null,
+    `${center ? "함께 나온 " : ""}인물 ${personCount}명`,
+    otherCount ? `기관·행사 등 ${otherCount}곳` : null,
+    textList ? "같은 내용을 그림 아래 목록으로 볼 수 있습니다" : null,
+  ].filter(Boolean).join(", ");
 
   return (
     <div className="relative">
       {/* 조절 막대 — 왼쪽은 얼마나 넓게 볼지, 오른쪽은 확대. 당진 사례와 같은 자리. */}
-      <div className="flex flex-wrap items-center gap-2 px-2 pb-2">
-        <span className="inline-flex overflow-hidden rounded-md border border-brand/20">
+      <div className="flex flex-wrap items-center gap-2 px-2 pb-3">
+        <span role="group" aria-label="얼마나 넓게 볼지" className="inline-flex overflow-hidden rounded-full border border-ti-line">
           {DENSITY.map((d, i) => (
             <button key={d.key} type="button" onClick={() => setLevel(i)} aria-pressed={i === level}
-              className={`${btn} rounded-none ${i === level ? "bg-brand text-background" : "text-brand hover:bg-brand/5"}`}>
+              className={`${btn} ${i === level ? "bg-ti-navy text-ti-on-navy" : "bg-ti-surface text-ti-ink hover:bg-ti-sunk"}`}>
               {d.key}
             </button>
           ))}
         </span>
-        <span className="text-xs text-foreground-muted tabular-nums">
-          그린 노드 {shown}{total > shown && <> · 전체 {total}</>}
+        <span className="text-[0.9rem] text-ti-ink2 tabular-nums">
+          지금 {shown}개 그림{total > shown && <> · 전체 {total}개</>}
         </span>
-        <span className="ml-auto inline-flex gap-1">
+        <span className="ml-auto inline-flex gap-1.5">
           <button type="button" aria-label="확대" onClick={() => ctrl.current?.zoomIn()}
-            className={`${btn} border border-brand/20 text-brand hover:bg-brand/5`}>+</button>
+            className={`${btn} rounded-full border border-ti-line bg-ti-surface text-[1.2rem] text-ti-ink hover:bg-ti-sunk`}>+</button>
           <button type="button" aria-label="축소" onClick={() => ctrl.current?.zoomOut()}
-            className={`${btn} border border-brand/20 text-brand hover:bg-brand/5`}>−</button>
+            className={`${btn} rounded-full border border-ti-line bg-ti-surface text-[1.2rem] text-ti-ink hover:bg-ti-sunk`}>−</button>
           <button type="button" onClick={() => { ctrl.current?.reset(); setLevel(1); }}
-            className={`${btn} border border-brand/20 text-foreground-muted hover:bg-brand/5`}>리셋</button>
+            className={`${btn} rounded-full border border-ti-line bg-ti-surface text-ti-ink2 hover:bg-ti-sunk`}>처음 모양</button>
         </span>
       </div>
-      <canvas ref={cvRef} style={{ display: "block", width: "100%", height }} />
+      <canvas ref={cvRef} role="img" aria-label={summary} style={{ display: "block", width: "100%", height }} />
       {/* 종류 범례 — 색이 무엇을 뜻하는지 없으면 색은 장식일 뿐이다. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 pt-2 text-[0.6875rem] text-foreground-muted">
+      <p className="sr-only">색 범례:</p>
+      <ul className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 px-2 pt-3 text-[0.9rem] text-ti-ink2">
         {[...new Set(view.nodes.map((n) => n.kind ?? "person"))].map((k) => (
-          <span key={k} className="inline-flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: KIND_COLOR[k] ?? KIND_COLOR.person }} />
+          <li key={k} className="inline-flex items-center gap-1.5">
+            <span aria-hidden className="inline-block h-3 w-3 rounded-full" style={{ background: KIND_COLOR[k] ?? KIND_COLOR.person }} />
             {KIND_LABEL[k] ?? k}
-          </span>
+          </li>
         ))}
-      </div>
+      </ul>
+      {textList && listed.length > 0 && (
+        <details className="mx-2 mt-3 rounded-[14px] border border-ti-line bg-ti-surface">
+          <summary className="flex min-h-11 cursor-pointer items-center px-4 font-bold text-ti-ink">
+            그림 대신 목록으로 보기 <span className="ml-1.5 font-normal text-ti-ink2 tabular-nums">({listed.length}개)</span>
+          </summary>
+          <ul className="m-0 list-none divide-y divide-ti-line border-t border-ti-line p-0">
+            {listed.map(({ n, e }) => {
+              const kind = KIND_LABEL[n.kind ?? "person"] ?? n.kind;
+              const rel = e?.reltype && e.reltype !== "기타" ? `${e.reltype}${e.estimated ? "(AI 추정)" : "(검수됨)"}` : null;
+              const count = e ? `함께 나온 기사 ${e.weight.toLocaleString()}건` : `기사 ${n.mentions.toLocaleString()}건`;
+              const body = (
+                <>
+                  <span className="font-bold text-ti-ink">{n.name}</span>
+                  <span className="text-[0.95rem] text-ti-ink2">{kind}{rel ? ` · ${rel}` : ""} · {count}</span>
+                </>
+              );
+              const clickable = onNodeClick && n.kind !== "org";
+              return (
+                <li key={n.id}>
+                  {clickable ? (
+                    <button type="button" onClick={() => onNodeClick(n.id)}
+                      className="flex min-h-11 w-full flex-wrap items-baseline gap-x-2 px-4 py-2.5 text-left hover:bg-ti-sunk">
+                      {body}
+                    </button>
+                  ) : (
+                    <div className="flex min-h-11 flex-wrap items-baseline gap-x-2 px-4 py-2.5">{body}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

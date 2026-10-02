@@ -10,11 +10,10 @@ import type { PersonProfile } from "@/lib/api/kg";
 
 export function PersonClient({ prof, summary }: { prof: PersonProfile; summary: string }) {
   const router = useRouter();
+  // 이 주소의 유일한 h1은 인물 이름 — 검색엔진용 한 줄은 이름 바로 밑에 둔다(사람에게도 '누구인지'를 먼저 알려준다).
   return (
-    <div className="mx-auto max-w-[1200px] space-y-6">
-      {/* 검색엔진이 읽는 한 줄. 사람에게도 '이 사람이 누구인지'를 먼저 알려준다. */}
-      <p className="pt-2 text-sm text-foreground-muted">{summary}</p>
-      <PersonProfileView prof={prof} onOpen={(id) => router.push(`/people/${encodeURIComponent(id)}`)} />
+    <div className="mx-auto max-w-[1200px]">
+      <PersonProfileView prof={prof} headingLevel={1} summary={summary} onOpen={(id) => router.push(`/people/${encodeURIComponent(id)}`)} />
     </div>
   );
 }

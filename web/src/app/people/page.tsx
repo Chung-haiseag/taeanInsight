@@ -9,9 +9,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
+import { Pill } from "@/components/editorial";
 import { searchPersonsPublic, getPersonProfilePublic, getKgStatus, getFeaturedPersons } from "@/lib/api/kg-public";
 import { PersonProfileView } from "./person-view";
-import { API_BASE_URL } from "@/lib/api/client";
 import type { PersonSearchResult, PersonProfile } from "@/lib/api/kg";
 
 export default function PeoplePage() {
@@ -80,60 +80,78 @@ export default function PeoplePage() {
   //   첫 화면의 무작위 관계망만 인라인으로 띄운다(맛보기라 주소를 바꾸지 않는다).
   const open = (id: string) => router.push(`/people/${encodeURIComponent(id)}`);
 
+  const canSearch = q.trim().length >= 2;
+
+  // 2026-10 리디자인(가독성) — 지금 태안·홈과 같은 체계(ti 토큰·세리프 제목).
+  //   흐름: 머리 → 주의 안내 → 이름 찾기(보이는 이름표·큰 입력칸) → 결과 목록 → 인물 화면(맛보기).
   return (
-    <div className="mx-auto max-w-[1200px] space-y-6">
-      <PageHeader title="인물 탐색" description="아카이브 기사 속 인물과 함께 등장한 관계를 찾아봅니다." />
+    <div className="mx-auto max-w-[1200px] space-y-8 text-ti-ink">
+      <PageHeader eyebrow="태안신문 아카이브" title="인물 탐색" description="아카이브 기사 속 인물과 함께 등장한 관계를 찾아봅니다." />
 
       {enabled === false ? (
-        <div className="rounded-lg border border-brand/15 bg-background p-10 text-center text-sm text-foreground-muted">
+        <p className="rounded-[18px] border border-ti-line bg-ti-surface p-8 text-center text-[1.05rem] text-ti-ink2">
           인물 탐색은 현재 준비 중입니다.
-        </div>
+        </p>
       ) : (
         <>
-      {/* 미검증 안내 — 크게 */}
-      <div role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="font-semibold">⚠️ 실험 기능 · AI 자동 추출(미검증)</p>
-        <p className="mt-1 leading-relaxed">
+      {/* 미검증 안내 — 크게. 색만이 아니라 '주의'라는 글로 먼저 말한다. */}
+      <section role="note" aria-labelledby="people-caution" className="rounded-[14px] border-2 border-[#9A5B00] bg-[#FFF4DF] p-4 md:p-5">
+        <h2 id="people-caution" className="text-[1.1rem] font-bold text-[#6B3F00]">주의 — AI가 자동으로 뽑은 자료입니다(사람이 검증하지 않음)</h2>
+        <p className="mt-1.5 leading-relaxed text-[#1A1203]">
           아래 인물·관계는 AI가 <strong>기사에서 자동으로 뽑아낸</strong> 것으로 <strong>사람이 검증하지 않았습니다</strong>. ‘함께 등장’은 같은 기사에 나온 빈도일 뿐 실제 관계를 뜻하지 않습니다.
-          관계 <strong>라벨</strong>은 <strong>실선=검수됨</strong>, <strong>점선=AI 추정(미검수)</strong>이며, 민감한 관계(대립·갈등·가족·인척)는 검수된 것만 표시합니다. 참고용으로만 보시고, 정확한 사실은 <Link href="/news" className="underline">기사 원문</Link>을 확인하세요.
+          관계 <strong>라벨</strong>은 <strong>실선=검수됨</strong>, <strong>점선=AI 추정(미검수)</strong>이며, 민감한 관계(대립·갈등·가족·인척)는 검수된 것만 표시합니다. 참고용으로만 보시고, 정확한 사실은 <Link href="/news" className="font-semibold underline underline-offset-4">기사 원문</Link>을 확인하세요.
         </p>
-      </div>
+      </section>
 
-      {/* 검색 */}
-      <form onSubmit={search} className="flex gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="인물 이름 (2자 이상)"
-          className="flex-1 rounded-lg border border-brand/20 bg-background px-3 py-2 text-sm"
-          aria-label="인물 이름 검색"
-        />
-        <button type="submit" disabled={busy || q.trim().length < 2} className="btn-accent px-5 py-2 text-sm disabled:opacity-60">
-          {busy ? "…" : "검색"}
-        </button>
-      </form>
+      {/* 검색 — 이름표를 눈에 보이게(자리표시 글자는 입력하면 사라져 무엇을 넣는 칸인지 잊는다). */}
+      <section aria-labelledby="people-search-title">
+        <form onSubmit={search} role="search" className="rounded-[18px] border border-ti-line bg-ti-surface p-5">
+          <label id="people-search-title" htmlFor="people-q" className="block text-[1.08rem] font-bold text-ti-ink">인물 이름으로 찾기</label>
+          <p id="people-q-hint" className="mt-1 text-[0.95rem] text-ti-ink2">두 글자 이상 넣고 ‘찾기’를 누르세요. 예: 군수·군의원 이름</p>
+          <div className="mt-3 flex flex-col gap-2 md:flex-row">
+            <input
+              id="people-q"
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="인물 이름"
+              aria-describedby="people-q-hint"
+              autoComplete="off"
+              className="min-h-12 flex-1 rounded-[12px] border-2 border-ti-line bg-ti-surface px-4 text-[1.08rem] text-ti-ink placeholder:text-ti-muted focus:border-ti-petrol"
+            />
+            <button type="submit" disabled={busy || !canSearch} className="btn-primary min-h-12 px-7 text-[1.05rem] disabled:opacity-60">
+              {busy ? "찾는 중" : "찾기"}
+            </button>
+          </div>
+        </form>
 
-      {/* 검색 결과 */}
-      {!prof && searched && (
-        hits.length === 0 ? (
-          <p className="text-sm text-foreground-muted">{busy ? "검색 중…" : "해당 인물을 찾지 못했습니다."}</p>
-        ) : (
-          <ul className="divide-y divide-brand/10 rounded-lg border border-brand/15">
-            {hits.map((h) => (
-              <li key={h.id}>
-                <button type="button" onClick={() => void open(h.id)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-brand/5">
-                  <span className="font-semibold text-brand">
-                    {h.name}
-                    {/* 이름이 같은 두 사람이 나란히 뜨면 고를 수가 없다 — 갈래를 이름 옆에 붙인다. */}
-                    {h.qualifier && <span className="ml-1.5 rounded bg-brand/10 px-1.5 py-0.5 text-xs font-semibold">{h.qualifier}</span>}
-                  </span>
-                  <span className="text-xs text-foreground-muted">기사 {h.mentions.toLocaleString()}건</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )
-      )}
+        {/* 검색 결과 — 몇 명 찾았는지 화면낭독기에도 알린다. */}
+        {!prof && searched && (
+          <div className="mt-5">
+            <p role="status" className="mb-3 text-[1.02rem] text-ti-ink2">
+              {busy ? "찾는 중입니다…" : hits.length === 0 ? "해당 인물을 찾지 못했습니다. 이름을 다시 확인해 주세요." : <>찾은 인물 <b className="font-display tabular-nums text-ti-ink">{hits.length}</b>명 — 이름을 누르면 그 사람 화면으로 갑니다.</>}
+            </p>
+            {hits.length > 0 && (
+              <ul className="m-0 list-none divide-y divide-ti-line overflow-hidden rounded-[18px] border border-ti-line bg-ti-surface p-0">
+                {hits.map((h) => (
+                  <li key={h.id}>
+                    <button type="button" onClick={() => void open(h.id)} className="flex min-h-14 w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-left hover:bg-ti-sunk">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-[1.1rem] font-bold text-ti-ink">{h.name}</span>
+                        {/* 이름이 같은 두 사람이 나란히 뜨면 고를 수가 없다 — 갈래를 이름 옆에 붙인다. */}
+                        {h.qualifier && <Pill tone="plain">{h.qualifier}</Pill>}
+                      </span>
+                      <span className="text-ti-ink2">
+                        기사 <span className="font-display text-[1.15rem] font-semibold tabular-nums text-ti-ink">{h.mentions.toLocaleString()}</span>건
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
 
       {prof && <PersonProfileView prof={prof} onOpen={open} onShuffle={shuffle} onBack={() => setProf(null)} />}
         </>
