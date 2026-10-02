@@ -116,7 +116,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
       {/* 제목 머리 — 분류 → 큰 세리프 제목 → 날짜·기자(신문 1면과 같은 순서) */}
       <header className="space-y-4 border-b-2 border-ti-ink pb-6">
         {article.categoryLabel && <p className="text-[0.95rem] font-bold tracking-[0.06em] text-ti-petrol-ink">{article.categoryLabel}</p>}
-        <h1 className="break-keep font-serif text-[clamp(1.75rem,4.4vw,2.6rem)] font-black leading-[1.28] tracking-[-0.02em] text-ti-ink">
+        <h1 className="break-keep font-head text-[clamp(1.75rem,4.4vw,2.6rem)] font-black leading-[1.28] tracking-[-0.02em] text-ti-ink">
           {raWords
             ? <ReadAlongParagraph text={article.title} offset={0} active={raActive} sentences={raSentences} onSeek={seekTo} />
             : article.title}
@@ -257,7 +257,7 @@ function RelatedArticles({ idxno }: { idxno: number }) {
                 )}
                 <div className="min-w-0">
                   {d && <time dateTime={d} className="block text-[0.88rem] tabular-nums text-ti-muted">{d.replace(/-/g, ".")}</time>}
-                  <p className="mt-0.5 line-clamp-2 font-serif text-[1.02rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">{decodeEntities(it.title)}</p>
+                  <p className="mt-0.5 line-clamp-2 font-head text-[1.02rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">{decodeEntities(it.title)}</p>
                 </div>
               </Link>
             </li>
@@ -452,7 +452,7 @@ function MemberGate({ hasFullText, idxno }: { hasFullText: boolean; idxno: numbe
   return (
     <div aria-labelledby="member-gate-title" role="region" className="space-y-4 rounded-[18px] border-2 border-ti-petrol bg-ti-petrol-soft p-6 text-center md:p-8">
       <p className="eyebrow justify-center"><Icon name="lock" /> 로그인하면 보입니다</p>
-      <h2 id="member-gate-title" className="break-keep font-serif text-[1.35rem] font-bold leading-snug text-ti-ink">
+      <h2 id="member-gate-title" className="break-keep font-head text-[1.35rem] font-bold leading-snug text-ti-ink">
         {hasFullText ? "이 기사의 전문은 로그인하시면 보실 수 있습니다" : "로그인하시면 더 많은 기능을 이용하실 수 있어요"}
       </h2>
       <p className="text-ti-ink2">

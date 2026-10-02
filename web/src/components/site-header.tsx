@@ -112,7 +112,7 @@ export function SiteHeader() {
               <circle cx="29" cy="12" r="3.2" fill="#F0CB82" />
             </svg>
             <span>
-              <strong className="block font-serif text-[1.45rem] font-black leading-tight tracking-[-0.02em]">태안 인사이트</strong>
+              <strong className="block font-head text-[1.45rem] font-black leading-tight tracking-[-0.02em]">태안 인사이트</strong>
               <small className="block text-[0.74rem] tracking-[0.08em] text-ti-muted">태안신문 · AI 지역 리포트</small>
             </span>
           </Link>

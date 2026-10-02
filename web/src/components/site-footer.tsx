@@ -13,7 +13,7 @@ export function SiteFooter() {
     <footer className="on-dark mt-24 bg-ti-navy-deep text-[0.85rem] text-ti-on-navy-muted">
       <div className="container mx-auto grid max-w-[1200px] gap-8 px-4 py-10 md:grid-cols-3">
         <div>
-          <p className="font-serif text-lg font-black text-ti-on-navy">태안 인사이트</p>
+          <p className="font-head text-lg font-black text-ti-on-navy">태안 인사이트</p>
           <p className="mt-2 leading-relaxed">
             태안신문이 만드는 AI 지역 리포트. 관광·바다·환경·부동산·지역경제를 매일 읽어 드립니다.
           </p>

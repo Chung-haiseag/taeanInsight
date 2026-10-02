@@ -79,7 +79,7 @@ export function CorrectionRequest({ idxno }: { idxno: number }) {
           <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg space-y-4 overflow-y-auto rounded-[18px] border border-ti-line bg-ti-surface p-6 shadow-lift">
             {done ? (
               <>
-                <h2 id="correction-title" className="font-serif text-[1.3rem] font-bold text-ti-ink">요청이 접수됐습니다</h2>
+                <h2 id="correction-title" className="font-head text-[1.3rem] font-bold text-ti-ink">요청이 접수됐습니다</h2>
                 <p role="status" className="text-ti-ink2">
                   관리자가 원본 지면과 대조해 확인 후 반영합니다. 처리 결과는 <strong>내 페이지 → 내 수정 요청</strong>에서 볼 수 있어요.
                 </p>
@@ -89,7 +89,7 @@ export function CorrectionRequest({ idxno }: { idxno: number }) {
               </>
             ) : (
               <>
-                <h2 id="correction-title" className="font-serif text-[1.3rem] font-bold text-ti-ink">기사 수정 요청</h2>
+                <h2 id="correction-title" className="font-head text-[1.3rem] font-bold text-ti-ink">기사 수정 요청</h2>
                 <label className="block space-y-1.5">
                   <span className="block font-bold text-ti-ink">틀린 부분 (본문에서 드래그하면 자동 입력)</span>
                   <textarea

@@ -29,7 +29,7 @@ function GroupHead({ id, level, title, note }: { id: string; level: number; titl
   const H = tag(level);
   return (
     <div className="mb-5 border-t-2 border-ti-ink pt-3.5">
-      <H id={id} className="font-serif text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em] text-ti-ink">{title}</H>
+      <H id={id} className="font-head text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em] text-ti-ink">{title}</H>
       {note && <p className="mt-1 text-ti-ink2">{note}</p>}
     </div>
   );
@@ -85,7 +85,7 @@ export function PersonProfileView({ prof, onOpen, onShuffle, onBack, headingLeve
             )}
             <div className="min-w-0">
               <p className="text-[0.85rem] font-bold tracking-[0.14em] text-ti-petrol-ink">인물 · 태안신문 아카이브</p>
-              <Name id={nameId} className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 font-serif text-[clamp(1.9rem,4vw,2.7rem)] font-black leading-tight tracking-[-0.025em] text-ti-ink">
+              <Name id={nameId} className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 font-head text-[clamp(1.9rem,4vw,2.7rem)] font-black leading-tight tracking-[-0.025em] text-ti-ink">
                 {prof.person.name}
                 {prof.nec?.hanja && <span className="font-sans text-[1.15rem] font-normal text-ti-ink2">{prof.nec.hanja}</span>}
                 {prof.nec?.birthYear && <span className="font-sans text-[1rem] font-normal text-ti-ink2">({prof.nec.birthYear}년생)</span>}

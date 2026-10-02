@@ -274,7 +274,7 @@ function NewsArchive() {
                               {date && <time dateTime={date} className="tabular-nums text-ti-muted">{date.replace(/-/g, ".")}</time>}
                               {h.author && <span className="text-ti-muted">· {h.author}</span>}
                             </p>
-                            <h3 className="mt-1.5 font-serif text-[1.15rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">
+                            <h3 className="mt-1.5 font-head text-[1.15rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">
                               {decodeEntities(h.title)}
                             </h3>
                             {h.excerpt && (

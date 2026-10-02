@@ -43,7 +43,7 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
         <p className="text-[0.85rem] font-bold tracking-[0.14em] text-ti-on-navy-muted">
           지금 태안{tide?.station ? ` · ${tide.station} 기준` : ""}
         </p>
-        <h2 id="sea-title" className="mt-1 font-serif text-[1.35rem] font-bold">오늘의 바다</h2>
+        <h2 id="sea-title" className="mt-1 font-head text-[1.35rem] font-bold">오늘의 바다</h2>
       </div>
 
       {!loaded && <div className="h-40 animate-pulse rounded-xl bg-white/10" aria-hidden="true" />}

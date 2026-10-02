@@ -54,7 +54,7 @@ export default async function LivePage() {
       <header className="flex flex-wrap items-end justify-between gap-4 pt-2">
         <div>
           <p className="text-[0.85rem] font-bold tracking-[0.14em] text-ti-petrol-ink">실시간 · 지금 태안</p>
-          <h1 className="mt-1.5 font-serif text-[clamp(2rem,4.4vw,3rem)] font-black leading-tight tracking-[-0.025em]">지금 태안</h1>
+          <h1 className="mt-1.5 font-head text-[clamp(2rem,4.4vw,3rem)] font-black leading-tight tracking-[-0.025em]">지금 태안</h1>
           <p className="mt-2 max-w-[40em] text-[1.08rem] text-ti-ink2">날씨·대기·물때·관광 수요·행사·도로 상황을 한 화면에 모았습니다.</p>
         </div>
         <LiveClock />

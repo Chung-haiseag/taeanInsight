@@ -17,14 +17,14 @@ export function PageHeader({
   align?: "left" | "center";
 }) {
   const centered = align === "center";
-  // 2026-10 리디자인: 신문 1면과 같은 세리프 제목·ti 토큰. 강조선 대신 아래 굵은 먹선(섹션 머리와 같은 결).
+  // 2026-10 리디자인: 신문 1면과 같은 세리프 제목·ti 토큰. 아래 선은 두지 않는다 — 바로 이어지는 섹션 머리(SecHead)의 굵은 먹선과 겹친다.
   return (
-    <header className={`border-b-2 border-ti-ink pb-5 pt-2 ${centered ? "text-center" : ""}`}>
+    <header className={`pb-2 pt-2 ${centered ? "text-center" : ""}`}>
       {eyebrow && (
         <p className={`text-[0.85rem] font-bold tracking-[0.14em] text-ti-petrol-ink ${centered ? "text-center" : ""}`}>{eyebrow}</p>
       )}
       <div className={`mt-1.5 flex flex-wrap items-end gap-4 ${centered ? "justify-center" : "justify-between"}`}>
-        <h1 className="font-serif text-[clamp(2rem,4.4vw,3rem)] font-black leading-tight tracking-[-0.025em] text-ti-ink">{title}</h1>
+        <h1 className="font-head text-[clamp(2rem,4.4vw,3rem)] font-black leading-tight tracking-[-0.025em] text-ti-ink">{title}</h1>
         {actions && !centered && <div className="shrink-0 pb-1">{actions}</div>}
       </div>
       {description && (

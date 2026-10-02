@@ -59,7 +59,7 @@ export function TvVideoGrid({ videos, columns = 2, compact = false }: {
             ) : (
               <figcaption className="space-y-1.5 p-4">
                 {v.publishedAt && <p className="text-[0.9rem] tabular-nums text-ti-muted">{formatTvDate(v.publishedAt)}</p>}
-                <p className="font-serif text-[1.1rem] font-bold leading-snug text-ti-ink">{v.title}</p>
+                <p className="font-head text-[1.1rem] font-bold leading-snug text-ti-ink">{v.title}</p>
                 {v.description && <p className="line-clamp-2 text-[0.95rem] text-ti-ink2">{v.description}</p>}
                 <a href={v.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-[0.95rem] font-bold text-ti-petrol-ink underline underline-offset-4">
                   유튜브에서 보기<span className="sr-only"> (새 창)</span>
@@ -124,7 +124,7 @@ export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
         <button
           type="button"
           onClick={() => scrollStrip(-1)}
-          className="absolute -left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-brand/15 bg-background/90 text-brand shadow-md transition-colors hover:bg-brand hover:text-background"
+          className="absolute -left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-brand/15 bg-background/90 text-brand shadow-md transition-colors hover:bg-brand hover:text-background"
           aria-label="이전 영상 목록"
         >
           ◀
@@ -132,19 +132,18 @@ export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
         <button
           type="button"
           onClick={() => scrollStrip(1)}
-          className="absolute -right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-brand/15 bg-background/90 text-brand shadow-md transition-colors hover:bg-brand hover:text-background"
+          className="absolute -right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-brand/15 bg-background/90 text-brand shadow-md transition-colors hover:bg-brand hover:text-background"
           aria-label="다음 영상 목록"
         >
           ▶
         </button>
-      <div ref={stripRef} className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" role="list" aria-label="다른 영상 선택">
+      <div ref={stripRef} className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1" role="group" aria-label="다른 영상 선택">
         {videos.map((v) => {
           const active = v.id === current.id;
           return (
             <button
               key={v.id}
               type="button"
-              role="listitem"
               onClick={() => { setCurrentId(v.id); setPlaying(true); }}
               className={`w-44 shrink-0 overflow-hidden rounded-xl border text-left transition-colors sm:w-52 ${
                 active ? "border-accent ring-1 ring-accent" : "border-brand/15 hover:border-brand/40"
@@ -156,7 +155,7 @@ export function TvVideoTheater({ videos }: { videos: TvGridVideo[] }) {
               <img src={v.thumbnail} alt="" className="aspect-video w-full object-cover" loading="lazy" />
               <span className="block px-2.5 py-2">
                 {v.publishedAt && (
-                  <span className="block text-[0.6875rem] text-foreground-muted">{formatTvDay(v.publishedAt)}</span>
+                  <span className="block text-[0.85rem] text-ti-muted">{formatTvDay(v.publishedAt)}</span>
                 )}
                 <span className={`block text-xs font-semibold leading-snug ${active ? "text-accent" : "text-brand"} line-clamp-2`}>
                   {v.title}

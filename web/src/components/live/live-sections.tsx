@@ -44,7 +44,7 @@ export function WeatherNow({ env }: { env: ReportMetrics["environment"] }) {
   return (
     <section aria-labelledby="wx-title" className="flex flex-col gap-4 rounded-[20px] border border-ti-line bg-ti-surface p-5 md:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="wx-title" className="font-serif text-[1.35rem] font-bold text-ti-ink">지금 날씨·대기</h2>
+        <h2 id="wx-title" className="font-head text-[1.35rem] font-bold text-ti-ink">지금 날씨·대기</h2>
         <p className="text-[0.9rem] text-ti-muted">{time ? `${time} 관측 · ` : ""}기상청·에어코리아</p>
       </div>
 

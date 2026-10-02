@@ -159,6 +159,10 @@ html {
   outline-color: var(--ti-focus);
 }
 
+/* 제목 글꼴(Pretendard) — 큰 고딕 제목은 자간을 좁혀야 단단해 보인다. 900은 Pretendard에서 너무 뭉쳐 800으로. */
+.font-head { letter-spacing: -0.025em; }
+.font-head.font-black { font-weight: 800; }
+
 /* 홈 조위 곡선 — 처음 한 번 그려지는 선(모션 줄임이면 생략) */
 @media (prefers-reduced-motion: no-preference) {
   .tide-draw {

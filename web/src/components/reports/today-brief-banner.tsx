@@ -10,7 +10,7 @@ export function TodayBriefBanner({ brief, vapidPublicKey }: { brief: TodayBriefV
   const items = brief.body.split(" · ").map((s) => s.trim()).filter(Boolean);
   return (
     <section aria-labelledby="today-brief-title" className="rounded-[18px] border border-ti-line bg-ti-surface p-5">
-      <h2 id="today-brief-title" className="font-serif text-[1.2rem] font-bold text-ti-ink">{brief.title}</h2>
+      <h2 id="today-brief-title" className="font-head text-[1.2rem] font-bold text-ti-ink">{brief.title}</h2>
       <ul className="m-0 mt-2.5 flex list-none flex-wrap gap-x-6 gap-y-1.5 p-0 text-[1.02rem] text-ti-ink">
         {items.map((t, i) => (
           <li key={i} className="relative pl-3.5 before:absolute before:left-0 before:top-[0.7em] before:h-[5px] before:w-[5px] before:rounded-full before:bg-ti-petrol">{t}</li>

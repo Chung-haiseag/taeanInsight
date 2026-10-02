@@ -58,10 +58,10 @@ export default {
           "Roboto",
           "sans-serif",
         ],
-        // 신문 1면 제목용 한글 세리프(Noto Serif KR)
-        serif: ["var(--font-serif-kr)", '"Nanum Myeongjo"', "Georgia", "serif"],
-        // 에디토리얼 디스플레이 — 라틴 숫자·헤드라인용 세리프(Fraunces), 한글은 sans로 폴백
-        display: ["var(--font-display)", "var(--font-sans)", "Georgia", '"Times New Roman"', "serif"],
+        // 제목 — Pretendard 굵게(2026-10: 명조·Fraunces가 촌스럽다는 의견으로 고딕 하나로 통일). 자간은 globals.css .font-head
+        head: ["var(--font-sans)", "Pretendard", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        // 숫자·디스플레이 — 예전 Fraunces 자리. 같은 Pretendard에 tabular-nums(사용처에서)로 자릿수를 맞춘다.
+        display: ["var(--font-sans)", "Pretendard", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
       },
       fontSize: {
         // 사용자 글자 크기 옵션 3단계 — Tailwind plugin 없이 CSS 변수로 동적 스케일링

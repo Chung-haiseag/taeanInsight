@@ -77,7 +77,7 @@ export default async function YearArchive({
                 <li key={h.idxno}>
                   <Link href={`/news/${h.idxno}`} className="group -mx-3 block rounded-xl px-3 py-3.5 transition-colors hover:bg-ti-sunk">
                     {d && <time dateTime={d} className="block text-[0.9rem] font-semibold tabular-nums text-ti-petrol-ink">{d.replace(/-/g, ".")}</time>}
-                    <span className="mt-0.5 block font-serif text-[1.1rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">{decodeEntities(h.title)}</span>
+                    <span className="mt-0.5 block font-head text-[1.1rem] font-bold leading-snug text-ti-ink group-hover:underline group-hover:underline-offset-4">{decodeEntities(h.title)}</span>
                   </Link>
                 </li>
               );

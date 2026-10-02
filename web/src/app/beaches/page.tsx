@@ -59,7 +59,7 @@ export default async function BeachesPage() {
             <div className="on-dark mb-5 flex flex-wrap items-end justify-between gap-4 rounded-[20px] bg-ti-navy p-5 text-ti-on-navy md:p-6">
               <div className="min-w-0">
                 <p className="font-bold text-ti-on-navy-muted">오늘의 추천 해변</p>
-                <h3 className="mt-1 font-serif text-[clamp(1.6rem,3.4vw,2.2rem)] font-black">{board.top.name}</h3>
+                <h3 className="mt-1 font-head text-[clamp(1.6rem,3.4vw,2.2rem)] font-black">{board.top.name}</h3>
                 {board.top.reasons.length > 0 && <p className="mt-1.5 text-ti-on-navy-muted">{board.top.reasons.join(" · ")}</p>}
               </div>
               <div className="text-right">

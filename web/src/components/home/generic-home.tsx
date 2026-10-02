@@ -70,7 +70,7 @@ export function GenericHome() {
       <div className="grid gap-9 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <article aria-labelledby="lead-title">
           <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.9rem] text-ti-muted">
-            <span className="font-serif text-base font-bold text-ti-ink">오늘의 태안</span>
+            <span className="font-head text-base font-bold text-ti-ink">오늘의 태안</span>
             <span>태안신문 최신 기사</span>
           </div>
           {lead?.leadImage && (
@@ -80,7 +80,7 @@ export function GenericHome() {
             </figure>
           )}
           {lead && <p className="text-[0.78rem] font-bold tracking-[0.14em] text-ti-petrol-ink">{labels[lead.category] ?? lead.category}</p>}
-          <h1 id="lead-title" className="mt-2.5 font-serif text-[clamp(1.9rem,4.2vw,3.1rem)] font-black leading-[1.22] tracking-[-0.025em]">
+          <h1 id="lead-title" className="mt-2.5 font-head text-[clamp(1.9rem,4.2vw,3.1rem)] font-black leading-[1.22] tracking-[-0.025em]">
             {lead ? (
               <Link href={`/news/${lead.id}`} className="hover:underline hover:decoration-2 hover:underline-offset-[6px]">{lead.title}</Link>
             ) : news.loaded ? (
@@ -122,7 +122,7 @@ export function GenericHome() {
                   )}
                 </div>
                 <p className="text-[0.78rem] font-bold text-ti-petrol-ink">{labels[it.category] ?? it.category}</p>
-                <h3 className="font-serif text-[1.12rem] font-bold leading-snug">
+                <h3 className="font-head text-[1.12rem] font-bold leading-snug">
                   <Link href={`/news/${it.id}`} className="hover:underline hover:underline-offset-4">{it.title}</Link>
                 </h3>
                 {it.excerpt && <p className="line-clamp-3 text-[0.92rem] text-ti-ink2">{it.excerpt}</p>}
@@ -162,7 +162,7 @@ function SecHead({ id, title, link, eyebrow, note, dark = false }: {
     <div className={`mb-6 flex flex-wrap items-end justify-between gap-3 border-t-2 pt-3.5 ${dark ? "border-ti-on-navy" : "border-ti-ink"}`}>
       <div>
         {eyebrow && <p className={`text-[0.78rem] font-bold tracking-[0.14em] ${dark ? "text-[#F0CB82]" : "text-ti-petrol-ink"}`}>{eyebrow}</p>}
-        <h2 id={id} className="font-serif text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em]">{title}</h2>
+        <h2 id={id} className="font-head text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em]">{title}</h2>
       </div>
       {note && <p className={`max-w-[34em] ${dark ? "text-ti-on-navy-muted" : "text-ti-ink2"}`}>{note}</p>}
       {link && (
@@ -247,7 +247,7 @@ function InsightTeaser({ demand, loaded, beaches }: { demand: DemandForecast | n
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div>
           <p className="text-[0.78rem] font-bold tracking-[0.14em] text-ti-petrol-ink">멤버 전용 인사이트</p>
-          <h2 id="ins-title" className="mt-2 font-serif text-[clamp(1.5rem,3vw,2.1rem)] font-black leading-[1.3] tracking-[-0.02em]">
+          <h2 id="ins-title" className="mt-2 font-head text-[clamp(1.5rem,3vw,2.1rem)] font-black leading-[1.3] tracking-[-0.02em]">
             이번 주말 태안, 얼마나 붐빌까요?
           </h2>
           <p className="mt-3.5 text-ti-ink2">
@@ -333,7 +333,7 @@ function MemoryAndPeople({ stats, onThisDay, people }: { stats: ArchiveStats | n
       <div className={`grid gap-7 ${people.length ? "md:grid-cols-2" : ""}`}>
         <article aria-labelledby="arc-h" className="flex min-w-0 flex-col gap-3.5 rounded-[20px] border border-ti-line bg-ti-surface p-6">
           <p className="text-[0.78rem] font-bold tracking-[0.14em] text-ti-petrol-ink">뉴스아카이브{minY ? ` · ${minY}년부터` : ""}</p>
-          <h3 id="arc-h" className="font-serif text-[1.3rem] font-bold">
+          <h3 id="arc-h" className="font-head text-[1.3rem] font-bold">
             {span ? `${span}년 치 태안신문을 검색하고 지면 그대로 봅니다` : "태안신문 옛 기사를 검색하고 지면 그대로 봅니다"}
           </h3>
           <p className="text-[0.95rem] text-ti-ink2">
@@ -342,14 +342,14 @@ function MemoryAndPeople({ stats, onThisDay, people }: { stats: ArchiveStats | n
           <div className="border-l-[3px] border-ti-gold py-0.5 pl-3.5">
             {onThisDay ? (
               <>
-                <Link href={`/news/${onThisDay.idxno}`} className="font-serif text-[1.02rem] font-bold hover:underline hover:underline-offset-4">
+                <Link href={`/news/${onThisDay.idxno}`} className="font-head text-[1.02rem] font-bold hover:underline hover:underline-offset-4">
                   “{onThisDay.title}”
                 </Link>
                 <p className="mt-1 text-[0.8rem] text-ti-muted">{onThisDay.yearsAgo}년 전 오늘({onThisDay.year}년) 태안신문</p>
               </>
             ) : (
               <>
-                <p className="font-serif text-[1.02rem] font-bold">“그해 오늘, 태안에는 어떤 소식이 있었을까요?”</p>
+                <p className="font-head text-[1.02rem] font-bold">“그해 오늘, 태안에는 어떤 소식이 있었을까요?”</p>
                 <p className="mt-1 text-[0.8rem] text-ti-muted">같은 날짜의 옛 기사를 아카이브에서 찾아보세요</p>
               </>
             )}
@@ -369,7 +369,7 @@ function MemoryAndPeople({ stats, onThisDay, people }: { stats: ArchiveStats | n
         {people.length > 0 && (
           <article aria-labelledby="ppl-h" className="flex min-w-0 flex-col gap-3.5 rounded-[20px] border border-ti-line bg-ti-surface p-6">
             <p className="text-[0.78rem] font-bold tracking-[0.14em] text-ti-petrol-ink">인물 · 관계 지도</p>
-            <h3 id="ppl-h" className="font-serif text-[1.3rem] font-bold">누가 태안을 움직이는지 기사 속 관계로 봅니다</h3>
+            <h3 id="ppl-h" className="font-head text-[1.3rem] font-bold">누가 태안을 움직이는지 기사 속 관계로 봅니다</h3>
             <p className="text-[0.95rem] text-ti-ink2">기사에 함께 등장한 사람과 조직, 맡았던 일을 기사 근거와 함께 연결했습니다.</p>
             <ul aria-label="자주 등장한 인물" className="m-0 flex list-none flex-wrap gap-2 p-0">
               {people.map((p) => (

@@ -43,7 +43,7 @@ export function SecHead({ id, title, note, link }: { id: string; title: string; 
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-t-2 border-ti-ink pt-3.5">
       <div>
-        <h2 id={id} className="font-serif text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em] text-ti-ink">{title}</h2>
+        <h2 id={id} className="font-head text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em] text-ti-ink">{title}</h2>
         {note && <p className="mt-1 text-ti-ink2">{note}</p>}
       </div>
       {link && <Link href={link.href} className="text-[0.95rem] font-bold text-ti-petrol-ink underline underline-offset-4">{link.label}</Link>}
