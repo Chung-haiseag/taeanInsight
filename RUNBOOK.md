@@ -72,6 +72,8 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-10-02 · **홈 리디자인 — 신문 1면(머리기사·오늘의 브리핑·오늘의 바다·이번 주 태안·숫자로 보는 태안·주말 예측 맛보기·기억과 사람·멤버십)** · `web/src/components/home`·`site-header.tsx`·`site-footer.tsx`·`lib/tide-curve.ts`
+  시안의 예시 수치는 전부 실데이터로 바꿨다(최신 기사·today-brief·metrics 물때/수온/파고/미세먼지·fog·위판 예측·아파트·유가·주말 수요·아카이브·인물). 값이 없으면 그 칸을 지운다. 유일한 정적 내용은 멤버십 요금 카드 넷 — ⚠ /membership 은 9,900원 한 상품만 팔므로 배포 전 맞출 것. 다크 모드는 사이트 전체에 없어 홈만 넣지 않았다.
 - 2026-08-27 · **관계망에 기관 넣기 — 기사 공유 기반 인물↔기관** · `backend/src/kg/graph.ts`·`tools/ebook/out/org-mentions.sql`
   기관은 노드(166개)만 있고 **기사와 연결된 적이 없었다** — `kg_mentions` 22.7만 건이 전부 인물이고, `coappears` 127만 엣지도 인물끼리뿐이었다. 그래서 관계망이 '누구와 어울렸나'까지만 보이고 '어디서 일했나'가 안 보였다.
   조직 사전(`affiliation.ts` ORGS 22곳)의 별칭으로 기사 본문을 훑어 **기관 언급 118,581건**을 만들고(D1 `INSERT…SELECT`, 20초), personEgo가 중심 인물과 **기사를 함께 쓴 상위 5개 기관**을 그때그때 세어 노드로 얹는다(`kg_mentions(article_idxno)` 인덱스로 1.5초). 실측: 윤희신 ↔ 태안군의회 125건·한국서부발전 71건·태안군청 44건.

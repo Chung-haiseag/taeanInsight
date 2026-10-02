@@ -93,6 +93,15 @@ export function QueryClient() {
     );
   }
 
+  // 머리의 '태안에 대해 물어보세요'(/query?q=…)로 왔으면 그 질문을 채우고 바로 묻는다 — 거기서 이미 '질문'을 눌렀다.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (!q) return;
+    setQuery(q);
+    void run(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     void run(query);
