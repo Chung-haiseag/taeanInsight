@@ -6,35 +6,35 @@
 @layer components {
   /* 섹션 위 작은 라벨 (대문자 트래킹) */
   .eyebrow {
-    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-kicker text-accent-ink;
+    @apply inline-flex items-center gap-2 text-[0.85rem] font-bold tracking-[0.14em] text-ti-petrol-ink;
   }
   /* 헤드라인 아래 짧은 강조선 */
   .accent-rule {
-    @apply block h-1 w-12 rounded-full bg-accent;
+    @apply block h-1 w-12 rounded-full bg-ti-petrol;
   }
   /* 얇은 구분선 */
   .hairline {
-    @apply border-t border-brand/10;
+    @apply border-t border-ti-line;
   }
   /* 카드 — 중립/강조 두 종으로 통일(패딩은 각 사용처에서). 테두리·배경·그림자 규격 고정 */
   .card {
-    @apply rounded-2xl border border-brand/10 bg-background shadow-card;
+    @apply rounded-[18px] border border-ti-line bg-ti-surface text-ti-ink;
   }
   .card-accent {
-    @apply rounded-2xl border border-accent/30 bg-accent-subtle/20;
+    @apply rounded-[18px] border border-ti-line bg-ti-sunk text-ti-ink;
   }
   /* 버튼 */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-[background-color,box-shadow,transform,opacity,border-color] duration-200 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.95rem] font-semibold transition-[background-color,box-shadow,transform,opacity,border-color] duration-200 active:scale-[0.98];
   }
   .btn-primary {
-    @apply btn bg-brand text-background hover:bg-brand-dark hover:shadow-lift;
+    @apply btn min-h-11 bg-ti-navy text-ti-on-navy hover:bg-ti-petrol;
   }
   .btn-accent {
-    @apply btn bg-accent text-background hover:opacity-90 hover:shadow-lift;
+    @apply btn min-h-11 bg-ti-petrol text-white hover:opacity-90;
   }
   .btn-ghost {
-    @apply btn border border-brand/20 text-brand hover:border-brand/50 hover:bg-brand/5;
+    @apply btn min-h-11 border border-ti-line bg-ti-surface text-ti-ink hover:border-ti-petrol;
   }
   /* 카드 호버 리프트 */
   .card-lift {

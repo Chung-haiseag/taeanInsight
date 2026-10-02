@@ -17,22 +17,19 @@ export function PageHeader({
   align?: "left" | "center";
 }) {
   const centered = align === "center";
+  // 2026-10 리디자인: 신문 1면과 같은 세리프 제목·ti 토큰. 강조선 대신 아래 굵은 먹선(섹션 머리와 같은 결).
   return (
-    <header className={`pt-2 ${centered ? "text-center" : ""}`}>
+    <header className={`border-b-2 border-ti-ink pb-5 pt-2 ${centered ? "text-center" : ""}`}>
       {eyebrow && (
-        <p className={`eyebrow ${centered ? "justify-center" : ""}`}>
-          <span className="inline-block h-px w-6 bg-accent" aria-hidden />
-          {eyebrow}
-        </p>
+        <p className={`text-[0.85rem] font-bold tracking-[0.14em] text-ti-petrol-ink ${centered ? "text-center" : ""}`}>{eyebrow}</p>
       )}
-      <div className={`mt-4 flex items-end gap-4 ${centered ? "justify-center" : "justify-between"}`}>
-        <h1 className="font-display text-display-sm text-brand">{title}</h1>
+      <div className={`mt-1.5 flex flex-wrap items-end gap-4 ${centered ? "justify-center" : "justify-between"}`}>
+        <h1 className="font-serif text-[clamp(2rem,4.4vw,3rem)] font-black leading-tight tracking-[-0.025em] text-ti-ink">{title}</h1>
         {actions && !centered && <div className="shrink-0 pb-1">{actions}</div>}
       </div>
       {description && (
-        <p className={`mt-2 text-foreground-muted ${centered ? "mx-auto max-w-prose" : "max-w-prose"}`}>{description}</p>
+        <p className={`mt-2 text-[1.08rem] text-ti-ink2 ${centered ? "mx-auto max-w-[40em]" : "max-w-[40em]"}`}>{description}</p>
       )}
-      <span className={`accent-rule mt-5 ${centered ? "mx-auto" : ""}`} aria-hidden />
     </header>
   );
 }
