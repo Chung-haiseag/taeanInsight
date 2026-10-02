@@ -75,6 +75,7 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 2026-10-02 · **홈 리디자인 — 신문 1면(머리기사·오늘의 브리핑·오늘의 바다·이번 주 태안·숫자로 보는 태안·주말 예측 맛보기·기억과 사람·멤버십)** · `web/src/components/home`·`site-header.tsx`·`site-footer.tsx`·`lib/tide-curve.ts`
   시안의 예시 수치는 전부 실데이터로 바꿨다(최신 기사·today-brief·metrics 물때/수온/파고/미세먼지·fog·위판 예측·아파트·유가·주말 수요·아카이브·인물). 값이 없으면 그 칸을 지운다. 멤버십 칸은 시안의 네 요금 대신 실제로 파는 것만(늘 무료 / 월 9,900원 / 기관·단체 문의). 다크 모드는 사이트 전체에 없어 홈만 넣지 않았다.
   배포 2026-10-02 production(axtaeannews.co.kr) 버전 `325bdf87-81d9-411b-bf7c-bdc7a9bbcd2f` — 브랜치 커밋 + main의 미커밋 web 변경(시민기자 안내 등, 운영 중)을 얹어 빌드. 스모크 통과(/, /citizen/guide, /membership, /query, /login, /news, /beaches, /people = 200). 직전 버전 df4f4342.
+  main 병합(543a1ab) 후 main에서 재배포 — 버전 `1d201739-3508-4e17-a592-9c45e1297eaf`, 스모크 8경로 200.
   ⚠ 워크트리에서 배포할 때 **node_modules를 심볼릭 링크로 두면 OpenNext 번들이 깨진다**(전 경로 500, "Dynamic require of /.next/server/middleware-manifest.json") — 첫 배포 1430d90c가 이걸로 500 → 즉시 롤백. 워크트리 안에서 `npm ci` 후 빌드.
 - 2026-09-21 · **시민기자 자습 안내 페이지 + 교육 자료(10월 2회)** · `web/src/app/citizen/guide/page.tsx`·`web/src/app/login/login-mode.ts`·`web/src/app/citizen/page.tsx`·`citizen/apply/page.tsx`
   교육 일정이 8월 말 6회 → **10월 초·중순 2회**로 바뀜(사용자 결정 9-21). 신청 5명(목표 8, 60대 이상 3명), 사이트 계정 0명. `/citizen/guide`는 **로그인 없이 읽는 7단계**(가입→신청→승인→에디터→글쓰기→사진·출처·라벨→제출) + '여기서 막히면' + 기사 쓰기 다섯 가지. 화면 그림은 캡처가 아니라 **HTML로 그린다** — 화면이 바뀌어도 낡지 않고 인쇄가 선명. `/login?mode=signup`으로 가입 화면을 바로 연다(`initialLoginMode`).
