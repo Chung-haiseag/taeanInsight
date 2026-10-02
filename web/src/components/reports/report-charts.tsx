@@ -3,6 +3,7 @@
 
 import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, AquaBoardView, AquaLevel, FestivalView, WeatherAlertView, FerryView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
+import { Card, CardTitle, Pill, Source, type Tone } from "@/components/editorial";
 
 // 만원 → "2.1억" / "8,500만원"
 function wonFmt(n: number): string {
@@ -492,33 +493,34 @@ export function WeatherCards({ env }: { env: ReportMetrics["environment"] }) {
 }
 
 // ── 부동산: 집계 카드 + 가격대 막대 + 실거래 표 ──
+//   2026-10 리디자인: ti 토큰 카드·큰 숫자. 휴대폰에선 '평균가 …… 2.1억' 한 줄씩(세 칸 나란히는 좁아 넘친다).
 export function RealEstatePanel({ re, compact = false }: { re: ReportMetrics["realestate"]; compact?: boolean }) {
   if (!re.apt && !re.land) return null;
   return (
-    <div className={`mt-4 ${compact ? "grid gap-3 sm:grid-cols-2" : "space-y-5"}`}>
+    <div className={compact ? "grid items-start gap-5 md:grid-cols-2" : "my-4 space-y-5"}>
       {re.apt && (
-        <div className="card p-4">
-          <p className="text-sm font-semibold text-brand">아파트 실거래 · 최근 {re.apt.count}건</p>
-          <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-            <Stat label="평균가" value={wonFmt(re.apt.avgManwon)} />
-            <Stat label="최고가" value={wonFmt(re.apt.maxManwon)} accent />
-            <Stat label="최저가" value={wonFmt(re.apt.minManwon)} />
-          </div>
+        <Card labelledBy="re-apt-title">
+          <CardTitle id="re-apt-title" aside={<span className="text-[0.9rem] text-ti-muted">최근 {re.apt.count}건</span>}>아파트 실거래</CardTitle>
+          <dl className="m-0 mt-3 grid gap-2.5 md:grid-cols-3">
+            <Stat label="평균가" value={re.apt.avgManwon} />
+            <Stat label="최고가" value={re.apt.maxManwon} />
+            <Stat label="최저가" value={re.apt.minManwon} />
+          </dl>
           <RangeBar min={re.apt.minManwon} avg={re.apt.avgManwon} max={re.apt.maxManwon} />
           {!compact && <AptTable items={re.apt.items} />}
-        </div>
+        </Card>
       )}
       {re.land && (
-        <div className="card p-4">
-          <p className="text-sm font-semibold text-brand">토지 실거래 · 최근 {re.land.count}건</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-center">
-            <Stat label="최고가" value={wonFmt(re.land.maxManwon)} accent />
-            <Stat label="최저가" value={wonFmt(re.land.minManwon)} />
-          </div>
+        <Card labelledBy="re-land-title">
+          <CardTitle id="re-land-title" aside={<span className="text-[0.9rem] text-ti-muted">최근 {re.land.count}건</span>}>토지 실거래</CardTitle>
+          <dl className="m-0 mt-3 grid gap-2.5 md:grid-cols-2">
+            <Stat label="최고가" value={re.land.maxManwon} />
+            <Stat label="최저가" value={re.land.minManwon} />
+          </dl>
           {!compact && <LandTable items={re.land.items} />}
-        </div>
+        </Card>
       )}
-      <p className={`text-right text-[0.7rem] text-foreground-muted ${compact ? "sm:col-span-2" : ""}`}>국토교통부 실거래가 공개시스템</p>
+      <p className={`text-[0.85rem] text-ti-muted ${compact ? "md:col-span-2" : ""}`}>출처: 국토교통부 실거래가 공개시스템</p>
     </div>
   );
 }
@@ -570,29 +572,56 @@ export function FestivalCalendar({ festivals }: { festivals: FestivalView[] }) {
 // 태안 산업 구조 — 큐레이션(통계청 지역내총생산·전국사업체조사). '태안은 관광만이 아니다'를
 //   실측 근거로 보여줌 → 사장님 멤버십이 농업·수산·관광 전 부문을 대상으로 하는 근거.
 const TAEAN_PILLARS = [
-  { emoji: "🌾", name: "농업", desc: "마늘·생강·고추·쌀 주산지", stat: "지역총생산 1차산업 8.3% (전국의 약 5배)" },
-  { emoji: "🐟", name: "수산업", desc: "갯벌·연안 — 바지락·굴·김·꽃게·대하", stat: "국가어항(안흥·모항)·양식·맨손어업" },
-  { emoji: "🏖️", name: "관광·서비스", desc: "숙박·음식·도소매 사업체 다수", stat: "종사자 숙박·음식 22.8% · 도소매 16.1%" },
-  { emoji: "⚡", name: "에너지", desc: "태안화력발전소", stat: "지역총생산 최대 단일 부문(전기·가스 54.6%)" },
+  { name: "농업", desc: "마늘·생강·고추·쌀 주산지", stat: "지역총생산 1차산업 8.3% (전국의 약 5배)" },
+  { name: "수산업", desc: "갯벌·연안 — 바지락·굴·김·꽃게·대하", stat: "국가어항(안흥·모항)·양식·맨손어업" },
+  { name: "관광·서비스", desc: "숙박·음식·도소매 사업체 다수", stat: "종사자 숙박·음식 22.8% · 도소매 16.1%" },
+  { name: "에너지", desc: "태안화력발전소", stat: "지역총생산 최대 단일 부문(전기·가스 54.6%)" },
 ];
 export function IndustryStructure() {
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🏭 태안 산업 구조</span>
-        <span className="text-[0.7rem] text-foreground-muted">농업·수산·관광 다부문</span>
-      </div>
-      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+    <Card labelledBy="industry-title">
+      <CardTitle id="industry-title" aside={<span className="text-[0.9rem] text-ti-muted">농업·수산·관광·에너지</span>}>태안 산업 구조</CardTitle>
+      <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-2">
         {TAEAN_PILLARS.map((p) => (
-          <div key={p.name} className="rounded-xl bg-brand/5 p-3">
-            <p className="text-sm font-bold text-brand">{p.emoji} {p.name}</p>
-            <p className="mt-0.5 text-xs text-foreground">{p.desc}</p>
-            <p className="mt-0.5 text-[0.7rem] text-foreground-muted">{p.stat}</p>
-          </div>
+          <li key={p.name} className="rounded-[12px] bg-ti-sunk p-3.5">
+            <h4 className="font-bold text-ti-ink">{p.name}</h4>
+            <p className="mt-1 text-ti-ink">{p.desc}</p>
+            <p className="mt-1 text-[0.9rem] text-ti-ink2">{p.stat}</p>
+          </li>
         ))}
-      </div>
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">통계청 지역내총생산·전국사업체조사 기준 구조. 정밀 최신 산업별 취업자 통계는 KOSIS 연동 예정.</p>
-    </div>
+      </ul>
+      <Source>통계청 지역내총생산·전국사업체조사 기준 구조. 정밀 최신 산업별 취업자 통계는 KOSIS 연동 예정.</Source>
+    </Card>
+  );
+}
+
+// 시세 칸 — 이름 · 큰 값(단위는 옆에 작게) · 변동(화살표만이 아니라 '올랐음/내렸음' 글로).
+//   휴대폰에선 이름과 값을 한 줄에 양끝 정렬, md부터 칸 모양.
+function PriceTile({ name, price, unit, change }: { name: string; price: number; unit: string; change?: React.ReactNode }) {
+  return (
+    <li className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded-[12px] bg-ti-sunk px-4 py-3 md:block">
+      <p className="font-semibold text-ti-ink2">{name}</p>
+      <p className="md:mt-1">
+        <span className="font-display text-[1.6rem] font-semibold leading-none tabular-nums text-ti-ink">{price.toLocaleString()}</span>
+        <span className="ml-1 text-[0.9rem] text-ti-muted">{unit}</span>
+      </p>
+      {change && <p className="w-full text-[0.9rem] md:mt-1">{change}</p>}
+    </li>
+  );
+}
+
+/** 변동 표시 — 오름은 짙은 빨강, 내림은 짙은 파랑(흰 바탕 AA). 색과 함께 글로 말한다. */
+function Change({ label, v, unit }: { label: string; v: number | null; unit: string }) {
+  if (v == null) return null;
+  if (v === 0) return <span className="text-ti-ink2">{label} 같음</span>;
+  const up = v > 0;
+  return (
+    <span className="text-ti-ink2">
+      {label}{" "}
+      <b className={`tabular-nums ${up ? "text-[#8A1C14]" : "text-[#0B3D91]"}`}>
+        {up ? "▲" : "▼"} {Math.abs(v)}{unit} {up ? "올랐음" : "내렸음"}
+      </b>
+    </span>
   );
 }
 
@@ -601,38 +630,24 @@ export function AgriCard({ agri }: { agri: AgriBoardView | null }) {
   if (!agri || !agri.crops.some((c) => c.wonPerKg != null)) return null;
   const rows = agri.crops.filter((c) => c.wonPerKg != null);
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🧑‍🌾 태안 농수산물 시세</span>
-        <span className="text-[0.7rem] text-foreground-muted">전국 도매 평균 · kg당{agri.date ? ` · ${agri.date.slice(5)}` : ""}</span>
-      </div>
+    <Card labelledBy="agri-title">
+      <CardTitle id="agri-title" aside={<span className="text-[0.9rem] text-ti-muted">전국 도매 평균 · 1kg당{agri.date ? ` · ${mdKo(agri.date)}` : ""}</span>}>농산물·해조류 도매 시세</CardTitle>
       {(["농산물", "해조류"] as const).map((cat) => {
         const catRows = rows.filter((c) => c.cat === cat);
         if (!catRows.length) return null;
         return (
-          <div key={cat} className="mt-3">
-            <p className="mb-1.5 text-[0.7rem] font-semibold text-foreground-muted">{cat === "농산물" ? "🌾 농산물" : "🌿 해조류"}</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {catRows.map((c) => {
-                const d = c.deltaPct;
-                return (
-                  <div key={c.key} className="rounded-xl bg-brand/5 p-3">
-                    <p className="text-xs text-foreground-muted">{c.emoji} {c.name}</p>
-                    <p className="mt-1 text-xl font-bold tabular-nums text-brand">{c.wonPerKg!.toLocaleString()}<span className="text-xs font-medium">원</span></p>
-                    {d != null && (
-                      <p className="mt-0.5 text-[0.7rem]" style={{ color: d > 0 ? "#dc2626" : d < 0 ? "#16a34a" : "#64748b" }}>
-                        전일 {d > 0 ? "▲" : d < 0 ? "▼" : "—"}{Math.abs(d)}%
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          <div key={cat} className="mt-4">
+            <h4 className="font-semibold text-ti-muted">{cat}</h4>
+            <ul className="m-0 mt-2 grid list-none gap-2.5 p-0 md:grid-cols-3">
+              {catRows.map((c) => (
+                <PriceTile key={c.key} name={c.name} price={c.wonPerKg!} unit="원" change={<Change label="어제보다" v={c.deltaPct} unit="%" />} />
+              ))}
+            </ul>
           </div>
         );
       })}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 공영도매시장 경매 낙찰가 중앙값(신선 원물). 태안 주산지 농산물·해조류 참고가 · 어패류는 아래 수산물 카드.</p>
-    </div>
+      <Source>전국 공영도매시장 경매 낙찰가 중앙값(신선 원물). 태안 주산지 농산물·해조류 참고가 · 어패류는 수산물 소매 시세 카드.</Source>
+    </Card>
   );
 }
 
@@ -640,105 +655,83 @@ export function AgriCard({ agri }: { agri: AgriBoardView | null }) {
 export function SeafoodCard({ seafood }: { seafood: SeafoodBoardView | null }) {
   if (!seafood || !seafood.items.length) return null;
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🐟 태안 수산물 소매 시세</span>
-        <span className="text-[0.7rem] text-foreground-muted">KAMIS 소매가{seafood.date ? ` · ${seafood.date.slice(5)}` : ""}</span>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {seafood.items.map((s) => {
-          const d = s.deltaPct;
-          return (
-            <div key={s.code} className="rounded-xl bg-brand/5 p-3">
-              <p className="text-xs text-foreground-muted">{s.emoji} {s.name}</p>
-              <p className="mt-1 text-lg font-bold tabular-nums text-brand">{s.price.toLocaleString()}<span className="text-xs font-medium">원</span></p>
-              <p className="text-[0.65rem] text-foreground-muted">/{s.unit}</p>
-              {d != null && (
-                <p className="mt-0.5 text-[0.7rem]" style={{ color: d > 0 ? "#dc2626" : d < 0 ? "#16a34a" : "#64748b" }}>
-                  주간 {d > 0 ? "▲" : d < 0 ? "▼" : "—"}{Math.abs(d)}%
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">전국 소매 평균가(KAMIS) · 주간=1주일 전 대비. 태안 갯벌·연안 대표 어패류 참고가.</p>
-    </div>
+    <Card labelledBy="seafood-title">
+      <CardTitle id="seafood-title" aside={<span className="text-[0.9rem] text-ti-muted">KAMIS 소매가{seafood.date ? ` · ${mdKo(seafood.date)}` : ""}</span>}>수산물 소매 시세</CardTitle>
+      <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-2 lg:grid-cols-4">
+        {seafood.items.map((s) => (
+          <PriceTile key={s.code} name={s.name} price={s.price} unit={`원 / ${s.unit}`} change={<Change label="지난주보다" v={s.deltaPct} unit="%" />} />
+        ))}
+      </ul>
+      <Source>전국 소매 평균가(KAMIS) · 지난주=1주일 전 대비. 태안 갯벌·연안 대표 어패류 참고가.</Source>
+    </Card>
   );
 }
 
 // 위판 물량·값 추세 예측 — 최신 위판일 vs 약 1주 전. 어종별 전망(사장님·중매인).
-const TONE_COLOR: Record<AuctionTone, string> = { up: "#dc2626", down: "#2563eb", flat: "#64748b" };
+//   예전 4열 표는 휴대폰에서 좁아 어종별 카드로 바꿨다. 전망은 글자 알약(색은 보조).
+const FORECAST_TONE: Record<AuctionTone, Tone> = { up: "warn", down: "good", flat: "plain" };
+const kgFmt = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)}톤` : `${kg.toLocaleString()}kg`);
 export function AuctionForecastCard({ forecast }: { forecast: AuctionForecastView | null }) {
   if (!forecast || !forecast.items.length) return null;
-  const pct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "▲" : v < 0 ? "▼" : "—"}${Math.abs(v)}%`);
-  const wt = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)}톤` : `${kg.toLocaleString()}kg`);
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">📈 위판 물량·값 추세</span>
-        <span className="text-[0.7rem] text-foreground-muted">{forecast.date?.slice(5)} vs {forecast.prevDate?.slice(5)}(주간)</span>
-      </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-[0.7rem] text-foreground-muted">
-              <th className="pb-1.5 font-medium">어종</th>
-              <th className="pb-1.5 text-right font-medium">경락가</th>
-              <th className="pb-1.5 text-right font-medium">값·물량</th>
-              <th className="pb-1.5 text-right font-medium">전망</th>
-            </tr>
-          </thead>
-          <tbody>
-            {forecast.items.map((f) => (
-              <tr key={f.fish} className="border-t border-brand/10">
-                <td className="py-1.5 text-foreground">{f.fish}</td>
-                <td className="py-1.5 text-right font-semibold tabular-nums text-brand">{f.avgPricePerKg.toLocaleString()}<span className="text-[0.6rem] text-foreground-muted">/kg</span></td>
-                <td className="py-1.5 text-right text-[0.7rem] tabular-nums text-foreground-muted"><span style={{ color: TONE_COLOR[f.tone] }}>{pct(f.pricePct)}</span> · {pct(f.volPct)} {wt(f.totalKg)}</td>
-                <td className="py-1.5 text-right text-[0.7rem] font-semibold" style={{ color: TONE_COLOR[f.tone] }}>{f.label}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">해수부 위판 실적 주간 비교(태안 위판장). 물량↑값↓=지금 사입 유리 · 물량↓값↑=귀해짐. 위판 3~4일 후 반영.</p>
-    </div>
+    <Card labelledBy="aucfc-title">
+      <CardTitle id="aucfc-title" aside={<span className="text-[0.9rem] text-ti-muted">{forecast.date ? mdKo(forecast.date) : ""}과 {forecast.prevDate ? mdKo(forecast.prevDate) : "1주 전"} 비교</span>}>위판 물량·값 추세</CardTitle>
+      <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-2">
+        {forecast.items.map((f) => (
+          <li key={f.fish} className="rounded-[12px] bg-ti-sunk p-3.5">
+            <p className="flex flex-wrap items-center justify-between gap-2 font-bold text-ti-ink">{f.fish}<Pill tone={FORECAST_TONE[f.tone]}>{f.label}</Pill></p>
+            <p className="mt-1.5">
+              <span className="font-display text-[1.4rem] font-semibold tabular-nums text-ti-ink">{f.avgPricePerKg.toLocaleString()}</span>
+              <span className="ml-1 text-[0.9rem] text-ti-muted">원/kg</span>
+              <span className="ml-3 text-[0.9rem] text-ti-ink2">위판량 {kgFmt(f.totalKg)}</span>
+            </p>
+            <p className="mt-1 flex flex-wrap gap-x-4 text-[0.9rem]">
+              <Change label="값" v={f.pricePct} unit="%" />
+              <Change label="물량" v={f.volPct} unit="%" />
+            </p>
+          </li>
+        ))}
+      </ul>
+      <Source>해수부 위판 실적 주간 비교(태안 위판장). 물량이 늘고 값이 내리면 지금 사들이기 유리, 물량이 줄고 값이 오르면 귀해진 것. 위판 3~4일 뒤 반영.</Source>
+    </Card>
   );
 }
 
 // 태안 위판장 경매가(경락가) — 사장님이 산지 위판장에서 실제 받는 값. 소매가 카드와 짝(소비자 vs 산지).
+//   어종·값·물량 3열이라 표가 맞다(휴대폰에서도 들어감). caption·scope로 화면낭독기에 구조를 알린다.
 export function AuctionCard({ auction }: { auction: AuctionBoardView | null }) {
   if (!auction || !auction.fish.length) return null;
-  const wt = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)}톤` : `${kg.toLocaleString()}kg`);
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🎣 태안 위판장 경매가</span>
-        <span className="text-[0.7rem] text-foreground-muted">산지 경락가 · {auction.date ? auction.date.slice(5) : ""}</span>
-      </div>
-      <p className="mt-1 text-[0.7rem] text-foreground-muted">{auction.markets.join(" · ")}{auction.totalAmount > 0 ? ` · 당일 위판 ${Math.round(auction.totalAmount / 10000).toLocaleString()}만원` : ""}</p>
+    <Card labelledBy="auction-title">
+      <CardTitle id="auction-title" aside={<span className="text-[0.9rem] text-ti-muted">산지 경락가{auction.date ? ` · ${mdKo(auction.date)}` : ""}</span>}>태안 위판장 경매가</CardTitle>
+      <p className="mt-1 text-[0.95rem] text-ti-ink2">{auction.markets.join(" · ")}{auction.totalAmount > 0 ? ` · 당일 위판 ${Math.round(auction.totalAmount / 10000).toLocaleString()}만원` : ""}</p>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-[0.95rem]">
+          <caption className="sr-only">어종별 평균 경락가와 위판량</caption>
           <thead>
-            <tr className="text-left text-[0.7rem] text-foreground-muted">
-              <th className="pb-1.5 font-medium">어종</th>
-              <th className="pb-1.5 text-right font-medium">경락가</th>
-              <th className="pb-1.5 text-right font-medium">위판량</th>
+            <tr className="text-left text-[0.9rem] text-ti-muted">
+              <th scope="col" className="pb-2 font-semibold">어종</th>
+              <th scope="col" className="pb-2 text-right font-semibold">경락가</th>
+              <th scope="col" className="pb-2 text-right font-semibold">위판량</th>
             </tr>
           </thead>
           <tbody>
             {auction.fish.map((f) => (
-              <tr key={f.fish} className="border-t border-brand/10">
-                <td className="py-1.5 text-foreground">{f.fish}{f.status && f.status !== "없음" ? <span className="ml-1 text-[0.65rem] text-foreground-muted">{f.status}</span> : null}</td>
-                <td className="py-1.5 text-right font-bold tabular-nums text-brand">{f.avgPricePerKg.toLocaleString()}<span className="text-[0.65rem] font-medium text-foreground-muted">원/kg</span></td>
-                <td className="py-1.5 text-right tabular-nums text-foreground-muted">{wt(f.totalKg)}</td>
+              <tr key={f.fish} className="border-t border-ti-line">
+                <th scope="row" className="py-2 pr-2 text-left font-semibold text-ti-ink">
+                  {f.fish}{f.status && f.status !== "없음" ? <span className="ml-1.5 text-[0.85rem] font-normal text-ti-muted">{f.status}</span> : null}
+                </th>
+                <td className="whitespace-nowrap py-2 text-right tabular-nums">
+                  <b className="text-ti-ink">{f.avgPricePerKg.toLocaleString()}</b><span className="ml-0.5 text-[0.85rem] text-ti-muted">원/kg</span>
+                </td>
+                <td className="whitespace-nowrap py-2 text-right tabular-nums text-ti-ink2">{kgFmt(f.totalKg)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">해양수산부 위판장별 위탁판매 · 물량가중 평균 경락가. 서산·안면도수협 태안 위판장 · 위판 3~4일 후 반영.</p>
-    </div>
+      <Source>해양수산부 위판장별 위탁판매 · 물량가중 평균 경락가. 서산·안면도수협 태안 위판장 · 위판 3~4일 뒤 반영.</Source>
+    </Card>
   );
 }
 
@@ -783,45 +776,47 @@ export function BloomCard({ bloom }: { bloom: BloomBoardView | null }) {
 export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null }) {
   if (!seasonal || !seasonal.inSeason.length) return null;
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🗓️ 태안 제철 수산물</span>
-        <span className="text-[0.7rem] text-foreground-muted">{seasonal.month}월 제철</span>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <Card labelledBy="seasonal-title">
+      <CardTitle id="seasonal-title" aside={<Pill tone="plain">{seasonal.month}월 제철</Pill>}>태안 제철 수산물</CardTitle>
+      <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-3">
         {seasonal.inSeason.map((s) => (
-          <div key={s.name} className="rounded-xl bg-accent-subtle/20 p-3">
-            <p className="text-sm font-bold text-brand">{s.emoji} {s.name}</p>
-            <p className="mt-0.5 text-[0.7rem] text-foreground-muted">{s.note}</p>
+          <li key={s.name} className="rounded-[12px] bg-ti-sunk p-3.5">
+            <p className="font-bold text-ti-ink">{s.name}</p>
+            <p className="mt-1 text-[0.95rem] text-ti-ink2">{s.note}</p>
             {s.pricePerKg != null && (
-              <p className="mt-1 text-xs font-semibold tabular-nums text-brand">위판 {s.pricePerKg.toLocaleString()}<span className="text-[0.65rem] font-medium text-foreground-muted">원/kg</span></p>
+              <p className="mt-1.5 text-ti-ink2">
+                위판 <span className="font-display text-[1.25rem] font-semibold tabular-nums text-ti-ink">{s.pricePerKg.toLocaleString()}</span>
+                <span className="ml-0.5 text-[0.9rem] text-ti-muted">원/kg</span>
+              </p>
             )}
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
       {seasonal.upcoming.length > 0 && (
-        <p className="mt-3 text-xs text-foreground-muted">
-          <span className="font-semibold text-brand">다가오는 제철</span> {seasonal.upcoming.map((s) => <span key={s.name} className="mr-1.5 inline-block">{s.emoji}{s.name}</span>)}
-        </p>
+        <p className="mt-3 text-ti-ink2"><b className="text-ti-ink">다가오는 제철</b> {seasonal.upcoming.map((s) => s.name).join(" · ")}</p>
       )}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</p>
-    </div>
+      <Source>태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</Source>
+    </Card>
   );
 }
 
 // 양식 수온 경보(고수온·저수온) — 양식 어가용. 위험(관심+)일 때만 노출.
-const AQUA_COLOR: Record<AquaLevel, string> = { "경보": "#dc2626", "주의": "#f59e0b", "관심": "#eab308", "정상": "#64748b" };
+//   경보·주의는 굵은 테두리(빨강/주황) + 알약 글자로 — 색만으로 알리지 않는다.
+const AQUA_TONE: Record<AquaLevel, Tone> = { "경보": "bad", "주의": "warn", "관심": "warn", "정상": "plain" };
 export function AquaCard({ aqua }: { aqua: AquaBoardView | null }) {
   if (!aqua || aqua.level === "정상" || !aqua.label) return null;
+  const border = aqua.level === "경보" ? "border-2 border-[#B3261E]" : aqua.level === "주의" ? "border-2 border-[#9A5B00]" : "";
   return (
-    <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: AQUA_COLOR[aqua.level] + "66", background: AQUA_COLOR[aqua.level] + "10" }}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🦪 양식 {aqua.label}</span>
-        {aqua.waterTemp != null && <span className="text-[0.7rem] font-semibold" style={{ color: AQUA_COLOR[aqua.level] }}>수온 {aqua.waterTemp}℃</span>}
-      </div>
-      {aqua.note && <p className="mt-1.5 text-xs text-foreground-muted">{aqua.note}</p>}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">표층 수온 기준 조기경보(우럭·전복·굴 등). 양식장 실측 수온·용존산소는 현장 확인 필수.</p>
-    </div>
+    <Card labelledBy="aqua-title" className={border}>
+      <CardTitle id="aqua-title" aside={<Pill tone={AQUA_TONE[aqua.level]}>{aqua.level}</Pill>}>양식 {aqua.label}</CardTitle>
+      {aqua.waterTemp != null && (
+        <p className="mt-2 text-ti-ink2">
+          표층 수온 <span className="font-display text-[2rem] font-semibold tabular-nums text-ti-ink">{aqua.waterTemp}</span><span className="ml-0.5 text-ti-muted">℃</span>
+        </p>
+      )}
+      {aqua.note && <p className="mt-1.5 text-ti-ink">{aqua.note}</p>}
+      <Source>표층 수온 기준 조기경보(우럭·전복·굴 등). 양식장 실측 수온·용존산소는 현장 확인 필수.</Source>
+    </Card>
   );
 }
 
@@ -845,29 +840,32 @@ export function FireRiskCard({ fire }: { fire: FireBoardView | null }) {
 export function FarmCard({ farm }: { farm: FarmBoardView | null }) {
   if (!farm || (!farm.alerts.length && !farm.tasks.length)) return null;
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🌾 영농 정보 <span className="text-xs font-medium text-foreground-muted">{farm.month}월</span></span>
-      </div>
+    <Card labelledBy="farm-title">
+      <CardTitle id="farm-title" aside={<Pill tone="plain">{farm.month}월</Pill>}>영농 정보</CardTitle>
       {farm.alerts.length > 0 && (
-        <div className="mt-2 space-y-1">
+        <ul className="m-0 mt-3 grid list-none gap-2 p-0">
           {farm.alerts.map((a) => (
-            <p key={a.kind} className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-foreground dark:bg-amber-950/20">⚠️ {a.text}</p>
+            <li key={a.kind} className="flex flex-wrap items-center gap-2 rounded-[12px] border-2 border-[#9A5B00] bg-ti-surface px-3.5 py-2.5 text-ti-ink">
+              <Pill tone="warn">{a.kind} 주의</Pill>{a.text}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       {farm.tasks.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {farm.tasks.map((t, i) => (
-            <span key={i} className="inline-flex items-center gap-1 rounded-full border border-brand/15 bg-brand/5 px-2.5 py-1 text-xs">
-              <span>{t.emoji} {t.crop}</span>
-              <span className="font-semibold text-brand">{t.task}</span>
-            </span>
-          ))}
-        </div>
+        <>
+          <h4 className="mt-4 font-semibold text-ti-muted">이번 달 농사 적기</h4>
+          <ul className="m-0 mt-1.5 grid list-none gap-0 divide-y divide-ti-line p-0 md:grid-cols-2 md:gap-x-6 md:divide-y-0">
+            {farm.tasks.map((t, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 py-2">
+                <span className="font-semibold text-ti-ink">{t.crop}</span>
+                <Pill tone={t.task === "수확 적기" ? "ok" : "good"}>{t.task}</Pill>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">태안 주요작물 파종·수확 적기 + 기상 위험. 지역 농업기술센터 지침도 확인하세요.</p>
-    </div>
+      <Source>태안 주요작물 파종·수확 적기 + 기상 위험. 지역 농업기술센터 지침도 확인하세요.</Source>
+    </Card>
   );
 }
 
@@ -914,137 +912,137 @@ export function DustCard({ dust }: { dust: DustBoardView | null }) {
 }
 
 // 해무(바다안개) 예보 — 위험 있을 때만 표시(양호면 숨김). 통근·낚싯배·관광 안전.
-const FOG_STYLE: Record<FogGrade, { ring: string; badge: string; emoji: string }> = {
-  "짙은 해무": { ring: "border-red-300 bg-red-50 dark:bg-red-950/20", badge: "bg-red-500 text-background", emoji: "🌫️" },
-  "해무 가능": { ring: "border-amber-300 bg-amber-50 dark:bg-amber-950/20", badge: "bg-amber-500 text-background", emoji: "🌁" },
-  "옅은 안개": { ring: "border-brand/15 bg-background", badge: "bg-brand/60 text-background", emoji: "🌁" },
-  "양호": { ring: "border-brand/15 bg-background", badge: "bg-brand/50 text-background", emoji: "☀️" },
-};
+const FOG_TONE: Record<FogGrade, Tone> = { "짙은 해무": "bad", "해무 가능": "warn", "옅은 안개": "plain", "양호": "good" };
 export function FogCard({ fog }: { fog: FogBoardView | null }) {
   // 앞으로 3일 해무 위험이 없으면(전부 양호/옅음) 표시하지 않음 — 뜨면 곧 주의 신호.
   if (!fog || !fog.worst || fog.worst.score < 40) return null;
+  const red = fog.worst.grade === "짙은 해무";
   return (
-    <div className={`mt-4 rounded-2xl border p-4 ${FOG_STYLE[fog.worst.grade].ring}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">{FOG_STYLE[fog.worst.grade].emoji} 해무(바다안개) 주의</span>
-        <span className="text-[0.7rem] text-foreground-muted">가시거리·안전 · 새벽~오전</span>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+    <Card labelledBy="fog-title" className={red ? "border-2 border-[#B3261E]" : "border-2 border-[#9A5B00]"}>
+      <CardTitle id="fog-title" aside={<Pill tone={FOG_TONE[fog.worst.grade]}>{fog.worst.grade}</Pill>}>해무(바다안개) 주의</CardTitle>
+      <p className="mt-1 text-[0.95rem] text-ti-ink2">새벽~오전에 가시거리가 크게 줄 수 있습니다.</p>
+      <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-3">
         {fog.days.map((d) => (
-          <div key={d.date} className="rounded-lg bg-background/60 p-2 text-center">
-            <p className="text-[0.7rem] font-semibold text-brand">{fmtMd(d.date)}({d.weekday})</p>
-            <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[0.7rem] font-bold ${FOG_STYLE[d.grade].badge}`}>{d.grade}</span>
-            {d.reh != null && <p className="mt-0.5 text-[0.65rem] text-foreground-muted">습도 {d.reh}%</p>}
-          </div>
+          <li key={d.date} className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] bg-ti-sunk p-3.5 md:block">
+            <p className="font-bold text-ti-ink">{fmtMd(d.date)}({d.weekday})</p>
+            <p className="md:mt-1.5"><Pill tone={FOG_TONE[d.grade]}>{d.grade}</Pill></p>
+            {d.reh != null && <p className="w-full text-[0.9rem] text-ti-ink2 md:mt-1">습도 {d.reh}%</p>}
+          </li>
         ))}
-      </div>
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">습도·기온-수온차·풍속 종합 예측. 해무 시 도로·항해 가시거리 급감 — 서행·출항 확인 필수.</p>
-    </div>
+      </ul>
+      <Source>습도·기온과 수온의 차이·풍속을 종합한 예측. 해무 때는 도로·바다 가시거리가 급감하니 서행하고, 출항 여부를 꼭 확인하세요.</Source>
+    </Card>
   );
 }
 
 // 낙조(노을) 예보 — 태안 낙조 명소 "오늘 노을 예쁠까". 무료 유입·공유용.
-const SUNSET_STYLE: Record<SunsetGrade, { badge: string; emoji: string }> = {
-  "환상적": { badge: "bg-orange-500 text-background", emoji: "🌅" },
-  "좋음": { badge: "bg-amber-500 text-background", emoji: "🌇" },
-  "보통": { badge: "bg-brand/70 text-background", emoji: "🌤" },
-  "흐림": { badge: "bg-brand/40 text-background", emoji: "☁️" },
-  "기대난망": { badge: "bg-brand/30 text-background", emoji: "🌧" },
-};
+//   예전 주황 그라데이션 배경은 고대비에서 글자가 묻혀 ti 카드로. 등급은 글자 알약.
+const SUNSET_TONE: Record<SunsetGrade, Tone> = { "환상적": "good", "좋음": "ok", "보통": "plain", "흐림": "plain", "기대난망": "plain" };
 export function SunsetCard({ sunset }: { sunset: SunsetBoardView | null }) {
   if (!sunset || !sunset.days.length) return null;
   const today = sunset.days[0];
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-orange-200/50 bg-gradient-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-400/20 dark:from-orange-950/30 dark:to-amber-950/20">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">{SUNSET_STYLE[today.grade].emoji} 오늘의 낙조</span>
-        <span className="text-[0.7rem] text-foreground-muted">{sunset.spots.join(" · ")}</span>
+    <Card labelledBy="sunset-title">
+      <CardTitle id="sunset-title" aside={<Pill tone={SUNSET_TONE[today.grade]}>오늘 {today.grade}</Pill>}>낙조 예보</CardTitle>
+      <p className="mt-1 text-[0.95rem] text-ti-ink2">명소: {sunset.spots.join(" · ")}</p>
+      <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-2">
+        <p className="text-ti-ink2">
+          <span className="block font-semibold text-ti-muted">오늘 노을 점수</span>
+          <span className="font-display text-[2.6rem] font-semibold leading-none tabular-nums text-ti-ink">{today.score}</span>
+          <span className="ml-1 text-ti-muted">/ 100</span>
+        </p>
+        {today.sunset && (
+          <p className="text-ti-ink2">
+            <span className="block font-semibold text-ti-muted">해 지는 시각</span>
+            <span className="font-display text-[2.6rem] font-semibold leading-none tabular-nums text-ti-ink">{today.sunset}</span>
+          </p>
+        )}
       </div>
-      <div className="mt-2 flex items-end justify-between gap-4">
-        <div>
-          <span className={`inline-block rounded-full px-3 py-0.5 text-sm font-bold ${SUNSET_STYLE[today.grade].badge}`}>{today.grade}</span>
-          <p className="mt-1.5 text-xs text-foreground-muted">{today.reasons.join(" · ")}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-2xl font-extrabold leading-none text-brand">{today.score}<span className="text-sm font-bold text-foreground-muted">/100</span></p>
-          {today.sunset && <p className="mt-1 text-xs text-foreground-muted">일몰 {today.sunset}</p>}
-        </div>
-      </div>
+      {today.reasons.length > 0 && <p className="mt-2 text-ti-ink2">{today.reasons.join(" · ")}</p>}
       {sunset.days.length > 1 && (
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-3">
           {sunset.days.map((d) => (
-            <div key={d.date} className="rounded-lg bg-background/60 p-2 text-center">
-              <p className="text-[0.7rem] font-semibold text-brand">{fmtMd(d.date)}({d.weekday})</p>
-              <p className="mt-0.5 text-sm font-bold text-brand">{SUNSET_STYLE[d.grade].emoji} {d.grade}</p>
-              <p className="text-[0.65rem] text-foreground-muted">일몰 {d.sunset}</p>
-            </div>
+            <li key={d.date} className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] bg-ti-sunk p-3.5 md:block">
+              <p className="font-bold text-ti-ink">{fmtMd(d.date)}({d.weekday})</p>
+              <p className="md:mt-1.5"><Pill tone={SUNSET_TONE[d.grade]}>{d.grade}</Pill></p>
+              {d.sunset && <p className="w-full text-[0.95rem] text-ti-ink2 md:mt-1">일몰 <b className="tabular-nums text-ti-ink">{d.sunset}</b></p>}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">하늘상태·습도·미세먼지·일몰시각 종합. 구름 적당·청명할수록 노을이 붉게 물듭니다.</p>
-    </div>
+      <Source>하늘상태·습도·미세먼지·일몰시각 종합. 구름이 적당하고 공기가 맑을수록 노을이 붉게 물듭니다.</Source>
+    </Card>
   );
 }
 
-const fmtMd = (iso: string) => { const [, m, d] = iso.split("-"); return `${Number(m)}/${Number(d)}`; };
+// 'YYYY-MM-DD' → '10월 3일' (빗금 날짜는 어르신들이 월/일을 헷갈려 글로 쓴다)
+const fmtMd = (iso: string) => { const [, m, d] = iso.split("-"); return `${Number(m)}월 ${Number(d)}일`; };
+// 'YYYY-MM-DD…' → '10월 3일' — 시세 카드 기준일
+const mdKo = (iso: string) => (iso.length >= 10 ? fmtMd(iso.slice(0, 10)) : iso);
 
 export function OilCard({ oil }: { oil: OilPrices | null }) {
   if (!oil || (!oil.gasoline && !oil.diesel)) return null;
-  const rows: Array<{ label: string; emoji: string; v: NonNullable<OilPrices["gasoline"]> }> = [];
-  if (oil.gasoline) rows.push({ label: "휘발유", emoji: "⛽", v: oil.gasoline });
-  if (oil.diesel) rows.push({ label: "경유", emoji: "🛢", v: oil.diesel });
+  const rows: Array<{ label: string; v: NonNullable<OilPrices["gasoline"]> }> = [];
+  if (oil.gasoline) rows.push({ label: "휘발유", v: oil.gasoline });
+  if (oil.diesel) rows.push({ label: "경유", v: oil.diesel });
   return (
-    <div className="mt-4 card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">충남 주유 평균가</span>
-        <span className="text-[0.7rem] text-foreground-muted">오피넷 · ℓ당</span>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3">
+    <Card labelledBy="oil-title">
+      <CardTitle id="oil-title" aside={<span className="text-[0.9rem] text-ti-muted">1리터당</span>}>충남 주유 평균가</CardTitle>
+      <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-2">
         {rows.map((r) => {
-          const dod = r.v.diffDay, vsNat = r.v.vsNational;
+          const vsNat = r.v.vsNational;
           return (
-            <div key={r.label} className="rounded-xl bg-brand/5 p-4">
-              <p className="text-xs text-foreground-muted">{r.emoji} {r.label}</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-brand">{r.v.chungnam.toLocaleString()}<span className="text-sm font-medium">원</span></p>
-              <div className="mt-1 flex flex-wrap gap-x-3 text-[0.7rem]">
-                <span style={{ color: dod > 0 ? "#dc2626" : dod < 0 ? "#16a34a" : "#64748b" }}>
-                  전일 {dod > 0 ? "▲" : dod < 0 ? "▼" : "—"}{Math.abs(dod)}
-                </span>
-                <span className="text-foreground-muted">
-                  전국대비 {vsNat > 0 ? `+${vsNat}` : vsNat}
-                </span>
-              </div>
-            </div>
+            <li key={r.label} className="rounded-[12px] bg-ti-sunk px-4 py-3.5">
+              <p className="font-semibold text-ti-ink2">{r.label}</p>
+              <p className="mt-1">
+                <span className="font-display text-[2rem] font-semibold leading-none tabular-nums text-ti-ink">{r.v.chungnam.toLocaleString()}</span>
+                <span className="ml-1 text-ti-muted">원</span>
+              </p>
+              <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[0.9rem]">
+                <Change label="어제보다" v={r.v.diffDay} unit="원" />
+                <span className="text-ti-ink2">전국 평균보다 <b className="tabular-nums text-ti-ink">{vsNat > 0 ? `${vsNat}원 비쌈` : vsNat < 0 ? `${Math.abs(vsNat)}원 쌈` : "같음"}</b></span>
+              </p>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ul>
+      <Source>오피넷(한국석유공사)</Source>
+    </Card>
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+// 만원 → 큰 숫자 + 단위 따로("2.1" + "억" / "8,500" + "만원") — 숫자는 크게, 단위는 옆에 작게.
+function wonParts(n: number): { v: string; u: string } {
+  if (!n) return { v: "—", u: "" };
+  return n >= 10000 ? { v: (n / 10000).toFixed(1), u: "억" } : { v: n.toLocaleString(), u: "만원" };
+}
+function Stat({ label, value }: { label: string; value: number }) {
+  const p = wonParts(value);
   return (
-    <div className={`rounded-xl px-3 py-2.5 ${accent ? "bg-accent-subtle/40" : "bg-brand/5"}`}>
-      <p className="text-xs text-foreground-muted">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold tabular-nums ${accent ? "text-accent" : "text-brand"}`}>{value}</p>
+    <div className="flex items-baseline justify-between gap-3 rounded-[12px] bg-ti-sunk px-4 py-3 md:block">
+      <dt className="font-semibold text-ti-ink2">{label}</dt>
+      <dd className="m-0 md:mt-1">
+        <span className="font-display text-[1.6rem] font-semibold leading-none tabular-nums text-ti-ink">{p.v}</span>
+        {p.u && <span className="ml-0.5 text-[0.95rem] text-ti-muted">{p.u}</span>}
+      </dd>
     </div>
   );
 }
 
-// 최저~최고 가격대에서 평균 위치를 표시하는 막대
+// 최저~최고 가격대에서 평균 위치를 표시하는 막대 — 막대는 장식, 같은 내용을 아래 글로 적는다.
 function RangeBar({ min, avg, max }: { min: number; avg: number; max: number }) {
   if (!max || max <= min) return null;
   const pct = Math.max(0, Math.min(100, ((avg - min) / (max - min)) * 100));
   return (
     <div className="mt-4">
-      <div className="relative h-2 rounded-full bg-gradient-to-r from-brand/20 via-accent/30 to-accent/60">
-        <span className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow" style={{ left: `${pct}%` }} title={`평균 ${wonFmt(avg)}`} />
+      <div className="relative h-2.5 rounded-full bg-ti-sunk" aria-hidden="true">
+        <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ti-surface bg-ti-petrol" style={{ left: `${pct}%` }} />
       </div>
-      <div className="mt-1 flex justify-between text-[0.7rem] tabular-nums text-foreground-muted">
-        <span>{wonFmt(min)}</span>
-        <span>평균 {wonFmt(avg)}</span>
-        <span>{wonFmt(max)}</span>
-      </div>
+      <p className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-[0.9rem] tabular-nums text-ti-ink2">
+        <span>최저 {wonFmt(min)}</span>
+        <span className="font-semibold text-ti-ink">평균 {wonFmt(avg)}</span>
+        <span>최고 {wonFmt(max)}</span>
+      </p>
     </div>
   );
 }
@@ -1053,22 +1051,23 @@ function AptTable({ items }: { items: AptItem[] }) {
   if (!items.length) return null;
   return (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full text-left text-xs">
+      <table className="w-full min-w-[22rem] text-left text-[0.9rem]">
+        <caption className="sr-only">아파트 최근 실거래 목록</caption>
         <thead>
-          <tr className="border-b border-brand/10 text-foreground-muted">
-            <th className="py-1.5 pr-2 font-medium">날짜</th>
-            <th className="py-1.5 pr-2 font-medium">단지</th>
-            <th className="py-1.5 pr-2 text-right font-medium">전용</th>
-            <th className="py-1.5 text-right font-medium">거래가</th>
+          <tr className="border-b border-ti-line text-ti-muted">
+            <th scope="col" className="py-2 pr-2 font-semibold">날짜</th>
+            <th scope="col" className="py-2 pr-2 font-semibold">단지</th>
+            <th scope="col" className="py-2 pr-2 text-right font-semibold">전용</th>
+            <th scope="col" className="py-2 text-right font-semibold">거래가</th>
           </tr>
         </thead>
         <tbody>
           {items.map((a, i) => (
-            <tr key={i} className="border-b border-brand/5">
-              <td className="py-1.5 pr-2 tabular-nums text-foreground-muted">{md(a.ymd)}</td>
-              <td className="py-1.5 pr-2 text-foreground">{a.dong} {a.name}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums text-foreground-muted">{a.area}㎡</td>
-              <td className="py-1.5 text-right font-semibold tabular-nums text-brand">{a.amount}</td>
+            <tr key={i} className="border-b border-ti-line">
+              <td className="whitespace-nowrap py-2 pr-2 tabular-nums text-ti-ink2">{md(a.ymd)}</td>
+              <td className="py-2 pr-2 text-ti-ink">{a.dong} {a.name}</td>
+              <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums text-ti-ink2">{a.area}㎡</td>
+              <td className="whitespace-nowrap py-2 text-right font-semibold tabular-nums text-ti-ink">{a.amount}</td>
             </tr>
           ))}
         </tbody>
@@ -1081,24 +1080,25 @@ function LandTable({ items }: { items: LandItem[] }) {
   if (!items.length) return null;
   return (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full text-left text-xs">
+      <table className="w-full min-w-[26rem] text-left text-[0.9rem]">
+        <caption className="sr-only">토지 최근 실거래 목록</caption>
         <thead>
-          <tr className="border-b border-brand/10 text-foreground-muted">
-            <th className="py-1.5 pr-2 font-medium">날짜</th>
-            <th className="py-1.5 pr-2 font-medium">소재지</th>
-            <th className="py-1.5 pr-2 font-medium">지목</th>
-            <th className="py-1.5 pr-2 text-right font-medium">면적</th>
-            <th className="py-1.5 text-right font-medium">거래가</th>
+          <tr className="border-b border-ti-line text-ti-muted">
+            <th scope="col" className="py-2 pr-2 font-semibold">날짜</th>
+            <th scope="col" className="py-2 pr-2 font-semibold">소재지</th>
+            <th scope="col" className="py-2 pr-2 font-semibold">지목</th>
+            <th scope="col" className="py-2 pr-2 text-right font-semibold">면적</th>
+            <th scope="col" className="py-2 text-right font-semibold">거래가</th>
           </tr>
         </thead>
         <tbody>
           {items.map((l, i) => (
-            <tr key={i} className="border-b border-brand/5">
-              <td className="py-1.5 pr-2 tabular-nums text-foreground-muted">{md(l.ymd)}</td>
-              <td className="py-1.5 pr-2 text-foreground">{l.dong}</td>
-              <td className="py-1.5 pr-2 text-foreground-muted">{l.jimok || "토지"}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums text-foreground-muted">{l.area}㎡</td>
-              <td className="py-1.5 text-right font-semibold tabular-nums text-brand">{l.amount}</td>
+            <tr key={i} className="border-b border-ti-line">
+              <td className="whitespace-nowrap py-2 pr-2 tabular-nums text-ti-ink2">{md(l.ymd)}</td>
+              <td className="py-2 pr-2 text-ti-ink">{l.dong}</td>
+              <td className="py-2 pr-2 text-ti-ink2">{l.jimok || "토지"}</td>
+              <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums text-ti-ink2">{l.area}㎡</td>
+              <td className="whitespace-nowrap py-2 text-right font-semibold tabular-nums text-ti-ink">{l.amount}</td>
             </tr>
           ))}
         </tbody>
@@ -1142,79 +1142,74 @@ export function FerryCard({ ferry }: { ferry: FerryView | null }) {
   const bad = ferry.sailings.filter((s) => s.state === "disrupted");
   const tt = ferry.timetable;
   return (
-    <div className={`mt-4 rounded-2xl border p-4 ${bad.length ? "border-red-300 bg-red-50" : "border-brand/15 bg-background"}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">⛴ 가의도 뱃길 — {ferry.route}</span>
-        {bad.length > 0 && (
-          <span className="rounded-full bg-red-500 px-2 py-0.5 text-[0.7rem] font-bold text-background">{bad.length}편 결항·통제</span>
-        )}
-      </div>
+    <Card labelledBy="ferry-title" className={bad.length ? "border-2 border-[#B3261E]" : ""}>
+      <CardTitle id="ferry-title" aside={bad.length > 0 ? <Pill tone="bad">{bad.length}편 결항·통제</Pill> : undefined}>가의도 뱃길 — {ferry.route}</CardTitle>
 
       {/* ① 다음 배 — 이 카드에서 가장 자주 찾는 정보라 제일 크게. */}
       {ferry.next && (
-        <div className="mt-3 flex items-baseline gap-2 rounded-xl bg-accent-subtle/25 px-4 py-3">
-          <span className="text-xs font-semibold text-accent-ink">다음 배</span>
-          <span className="text-2xl font-extrabold tabular-nums text-brand">{ferry.next.time}</span>
-          <span className="text-sm font-semibold text-foreground-muted">{ferry.next.when} · 안흥 출발</span>
-        </div>
+        <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[14px] bg-ti-petrol-soft px-4 py-3.5 text-ti-ink">
+          <span className="font-bold text-ti-petrol-ink">다음 배</span>
+          <span className="font-display text-[2.4rem] font-semibold leading-none tabular-nums">{ferry.next.time}</span>
+          <span className="font-semibold text-ti-ink2">{ferry.next.when} · 안흥 출발</span>
+        </p>
       )}
 
       {/* ② 정기 시간표 — 결항일·밤에도 항상 제공. 군청 표의 '도착시간'은 실은 가의도發 출항시각이라 방향별로 표기. */}
       {tt && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-lg border border-brand/10 bg-background/60 p-3">
-            <p className="text-[0.7rem] font-bold text-accent-ink">안흥 → 가의도</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-brand">{tt.out.join(" · ")}</p>
+        <dl className="m-0 mt-3 grid gap-2.5 md:grid-cols-2">
+          <div className="rounded-[12px] bg-ti-sunk p-3.5">
+            <dt className="font-bold text-ti-ink2">안흥 → 가의도</dt>
+            <dd className="m-0 mt-1 text-[1.15rem] font-semibold tabular-nums text-ti-ink">{tt.out.join(" · ")}</dd>
           </div>
-          <div className="rounded-lg border border-brand/10 bg-background/60 p-3">
-            <p className="text-[0.7rem] font-bold text-accent-ink">가의도 → 안흥</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-brand">{tt.back.join(" · ")}</p>
+          <div className="rounded-[12px] bg-ti-sunk p-3.5">
+            <dt className="font-bold text-ti-ink2">가의도 → 안흥</dt>
+            <dd className="m-0 mt-1 text-[1.15rem] font-semibold tabular-nums text-ti-ink">{tt.back.join(" · ")}</dd>
           </div>
-        </div>
+        </dl>
       )}
-      <p className="mt-2 text-[0.7rem] text-foreground-muted">
-        {ferry.season && <>{ferry.season}({ferry.season === "하계" ? "4~9월" : "10~3월"}) 시간표 · </>}1일 3회
-        {ferry.distanceKm ? ` · 약 ${ferry.distanceKm}km` : ""} · 기상에 따라 변동
+      <p className="mt-2.5 text-[0.9rem] text-ti-ink2">
+        {ferry.season && <>{ferry.season}({ferry.season === "하계" ? "4~9월" : "10~3월"}) 시간표 · </>}하루 3회
+        {ferry.distanceKm ? ` · 약 ${ferry.distanceKm}km` : ""} · 날씨에 따라 바뀔 수 있음
       </p>
       {/* 관광 유람선(옹도 등)은 여객선과 다른 제도(유선사업법)라 운항상태 API에 잡히지 않고, 군청에도 공식
           시간표가 없다. 검증 못 한 시간표·연락처를 실으면 헛걸음을 만들므로 '존재와 출발지'만 알린다. */}
-      <p className="mt-1 text-[0.7rem] text-foreground-muted">
-        ※ 옹도 등 <strong className="font-semibold text-brand">관광 유람선</strong>은 안흥외항에서 별도 운항합니다(21세기유람선·안흥유람선). 위 시간표는 정기 여객선 기준입니다.
+      <p className="mt-1 text-[0.9rem] text-ti-ink2">
+        ※ 옹도 등 <b className="text-ti-ink">관광 유람선</b>은 안흥외항에서 따로 운항합니다(21세기유람선·안흥유람선). 위 시간표는 정기 여객선 기준입니다.
       </p>
 
       {/* ③ 오늘 운항 현황 — 실제 API 상태. 없는 날(밤·장애)엔 접어두지 않고 조용히 생략. */}
       {ferry.sailings.length > 0 && (
         <>
-          <p className="mt-4 text-xs font-bold text-brand">오늘 운항 현황</p>
-          <ul className="mt-1.5 space-y-1.5">
+          <h4 className="mt-4 font-semibold text-ti-muted">오늘 운항 현황</h4>
+          <ul className="m-0 mt-1 grid list-none gap-0 divide-y divide-ti-line p-0">
             {ferry.sailings.map((s, i) => (
-              <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-                <span className="w-12 shrink-0 font-bold tabular-nums text-brand">{s.time}</span>
-                <span className="text-foreground-muted">{s.route}</span>
-                {/* 결항만 붉게. '모름'은 정상으로 위장하지 않고 회색+물음표로 둔다(단정 회피). */}
-                <span className={`ml-auto rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${
-                  s.state === "disrupted" ? "bg-red-500 text-background"
-                  : s.state === "unknown" ? "bg-foreground-muted/15 text-foreground-muted"
-                  : "bg-brand/8 text-brand"}`}>{s.status}{s.state === "unknown" ? " ?" : ""}</span>
-                {s.reason && <span className="w-full text-[0.7rem] text-red-700">사유: {s.reason}</span>}
+              <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+                <span className="w-14 shrink-0 font-bold tabular-nums text-ti-ink">{s.time}</span>
+                <span className="min-w-0 flex-1 text-ti-ink2">{s.route}</span>
+                {/* 결항만 붉게. '모름'은 정상으로 위장하지 않고 '확인 필요'로 둔다(단정 회피). */}
+                <Pill tone={s.state === "disrupted" ? "bad" : s.state === "unknown" ? "plain" : "ok"}>{s.status}{s.state === "unknown" ? " · 확인 필요" : ""}</Pill>
+                {s.reason && <span className="w-full text-[0.9rem] font-semibold text-[#8A1C14]">사유: {s.reason}</span>}
               </li>
             ))}
           </ul>
         </>
       )}
 
-      {/* ④ 연락처 — 섬 가는 사람에겐 결항 확인·문의처가 필수. 전화는 바로 걸리게. */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-brand/10 pt-3 text-[0.7rem] text-foreground-muted">
+      {/* ④ 연락처 — 섬 가는 사람에겐 결항 확인·문의처가 필수. 전화는 바로 걸리게(누르기 쉽게 44px). */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-ti-line pt-3 text-[0.9rem] text-ti-ink2">
         {ferry.operator && (
-          <span>
-            문의 {ferry.operator.name} <a href={`tel:${ferry.operator.phone.replace(/-/g, "")}`} className="font-bold text-accent hover:underline">{ferry.operator.phone}</a>
+          <span className="inline-flex flex-wrap items-center gap-x-2">
+            문의 {ferry.operator.name}
+            <a href={`tel:${ferry.operator.phone.replace(/-/g, "")}`} className="inline-flex min-h-11 items-center text-[1.05rem] font-bold text-ti-petrol-ink underline underline-offset-4">
+              {ferry.operator.phone}
+            </a>
           </span>
         )}
-        <span>
+        <span className="text-ti-muted">
           한국해양교통안전공단·태안군
-          {ferry.updatedAt ? ` · 기준 ${new Date(ferry.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}` : ""}
+          {ferry.updatedAt ? ` · ${new Date(ferry.updatedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })} 기준` : ""}
         </span>
       </div>
-    </div>
+    </Card>
   );
 }
