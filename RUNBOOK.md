@@ -72,6 +72,11 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-10-10 · **홈 오른쪽 날씨 두 칸 + /data 데이터 출처 접기** · `web/src/components/home/weather-cards.tsx`·`web/src/app/data/page.tsx`·`backend/src/env/tenday.ts`
+  홈 1면 오른쪽이 머리기사보다 한참 짧아 화면 절반이 비어 있었다(사용자 지적). '오늘의 바다' 아래에 **미세먼지·자외선**과 **10일 예보** 칸을 붙였다. `/data`의 '우리가 쓰는 데이터 출처'(소스 26개 카드)는 `<details>`로 감싸 **기본 닫힘** — 제목 줄 오른쪽에 "소스 26개 · 운영 중 25개 · 펼치기" 칩. JS 없이 열리고 닫혀 있어도 내용이 DOM에 남아 검색·인쇄에 잡힌다.
+  **10일 예보** = 단기예보 getVilageFcst(오늘~+3일) + 중기예보 getMidLandFcst/getMidTa(+3~+10일)를 이어 붙인 `GET /api/conditions/tenday`(30분 캐시). ⚠ 겹치는 날은 단기가 이기되 **칸 단위로** 이긴다 — 단기 끝자락(+4일쯤)은 하늘·강수만 오고 기온이 비어, 통째로 덮으면 중기 기온까지 날아간다(10.14가 실제로 빈칸이었다).
+  ⚠ **미세먼지는 metrics 스냅샷을 쓰지 않는다.** `/api/conditions/taean`(실측)에서 직접 받는다 — 30분 크론이 만드는 `metrics_snapshot`은 대기질만 자주 비기 때문. 자외선도 같은 응답에 실었다(3시간 캐시). 실측이 비면 **오늘 예보 등급**으로 떨어지고 '예보'라고 적는다. 'PM10/PM2.5' 코드 금지는 그대로.
+  ⚠ **미해결 — metrics 스냅샷의 대기질 공백.** 10-10 조사: 08:30 크론 스냅샷은 기온·자외선·바다·수요지수까지 다 찼는데 `environment.live.pm10`만 null, 같은 호출이 요청 경로에서는 정상(65). 크론은 외부 API 20여 개를 한꺼번에 띄우는데 에어코리아가 가장 느려 8초 타임아웃에 걸리는 것으로 **추정**. `fetchAir`를 12초·2회 시도로 늘리고 실패 이유를 `[air]`로 남겼다 — 다음 크론 로그에서 확인할 것(`npx wrangler tail --format json`, scheduled 이벤트만 골라 본다).
 - 2026-10-03 · **해변·지역경제·인물·뉴스아카이브 리디자인 + 글꼴 Pretendard 통일** · `web/src/app/{beaches,data,people,news,archive}`·`components/editorial.tsx`·`page-header.tsx`·`report-charts.tsx`·`kg-graph.tsx`
   홈·지금 태안과 같은 체계로 네 메뉴 전부(공용 조각은 editorial.tsx, 공용 머리·카드·버튼 클래스도 ti 토큰). 제목 명조(Noto Serif KR)·숫자 Fraunces는 "촌스럽다"는 의견으로 빼고 **Pretendard 하나**(제목 800·자간 -0.025em, 숫자 tabular-nums) — 구글 글꼴 두 벌을 더는 받지 않는다. 클래스 이름은 `font-head`. 인물 관계망: 글 목록 대체·휠은 Ctrl/⌘일 때만 확대(쪽 스크롤 갇힘 해소)·함께 나온 인물 단추가 window.open을 부르던 버그 수정.
   배포 2026-10-03 production 버전 `98151a1d-5190-4568-af5b-dc88a6fdfdbb`(직전 31f4a566), 스모크 12경로 200.
