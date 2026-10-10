@@ -425,6 +425,41 @@ export async function getDust(): Promise<DustBoardView | null> {
     return d.available ? d : null;
   } catch { return null; }
 }
+// 지금 태안 실황 — 기온·하늘·미세먼지(측정소 실측)·자외선. /api/conditions/taean
+//   ⚠ metrics 스냅샷(environment.live)과 같은 값이지만 **이쪽을 쓴다**: 30분 크론 스냅샷은 외부 API
+//     팬아웃에 밀려 대기질이 비는 일이 잦다(2026-10-10 확인). 이 경로는 요청 때 직접 받아 비지 않는다.
+export interface LiveConditionsView {
+  available: boolean;
+  observedAt: string | null;
+  weather: { temp: number | null; humidity: number | null; sky: string | null; pty: string | null };
+  air: { pm10: number | null; pm25: number | null; o3: number | null; khaiGrade: number | null; grade: string | null; station: string | null };
+  uv: { todayMax: number | null; level: string; peakHour: string | null } | null;
+}
+export async function getLiveConditions(): Promise<LiveConditionsView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/taean`, { next: { revalidate: 900 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as LiveConditionsView;
+    return d.available ? d : null;
+  } catch { return null; }
+}
+
+// 10일 예보 — 단기(오늘~+3일) + 중기(+3~+10일). /api/conditions/tenday
+export interface TenDayItemView {
+  date: string; label: string; weekday: string;
+  sky: string | null; pop: number | null; tmin: number | null; tmax: number | null;
+  source: "short" | "mid";
+}
+export interface TenDayView { available: boolean; days: TenDayItemView[]; baseDate: string | null }
+export async function getTenDay(): Promise<TenDayView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/conditions/tenday`, { next: { revalidate: 1800 } });
+    if (!res.ok) return null;
+    const d = (await res.json()) as TenDayView;
+    return d.available && d.days.length ? d : null;
+  } catch { return null; }
+}
+
 export async function getMudflat(): Promise<MudflatBoardView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/mudflat`, { next: { revalidate: 3600 } });

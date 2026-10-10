@@ -11,13 +11,15 @@ import Link from "next/link";
 
 import { BriefingCard } from "@/components/home/briefing-card";
 import { SeaPanel } from "@/components/home/sea-panel";
+import { AirUvCard, TenDayCard } from "@/components/home/weather-cards";
 import { getArchiveStats, type ArchiveStats } from "@/lib/api/archive";
 import { getFeaturedPersons, getKgStatus } from "@/lib/api/kg-public";
 import type { PersonSearchResult } from "@/lib/api/kg";
 import { getNews, type NewsItem } from "@/lib/api/news";
 import {
-  fetchOnThisDay, fetchReportMetrics, getAuctionForecast, getFog, getTodayBrief, getWeekendDemand,
-  type AuctionForecastView, type DemandForecast, type FogBoardView, type OnThisDayItem, type ReportMetrics, type TodayBriefView,
+  fetchOnThisDay, fetchReportMetrics, getAuctionForecast, getDust, getFog, getLiveConditions, getTenDay, getTodayBrief, getWeekendDemand,
+  type AuctionForecastView, type DemandForecast, type DustBoardView, type FogBoardView, type LiveConditionsView,
+  type OnThisDayItem, type ReportMetrics, type TenDayView, type TodayBriefView,
 } from "@/lib/api/reports";
 
 /** 실패해도 홈 전체가 죽지 않게 — 각 요청은 따로 받고 실패는 null. */
@@ -52,6 +54,9 @@ export function GenericHome() {
   const brief = useLoad<TodayBriefView | null>(getTodayBrief);
   const metrics = useLoad<ReportMetrics | null>(fetchReportMetrics);
   const fog = useLoad<FogBoardView | null>(getFog);
+  const live = useLoad<LiveConditionsView | null>(getLiveConditions);
+  const dust = useLoad<DustBoardView | null>(getDust);
+  const ten = useLoad<TenDayView | null>(getTenDay);
   const demand = useLoad<DemandForecast | null>(getWeekendDemand);
   const auction = useLoad<AuctionForecastView | null>(getAuctionForecast);
   const stats = useLoad<ArchiveStats>(getArchiveStats);
@@ -103,7 +108,12 @@ export function GenericHome() {
           {brief.data && <BriefingCard brief={brief.data} />}
         </article>
 
-        <SeaPanel metrics={metrics.data} fog={fog.data} loaded={metrics.loaded} />
+        {/* 오른쪽 열 — 오늘의 바다 + 미세먼지·자외선 + 10일 예보. 값이 없는 카드는 스스로 사라진다. */}
+        <div className="flex flex-col gap-5 self-start">
+          <SeaPanel metrics={metrics.data} fog={fog.data} loaded={metrics.loaded} />
+          <AirUvCard live={live.data} dust={dust.data} />
+          <TenDayCard ten={ten.data} />
+        </div>
       </div>
 
       {/* ── 이번 주 태안 ── */}

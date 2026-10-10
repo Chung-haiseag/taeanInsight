@@ -66,8 +66,15 @@ envRouter.get("/taean", async (c) => {
   if (!data.available) {
     return c.json({ available: false, message: "DATA_GO_KR_KEY 미설정 — 공공데이터포털 인증키를 Worker 시크릿으로 등록하세요" }, 200);
   }
-  return c.json(data);
+  // 자외선지수도 '지금 태안'이다 — 홈 미세먼지·자외선 카드가 한 번에 받도록 같이 싣는다(3시간 캐시).
+  const { fetchUV } = await import("./living");
+  const uv = await fetchUV(c.env).catch(() => null);
+  return c.json({ ...data, uv });
 });
+
+// 10일 예보 — 단기예보(오늘~+3일) + 중기예보(+3~+10일)를 이어 붙인 열흘치. 홈 오른쪽 카드.
+envRouter.get("/tenday", (c) =>
+  edgeCached(c, "tenday", 30 * 60_000, () => import("./tenday").then((m) => m.loadTenDay(c.env))));
 
 // 해변 해양기상(파고·수온·조석) — 태안 대표 해수욕장
 envRouter.get("/marine", async (c) => {

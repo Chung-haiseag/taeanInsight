@@ -1,6 +1,7 @@
 "use client";
 
-// 홈 1면 오른쪽 '오늘의 바다' — 조위 곡선 + 만조·간조 시각 + 수온·파고·해무·미세먼지.
+// 홈 1면 오른쪽 '오늘의 바다' — 조위 곡선 + 만조·간조 시각 + 수온·파고·해무.
+//   ⚠ 미세먼지는 2026-10-10에 아래 'AirUvCard'로 옮겼다(실측 경로가 달라 값이 더 잘 찬다).
 //   값은 전부 실측·예보(/api/reports/metrics 의 marine·environment, /api/conditions/fog). 없으면 그 칸만 비운다.
 
 import { useEffect, useState } from "react";
@@ -126,15 +127,6 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
               <dt className="text-[0.88rem] text-ti-on-navy-muted">해무</dt>
               <dd className="m-0 font-semibold">
                 오늘 <Pill tone={fogToday.grade === "양호" ? "ok" : "warn"}>{fogToday.grade}</Pill>
-              </dd>
-            </div>
-          )}
-          {live?.pm10 != null && (
-            <div className="border-t border-white/15 pt-2">
-              <dt className="text-[0.88rem] text-ti-on-navy-muted">미세먼지</dt>
-              <dd className="m-0 font-semibold">
-                <span className="mr-0.5 font-display text-[1.3rem] tabular-nums">{live.pm10}</span>㎍/㎥
-                {live.grade && <Pill tone={live.grade === "좋음" ? "ok" : live.grade === "보통" ? "plain" : "warn"}>{live.grade}</Pill>}
               </dd>
             </div>
           )}
