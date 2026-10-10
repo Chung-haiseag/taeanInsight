@@ -102,14 +102,30 @@ export default async function DataMapPage() {
         <IndustryStructure />
       </section>
 
-      {/* 데이터 지도 — 우리가 쓰는 전체 데이터 출처(투명성·신뢰) */}
+      {/* 데이터 지도 — 우리가 쓰는 전체 데이터 출처(투명성·신뢰).
+          2026-10-10 사용자 결정: **기본 닫힘**. 이 페이지의 본문은 지역경제 수치이고 출처 목록(26개 카드)은
+          "궁금하면 펼쳐 보는" 근거 자료다 — 펼친 채로 두면 본문보다 길어 스크롤을 잡아먹는다.
+          ⚠ <details>를 쓴 이유: 자바스크립트 없이 열리고(서버 컴포넌트 그대로), 닫혀 있어도 내용이 DOM에
+          남아 검색·인쇄·스크린리더에 그대로 잡힌다. 상태를 state로 숨기면 그게 사라진다. */}
       <section aria-labelledby="datamap-title">
-        <SecHead
-          id="datamap-title"
-          title="우리가 쓰는 데이터 출처"
-          note="관광·바다·수산·농업·날씨까지, 태안 인사이트의 모든 예측·시세는 공개된 공공데이터에 근거합니다 — 지어내지 않는다는 증거입니다."
-        />
+        <details className="group border-t-2 border-ti-ink">
+          <summary className="flex cursor-pointer list-none flex-wrap items-end justify-between gap-x-5 gap-y-2.5 py-3.5 [&::-webkit-details-marker]:hidden">
+            <div className="min-w-[18rem] flex-1">
+              <h2 id="datamap-title" className="font-head text-[clamp(1.4rem,2.6vw,1.85rem)] font-black tracking-[-0.02em] text-ti-ink">우리가 쓰는 데이터 출처</h2>
+              <p className="mt-1 text-ti-ink2">관광·바다·수산·농업·날씨까지, 태안 인사이트의 모든 예측·시세는 공개된 공공데이터에 근거합니다 — 지어내지 않는다는 증거입니다.</p>
+            </div>
+            {/* 닫혀 있을 때도 규모가 보이게 — 펼칠지 말지 여기서 정한다 */}
+            <span className="flex shrink-0 items-center gap-2 rounded-full border border-ti-line bg-ti-surface px-3.5 py-1.5 text-[0.95rem] font-bold text-ti-petrol-ink">
+              {sources.length > 0 ? <span className="tabular-nums">소스 {sources.length}개 · 운영 중 {live}개</span> : <span>목록</span>}
+              <span className="text-ti-muted group-open:hidden">펼치기</span>
+              <span className="hidden text-ti-muted group-open:inline">접기</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6l5 5 5-5" />
+              </svg>
+            </span>
+          </summary>
 
+          <div className="pb-1 pt-1">
         {sources.length === 0 ? (
           <p className="rounded-[18px] border border-ti-line bg-ti-surface p-8 text-center text-ti-ink2">데이터 지도를 불러오지 못했습니다. 잠시 뒤 다시 확인해 주세요.</p>
         ) : (
@@ -178,6 +194,8 @@ export default async function DataMapPage() {
             </div>
           </div>
         )}
+          </div>
+        </details>
       </section>
 
       {sources.length > 0 && kg && <KnowledgeGraph kg={kg} />}
