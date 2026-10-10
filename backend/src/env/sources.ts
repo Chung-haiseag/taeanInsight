@@ -65,12 +65,24 @@ async function fetchWeather(key: string, nx: string, ny: string): Promise<Condit
 async function fetchAir(key: string, stationHint: string): Promise<Conditions["air"] & { station: string | null }> {
   const out = { pm10: null as number | null, pm25: null as number | null, o3: null as number | null, khaiGrade: null as number | null, grade: null as string | null, station: null as string | null };
   const num = (v?: string) => (v && v !== "-" && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
+  // ⚠ 에어코리아는 셋 중 가장 느리다. metrics 크론은 외부 API 20여 개를 한꺼번에 띄우는데,
+  //   8초 타임아웃이면 이 호출만 번번이 잘려 스냅샷의 미세먼지가 통째로 비었다(2026-10-10 확인:
+  //   같은 호출이 요청 경로에서는 정상). 시간을 늘리고 한 번 더 시도하며, 실패하면 이유를 남긴다.
   try {
     // 시도별 실시간 — 시도 측정소 전체 후 지역명 포함 측정소 선택 (없으면 hint 일치)
     const sp = new URLSearchParams({ serviceKey: key, returnType: "json", sidoName: REGION.airSido, numOfRows: "100", pageNo: "1", ver: "1.5" });
-    const res = await fetch(`${AIR_BASE}/getCtprvnRltmMesureDnsty?${sp}`, { signal: AbortSignal.timeout(8000) });
-    const j = (await res.json()) as { response?: { body?: { items?: Array<Record<string, string>> } } };
-    const items = j.response?.body?.items ?? [];
+    let items: Array<Record<string, string>> = [];
+    for (let attempt = 1; attempt <= 2 && !items.length; attempt++) {
+      try {
+        const res = await fetch(`${AIR_BASE}/getCtprvnRltmMesureDnsty?${sp}`, { signal: AbortSignal.timeout(12_000) });
+        if (!res.ok) { console.warn(`[air] 에어코리아 ${res.status} (시도 ${attempt}/2)`); continue; }
+        const j = (await res.json()) as { response?: { body?: { items?: Array<Record<string, string>> }; header?: { resultMsg?: string } } };
+        items = j.response?.body?.items ?? [];
+        if (!items.length) console.warn(`[air] 에어코리아 빈 목록 (시도 ${attempt}/2): ${j.response?.header?.resultMsg ?? "메시지 없음"}`);
+      } catch (e) {
+        console.warn(`[air] 에어코리아 실패 (시도 ${attempt}/2): ${e instanceof Error ? e.message.slice(0, 120) : e}`);
+      }
+    }
     const taean = items.filter((x) => (x.stationName || "").includes(REGION.airStationMatch));
     const hasData = (x: Record<string, string>) => num(x.pm10Value) !== null || num(x.pm25Value) !== null || num(x.khaiGrade) !== null;
     // 태안 측정소 중 데이터 있는 것 우선(태안읍 통신장애 시 태안항으로 폴백)
