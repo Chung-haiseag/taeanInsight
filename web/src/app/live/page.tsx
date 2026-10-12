@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 
 import Link from "next/link";
 
-import { fetchReportMetrics, fetchLatestNews, fetchOnThisDay, fetchCctv, fetchTvNews, getDust, getBloom, getFireRisk, getTodayBrief, getFestivals, getWeatherAlert } from "@/lib/api/reports";
+import { fetchReportMetrics, fetchLatestNews, fetchOnThisDay, fetchCctv, fetchTvNews, getDust, getBloom, getFireRisk, getTodayBrief, getFestivals, getWeatherAlert, getLiveConditions, getTenDay } from "@/lib/api/reports";
 import {
-  AlertStrip, ArticleList, BloomList, DemandCard, DustForecast, Festivals, FireWarning, Glance, SecHead, WeatherNow,
+  AlertStrip, ArticleList, BloomList, DemandCard, DustForecast, Festivals, FireWarning, Glance, SecHead,
 } from "@/components/live/live-sections";
+import { WeatherHero } from "@/components/live/weather-hero";
+import { HourlyChart } from "@/components/live/hourly-chart";
+import { AirUvCard, TenDayCard } from "@/components/home/weather-cards";
 import { SeaPanel } from "@/components/home/sea-panel";
 import { TodayBriefBanner } from "@/components/reports/today-brief-banner";
 import { CctvPlayer } from "@/components/reports/cctv-player";
@@ -26,12 +29,17 @@ function decodeEntities(s: string): string {
   return s.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#039;/g, "'");
 }
 
-// 2026-10 리디자인(가독성) — 홈(신문 1면)과 같은 체계. 흐름:
-//   머리(제목·시계) → 특보 → 오늘의 한 줄(+아침 알림) → [지금 날씨·대기 | 오늘의 바다] → 한눈에(수요·자외선·산불·축제)
-//   → 날씨 더 보기(미세먼지 예보·산불) → 관광·행사(수요·축제·꽃) → 도로 CCTV → [최신 뉴스 | 역대 오늘] → 태안군TV.
-//   데이터 함수는 예전과 같다. 바다는 홈과 같은 '오늘의 바다' 패널(조위 곡선) — 해변별 상세는 /beaches.
+// 2026-10-11 날씨 칸 재정비 — 날씨를 한 블록으로 모았다(평택 인사이트 생활정보 화면을 본보기로).
+//   왼쪽(넓은 칸, 그림이 큰 것): 지금 날씨 머리칸 → 시간별 예보 24시간 → 오늘의 바다
+//   오른쪽(좁은 칸, 수치 목록): 미세먼지·자외선(지금) → 미세먼지 예보(사흘) → 10일 예보
+// ⚠ 칸 배정은 **같은 이야기끼리 + 두 기둥 길이 맞추기**다. 처음엔 바다를 오른쪽에 뒀더니
+//   오른쪽이 234px 더 길어 왼쪽 아래가 뻥 비었고(2026-10-11 사용자 지적), 미세먼지가 두 칸에
+//   흩어져 있었다. 물때·시간별 그래프는 넓은 칸이라야 읽히고, 미세먼지는 지금·사흘이 붙어야 한다.
+//   그 아래는 예전과 같다: 한눈에 → 관광·행사 → 도로 CCTV → [최신 뉴스 | 역대 오늘] → 태안군TV.
+// ⚠ 날씨 실측은 /api/conditions/taean(15분)에서 받는다 — metrics 스냅샷(30분 크론)은 외부 API
+//   팬아웃에 밀려 대기질이 비는 때가 있었다. 10일·시간별은 /api/conditions/tenday 한 번으로 둘 다 온다.
 export default async function LivePage() {
-  const [metrics, onThisDay, cctv, news, tvNews, dust, bloom, fireRisk, todayBrief, festivals, weatherAlert] = await Promise.all([
+  const [metrics, onThisDay, cctv, news, tvNews, dust, bloom, fireRisk, todayBrief, festivals, weatherAlert, live, ten] = await Promise.all([
     fetchReportMetrics(),
     fetchOnThisDay(8),
     fetchCctv(),
@@ -43,11 +51,14 @@ export default async function LivePage() {
     getTodayBrief(),
     getFestivals(),
     getWeatherAlert(),
+    getLiveConditions(),
+    getTenDay(),
   ]);
   const norm = (s: string) => s.replace(/\s/g, "");
   const festivalCount = new Set([...festivals.map((f) => norm(f.name)), ...(metrics?.tourism.festivals ?? []).map((f) => norm(f.title))]).size;
   const fireHigh = fireRisk?.level === "높음" || fireRisk?.level === "매우높음";
-  const showAir = (dust?.days.length ?? 0) > 0 || fireHigh;
+  const days = ten?.days ?? [];
+  const hours = ten?.hours ?? [];
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-10 text-ti-ink">
@@ -69,22 +80,23 @@ export default async function LivePage() {
         </p>
       ) : (
         <>
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <WeatherNow env={metrics.environment} />
-            <SeaPanel metrics={metrics} fog={null} loaded />
+          {/* ── 날씨 한 블록 — 지금·시간별·예보·대기·바다 ── */}
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            <div className="flex flex-col gap-5">
+              <WeatherHero live={live} today={days[0] ?? null} tomorrow={days[1] ?? null} hours={hours} />
+              <HourlyChart hours={hours} />
+              <SeaPanel metrics={metrics} fog={null} loaded wide />
+            </div>
+            <div className="flex flex-col gap-5 self-start">
+              <AirUvCard live={live} dust={dust} detailed />
+              <DustForecast dust={dust} compact />
+              <TenDayCard ten={ten} />
+            </div>
           </div>
 
-          <Glance metrics={metrics} fire={fireRisk} festivalCount={festivalCount} />
+          {fireHigh && <FireWarning fire={fireRisk} />}
 
-          {showAir && (
-            <section aria-labelledby="air-title">
-              <SecHead id="air-title" title="날씨 더 보기" />
-              <div className={`grid items-start gap-5 ${fireHigh && dust?.days.length ? "lg:grid-cols-2" : ""}`}>
-                <DustForecast dust={dust} />
-                <FireWarning fire={fireRisk} />
-              </div>
-            </section>
-          )}
+          <Glance metrics={metrics} fire={fireRisk} festivalCount={festivalCount} />
 
           <section aria-labelledby="tour-title">
             <SecHead id="tour-title" title="관광·행사" link={{ href: "/beaches", label: "해변별 상황 보기" }} />

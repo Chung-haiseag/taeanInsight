@@ -29,15 +29,8 @@ export function airTone(grade: string | null | undefined): Tone {
   if (grade.includes("좋음")) return "good";
   return "plain";
 }
-/** 측정값 → 한국 기준 등급(미세 30/80/150, 초미세 15/35/75) */
-export function pmGrade(kind: "pm10" | "pm25", v: number | null): string | null {
-  if (v == null) return null;
-  const t = kind === "pm10" ? [30, 80, 150] : [15, 35, 75];
-  if (v <= t[0]) return "좋음";
-  if (v <= t[1]) return "보통";
-  if (v <= t[2]) return "나쁨";
-  return "매우나쁨";
-}
+// 등급 기준은 순수 규칙이라 lib/air-grade.ts 에 둔다(테스트에서 값으로 가져오기 위함). 여기서는 다시 내보내기만.
+export { pmGrade } from "@/lib/air-grade";
 
 export function SecHead({ id, title, note, link }: { id: string; title: string; note?: string; link?: { href: string; label: string } }) {
   return (

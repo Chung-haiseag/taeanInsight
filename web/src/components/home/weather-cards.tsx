@@ -8,7 +8,10 @@
 // ⚠ 'PM10/PM2.5' 같은 코드는 쓰지 않는다 — 고령 독자 기준 쉬운 우리말(미세먼지·초미세먼지).
 
 import type { DustBoardView, LiveConditionsView, TenDayView } from "@/lib/api/reports";
+import { fillDayTempsFromHours } from "@/lib/tenday-fill";
 import { pmGrade } from "@/components/editorial";
+import { overallGapNote, worstPmGrade } from "@/lib/air-grade";
+import { skyIcon } from "@/lib/sky-icon";
 
 const GRADE_TONE: Record<string, string> = {
   좋음: "bg-[#CFEEDC] text-[#0F4D2E]",
@@ -41,7 +44,12 @@ function hhmm(iso: string | null): string | null {
   } catch { return null; }
 }
 
-export function AirUvCard({ live, dust }: { live: LiveConditionsView | null; dust: DustBoardView | null }) {
+/**
+ * 미세먼지·자외선.
+ * detailed=true(지금 태안 쪽) — 태안 측정소가 둘 이상이면 측정소별로, 충남 평균과도 견준다.
+ *   둘 다 같은 에어코리아 응답에서 나온다(추가 호출 없음).
+ */
+export function AirUvCard({ live, dust, detailed = false }: { live: LiveConditionsView | null; dust: DustBoardView | null; detailed?: boolean }) {
   const air = live?.air ?? null;
   const uv = live?.uv ?? null;
   const pm10 = air?.pm10 ?? null;
@@ -92,6 +100,33 @@ export function AirUvCard({ live, dust }: { live: LiveConditionsView | null; dus
         </dl>
       )}
 
+      {/* 제목 옆 알약은 통합대기지수(오존 등 포함) 등급이다 — 미세먼지 등급과 다르면 왜 그런지 적는다 */}
+      {measured && (() => {
+        const note = overallGapNote(overall, worstPmGrade(pm10, pm25), air?.o3 ?? null);
+        return note ? <p className="mt-2.5 text-[0.92rem] text-ti-ink2">{note}</p> : null;
+      })()}
+
+      {detailed && (air?.stations?.length ?? 0) >= 2 && (
+        <div className="mt-3">
+          <p className="text-[0.85rem] font-semibold text-ti-ink2">측정소별 (미세먼지 / 초미세먼지)</p>
+          <dl className="m-0 mt-1.5 grid gap-0 divide-y divide-ti-line">
+            {air!.stations.map((st) => (
+              <div key={st.name} className="flex items-center justify-between gap-2 py-1.5 text-[0.95rem]">
+                <dt className="truncate text-ti-ink2">{st.name}</dt>
+                <dd className="m-0 shrink-0 tabular-nums text-ti-ink">{st.pm10 ?? "—"} <span className="text-ti-muted">/</span> {st.pm25 ?? "—"}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {detailed && measured && air?.sidoAvgPm10 != null && pm10 != null && (
+        <p className="mt-2.5 text-[0.92rem] text-ti-ink2">
+          충남 평균 <b className="font-bold tabular-nums text-ti-ink">{air.sidoAvgPm10}</b>
+          <span className="ml-1.5">— 태안이 {pm10 > air.sidoAvgPm10 ? "조금 높습니다" : pm10 < air.sidoAvgPm10 ? "조금 낮습니다" : "같습니다"}</span>
+        </p>
+      )}
+
       {uv?.todayMax != null && (
         <p className="mt-3 border-t border-ti-line pt-3 text-ti-ink">
           자외선 <strong className="font-bold">{uv.level}</strong>
@@ -100,7 +135,8 @@ export function AirUvCard({ live, dust }: { live: LiveConditionsView | null; dus
         </p>
       )}
 
-      {tomorrow && (tomorrow.pm10 || tomorrow.pm25) && (
+      {/* 홈에서만 — '지금 태안'은 바로 아래에 '미세먼지 예보(오늘·내일·모레)' 칸이 따로 있다. 같은 말 두 번 금지. */}
+      {!detailed && tomorrow && (tomorrow.pm10 || tomorrow.pm25) && (
         <p className="mt-2 text-[0.92rem] text-ti-ink2">
           내일 예보 <strong className="font-semibold text-ti-ink">{tomorrow.pm10 ?? tomorrow.pm25}</strong>
         </p>
@@ -113,14 +149,9 @@ export function AirUvCard({ live, dust }: { live: LiveConditionsView | null; dus
   );
 }
 
-const SKY_ICON: Array<[RegExp, string]> = [
-  [/소나기/, "🌦️"], [/비\/눈|진눈깨비/, "🌨️"], [/눈/, "❄️"], [/비/, "🌧️"],
-  [/흐림|흐리/, "☁️"], [/구름/, "⛅"], [/맑음/, "☀️"],
-];
-const skyIcon = (s: string | null) => (s ? (SKY_ICON.find(([re]) => re.test(s))?.[1] ?? "☁️") : null);
-
 export function TenDayCard({ ten }: { ten: TenDayView | null }) {
-  const days = ten?.days ?? [];
+  // 낮이 지나면 오늘 최저·최고가 단기예보에서 사라진다 — 시간별 예보로 메우고 '남은 시간'이라 밝힌다
+  const days = fillDayTempsFromHours(ten?.days ?? [], ten?.hours ?? []);
   if (days.length < 2) return null;
   // 기온 막대는 열흘 전체를 같은 자로 잰다 — 날마다 자가 다르면 비교가 안 된다
   const temps = days.flatMap((d) => [d.tmin, d.tmax]).filter((n): n is number => n != null);
@@ -136,7 +167,9 @@ export function TenDayCard({ ten }: { ten: TenDayView | null }) {
           const right = d.tmax != null ? ((d.tmax - lo) / span) * 100 : null;
           return (
             <li key={d.date} className="grid grid-cols-[3.9rem_1fr_auto] items-center gap-2 py-2 text-[0.92rem]">
-              <span className={`${d.label === "오늘" ? "font-bold text-ti-ink" : "text-ti-ink2"}`}>{d.label}</span>
+              <span className={`${d.label === "오늘" ? "font-bold text-ti-ink" : "text-ti-ink2"}`}>
+                {d.label}{d.partial && <span className="ml-0.5 align-super text-[0.7rem] font-normal text-ti-muted">*</span>}
+              </span>
               <span className="flex min-w-0 items-center gap-1.5 text-ti-ink">
                 <span aria-hidden className="shrink-0">{skyIcon(d.sky)}</span>
                 <span className="truncate">{d.sky ?? "—"}</span>
@@ -159,7 +192,10 @@ export function TenDayCard({ ten }: { ten: TenDayView | null }) {
           );
         })}
       </ul>
-      <p className="mt-2.5 text-[0.8rem] text-ti-muted">사흘까지는 동네예보, 그 뒤는 중기예보입니다.</p>
+      <p className="mt-2.5 text-[0.8rem] text-ti-muted">
+        사흘까지는 동네예보, 그 뒤는 중기예보입니다.
+        {days.some((d) => d.partial) && " * 표시는 남은 시간 기준입니다."}
+      </p>
     </Shell>
   );
 }

@@ -428,12 +428,18 @@ export async function getDust(): Promise<DustBoardView | null> {
 // 지금 태안 실황 — 기온·하늘·미세먼지(측정소 실측)·자외선. /api/conditions/taean
 //   ⚠ metrics 스냅샷(environment.live)과 같은 값이지만 **이쪽을 쓴다**: 30분 크론 스냅샷은 외부 API
 //     팬아웃에 밀려 대기질이 비는 일이 잦다(2026-10-10 확인). 이 경로는 요청 때 직접 받아 비지 않는다.
+export interface WindView { speed: number; dir: string | null; strength: string }
+export interface AirStationView { name: string; pm10: number | null; pm25: number | null }
 export interface LiveConditionsView {
   available: boolean;
   observedAt: string | null;
-  weather: { temp: number | null; humidity: number | null; sky: string | null; pty: string | null };
-  air: { pm10: number | null; pm25: number | null; o3: number | null; khaiGrade: number | null; grade: string | null; station: string | null };
+  weather: { temp: number | null; humidity: number | null; sky: string | null; pty: string | null; wind: WindView | null };
+  air: {
+    pm10: number | null; pm25: number | null; o3: number | null; khaiGrade: number | null; grade: string | null; station: string | null;
+    stations: AirStationView[]; sidoAvgPm10: number | null; sidoAvgPm25: number | null;
+  };
   uv: { todayMax: number | null; level: string; peakHour: string | null } | null;
+  sun: { sunrise: string; sunset: string } | null;
 }
 export async function getLiveConditions(): Promise<LiveConditionsView | null> {
   try {
@@ -450,13 +456,15 @@ export interface TenDayItemView {
   sky: string | null; pop: number | null; tmin: number | null; tmax: number | null;
   source: "short" | "mid";
 }
-export interface TenDayView { available: boolean; days: TenDayItemView[]; baseDate: string | null }
+// hours: 같은 단기예보에서 뽑은 앞으로 24시간(시간별 그래프)
+export interface HourItemView { date: string; hour: number; label: string; temp: number | null; sky: string | null; pop: number | null }
+export interface TenDayView { available: boolean; days: TenDayItemView[]; hours: HourItemView[]; baseDate: string | null }
 export async function getTenDay(): Promise<TenDayView | null> {
   try {
     const res = await fetch(`${API_BASE}/api/conditions/tenday`, { next: { revalidate: 1800 } });
     if (!res.ok) return null;
     const d = (await res.json()) as TenDayView;
-    return d.available && d.days.length ? d : null;
+    return d.available && (d.days.length > 0 || (d.hours?.length ?? 0) > 0) ? { ...d, hours: d.hours ?? [] } : null;
   } catch { return null; }
 }
 

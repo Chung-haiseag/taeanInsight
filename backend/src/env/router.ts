@@ -69,7 +69,9 @@ envRouter.get("/taean", async (c) => {
   // 자외선지수도 '지금 태안'이다 — 홈 미세먼지·자외선 카드가 한 번에 받도록 같이 싣는다(3시간 캐시).
   const { fetchUV } = await import("./living");
   const uv = await fetchUV(c.env).catch(() => null);
-  return c.json({ ...data, uv });
+  // 일출·일몰은 천문계산 — 외부 호출이 없다(비용 0). /live 날씨 머리칸이 쓴다.
+  const { computeSun } = await import("../tour/marine");
+  return c.json({ ...data, uv, sun: computeSun() });
 });
 
 // 10일 예보 — 단기예보(오늘~+3일) + 중기예보(+3~+10일)를 이어 붙인 열흘치. 홈 오른쪽 카드.

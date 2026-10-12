@@ -4,6 +4,7 @@
 // ⚠ 날짜 계산은 전부 KST 문자열(YYYY-MM-DD)로 한다 — Date 산술은 UTC 경계에서 하루가 밀린다.
 import { makeTtlCache } from "../lib/cache";
 import { fetchMidForecast, type MidDay } from "./midforecast";
+import { parseHours, kstHourKey, type FcstItem, type HourItem } from "./hourly";
 import { REGION } from "../region";
 
 const KMA_VILAGE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst";
@@ -22,9 +23,8 @@ export interface TenDayItem {
   tmax: number | null;
   source: "short" | "mid";
 }
-export interface TenDayForecast { available: boolean; days: TenDayItem[]; baseDate: string | null }
-
-interface FcstItem { fcstDate: string; fcstTime: string; category: string; fcstValue: string }
+// hours: 같은 단기예보 응답에서 뽑은 앞으로 24시간(시간별 예보 그래프용). 외부 호출은 한 번뿐이다.
+export interface TenDayForecast { available: boolean; days: TenDayItem[]; hours: HourItem[]; baseDate: string | null }
 
 const num = (v: string | undefined): number | null => {
   if (v == null || v === "" || v === "-") return null;
@@ -110,14 +110,16 @@ function vilageBase(now = Date.now()): { baseDate: string; baseTime: string } {
   return { baseDate: d.toISOString().slice(0, 10).replace(/-/g, ""), baseTime: `${String(slot ?? 23).padStart(2, "0")}00` };
 }
 
-async function fetchShort(key: string, nx: string, ny: string): Promise<ShortDay[]> {
+/** 단기예보 원자료. 날짜별(10일)과 시각별(24시간) 둘 다 여기서 나온다. */
+async function fetchVilage(key: string, nx: string, ny: string): Promise<FcstItem[]> {
   try {
     const { baseDate, baseTime } = vilageBase();
+    // numOfRows 1000은 약 3일치 — 10일 예보의 앞 사흘과 24시간 그래프 모두 넉넉하다.
     const sp = new URLSearchParams({ serviceKey: key, dataType: "JSON", numOfRows: "1000", pageNo: "1", base_date: baseDate, base_time: baseTime, nx, ny });
     const res = await fetch(`${KMA_VILAGE}?${sp}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) { console.warn(`[tenday] 단기예보 ${res.status}`); return []; }
     const j = (await res.json()) as { response?: { body?: { items?: { item?: FcstItem[] } } } };
-    return parseShortDays(j.response?.body?.items?.item ?? []);
+    return j.response?.body?.items?.item ?? [];
   } catch (e) {
     console.warn("[tenday] 단기예보 실패:", e instanceof Error ? e.message.slice(0, 120) : e);
     return [];
@@ -126,14 +128,15 @@ async function fetchShort(key: string, nx: string, ny: string): Promise<ShortDay
 
 async function loadImpl(env: { DATA_GO_KR_KEY?: string; TAEAN_NX?: string; TAEAN_NY?: string }): Promise<TenDayForecast> {
   const key = env.DATA_GO_KR_KEY;
-  if (!key) return { available: false, days: [], baseDate: null };
+  if (!key) return { available: false, days: [], hours: [], baseDate: null };
   const today = kstToday();
-  const [short, mid] = await Promise.all([
-    fetchShort(key, env.TAEAN_NX ?? REGION.grid.nx, env.TAEAN_NY ?? REGION.grid.ny),
+  const [items, mid] = await Promise.all([
+    fetchVilage(key, env.TAEAN_NX ?? REGION.grid.nx, env.TAEAN_NY ?? REGION.grid.ny),
     fetchMidForecast(env).catch(() => ({ available: false, days: {}, baseDate: null })),
   ]);
-  const days = mergeTenDays(short, mid.days, today);
-  return { available: days.length > 0, days, baseDate: today };
+  const days = mergeTenDays(parseShortDays(items), mid.days, today);
+  const hours = parseHours(items, kstHourKey());
+  return { available: days.length > 0 || hours.length > 0, days, hours, baseDate: today };
 }
 
 // 30분 캐시 — 단기예보는 3시간마다, 중기는 하루 2회 갱신이라 이 이상 자주 부를 이유가 없다.

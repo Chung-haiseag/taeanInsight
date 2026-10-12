@@ -1,8 +1,10 @@
 "use client";
 
-// 홈 1면 오른쪽 '오늘의 바다' — 조위 곡선 + 만조·간조 시각 + 수온·파고·해무.
+// '오늘의 바다' — 조위 곡선 + 만조·간조 시각 + 수온·파고·해무.
 //   ⚠ 미세먼지는 2026-10-10에 아래 'AirUvCard'로 옮겼다(실측 경로가 달라 값이 더 잘 찬다).
 //   값은 전부 실측·예보(/api/reports/metrics 의 marine·environment, /api/conditions/fog). 없으면 그 칸만 비운다.
+//   wide — 넓은 칸(지금 태안 왼쪽)에서는 곡선과 숫자를 좌우로 나눈다. 세로로만 쌓으면 그래프가
+//   통째로 커져 칸이 130px 길어지고, 옆 기둥과 길이가 어긋난다(2026-10-11).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -24,7 +26,7 @@ function Pill({ tone, children }: { tone: "ok" | "warn" | "plain"; children: Rea
   return <span className={`ml-1.5 inline-block rounded-full px-2 align-[2px] text-[0.72rem] font-bold ${cls}`}>{children}</span>;
 }
 
-export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | null; fog: FogBoardView | null; loaded: boolean }) {
+export function SeaPanel({ metrics, fog, loaded, wide = false }: { metrics: ReportMetrics | null; fog: FogBoardView | null; loaded: boolean; wide?: boolean }) {
   const [now, setNow] = useState<{ minutes: number; label: string } | null>(null);
   useEffect(() => { setNow(nowKst()); }, []);
 
@@ -38,17 +40,18 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
   const live = metrics?.environment.live ?? null;
   const fogToday = fog?.available ? fog.days[0] ?? null : null;
 
-  return (
-    <aside aria-labelledby="sea-title" className="on-dark flex flex-col gap-4 self-start rounded-[20px] bg-ti-navy p-5 text-ti-on-navy md:p-6">
+  const head = (
       <div>
         <p className="text-[0.85rem] font-bold tracking-[0.14em] text-ti-on-navy-muted">
           지금 태안{tide?.station ? ` · ${tide.station} 기준` : ""}
         </p>
         <h2 id="sea-title" className="mt-1 font-head text-[1.35rem] font-bold">오늘의 바다</h2>
       </div>
+  );
 
+  const chart = (
+    <>
       {!loaded && <div className="h-40 animate-pulse rounded-xl bg-white/10" aria-hidden="true" />}
-
       {loaded && geo && (
         <figure className="m-0">
           <svg viewBox="0 0 340 128" role="img" aria-labelledby="tide-t tide-d" className="block h-auto w-full">
@@ -89,9 +92,13 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
           </svg>
         </figure>
       )}
+    </>
+  );
 
+  const facts = (
+    <>
       {loaded && events.length > 0 && (
-        <ul aria-label="오늘 물때 시각" className="grid grid-cols-2 gap-1.5 text-center text-[0.88rem] text-ti-on-navy-muted sm:grid-cols-4">
+        <ul aria-label="오늘 물때 시각" className={`grid gap-1.5 text-center text-[0.88rem] text-ti-on-navy-muted ${wide ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
           {events.map((e) => (
             <li key={`${e.type}-${e.time}`} className="rounded-[10px] bg-white/[0.06] px-2 py-1.5">
               {e.type === "고조" ? "만조" : "간조"}
@@ -136,6 +143,22 @@ export function SeaPanel({ metrics, fog, loaded }: { metrics: ReportMetrics | nu
       <Link href="/beaches" className="text-[0.9rem] font-bold text-ti-on-navy underline underline-offset-4">
         해변별 상황 보기
       </Link>
+    </>
+  );
+
+  const shell = "on-dark rounded-[20px] bg-ti-navy p-5 text-ti-on-navy md:p-6";
+  // 넓은 칸 — lg부터 좌우 두 쪽(곡선 | 숫자). 그보다 좁으면 평소대로 세로로 쌓인다.
+  if (wide) {
+    return (
+      <aside aria-labelledby="sea-title" className={`${shell} grid gap-x-7 gap-y-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start`}>
+        <div className="flex flex-col gap-4">{head}{chart}</div>
+        <div className="flex flex-col gap-4">{facts}</div>
+      </aside>
+    );
+  }
+  return (
+    <aside aria-labelledby="sea-title" className={`${shell} flex flex-col gap-4`}>
+      {head}{chart}{facts}
     </aside>
   );
 }

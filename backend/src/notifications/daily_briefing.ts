@@ -5,6 +5,7 @@
 
 import type { Env } from "../types";
 import { REGION } from "../region";
+import { worstPmGrade } from "../env/sources";
 import { D1WebPushSubscriptionRepo } from "./repo_d1";
 import { WebCryptoWebPushDispatcher, vapidFromEnv } from "./dispatcher";
 
@@ -79,8 +80,13 @@ export async function buildDailyBriefing(env: Env): Promise<Briefing | null> {
 
   // 안전경보(맨 앞) — 이미 가져온 cond·marine에서 직접 도출(env_alerts 재fetch 경합 제거).
   const safety: string[] = [];
-  const dusty = cond?.air?.grade === "나쁨" || cond?.air?.grade === "매우나쁨";
-  if (dusty && cond?.air?.grade) safety.push(`미세먼지 ${cond.air.grade}`);
+  // ⚠ air.grade 는 오존까지 합친 통합대기지수다 — '미세먼지'라 부르려면 미세먼지 값으로 재야 한다.
+  //   (2026-10-11: 미세먼지 42·초미세먼지 31로 둘 다 '보통'인 날 '미세먼지 나쁨' 푸시가 나갔다.)
+  const bad = (g: string | null | undefined) => g === "나쁨" || g === "매우나쁨";
+  const pmWorst = worstPmGrade(cond?.air?.pm10 ?? null, cond?.air?.pm25 ?? null);
+  const dusty = bad(pmWorst) || bad(cond?.air?.grade);
+  if (bad(pmWorst)) safety.push(`미세먼지 ${pmWorst}`);
+  else if (bad(cond?.air?.grade)) safety.push(`공기 ${cond!.air!.grade}`);  // 오존 등 다른 항목 탓
   const highTemp = fc.tmax ?? cond?.weather?.temp ?? null; // 폭염은 오늘 최고기온으로 판정(아침 현재값 아님)
   if (highTemp != null && highTemp >= 33) safety.push(SAFETY_SHORT.heat);
   else if (cond?.weather?.temp != null && cond.weather.temp <= -10) safety.push(SAFETY_SHORT.cold);
@@ -94,8 +100,8 @@ export async function buildDailyBriefing(env: Env): Promise<Briefing | null> {
     const bits = [cond.weather.sky, cond.weather.temp != null ? `${Math.round(cond.weather.temp)}°` : null].filter(Boolean).join(" ");
     if (bits) parts.weather = bits;
   }
-  // 대기질(현재 등급) — 나쁨/매우나쁨은 안전(⚠️)에서 이미 표기하므로 중복 제외
-  if (cond?.air?.grade && !dusty) parts.air = `미세먼지 ${cond.air.grade}`;
+  // 대기질 — 나쁨/매우나쁨은 안전(⚠️)에서 이미 표기하므로 중복 제외
+  if (pmWorst && !dusty) parts.air = `미세먼지 ${pmWorst}`;
   // 바다 — 지금 이후 다음 만조/간조
   if (marine?.tide?.events?.length) {
     const nowHm = `${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
