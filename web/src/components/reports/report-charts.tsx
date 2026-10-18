@@ -4,6 +4,7 @@
 import type { ReportMetrics, AptItem, LandItem, DemandForecast, MarineInfo, WeeklyTrends, TrendItem, OilPrices, AgriBoardView, SeafoodBoardView, AuctionBoardView, AuctionForecastView, AuctionTone, SeasonalBoardView, SunsetBoardView, SunsetGrade, FogBoardView, FogGrade, DustBoardView, BloomBoardView, BloomStatus, FireBoardView, FarmBoardView, AquaBoardView, AquaLevel, FestivalView, WeatherAlertView, FerryView } from "@/lib/api/reports";
 import { Icon } from "@/components/icon";
 import { Card, CardTitle, Pill, Source, type Tone } from "@/components/editorial";
+import { itemIcon } from "@/lib/fish-icon";
 
 // 만원 → "2.1억" / "8,500만원"
 function wonFmt(n: number): string {
@@ -597,10 +598,17 @@ export function IndustryStructure() {
 
 // 시세 칸 — 이름 · 큰 값(단위는 옆에 작게) · 변동(화살표만이 아니라 '올랐음/내렸음' 글로).
 //   휴대폰에선 이름과 값을 한 줄에 양끝 정렬, md부터 칸 모양.
+/** 품목 이름 앞의 작은 상징. 이름이 바로 옆에 있으니 화면낭독기에서는 숨긴다.
+    모르는 품목은 아무것도 그리지 않는다(src/lib/fish-icon.ts). */
+function Mark({ name }: { name: string }) {
+  const ic = itemIcon(name);
+  return ic ? <span aria-hidden className="mr-1.5">{ic}</span> : null;
+}
+
 function PriceTile({ name, price, unit, change }: { name: string; price: number; unit: string; change?: React.ReactNode }) {
   return (
     <li className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded-[12px] bg-ti-sunk px-4 py-3 md:block">
-      <p className="font-semibold text-ti-ink2">{name}</p>
+      <p className="font-semibold text-ti-ink2"><Mark name={name} />{name}</p>
       <p className="md:mt-1">
         <span className="font-display text-[1.6rem] font-semibold leading-none tabular-nums text-ti-ink">{price.toLocaleString()}</span>
         <span className="ml-1 text-[0.9rem] text-ti-muted">{unit}</span>
@@ -679,7 +687,7 @@ export function AuctionForecastCard({ forecast }: { forecast: AuctionForecastVie
       <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-2">
         {forecast.items.map((f) => (
           <li key={f.fish} className="rounded-[12px] bg-ti-sunk p-3.5">
-            <p className="flex flex-wrap items-center justify-between gap-2 font-bold text-ti-ink">{f.fish}<Pill tone={FORECAST_TONE[f.tone]}>{f.label}</Pill></p>
+            <p className="flex flex-wrap items-center justify-between gap-2 font-bold text-ti-ink"><span><Mark name={f.fish} />{f.fish}</span><Pill tone={FORECAST_TONE[f.tone]}>{f.label}</Pill></p>
             <p className="mt-1.5">
               <span className="font-display text-[1.4rem] font-semibold tabular-nums text-ti-ink">{f.avgPricePerKg.toLocaleString()}</span>
               <span className="ml-1 text-[0.9rem] text-ti-muted">원/kg</span>
@@ -719,7 +727,7 @@ export function AuctionCard({ auction }: { auction: AuctionBoardView | null }) {
             {auction.fish.map((f) => (
               <tr key={f.fish} className="border-t border-ti-line">
                 <th scope="row" className="py-2 pr-2 text-left font-semibold text-ti-ink">
-                  {f.fish}{f.status && f.status !== "없음" ? <span className="ml-1.5 text-[0.85rem] font-normal text-ti-muted">{f.status}</span> : null}
+                  <Mark name={f.fish} />{f.fish}{f.status && f.status !== "없음" ? <span className="ml-1.5 text-[0.85rem] font-normal text-ti-muted">{f.status}</span> : null}
                 </th>
                 <td className="whitespace-nowrap py-2 text-right tabular-nums">
                   <b className="text-ti-ink">{f.avgPricePerKg.toLocaleString()}</b><span className="ml-0.5 text-[0.85rem] text-ti-muted">원/kg</span>
@@ -745,7 +753,7 @@ export function BloomCard({ bloom }: { bloom: BloomBoardView | null }) {
   return (
     <div className="mt-4 overflow-hidden rounded-2xl border border-pink-200/50 bg-gradient-to-br from-pink-50 to-rose-50 p-4 dark:border-pink-400/20 dark:from-pink-950/20 dark:to-rose-950/15">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🌷 태안 꽃·단풍 개화</span>
+        <span className="text-sm font-semibold text-brand">태안 꽃·단풍 개화</span>
         <span className="text-[0.7rem] text-foreground-muted">지금 & 다가오는 개화</span>
       </div>
       {bloom.active.length > 0 && (
@@ -781,7 +789,7 @@ export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null 
       <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-3">
         {seasonal.inSeason.map((s) => (
           <li key={s.name} className="rounded-[12px] bg-ti-sunk p-3.5">
-            <p className="font-bold text-ti-ink">{s.name}</p>
+            <p className="font-bold text-ti-ink"><Mark name={s.name} />{s.name}</p>
             <p className="mt-1 text-[0.95rem] text-ti-ink2">{s.note}</p>
             {s.pricePerKg != null && (
               <p className="mt-1.5 text-ti-ink2">
@@ -793,7 +801,12 @@ export function SeasonalCard({ seasonal }: { seasonal: SeasonalBoardView | null 
         ))}
       </ul>
       {seasonal.upcoming.length > 0 && (
-        <p className="mt-3 text-ti-ink2"><b className="text-ti-ink">다가오는 제철</b> {seasonal.upcoming.map((s) => s.name).join(" · ")}</p>
+        <p className="mt-3 text-ti-ink2">
+          <b className="text-ti-ink">다가오는 제철</b>{" "}
+          {seasonal.upcoming.map((s, i) => (
+            <span key={s.name}>{i > 0 && <span className="mx-1.5 text-ti-muted">·</span>}<Mark name={s.name} />{s.name}</span>
+          ))}
+        </p>
       )}
       <Source>태안 제철 달력 + 위판장 경락가(있을 때). 제철엔 맛도 좋고 공급도 많아 값이 안정적입니다.</Source>
     </Card>
@@ -883,7 +896,7 @@ export function DustCard({ dust }: { dust: DustBoardView | null }) {
   return (
     <div className="mt-4 card p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-brand">🌫️ 미세먼지 예보</span>
+        <span className="text-sm font-semibold text-brand">미세먼지 예보</span>
         <span className="text-[0.7rem] text-foreground-muted">{dust.city} · 에어코리아</span>
       </div>
       <div className="mt-3 overflow-x-auto">
