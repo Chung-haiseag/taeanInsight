@@ -25,7 +25,7 @@ export default async function AdsPage() {
   const total = years.reduce((s, y) => s + y.n, 0);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <div>
       <PageHeader
         eyebrow={<Link href="/news" className="text-accent underline">← 뉴스아카이브</Link>}
         title="🏷 옛 광고"
@@ -45,6 +45,6 @@ export default async function AdsPage() {
       {years.length === 0
         ? <p className="text-sm text-foreground-muted">아직 정리된 광고가 없습니다.</p>
         : <AdsClient years={years} />}
-    </main>
+    </div>
   );
 }

@@ -80,7 +80,7 @@ export default async function PricesPage() {
   const total = labels.reduce((s, l) => s + l.total, 0);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <div>
       <PageHeader
         eyebrow={<Link href="/paper/ads" className="text-accent underline">← 옛 광고</Link>}
         title="💰 옛날 물가"
@@ -149,6 +149,6 @@ export default async function PricesPage() {
         광고 원문의 표기를 자동으로 읽어 만든 표라 일부 값은 어긋날 수 있습니다.
         1990~1992년은 실린 광고 자체가 적어 표에서 빠진 해가 있습니다.
       </p>
-    </main>
+    </div>
   );
 }

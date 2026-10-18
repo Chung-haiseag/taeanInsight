@@ -39,7 +39,7 @@ export default async function BeachesPage() {
   const fogQuiet = !!fog && (!fog.worst || fog.worst.score < 40);
 
   return (
-    <div className="mx-auto max-w-[1000px] space-y-10 text-ti-ink">
+    <div className="space-y-10 text-ti-ink">
       <PageHeader
         eyebrow="해변"
         title="이번 주말, 태안 어느 해변?"

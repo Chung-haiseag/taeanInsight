@@ -34,7 +34,7 @@ export default async function PaperDate({ params }: { params: Promise<{ year: st
   if (!issue) notFound();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <div>
       <PageHeader
         eyebrow={<Link href={`/paper/${yr}`} className="text-accent underline">← {yr}년 지면</Link>}
         title={label(date)}
@@ -43,6 +43,6 @@ export default async function PaperDate({ params }: { params: Promise<{ year: st
       <div className="mt-6">
         <PaperViewer year={yr} date={date} pages={issue.pages.map((p) => p.no)} />
       </div>
-    </main>
+    </div>
   );
 }

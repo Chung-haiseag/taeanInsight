@@ -79,6 +79,9 @@ export default function RootLayout({
         <AccessibilityProvider>
           <div className="min-h-dvh flex flex-col">
             <SiteHeader />
+            {/* 가로폭(레일)은 여기 한 곳에서만 정한다 — 상단 메뉴·바닥글과 같은 1200px.
+                화면이 저마다 더 좁히면 메뉴보다 안으로 들어가 어긋나 보인다(2026-10-17 사용자 지적).
+                기사 본문 읽는 폭·입력칸 폭은 이 레일 '안에서' 좁히는 것이라 예외. src/lib/page-rail.ts */}
             <main id="main" className="flex-1 container mx-auto px-4 py-8 max-w-[1200px]">
               {/* 인쇄 페이지 프레임: thead/tfoot은 인쇄 시 페이지마다 반복되므로
                   2페이지 이후에도 상·하단 여백이 유지된다(인쇄 설정 '여백=없음'에서도).

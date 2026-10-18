@@ -57,7 +57,7 @@ export default async function DataMapPage() {
   const showSea = (!!aqua && aqua.level !== "정상" && !!aqua.label) || !!seafood?.items.length || !!auction?.fish.length || !!auctionForecast?.items.length || !!seasonal?.inSeason.length;
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-12 text-ti-ink">
+    <div className="space-y-12 text-ti-ink">
       <PageHeader
         eyebrow="지역경제"
         title="태안 지역경제"

@@ -48,7 +48,7 @@ export default async function YearArchive({
 
   // 2026-10 리디자인: 뉴스아카이브와 같은 세리프 머리·먹선 목록. 날짜는 제목 위로 올려 폰에서도 제목이 넓게.
   return (
-    <div className="mx-auto max-w-[48rem] space-y-8">
+    <div className="space-y-8">
       <PageHeader
         eyebrow="뉴스아카이브"
         title={`${year}년 태안 뉴스`}

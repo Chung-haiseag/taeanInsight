@@ -32,7 +32,7 @@ export default async function PaperYear({ params }: { params: Promise<{ year: st
   } catch { /* 조회 실패 → 빈 목록 */ }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <div>
       <PageHeader
         eyebrow={<Link href="/paper" className="text-accent underline">← 과거신문</Link>}
         title={`${yr}년 지면`}
@@ -56,6 +56,6 @@ export default async function PaperYear({ params }: { params: Promise<{ year: st
       </ul>
 
       {issues.length === 0 && <p className="mt-6 text-sm text-foreground-muted">이 해의 지면을 불러오지 못했습니다.</p>}
-    </main>
+    </div>
   );
 }

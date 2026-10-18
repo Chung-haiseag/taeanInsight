@@ -24,7 +24,7 @@ export default async function PaperIndex() {
   const total = years.reduce((s, y) => s + y.pages, 0);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <div>
       <PageHeader
         eyebrow={<Link href="/news" className="text-accent underline">← 뉴스아카이브</Link>}
         title="📰 과거신문"
@@ -63,6 +63,6 @@ export default async function PaperIndex() {
       </ul>
 
       {years.length === 0 && <p className="text-sm text-foreground-muted">지면 목록을 불러오지 못했습니다.</p>}
-    </main>
+    </div>
   );
 }
