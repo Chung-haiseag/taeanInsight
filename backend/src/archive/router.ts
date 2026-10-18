@@ -10,12 +10,29 @@ import { adKind } from "./ad_filter";
 import { PRICE_LABELS } from "./ad_prices";
 
 import type { Env } from "../types";
+import { FTS_MIN, relatedKeywords, titleMatchQuery } from "./related";
 
 export const archiveRouter = new Hono<{ Bindings: Env }>();
 
 const PAGE_SIZE = 20;
 
 // stats 카테고리 집계 — GROUP BY 결과 행을 { category: count } 맵으로.
+/**
+ * 연도별 기사 수를 minYear~maxYear 빈 해까지 채워 돌려준다(뉴스아카이브 머리칸 막대).
+ * ⚠ 없는 해를 건너뛰면 가로축이 '값 있는 해'만 늘어서 36년이라는 폭 자체가 거짓이 된다.
+ */
+export function toYearCounts(
+  rows: { year: number; n: number }[],
+  minYear: number | null,
+  maxYear: number | null,
+): Array<{ year: number; n: number }> {
+  if (minYear == null || maxYear == null || maxYear < minYear || !rows.length) return [];
+  const got = new Map(rows.map((r) => [Number(r.year), Number(r.n)]));
+  const out: Array<{ year: number; n: number }> = [];
+  for (let y = minYear; y <= maxYear; y++) out.push({ year: y, n: got.get(y) ?? 0 });
+  return out;
+}
+
 export function toCategoryCounts(rows: { category: string; n: number }[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const r of rows) if (r.category) out[r.category] = r.n;
@@ -116,12 +133,7 @@ archiveRouter.get("/search", async (c) => {
 
 // 관련 "과거" 기사 — 제목 키워드로 주제 매칭 + 현재 기사보다 이전(published_at <) 우선.
 // 주제 매칭이 부족하면 같은 분류의 과거 기사로 폴백. 추후 임베딩 의미검색으로 업그레이드.
-const REL_STOP = new Set([
-  "태안", "태안군", "주간", "우리", "위해", "관련", "오늘", "올해", "지난", "이번",
-  "대회", "행사", "개최", "실시", "운영", "마련", "추진", "지원", "교육", "사업", "방문", "참여",
-  "전면", "착용", "의무화", "확대", "강화", "재검토", "선정", "모집", "안내", "협약", "체결",
-  "전국", "최대", "최초", "처음", "기념", "예정", "결정", "촉구", "주민", "지역",
-]);
+// (관련 뉴스 키워드 규칙은 ./related.ts 로 옮겼다 — 2026-10-17)
 
 // "역대 오늘, 태안" — 정확히 오늘과 같은 일자(MM-DD)의 과거 주요 뉴스를 랜덤으로.
 //   주요 신호: 옛 지면 01~03면(1면·종합), 현대 정치·자치행정, 또는 사진(lead_image) 보유.
@@ -160,19 +172,24 @@ archiveRouter.get("/stats", async (c) => {
   }
 
   try {
-    const [agg, cats] = await Promise.all([
+    const [agg, cats, years] = await Promise.all([
       db
         .prepare("SELECT COUNT(*) AS total, MIN(year) AS minYear, MAX(year) AS maxYear FROM archive_articles WHERE COALESCE(is_ad,0)=0")
         .first<{ total: number; minYear: number | null; maxYear: number | null }>(),
       db
         .prepare("SELECT category, COUNT(*) AS n FROM archive_articles WHERE category IS NOT NULL AND COALESCE(is_ad,0)=0 GROUP BY category")
         .all<{ category: string; n: number }>(),
+      // idx_archive_year 를 타는 집계다. 6시간 캐시라 하루 네 번만 돈다.
+      db
+        .prepare("SELECT year, COUNT(*) AS n FROM archive_articles WHERE year IS NOT NULL AND COALESCE(is_ad,0)=0 GROUP BY year")
+        .all<{ year: number; n: number }>(),
     ]);
     const body = JSON.stringify({
       total: agg?.total ?? 0,
       minYear: agg?.minYear ?? null,
       maxYear: agg?.maxYear ?? null,
       categories: toCategoryCounts(cats.results ?? []),
+      years: toYearCounts(years.results ?? [], agg?.minYear ?? null, agg?.maxYear ?? null),
     });
     // 다음 요청부터는 표를 훑지 않는다. 저장 실패해도 응답은 그대로 낸다.
     c.executionCtx.waitUntil(
@@ -267,49 +284,59 @@ archiveRouter.get("/related/:idxno{[0-9]+}", async (c) => {
   const adb: D1Database = db;
   const cols = "idxno,title,published_at,year,category,lead_image";
 
-  // 제목에서 키워드 추출 (2자 이상, 흔한 단어 제외, 최대 4개)
-  const kws = [
-    ...new Set(
-      (self.title ?? "")
-        .split(/[\s,.·…!?"'“”‘’()[\]/~\-—–]+/)
-        .map((w) => w.trim())
-        // 2자 이상 · 흔한 단어 제외 · 날짜/숫자 토큰 제외(7월, 1일부터, 2026, 20만 …)
-        .filter((w) => w.length >= 2 && !REL_STOP.has(w) && !/^\d/.test(w)),
-    ),
-  ]
-    .sort((a, b) => b.length - a.length) // 긴 단어(더 고유한 복합명사) 우선
-    .slice(0, 3);
-
   const page = Math.max(1, Number(c.req.query("page") ?? "1"));
   const PAGE = 6;
   const offset = (page - 1) * PAGE;
 
-  // 주제(제목 키워드) 매칭 — 시간 무관, 최근순. 매칭이 0이면 같은 분류로 폴백.
-  let where: string;
-  let binds: unknown[];
-  let mode: string;
-  if (kws.length) {
-    where = "(" + kws.map(() => "title LIKE ?").join(" OR ") + ") AND idxno != ?";
-    binds = [...kws.map((k) => `%${k}%`), idxno];
-    mode = "topic";
-    const cnt = await adb.prepare(`SELECT COUNT(*) n FROM archive_articles WHERE ${where}`).bind(...binds).first<{ n: number }>();
-    if (!cnt || cnt.n === 0) {
-      where = "category = ? AND idxno != ?";
-      binds = [self.category, idxno];
-      mode = "category";
-    }
-  } else {
-    where = "category = ? AND idxno != ?";
-    binds = [self.category, idxno];
-    mode = "category";
+  // 주제(제목 키워드) 매칭 — 시간 무관, 최근순.
+  // ⚠ 제목 LIKE 풀스캔은 쓰지 않는다. 선행 와일드카드라 색인을 못 타 한 번에 표 전체(11만 행)를
+  //   읽고, 2026-10-17 에 그것 하나로 하루 3억 8,620만 행을 읽어 D1 이 넘어갔다(/news 500).
+  //   트라이그램 색인 archive_fts 는 같은 일을 7천 행·20ms 로 한다.
+  const kws = relatedKeywords(self.title ?? "");
+  const ftsKws = kws.filter((k) => k.length >= FTS_MIN); // 2글자는 트라이그램이 못 찾는다
+  const byCategory = {
+    base: `FROM archive_articles a WHERE a.category = ? AND a.idxno != ?`,
+    binds: [self.category, idxno] as unknown[],
+    mode: "category",
+  };
+
+  let plan = byCategory;
+  if (ftsKws.length) {
+    plan = {
+      base:
+        "FROM archive_fts f JOIN archive_articles a ON a.idxno = f.rowid " +
+        "WHERE archive_fts MATCH ? AND f.rowid != ?",
+      binds: [titleMatchQuery(ftsKws), idxno],
+      mode: "topic",
+    };
   }
 
-  const total = (await adb.prepare(`SELECT COUNT(*) n FROM archive_articles WHERE ${where}`).bind(...binds).first<{ n: number }>())?.n ?? 0;
-  const rows = await adb
-    .prepare(`SELECT ${cols} FROM archive_articles WHERE ${where} ORDER BY published_at DESC LIMIT ? OFFSET ?`)
-    .bind(...binds, PAGE, offset)
-    .all();
-  return c.json({ items: rows.results ?? [], total, page, pageSize: PAGE, mode, keywords: kws });
+  // 건수와 목록을 한 번씩만, 나란히 묻는다(예전엔 같은 COUNT 를 두 번 돌렸다).
+  const run = async (p: typeof byCategory) => {
+    const [cnt, rows] = await Promise.all([
+      adb.prepare(`SELECT COUNT(*) n ${p.base}`).bind(...p.binds).first<{ n: number }>(),
+      adb
+        .prepare(`SELECT ${cols.replace(/(\w+)/g, "a.$1")} ${p.base} ORDER BY a.published_at DESC LIMIT ? OFFSET ?`)
+        .bind(...p.binds, PAGE, offset)
+        .all(),
+    ]);
+    return { total: cnt?.n ?? 0, rows };
+  };
+
+  let out = await run(plan);
+  if (out.total === 0 && plan.mode === "topic") {
+    plan = byCategory; // 제목으로 걸리는 게 없으면 같은 분류로
+    out = await run(plan);
+  }
+
+  return c.json({
+    items: out.rows.results ?? [],
+    total: out.total,
+    page,
+    pageSize: PAGE,
+    mode: plan.mode,
+    keywords: plan.mode === "topic" ? ftsKws : [],
+  });
 });
 
 // 기사 1건 (전문 포함)
