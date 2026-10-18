@@ -5,7 +5,7 @@
 import Link from "next/link";
 
 import type {
-  BloomBoardView, DemandForecast, DustBoardView, FestivalView, FireBoardView, ReportMetrics, TrendItem, WeatherAlertView,
+  BloomBoardView, DemandForecast, FestivalView, FireBoardView, ReportMetrics, TrendItem, WeatherAlertView,
 } from "@/lib/api/reports";
 
 import { Card, CardTitle, Pill, SecHead, Source, airTone, pmGrade, type Tone } from "@/components/editorial";
@@ -88,46 +88,6 @@ function Trends({ trends }: { trends: ReportMetrics["trends"] }) {
 }
 
 // ── 미세먼지 예보 — 표 대신 날짜별 카드 ──
-// compact — 좁은 기둥(지금 태안 오른쪽)에서는 하루를 한 줄로. 세 칸으로 나누면 폭이 140px밖에
-//   안 돼 '초미세먼지'가 '초미세/먼지'로 꺾인다(2026-10-11). 칸 폭에 맞춰 방향만 바꾼다.
-export function DustForecast({ dust, compact = false }: { dust: DustBoardView | null; compact?: boolean }) {
-  if (!dust || !dust.days.length) return null;
-  const label = (i: number) => (i === 0 ? "오늘" : i === 1 ? "내일" : "모레");
-  const val = (g: string | null) => (g ? <Pill tone={airTone(g)}>{g}</Pill> : <span className="text-ti-muted">—</span>);
-  return (
-    <Card labelledBy="dust-title">
-      <CardTitle id="dust-title" aside={<span className="text-[0.9rem] text-ti-muted">{dust.city}</span>}>미세먼지 예보</CardTitle>
-      {compact ? (
-        <ul className="m-0 mt-3 grid list-none gap-2 p-0">
-          {dust.days.slice(0, 3).map((d, i) => (
-            <li key={d.date} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-[12px] bg-ti-sunk px-3.5 py-2.5">
-              <span className="font-bold text-ti-ink">{label(i)}</span>
-              <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <span className="whitespace-nowrap text-ti-ink2">미세먼지 {val(d.pm10)}</span>
-                <span className="whitespace-nowrap text-ti-ink2">초미세먼지 {val(d.pm25)}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="m-0 mt-3 grid list-none gap-2.5 p-0 md:grid-cols-3">
-          {dust.days.slice(0, 3).map((d, i) => (
-            <li key={d.date} className="rounded-[12px] bg-ti-sunk p-3.5">
-              <p className="font-bold text-ti-ink">{label(i)}</p>
-              <dl className="m-0 mt-2 grid gap-1.5">
-                <div className="flex items-center justify-between gap-2"><dt className="text-ti-ink2">미세먼지</dt><dd className="m-0">{val(d.pm10)}</dd></div>
-                <div className="flex items-center justify-between gap-2"><dt className="text-ti-ink2">초미세먼지</dt><dd className="m-0">{val(d.pm25)}</dd></div>
-              </dl>
-            </li>
-          ))}
-        </ul>
-      )}
-      {dust.days[0]?.overall && <p className="mt-3 text-[0.95rem] text-ti-ink2">{dust.days[0].overall}</p>}
-      <Source>에어코리아 예보</Source>
-    </Card>
-  );
-}
-
 // ── 산불 위험 — 높을 때만 따로 크게(평소엔 '한눈에'의 한 칸) ──
 export function FireWarning({ fire }: { fire: FireBoardView | null }) {
   if (!fire || (fire.level !== "높음" && fire.level !== "매우높음")) return null;

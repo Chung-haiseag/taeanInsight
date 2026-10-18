@@ -23,12 +23,13 @@ export function livingTips(i: TipInput): Tip[] {
     else out.push({ key: "rain", text: "우산 필요 없음", tone: "plain" });
   }
 
-  if (i.airGrade) {
-    const bad = i.airGrade.includes("나쁨");
+  // ⚠ '좋음·보통'은 적지 않는다 — 할 일이 없는 데다, 바로 옆 '미세먼지·자외선' 칸이 숫자와
+  //   등급을 이미 크게 말한다. 여기까지 적으면 한 화면에 같은 말이 세 번 나온다(2026-10-12).
+  if (i.airGrade?.includes("나쁨")) {
     out.push({
       key: "air",
-      text: bad ? `미세먼지 ${i.airGrade} — 바깥 활동 줄이기` : `미세먼지 ${i.airGrade}`,
-      tone: i.airGrade.includes("매우") ? "bad" : bad ? "warn" : i.airGrade.includes("보통") ? "ok" : "good",
+      text: `미세먼지 ${i.airGrade} — 바깥 활동 줄이기`,
+      tone: i.airGrade.includes("매우") ? "bad" : "warn",
     });
   }
 

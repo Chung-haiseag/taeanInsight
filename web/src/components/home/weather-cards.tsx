@@ -57,6 +57,7 @@ export function AirUvCard({ live, dust, detailed = false }: { live: LiveConditio
   // 내일 예보 등급(에어코리아 충남 예보) — 오늘 실측 옆에 '내일은?'을 한 줄로
   const today = dust?.days?.[0] ?? null;
   const tomorrow = dust?.days?.[1] ?? null;
+  const dayAfter = dust?.days?.[2] ?? null;
   // ⚠ 실측(에어코리아)이 비는 때가 있다 — 그럴 땐 숫자를 비워 두는 대신 **오늘 예보 등급**을 보여주고
   //   '예보'라고 적는다. 빈 카드보다 낫고, 예보를 실측인 척하지도 않는다.
   const measured = pm10 != null || pm25 != null;
@@ -135,12 +136,19 @@ export function AirUvCard({ live, dust, detailed = false }: { live: LiveConditio
         </p>
       )}
 
-      {/* 홈에서만 — '지금 태안'은 바로 아래에 '미세먼지 예보(오늘·내일·모레)' 칸이 따로 있다. 같은 말 두 번 금지. */}
-      {!detailed && tomorrow && (tomorrow.pm10 || tomorrow.pm25) && (
-        <p className="mt-2 text-[0.92rem] text-ti-ink2">
-          내일 예보 <strong className="font-semibold text-ti-ink">{tomorrow.pm10 ?? tomorrow.pm25}</strong>
+      {/* 앞으로 — 2026-10-12에 '미세먼지 예보' 칸을 여기로 합쳤다. 미세먼지를 말하는 칸이 나란히
+          둘일 이유가 없고, 그 칸의 '오늘'은 바로 위 실측과 같은 날을 두 번 말하는 것이었다. */}
+      {(tomorrow?.pm10 || tomorrow?.pm25 || (detailed && (dayAfter?.pm10 || dayAfter?.pm25))) && (
+        <p className="mt-3 border-t border-ti-line pt-3 text-ti-ink">
+          <span className="text-ti-ink2">앞으로</span>{" "}
+          내일 <strong className="font-bold">{tomorrow?.pm10 ?? tomorrow?.pm25 ?? "—"}</strong>
+          {detailed && (dayAfter?.pm10 || dayAfter?.pm25) && (
+            <><span className="mx-1.5 text-ti-muted">·</span>모레 <strong className="font-bold">{dayAfter.pm10 ?? dayAfter.pm25}</strong></>
+          )}
+          {detailed && dust?.city && <span className="ml-1.5 text-[0.85rem] text-ti-muted">{dust.city} 예보</span>}
         </p>
       )}
+      {detailed && tomorrow?.overall && <p className="mt-1.5 text-[0.92rem] text-ti-ink2">{tomorrow.overall}</p>}
 
       <p className="mt-3 text-[0.8rem] text-ti-muted">
         {[measured && air?.station ? `${air.station} 측정소` : null, measured && at ? `${at} 기준` : null, "에어코리아·기상청"].filter(Boolean).join(" · ")}

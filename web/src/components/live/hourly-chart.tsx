@@ -79,7 +79,10 @@ export function HourlyChart({ hours }: { hours: HourItemView[] }) {
         ))}
       </ul>
 
+      {/* ⚠ 이 최고·최저는 '앞으로 24시간' 값이다 — 머리칸의 '오늘 최저·최고'(달력날)와 다른 값이라
+          그렇게 밝혀 적는다. 안 밝히면 두 숫자가 어긋나 보여 독자가 어느 쪽을 믿을지 모른다. */}
       <p className="mt-3 text-[0.92rem] text-ti-ink2">
+        <span className="text-ti-muted">앞으로 24시간 중 </span>
         {s.max && <>가장 더울 때 <b className="font-bold">{Math.round(s.max.temp)}°</b>({s.max.label}) · </>}
         {s.min && <>가장 추울 때 <b className="font-bold">{Math.round(s.min.temp)}°</b>({s.min.label}) · </>}
         {s.rain}

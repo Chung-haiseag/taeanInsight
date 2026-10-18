@@ -4,11 +4,12 @@ import Link from "next/link";
 
 import { fetchReportMetrics, fetchLatestNews, fetchOnThisDay, fetchCctv, fetchTvNews, getDust, getBloom, getFireRisk, getTodayBrief, getFestivals, getWeatherAlert, getLiveConditions, getTenDay } from "@/lib/api/reports";
 import {
-  AlertStrip, ArticleList, BloomList, DemandCard, DustForecast, Festivals, FireWarning, Glance, SecHead,
+  AlertStrip, ArticleList, BloomList, DemandCard, Festivals, FireWarning, Glance, SecHead,
 } from "@/components/live/live-sections";
 import { WeatherHero } from "@/components/live/weather-hero";
 import { HourlyChart } from "@/components/live/hourly-chart";
 import { AirUvCard, TenDayCard } from "@/components/home/weather-cards";
+import { fillDayTempsFromHours } from "@/lib/tenday-fill";
 import { SeaPanel } from "@/components/home/sea-panel";
 import { TodayBriefBanner } from "@/components/reports/today-brief-banner";
 import { CctvPlayer } from "@/components/reports/cctv-player";
@@ -30,7 +31,7 @@ function decodeEntities(s: string): string {
 }
 
 // 2026-10-11 날씨 칸 재정비 — 날씨를 한 블록으로 모았다(평택 인사이트 생활정보 화면을 본보기로).
-//   왼쪽(넓은 칸, 그림이 큰 것): 지금 날씨 머리칸 → 시간별 예보 24시간 → 오늘의 바다
+//   왼쪽(넓은 칸, 그림이 큰 것): 지금 날씨 머리칸(지금 수치 | 오늘의 생활 안내) → 시간별 예보 24시간 → 오늘의 바다
 //   오른쪽(좁은 칸, 수치 목록): 미세먼지·자외선(지금) → 미세먼지 예보(사흘) → 10일 예보
 // ⚠ 칸 배정은 **같은 이야기끼리 + 두 기둥 길이 맞추기**다. 처음엔 바다를 오른쪽에 뒀더니
 //   오른쪽이 234px 더 길어 왼쪽 아래가 뻥 비었고(2026-10-11 사용자 지적), 미세먼지가 두 칸에
@@ -57,11 +58,14 @@ export default async function LivePage() {
   const norm = (s: string) => s.replace(/\s/g, "");
   const festivalCount = new Set([...festivals.map((f) => norm(f.name)), ...(metrics?.tourism.festivals ?? []).map((f) => norm(f.title))]).size;
   const fireHigh = fireRisk?.level === "높음" || fireRisk?.level === "매우높음";
-  const days = ten?.days ?? [];
+  // ⚠ 머리칸과 10일 예보가 **같은 오늘**을 말하게 한다. 낮이 지나면 단기예보에서 그날 TMN/TMX가
+  //   사라지는데, 10일 예보만 시간별로 메우고 머리칸은 안 메우면 한 화면에서 '오늘 — / 27°'와
+  //   '오늘* 19° 20°'가 동시에 보인다(2026-10-12 사용자 캡처).
+  const days = fillDayTempsFromHours(ten?.days ?? [], ten?.hours ?? []);
   const hours = ten?.hours ?? [];
 
   return (
-    <div className="mx-auto max-w-[1200px] space-y-10 text-ti-ink">
+    <div className="space-y-10 text-ti-ink">
       <header className="flex flex-wrap items-end justify-between gap-4 pt-2">
         <div>
           <p className="text-[0.85rem] font-bold tracking-[0.14em] text-ti-petrol-ink">실시간 · 지금 태안</p>
@@ -72,7 +76,6 @@ export default async function LivePage() {
       </header>
 
       <AlertStrip alert={weatherAlert} />
-      <TodayBriefBanner brief={todayBrief} vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
 
       {!metrics ? (
         <p className="rounded-[18px] border border-ti-line bg-ti-surface p-8 text-center text-ti-ink2">
@@ -83,16 +86,20 @@ export default async function LivePage() {
           {/* ── 날씨 한 블록 — 지금·시간별·예보·대기·바다 ── */}
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             <div className="flex flex-col gap-5">
-              <WeatherHero live={live} today={days[0] ?? null} tomorrow={days[1] ?? null} hours={hours} />
+              <WeatherHero live={live} today={days[0] ?? null} tomorrow={days[1] ?? null} />
               <HourlyChart hours={hours} />
               <SeaPanel metrics={metrics} fog={null} loaded wide />
             </div>
             <div className="flex flex-col gap-5 self-start">
               <AirUvCard live={live} dust={dust} detailed />
-              <DustForecast dust={dust} compact />
               <TenDayCard ten={ten} />
             </div>
           </div>
+
+          {/* 아침 알림 견본 — 날씨 칸 **아래**에 둔다. 맨 위에 두면 바로 밑에서 더 잘 보여줄 값들을
+              (하늘·미세먼지·물때) 한 줄로 또 말하게 된다(2026-10-12 사용자 지적). 알림 받기 버튼이
+              이 쪽의 유일한 구독 입구이므로 칸 자체는 그대로 둔다. */}
+          <TodayBriefBanner brief={todayBrief} vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
 
           {fireHigh && <FireWarning fire={fireRisk} />}
 
