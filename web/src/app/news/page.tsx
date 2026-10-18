@@ -18,7 +18,7 @@ import {
 import { getTvNews, type TvNewsResponse } from "@/lib/api/news";
 import { getMe } from "@/lib/api/me";
 import { decodeEntities } from "@/lib/html";
-import { PageHeader } from "@/components/page-header";
+import { ArchiveBanner } from "@/components/news/archive-banner";
 import { SecHead, Source } from "@/components/editorial";
 import { TvVideoGrid } from "@/components/tv-video-grid";
 import { Icon } from "@/components/icon";
@@ -140,45 +140,14 @@ function NewsArchive() {
   const tabs = useMemo(() => sortCategoryTabs(CATEGORY_ORDER, interests), [interests]);
 
   return (
-    <div className="mx-auto max-w-[1200px] space-y-8">
-      <div>
-        <PageHeader
-          eyebrow="뉴스아카이브"
-          title="뉴스아카이브"
-          description="태안신문 최신 기사부터 1990년 창간호까지 한 곳에서 보고 검색하세요."
-        />
-        {stats && stats.total > 0 && (
-          <p className="mt-4 text-[1rem] text-ti-ink2">
-            모두 <strong className="font-display text-[1.35rem] font-bold tabular-nums text-ti-ink">{stats.total.toLocaleString()}</strong>건
-            <span className="text-ti-muted"> · {stats.minYear}~{stats.maxYear}년 기사를 디지털로 옮겼습니다</span>
-          </p>
-        )}
-      </div>
-
-      {/* 보는 방식 — 기사와 옛 광고를 갈라 놓았으니 오가는 길을 여기 둔다.
-          상단 메뉴를 늘리는 대신 아카이브라는 한 우산 아래 묶는다. 설명은 줄바꿈해 큰 글씨로. */}
-      <nav aria-label="아카이브 보는 방식">
-        <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-3">
-          <li>
-            <span aria-current="page" className="flex min-h-11 flex-col justify-center rounded-xl border-2 border-ti-ink bg-ti-surface px-4 py-2.5">
-              <span className="font-bold text-ti-ink">기사 검색</span>
-              <span className="text-[0.9rem] text-ti-ink2">지금 보고 있는 화면</span>
-            </span>
-          </li>
-          <li>
-            <Link href="/paper/ads" className="flex min-h-11 flex-col justify-center rounded-xl border border-ti-line bg-ti-surface px-4 py-2.5 hover:border-ti-petrol">
-              <span className="font-bold text-ti-petrol-ink underline underline-offset-4">옛 광고</span>
-              <span className="text-[0.9rem] text-ti-ink2">그 시절 집값·품삯</span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/paper/prices" className="flex min-h-11 flex-col justify-center rounded-xl border border-ti-line bg-ti-surface px-4 py-2.5 hover:border-ti-petrol">
-              <span className="font-bold text-ti-petrol-ink underline underline-offset-4">옛날 물가</span>
-              <span className="text-[0.9rem] text-ti-ink2">광고로 만든 30년 시세표</span>
-            </Link>
-          </li>
-        </ul>
-      </nav>
+    <div className="space-y-8">
+      <ArchiveBanner
+        total={stats?.total ?? 0}
+        minYear={stats?.minYear ?? null}
+        maxYear={stats?.maxYear ?? null}
+        years={stats?.years ?? []}
+        current="/news"
+      />
 
       {/* 검색 폼 — 키워드 + 연도. 라벨을 눈에 보이게 둔다(자리표시 글자만으론 어르신이 놓친다). */}
       <form onSubmit={runSearch} role="search" aria-label="기사 검색" className="rounded-[18px] border border-ti-line bg-ti-surface p-5">
