@@ -23,7 +23,7 @@ export interface Conditions {
 }
 
 /** 에어코리아 시도별 실시간 한 행(필요한 칸만). */
-export interface AirRow { stationName?: string; pm10Value?: string; pm25Value?: string; o3Value?: string; khaiGrade?: string }
+export interface AirRow { stationName?: string; pm10Value?: string; pm25Value?: string; o3Value?: string; khaiGrade?: string; pm10Flag?: string; pm25Flag?: string }
 
 const WIND_DIR = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
 
@@ -37,28 +37,47 @@ export function windWords(speed: number | null, deg: number | null): WindInfo | 
 }
 
 /** 시도 전체 응답 한 번에서 ① 대표 측정소 ② 태안 측정소 목록 ③ 시도 평균을 뽑는다. */
+/**
+ * 측정기 고장값 거르기. 2026-10-12 태안항이 미세먼지 985㎍/㎥를 뱉었다(초미세먼지는 42로 멀쩡).
+ * 그대로 화면에 나갔고, 태안읍이 비는 순간 대표값이 되어 아침 푸시가 '미세먼지 매우나쁨'이라 말했다.
+ * 상한은 넉넉히 잡는다 — 2021년 황사 때 서울 시간값이 600대였다. 그 위는 사실상 기기 오류다.
+ * ⚠ 한 항목이 고장나도 **그 항목만** 버린다. 측정소를 통째로 버리면 멀쩡한 초미세먼지까지 사라진다.
+ */
+const PM_MAX = { pm10: 600, pm25: 300 } as const;
+export function plausiblePm(kind: "pm10" | "pm25", v: number | null): number | null {
+  if (v == null || !Number.isFinite(v)) return null;
+  if (v < 0 || v > PM_MAX[kind]) return null;
+  return v;
+}
+
 export function summarizeAir(rows: AirRow[], match: string): Conditions["air"] {
   const n = (v?: string) => (v && v !== "-" && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
+  // 에어코리아는 통신장애·점검및교정·자료이상일 때 Flag에 사유를 적고 값은 믿을 수 없게 둔다.
+  const pm10 = (x: AirRow) => (x.pm10Flag ? null : plausiblePm("pm10", n(x.pm10Value)));
+  const pm25 = (x: AirRow) => (x.pm25Flag ? null : plausiblePm("pm25", n(x.pm25Value)));
   const local = rows.filter((x) => (x.stationName || "").includes(match));
-  const hasData = (x: AirRow) => n(x.pm10Value) !== null || n(x.pm25Value) !== null || n(x.khaiGrade) !== null;
-  // 태안읍 통신장애 시 태안항으로 폴백
-  const it = local.find(hasData) ?? local[0] ?? null;
-  const withData = local.filter((x) => n(x.pm10Value) !== null || n(x.pm25Value) !== null);
+  // 대표 측정소는 **성한 곳**으로 고른다. 목록 순서대로 뽑으면, 미세먼지가 고장나 비어 있는
+  //   태안항이 앞에 있다는 이유로 대표가 되어 태안읍(71/27)이 멀쩡한데도 화면이 '—'가 된다
+  //   (2026-10-12, 985를 걸러내자 드러났다). 둘 다 있는 곳 → 하나라도 있는 곳 → 첫 측정소.
+  const whole = (x: AirRow) => pm10(x) !== null && pm25(x) !== null;
+  const hasData = (x: AirRow) => pm10(x) !== null || pm25(x) !== null || n(x.khaiGrade) !== null;
+  const it = local.find(whole) ?? local.find(hasData) ?? local[0] ?? null;
+  const withData = local.filter((x) => pm10(x) !== null || pm25(x) !== null);
   const avg = (pick: (x: AirRow) => number | null) => {
     const vs = rows.map(pick).filter((v): v is number => v !== null);
     return vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : null;
   };
   const g = it ? n(it.khaiGrade) : null;
   return {
-    pm10: it ? n(it.pm10Value) : null,
-    pm25: it ? n(it.pm25Value) : null,
+    pm10: it ? pm10(it) : null,
+    pm25: it ? pm25(it) : null,
     o3: it ? n(it.o3Value) : null,
     khaiGrade: g,
     grade: g ? (GRADE[g] ?? null) : null,
     station: it?.stationName ?? null,
-    stations: withData.length >= 2 ? withData.map((x) => ({ name: x.stationName ?? "", pm10: n(x.pm10Value), pm25: n(x.pm25Value) })) : [],
-    sidoAvgPm10: avg((x) => n(x.pm10Value)),
-    sidoAvgPm25: avg((x) => n(x.pm25Value)),
+    stations: withData.length >= 2 ? withData.map((x) => ({ name: x.stationName ?? "", pm10: pm10(x), pm25: pm25(x) })) : [],
+    sidoAvgPm10: avg(pm10),
+    sidoAvgPm25: avg(pm25),
   };
 }
 
