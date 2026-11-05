@@ -16,18 +16,22 @@ import { getArchiveStats, type ArchiveStats } from "@/lib/api/archive";
 import { getFeaturedPersons, getKgStatus } from "@/lib/api/kg-public";
 import type { PersonSearchResult } from "@/lib/api/kg";
 import { getNews, type NewsItem } from "@/lib/api/news";
+import { retry } from "@/lib/retry";
 import {
   fetchOnThisDay, fetchReportMetrics, getAuctionForecast, getDust, getFog, getLiveConditions, getTenDay, getTodayBrief, getWeekendDemand,
   type AuctionForecastView, type DemandForecast, type DustBoardView, type FogBoardView, type LiveConditionsView,
   type OnThisDayItem, type ReportMetrics, type TenDayView, type TodayBriefView,
 } from "@/lib/api/reports";
 
-/** 실패해도 홈 전체가 죽지 않게 — 각 요청은 따로 받고 실패는 null. */
+/** 실패해도 홈 전체가 죽지 않게 — 각 요청은 따로 받고 실패는 null.
+ *  ⚠ 한 번 끊겼다고 바로 포기하지 않는다. 2026-11-06 사용자 화면에서 머리기사 자리가
+ *    "불러오지 못했습니다"로 굳어 1면 왼쪽 단이 통째로 비었는데, 같은 시각 API는 멀쩡했다.
+ *    브라우저에서 한 번 끊긴 것이 그대로 박제된 것이다 — 잠깐 쉬었다 한 번 더 묻는다(lib/retry). */
 function useLoad<T>(load: () => Promise<T>): { data: T | null; loaded: boolean } {
   const [state, setState] = useState<{ data: T | null; loaded: boolean }>({ data: null, loaded: false });
   useEffect(() => {
     let alive = true;
-    load().then((d) => { if (alive) setState({ data: d, loaded: true }); }).catch(() => { if (alive) setState({ data: null, loaded: true }); });
+    retry(load).then((d) => { if (alive) setState({ data: d, loaded: true }); }).catch(() => { if (alive) setState({ data: null, loaded: true }); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -69,11 +73,19 @@ export function GenericHome() {
   const grid = items.slice(1, 5);
   const more = items.slice(5, 9);
 
+  // 머리기사가 없으면 1면을 **한 단**으로 편다.
+  //   두 단일 때 왼쪽은 머리기사(사진·제목·발췌)가 채운다. 기사를 못 받아 오면 왼쪽엔 안내문과
+  //   브리핑 카드만 남는데, 오른쪽 띠(물때·미세먼지·10일 예보)는 그대로 길어서 왼쪽 아래가
+  //   화면 한 폭만큼 텅 빈다(2026-11-06 사용자 지적 "공백이 많다").
+  //   그때는 띠를 가로로 눕혀 폭을 쓴다 — 빈 칸을 만들지 않는다.
+  const oneColumn = news.loaded && !lead;
+
   return (
     <div className="space-y-12 text-ti-ink">
       {/* ── 1면 ── */}
-      <div className="grid gap-9 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        <article aria-labelledby="lead-title">
+      <div className={`grid gap-9 ${oneColumn ? "" : "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]"}`}>
+        {/* 한 단일 때는 글 폭을 묶는다 — 안내문과 브리핑이 1166px 로 늘어나면 한 줄이 너무 길다. */}
+        <article aria-labelledby="lead-title" className={oneColumn ? "max-w-[52em]" : undefined}>
           <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.9rem] text-ti-muted">
             <span className="font-head text-base font-bold text-ti-ink">오늘의 태안</span>
             <span>태안신문 최신 기사</span>
@@ -109,7 +121,7 @@ export function GenericHome() {
         </article>
 
         {/* 오른쪽 열 — 오늘의 바다 + 미세먼지·자외선 + 10일 예보. 값이 없는 카드는 스스로 사라진다. */}
-        <div className="flex flex-col gap-5 self-start">
+        <div className={oneColumn ? "grid gap-5 md:grid-cols-2 lg:grid-cols-3" : "flex flex-col gap-5 self-start"}>
           <SeaPanel metrics={metrics.data} fog={fog.data} loaded={metrics.loaded} />
           <AirUvCard live={live.data} dust={dust.data} />
           <TenDayCard ten={ten.data} />
