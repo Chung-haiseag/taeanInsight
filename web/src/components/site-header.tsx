@@ -121,26 +121,22 @@ export function SiteHeader() {
             <ul className="flex flex-wrap items-center gap-1">
               {navItems.map((item) => {
                 const active = isActive(item.href);
-                const join = item.href === "/membership";
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
                       aria-current={active ? "page" : undefined}
-                      className={
-                        join
-                          // 멤버십은 가입 단추라 늘 진하다. 그 위에 '여기 있음' 표시를 따로 얹는다 —
-                          //   전엔 active 를 아예 안 봐서, 멤버십 화면에 있어도 표시가 없었다(2026-11-06).
-                          ? `ml-1.5 block rounded-lg bg-ti-navy px-4 py-2 text-[0.95rem] font-semibold text-ti-on-navy transition-colors hover:bg-ti-petrol${active ? " shadow-[inset_0_-3px_0_var(--ti-on-navy)]" : ""}`
-                          // 지금 보고 있는 메뉴는 한눈에 보이게 — 채움 + 진한 글씨 + 3px 밑줄.
-                          //   ⚠ 고대비 모드에선 --ti-petrol-soft 가 흰색이라 채움이 사라진다.
-                          //     그래서 밑줄과 글자색을 함께 둔다 — 하나가 없어져도 표시가 남는다.
-                          : `block rounded-lg px-3 py-2 text-[0.95rem] transition-colors hover:bg-ti-sunk hover:text-ti-ink ${
-                              active
-                                ? "bg-ti-petrol-soft font-bold text-ti-petrol-ink shadow-[inset_0_-3px_0_var(--ti-petrol)]"
-                                : "font-semibold text-ti-ink2"
-                            }`
-                      }
+                      // 칸의 색은 **지금 보고 있는가**만 말한다 — 채움 + 진한 글씨 + 3px 밑줄.
+                      //   ⚠ 고대비 모드에선 --ti-petrol-soft 가 흰색이라 채움이 사라진다.
+                      //     그래서 밑줄과 글자색을 함께 둔다 — 하나가 없어져도 표시가 남는다.
+                      //   ⚠ 멤버십을 가입 단추처럼 늘 네이비로 칠해 두었더니, 홈에 있어도
+                      //     멤버십이 켜진 것처럼 보였다(2026-11-06 사용자 지적). 파는 것이라고
+                      //     늘 칠하면 하이라이트가 거짓말이 된다 — 예외를 없앴다.
+                      className={`block rounded-lg px-3 py-2 text-[0.95rem] transition-colors hover:bg-ti-sunk hover:text-ti-ink ${
+                        active
+                          ? "bg-ti-petrol-soft font-bold text-ti-petrol-ink shadow-[inset_0_-3px_0_var(--ti-petrol)]"
+                          : "font-semibold text-ti-ink2"
+                      }`}
                     >
                       {item.label}
                     </Link>
