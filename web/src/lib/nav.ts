@@ -35,3 +35,9 @@ export const NAV_ITEMS: NavItem[] = [
 export function visibleNav(role: string | null | undefined): NavItem[] {
   return NAV_ITEMS.filter((i) => i.minRole === null || hasRole(role, i.minRole));
 }
+
+/** 지금 보고 있는 화면이 이 메뉴에 속하는가 — 상단·모바일 메뉴가 같은 판정을 쓴다.
+ *  하위 화면(/citizen/articles)도 그 메뉴를 켠다. 앞글자만 같은 남남(/membership 과 /me)은 켜지 않는다. */
+export function navActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(href + "/");
+}

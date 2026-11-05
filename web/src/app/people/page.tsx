@@ -153,6 +153,38 @@ export default function PeoplePage() {
         )}
       </section>
 
+      {/* 자주 나오는 인물 — 빈 검색창만 두면 무엇을 칠지 모른다. 실제 이름을 보여 주고 누르게 한다.
+          ⚠ 목록은 이미 받아 오고 있었는데(무작위 한 명을 펼치는 데만 썼다) 화면에 내보내지 않았다
+            (2026-11-06 사용자 요청). 등장 건수는 받은 값 그대로 — 순위를 지어내지 않는다. */}
+      {!searched && featured.length > 0 && (
+        <section aria-labelledby="people-featured" className="rounded-[18px] border border-ti-line bg-ti-surface p-5">
+          <h2 id="people-featured" className="text-[1.08rem] font-bold text-ti-ink">아카이브에 자주 나오는 분들</h2>
+          <p className="mt-1 text-[0.95rem] text-ti-ink2">이름을 누르면 그 사람 화면으로 갑니다.</p>
+          <ul className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
+            {featured.slice(0, 12).map((f) => (
+              <li key={f.id}>
+                <button
+                  type="button"
+                  onClick={() => void open(f.id)}
+                  className="flex min-h-11 items-center gap-2 rounded-full border border-ti-line bg-ti-paper px-4 text-[1.02rem] text-ti-ink transition-colors hover:border-ti-petrol hover:bg-ti-sunk"
+                >
+                  <span className="font-bold">{f.name}</span>
+                  <span className="text-[0.9rem] tabular-nums text-ti-ink2">{f.mentions.toLocaleString()}건</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 첫 인물을 받아오는 동안 빈 화면을 보여 주지 않는다 — 다 그려진 줄 알고 되돌아간다
+          (2026-11-06 사용자가 본 화면이 이 상태였다). */}
+      {!prof && !searched && busy && (
+        <p role="status" className="rounded-[18px] border border-ti-line bg-ti-surface p-8 text-center text-[1.05rem] text-ti-ink2">
+          인물 한 분을 불러오는 중입니다…
+        </p>
+      )}
+
       {prof && <PersonProfileView prof={prof} onOpen={open} onShuffle={shuffle} onBack={() => setProf(null)} />}
         </>
       )}

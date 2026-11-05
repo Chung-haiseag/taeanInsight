@@ -10,7 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAccessibility } from "./accessibility-provider";
 import { AdminHeader } from "./admin-header";
 import { AccountNav } from "./account-nav";
-import { visibleNav } from "@/lib/nav";
+import { navActive, visibleNav } from "@/lib/nav";
 import { cachedRole, getSession } from "@/lib/api/auth";
 import { getKgStatus } from "@/lib/api/kg-public";
 
@@ -52,7 +52,7 @@ export function SiteHeader() {
   // 관리자 영역은 공개 사이트와 완전히 다른 운영 콘솔 크롬 사용
   if (pathname.startsWith("/admin")) return <AdminHeader />;
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = (href: string) => navActive(pathname, href);   // 판정은 lib/nav.ts 한 곳
 
   function ask(e: React.FormEvent) {
     e.preventDefault();
@@ -129,8 +129,17 @@ export function SiteHeader() {
                       aria-current={active ? "page" : undefined}
                       className={
                         join
-                          ? "ml-1.5 block rounded-lg bg-ti-navy px-4 py-2 text-[0.95rem] font-semibold text-ti-on-navy transition-colors hover:bg-ti-petrol"
-                          : `block rounded-lg px-3 py-2 text-[0.95rem] font-semibold transition-colors hover:bg-ti-sunk hover:text-ti-ink ${active ? "text-ti-ink shadow-[inset_0_-2px_0_var(--ti-petrol)]" : "text-ti-ink2"}`
+                          // 멤버십은 가입 단추라 늘 진하다. 그 위에 '여기 있음' 표시를 따로 얹는다 —
+                          //   전엔 active 를 아예 안 봐서, 멤버십 화면에 있어도 표시가 없었다(2026-11-06).
+                          ? `ml-1.5 block rounded-lg bg-ti-navy px-4 py-2 text-[0.95rem] font-semibold text-ti-on-navy transition-colors hover:bg-ti-petrol${active ? " shadow-[inset_0_-3px_0_var(--ti-on-navy)]" : ""}`
+                          // 지금 보고 있는 메뉴는 한눈에 보이게 — 채움 + 진한 글씨 + 3px 밑줄.
+                          //   ⚠ 고대비 모드에선 --ti-petrol-soft 가 흰색이라 채움이 사라진다.
+                          //     그래서 밑줄과 글자색을 함께 둔다 — 하나가 없어져도 표시가 남는다.
+                          : `block rounded-lg px-3 py-2 text-[0.95rem] transition-colors hover:bg-ti-sunk hover:text-ti-ink ${
+                              active
+                                ? "bg-ti-petrol-soft font-bold text-ti-petrol-ink shadow-[inset_0_-3px_0_var(--ti-petrol)]"
+                                : "font-semibold text-ti-ink2"
+                            }`
                       }
                     >
                       {item.label}

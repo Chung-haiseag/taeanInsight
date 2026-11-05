@@ -7,6 +7,8 @@
 
 import Link from "next/link";
 
+import { Icon, type IconName } from "@/components/icon";
+
 import { summarizeYears, barHeights, decadeTicks, type YearCount } from "@/lib/archive-years";
 
 const BAR = 7;
@@ -15,12 +17,13 @@ const PLOT_H = 76;
 const AXIS_H = 15;
 const PAD_X = 14;   // 양끝 연도 글자가 막대 밖으로 나가므로 viewBox 를 그만큼 넓힌다
 
-/** 아카이브를 보는 세 가지 길. current 는 지금 보고 있는 화면. */
-const WAYS = [
-  { href: "/news", label: "기사 검색", note: "제목·본문에서 찾기" },
-  { href: "/paper/ads", label: "옛 광고", note: "그 시절 집값·품삯" },
-  { href: "/paper/prices", label: "옛날 물가", note: "광고로 만든 30년 시세표" },
-] as const;
+/** 아카이브를 보는 세 가지 길. current 는 지금 보고 있는 화면.
+ *  아이콘은 글자를 거드는 것이지 대신하지 않는다 — 이름이 바로 옆에 있어 aria-hidden(Icon 기본값). */
+const WAYS: { href: string; label: string; note: string; icon: IconName }[] = [
+  { href: "/news", label: "기사 검색", note: "제목·본문에서 찾기", icon: "search" },
+  { href: "/paper/ads", label: "옛 광고", note: "그 시절 집값·품삯", icon: "megaphone" },
+  { href: "/paper/prices", label: "옛날 물가", note: "광고로 만든 30년 시세표", icon: "won" },
+];
 
 function YearChart({ years }: { years: YearCount[] }) {
   const s = summarizeYears(years);
@@ -101,23 +104,30 @@ export function ArchiveBanner({ total, minYear, maxYear, years, current }: {
         <ul className="m-0 grid list-none gap-2.5 p-0 md:grid-cols-3">
           {WAYS.map((w) => {
             const here = w.href === current;
+            // 아이콘을 동그란 바탕에 얹어 '누르는 칸'으로 보이게 한다 — 전엔 글자만 있어
+            //   어두운 칸 위에 묻혔다(2026-11-06 사용자 지적).
             const inner = (
-              <>
-                <span className="flex items-center gap-2 font-bold">
-                  {w.label}
-                  {here
-                    ? <span className="rounded-full bg-white/20 px-2 py-0.5 text-[0.75rem] font-bold">지금 화면</span>
-                    : <span aria-hidden className="ml-auto transition-transform group-hover:translate-x-0.5">→</span>}
+              <span className="flex items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/15 text-white">
+                  <Icon name={w.icon} size="1.25rem" weight="bold" />
                 </span>
-                <span className="mt-0.5 block break-keep text-[0.9rem] text-ti-on-navy-muted">{w.note}</span>
-              </>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 text-[1.02rem] font-bold">
+                    {w.label}
+                    {here
+                      ? <span className="rounded-full bg-white/25 px-2 py-0.5 text-[0.75rem] font-bold">지금 화면</span>
+                      : <span aria-hidden className="ml-auto transition-transform group-hover:translate-x-1">→</span>}
+                  </span>
+                  <span className="mt-0.5 block break-keep text-[0.9rem] text-ti-on-navy-muted">{w.note}</span>
+                </span>
+              </span>
             );
             return (
               <li key={w.href}>
                 {here ? (
-                  <span aria-current="page" className="block min-h-11 rounded-xl bg-white/[0.16] px-4 py-2.5">{inner}</span>
+                  <span aria-current="page" className="block min-h-11 rounded-xl border border-white/25 bg-white/[0.20] px-4 py-3">{inner}</span>
                 ) : (
-                  <Link href={w.href} className="group block min-h-11 rounded-xl bg-white/[0.06] px-4 py-2.5 transition-colors hover:bg-white/[0.14]">
+                  <Link href={w.href} className="group block min-h-11 rounded-xl border border-white/15 bg-white/[0.10] px-4 py-3 transition-colors hover:border-white/35 hover:bg-white/[0.20]">
                     {inner}
                   </Link>
                 )}
