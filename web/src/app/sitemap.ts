@@ -23,8 +23,11 @@ export async function generateSitemaps(): Promise<{ id: number }[]> {
   }
 }
 
-export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  if (Number(id) === 0) {   // Next가 id를 문자열로 넘길 수 있어 Number()로 정규화
+// ⚠ Next 16 부터 id 가 Promise 로 온다(generateSitemaps 는 그대로 동기). 2026-11-05 업그레이드.
+//   await 를 빼먹으면 Number(Promise) = NaN 이 되어 **모든 청크가 연도 분기로 떨어진다** — 조용히 틀린다.
+export default async function sitemap({ id }: { id: Promise<number> | number }): Promise<MetadataRoute.Sitemap> {
+  const sid = Number(await id);   // Next 가 문자열로 넘길 수도 있어 Number() 로 정규화
+  if (sid === 0) {
     const staticEntries = STATIC.map((p) => ({
       url: `${SITE}${p}`,
       changeFrequency: "daily" as const,
@@ -43,7 +46,7 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
   //   색인되지 않았다(인물 화면이 /people 안의 상태로만 있었다). 개별 주소가 생겨 이제 넣는다.
   //   ⚠ 3만 4천 명을 다 넣지 않는다 — 기사 몇 건뿐인 이름은 내용이 얇아 색인에 되레 해가 된다.
   //     백엔드가 등장 10회 이상·바이라인 제외로 걸러 3천여 명만 준다.
-  if (Number(id) === 1) {
+  if (sid === 1) {
     try {
       const res = await fetch(`${API_BASE}/api/kg/persons/sitemap`, { next: { revalidate: 86400 } });
       if (!res.ok) return [];
@@ -56,7 +59,7 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     } catch { return []; }
   }
   try {
-    const res = await fetch(`${API_BASE}/api/news/sitemap-ids?year=${id}`, { next: { revalidate: 86400 } });
+    const res = await fetch(`${API_BASE}/api/news/sitemap-ids?year=${sid}`, { next: { revalidate: 86400 } });
     if (!res.ok) return [];
     const data = (await res.json()) as { ids?: { id: number; publishedAt?: string | null }[] };
     return (data.ids ?? []).map((a) => ({
