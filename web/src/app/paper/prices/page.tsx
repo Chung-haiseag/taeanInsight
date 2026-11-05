@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
 import { CopilotScreen } from "@/components/copilot/copilot-screen";
+import { loadPrices, type PricePoint as Point } from "@/lib/archive-load";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 export const revalidate = 86400;
@@ -15,9 +16,6 @@ export const metadata: Metadata = {
   description: "1990~2001년 주간태안신문 광고에 적힌 전세·매매·월세 3,082건으로 만든 태안 물가표. IMF 전후 집값 변화가 그대로 남아 있습니다.",
   alternates: { canonical: "/paper/prices" },
 };
-
-interface Point { year: number; n: number; med: number; p25: number; p75: number }
-interface LabelSeries { label: string; total: number; series: Point[] }
 
 /** 만원 단위를 읽기 쉽게 — 고령 독자 기준으로 '1억 2,000만원'까지 풀어 쓴다. */
 const won = (man: number): string => {
@@ -71,11 +69,9 @@ function Chart({ series }: { series: Point[] }) {
 }
 
 export default async function PricesPage() {
-  let labels: LabelSeries[] = [];
-  try {
-    const res = await fetch(`${API_BASE}/api/archive/ads/prices`, { next: { revalidate: 86400 } });
-    if (res.ok) labels = ((await res.json()) as { labels?: LabelSeries[] }).labels ?? [];
-  } catch { /* 조회 실패 → 빈 목록 */ }
+  // 못 가져온 것과 정말 없는 것은 다른 말이다 — src/lib/paper-prices.ts
+  const result = await loadPrices(`${API_BASE}/api/archive/ads/prices`);
+  const labels = result.state === "ok" ? result.labels : [];
 
   const total = labels.reduce((s, l) => s + l.total, 0);
 
@@ -106,7 +102,16 @@ export default async function PricesPage() {
         ).join("\n")
       } />
 
-      {labels.length === 0 && <p className="text-sm text-foreground-muted">아직 정리된 시세가 없습니다.</p>}
+      {/* 자료가 안 보일 땐 왜 안 보이는지를 말한다. '없다'고 하면 독자는 믿고 돌아간다. */}
+      {result.state === "error" && (
+        <div className="rounded-2xl border border-brand/20 bg-brand/5 p-5">
+          <p className="font-semibold text-brand">시세표를 지금 불러오지 못했습니다.</p>
+          <p className="mt-1 text-sm text-foreground-muted">
+            자료가 없어진 것이 아니라 잠시 연결이 안 된 것입니다. 조금 뒤에 다시 열어 주세요.
+          </p>
+        </div>
+      )}
+      {result.state === "empty" && <p className="text-sm text-foreground-muted">아직 정리된 시세가 없습니다.</p>}
 
       <div className="space-y-10">
         {labels.map(({ label, total: n, series }) => (

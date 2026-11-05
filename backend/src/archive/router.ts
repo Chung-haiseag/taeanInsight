@@ -11,6 +11,7 @@ import { PRICE_LABELS } from "./ad_prices";
 
 import type { Env } from "../types";
 import { FTS_MIN, relatedKeywords, titleMatchQuery } from "./related";
+import { cacheRule } from "../lib/cache_headers";
 
 export const archiveRouter = new Hono<{ Bindings: Env }>();
 
@@ -367,9 +368,11 @@ archiveRouter.get("/ads/years", async (c) => {
   if (!db) return c.json({ error: "archive_db_unbound" }, 503);
   const r = await db.prepare(
     "SELECT year, COUNT(*) AS n FROM archive_articles WHERE COALESCE(is_ad,0)=1 GROUP BY year ORDER BY year",
-  ).all().catch(() => null);                    // 아직 표시 전이면 빈 목록으로
-  const res = c.json({ years: r?.results ?? [] });
-  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  ).all().catch(() => null);                    // null = 조회 실패, [] = 아직 표시 전
+  const years = r?.results ?? [];
+  const rule = cacheRule({ failed: r === null, empty: years.length === 0, maxAge: 86400 });
+  const res = rule.status === 503 ? c.json({ error: "archive_query_failed" }, 503) : c.json({ years });
+  res.headers.set("Cache-Control", rule.cacheControl);
   return res;
 });
 
@@ -407,7 +410,13 @@ archiveRouter.get("/ads", async (c) => {
       ).bind(year)
   ).all<{ idxno: number; title: string; section: string; published_at: string; ad_key: string | null; b: string }>()
     .catch(() => null);
-  const rows = r?.results ?? [];
+  // 조회 자체가 실패했으면 여기서 접는다 — '광고가 없다'로 둔갑시켜 캐시하면 안 된다.
+  if (r === null) {
+    const res = c.json({ error: "archive_query_failed" }, 503);
+    res.headers.set("Cache-Control", "no-store");
+    return res;
+  }
+  const rows = r.results ?? [];
 
   // 같은 광고 접기 — 반복 게재(ad_key 동일)는 첫 번째 것만 남긴다(마이그레이션 056).
   //   신도신협 같은 광고는 한 해에만 수십 번 실려, 안 접으면 목록이 그 광고로 도배된다.
@@ -441,7 +450,8 @@ archiveRouter.get("/ads", async (c) => {
     page, totalPages: Math.max(1, Math.ceil(picked.length / SIZE)),
     items: pageItems.map(({ ad_key, ...x }) => ({ ...x, runs: (ad_key && runs.get(ad_key)) || null })),
   });
-  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  res.headers.set("Cache-Control",
+    cacheRule({ failed: false, empty: picked.length === 0, maxAge: 86400 }).cacheControl);
   return res;
 });
 
@@ -453,7 +463,13 @@ archiveRouter.get("/ads/prices", async (c) => {
   if (!db) return c.json({ error: "archive_db_unbound" }, 503);
   const r = await db.prepare("SELECT label, year, man FROM ad_prices").all<{ label: string; year: number; man: number }>()
     .catch(() => null);
-  const rows = r?.results ?? [];
+  // 2026-11-05: 여기서 실패를 빈 목록으로 삼켜 "아직 정리된 시세가 없습니다"가 하루 박제됐다.
+  if (r === null) {
+    const res = c.json({ error: "archive_query_failed" }, 503);
+    res.headers.set("Cache-Control", "no-store");
+    return res;
+  }
+  const rows = r.results ?? [];
   const byKey = new Map<string, number[]>();
   for (const x of rows) {
     const k = `${x.label}|${x.year}`;
@@ -471,7 +487,8 @@ archiveRouter.get("/ads/prices", async (c) => {
     return { label, total: series.reduce((a, x) => a + x.n, 0), series };
   }).filter((l) => l.total > 0);
   const res = c.json({ labels });
-  res.headers.set("Cache-Control", "public, s-maxage=86400");
+  res.headers.set("Cache-Control",
+    cacheRule({ failed: false, empty: labels.length === 0, maxAge: 86400 }).cacheControl);
   return res;
 });
 
@@ -493,8 +510,18 @@ archiveRouter.get("/ads/on-this-day", async (c) => {
     "FROM archive_articles WHERE COALESCE(is_ad,0)=1 AND substr(published_at,6,5) IN (" +
     days.map(() => "?").join(",") + ") AND length(COALESCE(body,'')) >= 20 ORDER BY idxno",
   ).bind(...days).all<{ idxno: number; title: string; year: number; date: string; b: string }>().catch(() => null);
-  const rows = r?.results ?? [];
-  if (!rows.length) return c.json({ item: null });
+  if (r === null) {
+    const res = c.json({ error: "archive_query_failed" }, 503);
+    res.headers.set("Cache-Control", "no-store");
+    return res;
+  }
+  const rows = r.results ?? [];
+  // 오늘 날짜 창에 옛 광고가 없는 날은 정말 있다 — 없다는 건 사실이니 짧게만 담아둔다.
+  if (!rows.length) {
+    const res = c.json({ item: null });
+    res.headers.set("Cache-Control", cacheRule({ failed: false, empty: true, maxAge: 3600 }).cacheControl);
+    return res;
+  }
   const seed = Number(`${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}`);
   const pick = rows[seed % rows.length];
   const res = c.json({ item: { ...pick, yearsAgo: now.getUTCFullYear() - pick.year } });

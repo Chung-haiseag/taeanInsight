@@ -4,6 +4,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
+import { loadArchiveList } from "@/lib/archive-load";
 import { AdsClient } from "./ads-client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
@@ -16,11 +17,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AdsPage() {
-  let years: Array<{ year: number; n: number }> = [];
-  try {
-    const res = await fetch(`${API_BASE}/api/archive/ads/years`, { next: { revalidate: 86400 } });
-    if (res.ok) years = ((await res.json()) as { years?: Array<{ year: number; n: number }> }).years ?? [];
-  } catch { /* 조회 실패 → 빈 목록 */ }
+  // 못 가져온 것과 정말 없는 것은 다른 말이다 — src/lib/archive-load.ts
+  const result = await loadArchiveList<{ year: number; n: number }>(
+    `${API_BASE}/api/archive/ads/years`, "years");
+  const years = result.state === "ok" ? result.items : [];
 
   const total = years.reduce((s, y) => s + y.n, 0);
 
@@ -42,9 +42,17 @@ export default async function AdsPage() {
           {years[0]?.year}~{years[years.length - 1]?.year}년 · {total.toLocaleString()}건
         </p>
       )}
-      {years.length === 0
-        ? <p className="text-sm text-foreground-muted">아직 정리된 광고가 없습니다.</p>
-        : <AdsClient years={years} />}
+      {/* 자료가 안 보일 땐 왜 안 보이는지를 말한다. '없다'고 하면 독자는 믿고 돌아간다. */}
+      {result.state === "error" && (
+        <div className="rounded-2xl border border-brand/20 bg-brand/5 p-5">
+          <p className="font-semibold text-brand">옛 광고를 지금 불러오지 못했습니다.</p>
+          <p className="mt-1 text-sm text-foreground-muted">
+            자료가 없어진 것이 아니라 잠시 연결이 안 된 것입니다. 조금 뒤에 다시 열어 주세요.
+          </p>
+        </div>
+      )}
+      {result.state === "empty" && <p className="text-sm text-foreground-muted">아직 정리된 광고가 없습니다.</p>}
+      {result.state === "ok" && <AdsClient years={years} />}
     </div>
   );
 }

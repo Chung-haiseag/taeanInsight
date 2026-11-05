@@ -36,6 +36,9 @@ function Ads({ years }: { years: Array<{ year: number; n: number }> }) {
   const [qInput, setQInput] = useState(sp.get("q") ?? "");
   const [q, setQ] = useState(sp.get("q") ?? "");
   const [data, setData] = useState<Res | null>(null);
+  // 못 가져온 것과 '이 조건에 맞는 게 없는 것'은 다른 말이다(2026-11-05).
+  //   예전엔 실패해도 빈 객체를 넣어, 단추만 남고 아래가 통째로 비어 보였다.
+  const [failed, setFailed] = useState(false);
 
   // 목록이 그려진 뒤 보던 자리로 되돌린다(뒤로가기).
   useListScrollMemory(listScrollKey("/paper/ads", { year: year ?? "all", kind, q, page }), !!data?.items);
@@ -43,6 +46,7 @@ function Ads({ years }: { years: Array<{ year: number; n: number }> }) {
   useEffect(() => {
     let alive = true;
     setData(null);
+    setFailed(false);
     const sp = new URLSearchParams({ page: String(page) });
     // 검색어가 있으면 연도를 안 걸어 **전 기간**에서 찾는다 — 연도 단추를 누르면 그 해로 좁힌다.
     if (year !== null) sp.set("year", String(year));
@@ -58,9 +62,9 @@ function Ads({ years }: { years: Array<{ year: number; n: number }> }) {
     router.replace(`/paper/ads?${url}`, { scroll: false });
 
     fetch(`${API_BASE}/api/archive/ads?${qs}`)
-      .then((r) => (r.ok ? r.json() : {}))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`http ${r.status}`))))
       .then((d) => { if (alive) setData(d as Res); })
-      .catch(() => { if (alive) setData({}); });
+      .catch(() => { if (alive) { setData({}); setFailed(true); } });
     return () => { alive = false; };
   }, [year, kind, page, q, router]);
 
@@ -121,7 +125,15 @@ function Ads({ years }: { years: Array<{ year: number; n: number }> }) {
       </div>
 
       {!data && <p className="text-sm text-foreground-muted">불러오는 중…</p>}
-      {data?.items?.length === 0 && <p className="text-sm text-foreground-muted">이 조건에 맞는 광고가 없습니다.</p>}
+      {failed && (
+        <div className="rounded-2xl border border-brand/20 bg-brand/5 p-5">
+          <p className="font-semibold text-brand">광고를 지금 불러오지 못했습니다.</p>
+          <p className="mt-1 text-sm text-foreground-muted">
+            자료가 없어진 것이 아니라 잠시 연결이 안 된 것입니다. 조금 뒤에 다시 해 주세요.
+          </p>
+        </div>
+      )}
+      {!failed && data?.items?.length === 0 && <p className="text-sm text-foreground-muted">이 조건에 맞는 광고가 없습니다.</p>}
 
       <ul className="grid gap-2 sm:grid-cols-2">
         {data?.items?.map((a) => (
