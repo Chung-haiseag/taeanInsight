@@ -78,3 +78,30 @@ describe("훑어보는 화면의 가로폭은 상단 메뉴와 같다", () => {
     }
   });
 });
+
+// ── 상단 메뉴 열 개 전수 ──────────────────────────────────────────────────
+//   2026-11-05 사용자 요청으로 메뉴별 가로폭을 실제 화면에서 전수 측정했다(뷰포트 1800).
+//   여덟은 1200px 레일에 맞아 있었고 **둘만 어긋났다** — 멤버십 768px, 주간 리포트 896px.
+//   ⚠ 주간 리포트의 틀은 page.tsx 가 아니라 **컴포넌트**(report-reader.tsx)가 쥐고 있었다.
+//     page.tsx 만 보던 앞의 가드가 놓친 자리라, 틀을 쥔 컴포넌트도 함께 센다.
+//   [파일, 이 파일에서만 봐주는 폭] — 봐주는 것은 '틀'이 아니라 레일 안에서 좁히는 '속'이다.
+const MENU_SCREENS: Array<[string, string[]]> = [
+  ["app/news/page.tsx", []],
+  ["app/people/page.tsx", []],
+  ["app/live/page.tsx", []],
+  ["app/beaches/page.tsx", []],
+  ["app/data/page.tsx", []],
+  ["app/membership/page.tsx", []],
+  ["app/reports/page.tsx", []],
+  ["app/citizen/page.tsx", []],
+  ["app/me/page.tsx", ["max-w-xl"]],   // 입력칸 — 이름·전화 적는 칸까지 1200px 로 늘릴 이유가 없다
+  ["app/reporter/page.tsx", []],
+  ["components/reports/report-reader.tsx", []],
+];
+
+describe("상단 메뉴 열 개 — 전부 같은 레일", () => {
+  it.each(MENU_SCREENS)("%s", (rel, allowed) => {
+    const src = readFileSync(join(process.cwd(), "src", rel), "utf8");
+    expect(narrowRails(src).filter((t) => !allowed.includes(t))).toEqual([]);
+  });
+});

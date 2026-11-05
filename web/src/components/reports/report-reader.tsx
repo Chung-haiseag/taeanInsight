@@ -102,7 +102,7 @@ export function ReportReader({
   // ── 발행 전 ──
   if (!report) {
     return (
-      <div className="mx-auto max-w-4xl">
+      <div>
         <Masthead weekLabel="" publishedAt="" aiLabel="ai_assisted" gated={false} />
         <div className="mt-10 card p-8 text-center">
           <p className="text-4xl" aria-hidden><Icon name="news" /></p>
@@ -114,7 +114,7 @@ export function ReportReader({
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div>
       <Masthead
         weekLabel={weekLabel(report.weekId)}
         publishedAt={report.publishedAt}
@@ -185,7 +185,7 @@ export function ReportReader({
                     </p>
                   </>
                 )}
-                <p className={`whitespace-pre-line text-[1.05rem] leading-[1.85] text-foreground ${s.key === "summary" ? "mt-6" : ""}`}>{s.content}</p>
+                <p className={`mx-auto max-w-[40em] whitespace-pre-line text-[1.05rem] leading-[1.85] text-foreground ${s.key === "summary" ? "mt-6" : ""}`}>{s.content}</p>
                 {!s.truncated && <SectionVisual sectionKey={s.key} metrics={metrics} />}
                 {s.truncated && (
                   <Link href="/membership?utm_source=report" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">

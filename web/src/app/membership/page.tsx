@@ -86,7 +86,9 @@ export default function MembershipPage() {
   const phone = pay.phone ?? me?.phone ?? null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-12 pb-8">
+    // 가로폭은 레일(1200px) 하나만 쓴다 — 여기서 또 좁히면 상단 메뉴보다 안으로 들어간다
+    //   (2026-11-05 전수 측정에서 768px 로 혼자 좁아 있었다). src/lib/page-rail.ts
+    <div className="space-y-12 pb-8">
       <PageHeader
         align="center"
         eyebrow="멤버십"
