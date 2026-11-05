@@ -35,7 +35,9 @@ export function composeBriefingBody(p: BriefingParts): string {
     .slice(0, 178);
 }
 
-export interface Briefing { title: string; body: string; hasSafety: boolean }
+// spoken — 귀로 듣는 글(src/audio/brief_script.ts). 화면 글과 따로 간다:
+//   눈은 토막글이 빠르고, 귀는 문장이라야 알아듣는다(2026-11-05).
+export interface Briefing { title: string; body: string; hasSafety: boolean; spoken: string }
 
 function ymdCompact(d: Date): string {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
@@ -133,7 +135,8 @@ export async function buildDailyBriefing(env: Env): Promise<Briefing | null> {
   if (!body) return null;
   const hasSafety = !!parts.safety;
   const title = `${hasSafety ? "⚠️ " : ""}오늘의 태안 · ${k.getUTCMonth() + 1}/${k.getUTCDate()}(${WD[k.getUTCDay()]})`;
-  return { title, body, hasSafety };
+  const { briefScript } = await import("../audio/brief_script");
+  return { title, body, hasSafety, spoken: briefScript(title, parts) };
 }
 
 export interface DailyBriefingResult { subscribers: number; sent: number; skipped?: string }

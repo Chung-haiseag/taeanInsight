@@ -1,6 +1,6 @@
 // 오디오 뉴스/브리핑/팟캐스트 — 로컬·VPS 잡이 R2에 올린 Gemini 낭독(.wav)만 서빙.
 //  Gemini본이 없으면 503(no_audio) — Chirp3-HD(Google Cloud TTS 유료) 폴백은 비활성(2026-07-27).
-//  GET /api/audio/news/:idxno · /briefing · /podcast · /status · /manifest
+//  GET /api/audio/news/:idxno · /brief · /briefing · /podcast · /status · /manifest
 
 import { Hono } from "hono";
 import type { Env } from "../types";
@@ -90,6 +90,21 @@ audioRouter.get("/briefing", async (c) => {
   return r ?? c.json({ error: "no_audio", hint: "Gemini 낭독 미생성(Chirp3-HD 폴백 비활성)" }, 503);
 });
 
+// GET /api/audio/brief — '오늘의 브리핑' 한 토막 낭독(1면 카드).
+//   저녁 팟캐스트(/briefing, 2인 대담)와는 다른 것이다 — 이쪽은 날씨·물때 한 문단, 20초쯤.
+//   ⚠ 브라우저 speechSynthesis 로 읽던 것을 옮겨 왔다(2026-11-05). OS 음성은 한국어 목소리가
+//     없으면 다른 언어 목소리로 읽어, 한글을 일본어로 읽는 일이 실제로 있었다.
+//     서버가 만든 한국어 음성만 서빙하면 그런 일이 생길 수 없다. 없으면 503 — 나쁜 목소리로 때우지 않는다.
+audioRouter.get("/brief", async (c) => {
+  if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "bad_request" }, 400);
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  const date = `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}-${String(k.getUTCDate()).padStart(2, "0")}`;
+  const cc = "public, max-age=600, must-revalidate", rh = c.req.header("range");
+  const r = (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/brief/${date}.mp3`, "audio/mpeg", cc, rh))
+    ?? (await serveAudio(c.env.ARCHIVE_PHOTOS, `audio/brief/${date}.wav`, "audio/wav", cc, rh));
+  return r ?? c.json({ error: "no_audio", hint: "오늘 브리핑 낭독 미생성" }, 503);
+});
+
 // GET /api/audio/status — 오디오 자동생성 현황(로컬 잡이 기록한 status.json + 이번주 팟캐스트 존재)
 audioRouter.get("/status", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS) return c.json({ error: "no_r2" }, 503);
@@ -118,7 +133,15 @@ audioRouter.get("/status", async (c) => {
       if (h) { try { health = { ...JSON.parse(h.v), checkedAt: new Date(h.ts).toISOString(), ageHours: Math.round((Date.now() - h.ts) / 36e5) }; } catch { /* */ } }
     }
   }
-  return c.json({ ...status, podcastLive, week, health, checkedAt: new Date().toISOString() });
+  // 오늘의 브리핑 낭독이 있는지 — 1면에서 독자가 바로 보는 것이라 조용히 죽으면 안 된다.
+  //   (기사 듣기는 두 번 죽었고 두 번 다 독자가 먼저 알았다. 같은 일을 또 겪지 않으려 여기서 센다.)
+  const kb = new Date(Date.now() + 9 * 3600 * 1000);
+  const briefDate = `${kb.getUTCFullYear()}-${String(kb.getUTCMonth() + 1).padStart(2, "0")}-${String(kb.getUTCDate()).padStart(2, "0")}`;
+  const briefHas = !!(await c.env.ARCHIVE_PHOTOS.head(`audio/brief/${briefDate}.mp3`))
+    || !!(await c.env.ARCHIVE_PHOTOS.head(`audio/brief/${briefDate}.wav`));
+  // 생성은 아침 7시 배치라 그 전에 없는 것은 정상이다.
+  const brief = { date: briefDate, has: briefHas, ok: briefHas || kb.getUTCHours() < 8 };
+  return c.json({ ...status, podcastLive, week, health, brief, checkedAt: new Date().toISOString() });
 });
 
 // GET /api/audio/manifest — R2 오디오 파일 포맷별 집계(관리자, 읽기 전용). 저품질·구버전 정리용.
