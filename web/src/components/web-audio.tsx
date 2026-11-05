@@ -7,6 +7,7 @@
 import { useRef, useState, useEffect, useCallback, type MouseEvent } from "react";
 import { Icon } from "@/components/icon";
 import { trackEvent } from "@/lib/api/reading";
+import { listenLabel } from "@/lib/listen-label";
 
 type St = "idle" | "loading" | "playing" | "paused" | "error" | "unavailable";
 
@@ -131,7 +132,7 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle, onPo
         : playing ? <span className="inline-flex items-center gap-1.5"><span aria-hidden>❙❙</span> 일시정지</span>
         : st === "paused" ? <><Icon name="play" /> 이어 듣기</>
         : st === "error" ? <><Icon name="refresh" /> 다시 듣기</>
-        : <><Icon name="speaker" /> {variant === "card" ? "듣기" : "기사 듣기"}</>}
+        : <><Icon name="speaker" /> {listenLabel(variant, title)}</>}
     </button>
   );
 
