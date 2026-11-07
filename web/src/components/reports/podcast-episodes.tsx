@@ -27,24 +27,34 @@ export function PodcastEpisodes({ excludeWeekId }: { excludeWeekId?: string } = 
   if (!eps || list.length === 0) return null;
 
   return (
-    <section aria-labelledby="past-episodes" className="no-print card px-5 py-5">
-      <h2 id="past-episodes" className="font-head text-xl font-bold text-ti-ink">🎙 지난 회차 다시 듣기</h2>
-      <p className="mt-1 text-sm text-ti-muted">{list.length}개 회차를 다시 들으실 수 있어요. · AI 생성</p>
+    // 회차 머리와 같은 활자 리듬. 카드(둥근 상자)에 담지 않고 **굵은 가로선 아래 목록**으로 둔다 —
+    //   위의 회차가 선으로 끊어 읽히는데 여기만 상자에 담기면 한 화면에 두 가지 문법이 섞인다.
+    <section aria-labelledby="past-episodes" className="no-print border-t-2 border-ti-ink pt-8">
+      <h2 id="past-episodes" className="font-head text-2xl font-bold text-ti-ink md:text-[1.75rem]">다시 듣기</h2>
+      <p className="mt-2 text-[0.95rem] text-ti-muted">{list.length}개 회차를 다시 들으실 수 있어요. · AI 생성</p>
 
-      <ul className="mt-4 divide-y divide-ti-line">
+      <ul className="mt-6 border-t border-ti-line">
         {list.map((e) => {
           const no = episodeNoLabel(e.no);
           const range = episodeRangeLabel(e.weekId);
           // 날짜 범위를 못 구하면(모르는 주차 꼴) 발행일로 대신한다 — 빈칸으로 두지 않는다.
           const when = range || publishedLabel(e.publishedAt);
           return (
-            <li key={e.weekId} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3.5">
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-baseline gap-x-2">
-                  {no && <span className="font-head font-bold text-ti-ink">{no}</span>}
-                  {when && <span className={no ? "text-[0.95rem] text-ti-ink2" : "font-semibold text-ti-ink"}>{when}</span>}
-                </p>
-                {e.summary && <p className="mt-0.5 line-clamp-1 text-xs text-ti-muted">{e.summary}</p>}
+            <li
+              key={e.weekId}
+              className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-ti-line py-5 md:py-6"
+            >
+              <div className="flex min-w-0 flex-1 items-baseline gap-6">
+                {/* 번호 칸 너비는 회차 머리의 기사 목록과 같다(w-10) — 두 목록이 같은 세로선에 선다. */}
+                <span className="w-10 shrink-0 whitespace-nowrap text-right font-head text-[1.05rem] font-bold tabular-nums text-ti-ink">
+                  {no}
+                </span>
+                <div className="min-w-0 flex-1">
+                  {when && <p className="text-[1.05rem] text-ti-ink md:text-[1.12rem]">{when}</p>}
+                  {e.summary && (
+                    <p className="mt-1.5 line-clamp-1 text-[0.95rem] leading-relaxed text-ti-muted">{e.summary}</p>
+                  )}
+                </div>
               </div>
               {/* ⚠ title 을 꼭 넘긴다. 줄 안(inline) 단추는 title 이 없으면 **"기사 듣기"**로 적힌다
                   — 팟캐스트 회차는 기사가 아니다(lib/listen-label.ts 가 기록한 2026-11-06 사고와 같은 자리). */}

@@ -93,3 +93,74 @@ describe("들을 수 없는 회차에는 길이를 적지 않는다", () => {
     expect(m![1]).toMatch(/hasAudio/);
   });
 });
+
+// 2026-11-07: 당진의 기억 구조로 다시 짰다. 되돌아가면 안 되는 것들을 박제한다.
+describe("회차 머리 — 당진 구조에서 되돌아가지 않는다", () => {
+  // ⚠ 주석을 걷어내고 본다. 처음엔 안 걷어내서 "<details> 안의 글은 주소가 없다"고 **설명하는
+  //   주석**을 코드로 읽고 가드가 헛돌았다 — 소스를 읽는 가드는 코드만 읽어야 한다.
+  const code = (p: string) =>
+    readFileSync(join(process.cwd(), p), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const head = () => code("src/components/reports/episode-head.tsx");
+
+  it("대본은 접는 칸이 아니라 제 주소를 가진 화면으로 간다", () => {
+    // <details> 안의 글은 공유할 주소가 없고 검색 결과로도 서지 못한다 —
+    //   대본을 저장하기로 한 이유(귀가 어두운 독자·검색)가 통째로 무너진다.
+    expect(head()).not.toMatch(/<details/);
+    expect(head()).toMatch(/\/reports\/\$\{episode\.weekId\}\/script/);
+  });
+
+  it("대본 화면이 실제로 있다", () => {
+    expect(() => readFileSync(join(process.cwd(), "src/app/reports/[weekId]/script/page.tsx"), "utf8")).not.toThrow();
+  });
+
+  it("대본이 없는 회차엔 링크를 그리지 않는다", () => {
+    // 지난 21회차는 대본이 없다. 눌러서 404 를 보게 하면 독자는 자기가 잘못 눌렀다고 여긴다.
+    expect(head()).toMatch(/episode\.script\.length > 0 &&/);
+  });
+
+  it("제목은 사람 말이다 — 번호(제N화)를 제목으로 쓰지 않는다", () => {
+    // 번호는 왼쪽에 크게 선다. h1 은 '11월 둘째 주의 태안'처럼 읽혀야 한다.
+    const h1 = /<h1[\s\S]*?<\/h1>/.exec(head())?.[0] ?? "";
+    expect(h1).toMatch(/monthWeekLabel|week\b/);
+    expect(h1).not.toMatch(/episodeNoLabel/);
+  });
+
+  it("옛 기사 줄은 있을 때만 그린다", () => {
+    // 없는 주차에 '0년 전'이나 빈 줄을 그리면 아카이브가 비어 보인다.
+    expect(head()).toMatch(/episode\.throwback &&/);
+  });
+
+  it("사진 번호는 목록 순번에서 온다 — 사진 순번이 아니다", () => {
+    // 사진 없는 기사가 섞이면 번호가 건너뛴다. 그게 맞다 — 번호는 '목록에서 몇 번째'다.
+    expect(head()).toMatch(/\.map\(\(a, i\) => \(\{ \.\.\.a, n: i \+ 1 \}\)\)[\s\S]{0,80}\.filter\(/);
+  });
+});
+
+// 2026-11-07: 모자이크 사진 한 칸이 빈 회색 상자 + 번호표로 남아 있었다 — 신문사 CDN 에
+//   사진이 없는 기사(idxno 69385)였다. 예전 배치에선 96×64 썸네일이라 티가 안 났는데
+//   큰 칸이 되니 **우리 쪽이 고장난 것처럼** 보였다. 서버는 그 주소가 사는지 알 수 없다.
+describe("깨진 사진은 칸째로 접는다", () => {
+  it("모자이크는 onError 를 아는 칸(MosaicPhoto)을 쓴다 — 맨 <img> 를 직접 박지 않는다", () => {
+    const head = readFileSync(join(process.cwd(), "src/components/reports/episode-head.tsx"), "utf8");
+    expect(head).toMatch(/<MosaicPhoto\b/);
+    expect(head).not.toMatch(/<img\b/);
+  });
+  it("MosaicPhoto 는 깨지면 null 을 돌려준다", () => {
+    const m = readFileSync(join(process.cwd(), "src/components/reports/mosaic-photo.tsx"), "utf8");
+    expect(m).toMatch(/onError=/);
+    expect(m).toMatch(/if \(broken\) return null;/);
+  });
+});
+
+// onError 만으로는 못 잡는다 — 서버가 그린 <img> 는 React 가 하이드레이트하기 전에 이미 실패할 수
+//   있고, 그 이벤트는 핸들러가 붙기 전에 지나간다. 실측으로 확인했다(complete=true·naturalWidth=0
+//   인데 빈 칸이 그대로 남았다). 마운트 때 직접 묻는 길이 반드시 있어야 한다.
+describe("하이드레이션 전에 깨진 사진도 잡는다", () => {
+  it("MosaicPhoto 가 마운트 때 complete·naturalWidth 를 직접 확인한다", () => {
+    const m = readFileSync(join(process.cwd(), "src/components/reports/mosaic-photo.tsx"), "utf8");
+    expect(m).toMatch(/useEffect\(/);
+    expect(m).toMatch(/complete[\s\S]{0,40}naturalWidth === 0/);
+  });
+});

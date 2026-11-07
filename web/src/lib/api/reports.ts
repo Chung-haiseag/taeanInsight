@@ -675,6 +675,16 @@ export interface PodcastEpisodeView {
   scripted: boolean;
   script: EpisodeScriptLine[];
   articles: EpisodeArticle[];
+  /** 같은 주에 실렸던 옛 기사 한 건(1990~2001 전자북). 없는 주차면 null — 줄 자체를 안 그린다 */
+  throwback: EpisodeThrowback | null;
+}
+
+export interface EpisodeThrowback {
+  idxno: number;
+  title: string;
+  publishedAt: string;
+  /** "36년" — 이 회차 기준 몇 해 전인가 */
+  yearsAgo: string;
 }
 
 export async function fetchEpisode(weekId: string): Promise<PodcastEpisodeView | null> {

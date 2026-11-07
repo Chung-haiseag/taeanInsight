@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isoWeekRange, episodeRangeLabel, durationLabel, episodeNoLabel } from "./podcast-episode";
+import { isoWeekRange, episodeRangeLabel, durationLabel, episodeNoLabel, monthWeekLabel } from "./podcast-episode";
 
 // 기대값은 Python 표준 라이브러리(date.fromisocalendar)로 따로 뽑았다 — 제 계산을 제 계산으로 검산하지 않는다.
 describe("isoWeekRange — 주차 한 칸이 덮는 월~일", () => {
@@ -65,13 +65,43 @@ describe("durationLabel — 얼마나 긴가", () => {
   });
 });
 
+// 2026-11-07: '제24화' → '24회'. 회차 머리가 번호를 '21' + 작은 '회'로 세우게 되면서,
+//   같은 화면 아래 '지난 회차' 목록만 '제20화'라고 적혀 **같은 것을 두 가지 말로 부르고 있었다.**
 describe("episodeNoLabel — 몇 번째 이야기인가", () => {
-  it("제24화", () => {
-    expect(episodeNoLabel(24)).toBe("제24화");
+  it("24회 — 회차 머리와 같은 말로 적는다", () => {
+    expect(episodeNoLabel(24)).toBe("24회");
+    expect(episodeNoLabel(24)).not.toMatch(/화/);
   });
   it("회차를 모르면 빈 문자열", () => {
     expect(episodeNoLabel(null)).toBe("");
     expect(episodeNoLabel(0)).toBe("");
     expect(episodeNoLabel(undefined)).toBe("");
+  });
+});
+
+// 당진의 기억은 회차 제목을 '11월 첫째 주의 당진'이라고 적는다 — 번호가 아니라 **사람 말**이다.
+//   그 주(10월 27일~11월 2일)가 '11월 첫째 주'가 되는 규칙을 맞춰 보면: 10월이 5일, 11월이 2일인데도
+//   11월이다. 목요일(10/30)로 봐도 10월이고 날짜 수로 봐도 10월이다 →
+//   **일요일이 든 달, 그 달의 몇 번째 일요일**이 답이다(11/2 = 11월 첫 일요일 → 첫째 주).
+//   우리 주차에도 같은 규칙을 쓴다.
+describe("monthWeekLabel — 회차 제목에 쓸 사람 말", () => {
+  it("당진 예시를 재현한다 — 10/27~11/2 는 '11월 첫째 주'", () => {
+    expect(monthWeekLabel("2025-W44")).toBe("11월 첫째 주"); // 월 2025-10-27 ~ 일 2025-11-02
+  });
+  it("2026-W45(11월 2일~8일)는 '11월 둘째 주'", () => {
+    expect(monthWeekLabel("2026-W45")).toBe("11월 둘째 주");
+  });
+  it("달 중간 주차", () => {
+    expect(monthWeekLabel("2026-W46")).toBe("11월 셋째 주"); // 일 2026-11-15
+    expect(monthWeekLabel("2026-W47")).toBe("11월 넷째 주"); // 일 2026-11-22
+    expect(monthWeekLabel("2026-W48")).toBe("11월 다섯째 주"); // 일 2026-11-29
+  });
+  it("해가 바뀌는 주 — 일요일이 든 달로 간다", () => {
+    expect(monthWeekLabel("2026-W01")).toBe("1월 첫째 주"); // 월 2025-12-29 ~ 일 2026-01-04
+  });
+  it("모르는 주차는 빈 문자열 — 지어내지 않는다", () => {
+    expect(monthWeekLabel("2025-W53")).toBe("");
+    expect(monthWeekLabel("헛소리")).toBe("");
+    expect(monthWeekLabel("")).toBe("");
   });
 });

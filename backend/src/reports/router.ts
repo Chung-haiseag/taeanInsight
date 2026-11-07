@@ -24,7 +24,7 @@ import { loadReportMetrics } from "./metrics";
 import { notifyReportPublished } from "./notify";
 import type { ReportSection, ReportSectionKey } from "./types";
 import { getIsoWeekId } from "./types";
-import { durationFromBytes, parseScript, parseIdxnos } from "./episode";
+import { durationFromBytes, parseScript, parseIdxnos, throwbackRanges, yearsAgoLabel } from "./episode";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
 import { decideVisibility, type VisibilityTier } from "../preferences/content_filter";
 import type { InterestCategory, UserPreferences } from "../preferences/types";
@@ -258,6 +258,36 @@ reportsRouter.get("/:weekId/episode", async (c) => {
     rows = r.results ?? [];
   }
 
+  // 같은 주에 실렸던 옛 기사 한 건 — 가장 오래된 해부터(1990 먼저), 그 해에 신문이 안 나왔으면
+  //   저절로 다음 해로 넘어간다(published_at ASC). 없으면 null 이고 화면은 줄 자체를 안 그린다.
+  //
+  //   ⚠ 한때 `category IN ('culture','opinion')` 을 앞세웠다 — 당진이 '가을에-김정환' 같은 글을
+  //     고르는 결을 따르려던 것이었는데, **자동분류를 못 믿는다**. 1990-08-25 주를 보면
+  //     칼럼 '時論 김학렬'이 society 로 들어가 있고, culture 로 분류된 매주 나오는 '금주의 운세'가
+  //     이겼다. 36년 전 이 주를 대표하는 글이 운세일 수는 없다. 길이만으로 뽑으니 같은 주가
+  //     '우리말 바르게 쓰자'로 바뀌었다 — 6주를 비교해 5주가 나아졌다.
+  //   ⚠ is_ad 를 걸어도 광고가 샌다(1995년 '태안반도 자동차 학원'). 광고 판별 쪽 문제라 여기서
+  //     덧대지 않았다.
+  let throwback: { idxno: number; title: string; publishedAt: string; yearsAgo: string } | null = null;
+  const ranges = throwbackRanges(weekId);
+  if (ranges.length) {
+    const where = ranges.map((_, i) => `(published_at >= ?${i * 2 + 1} AND published_at < ?${i * 2 + 2})`).join(" OR ");
+    const binds = ranges.flatMap((r) => [r.start, r.end]);
+    const t = await c.env.ARCHIVE_DB.prepare(
+      `SELECT idxno, title, published_at FROM archive_articles
+        WHERE (${where}) AND COALESCE(is_ad,0) = 0 AND length(COALESCE(body,'')) > 300
+        ORDER BY published_at ASC, length(COALESCE(body,'')) DESC
+        LIMIT 1`,
+    )
+      .bind(...binds)
+      .first<{ idxno: number; title: string; published_at: string }>()
+      .catch(() => null);
+    if (t) {
+      const yearsAgo = yearsAgoLabel(t.published_at, weekId);
+      if (yearsAgo) throwback = { idxno: t.idxno, title: t.title, publishedAt: t.published_at, yearsAgo };
+    }
+  }
+
   const res = c.json({
     episode: {
       weekId,
@@ -268,6 +298,7 @@ reportsRouter.get("/:weekId/episode", async (c) => {
       hasAudio: !!head,
       scripted: idxnos.length > 0,
       script,
+      throwback,
       articles: rows.map((x) => ({
         idxno: x.idxno,
         title: x.title,

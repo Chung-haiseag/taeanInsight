@@ -64,7 +64,31 @@ export function durationLabel(sec: number | null | undefined): string {
   return parts.join(" ");
 }
 
-/** 몇 번째 이야기인가 — "제24화". 모르면 빈 문자열. */
+/**
+ * 몇 번째 이야기인가 — "24회". 모르면 빈 문자열.
+ *   ⚠ 예전엔 "제24화"였다. 회차 머리가 번호를 큰 '21' + 작은 '회'로 세우게 되면서 같은 화면
+ *     아래 '지난 회차'만 '제20화'라 적혀 **같은 것을 두 가지 말로 부르고 있었다.**
+ */
 export function episodeNoLabel(no: number | null | undefined): string {
-  return typeof no === "number" && Number.isInteger(no) && no > 0 ? `제${no}화` : "";
+  return typeof no === "number" && Number.isInteger(no) && no > 0 ? `${no}회` : "";
+}
+
+const ORDINAL = ["", "첫째", "둘째", "셋째", "넷째", "다섯째", "여섯째"] as const;
+
+/**
+ * "2026-W45" → "11월 둘째 주". 회차 제목에 쓸 **사람 말**이다.
+ *
+ *   ⚠ 어느 달의 주인지는 **일요일(주의 마지막 날)**이 정한다. 10월 27일~11월 2일은
+ *     10월이 5일이고 11월이 2일인데도 '11월 첫째 주'다 — 날짜 수로도, ISO 목요일로도
+ *     10월이 나와서 둘 다 틀린다. 일요일이 든 달의 `ceil(일/7)`번째가 맞다.
+ *     (당진의 기억이 같은 규칙을 쓴다. 한국에서 '몇째 주'를 세는 일상 감각이기도 하다.)
+ *
+ *   모르는 주차면 빈 문자열 — 없는 주를 지어내지 않는다.
+ */
+export function monthWeekLabel(weekId: string): string {
+  const r = isoWeekRange(weekId);
+  if (!r) return "";
+  const [, mm, dd] = r.end.split("-").map(Number) as [number, number, number];
+  const nth = ORDINAL[Math.ceil(dd / 7)];
+  return nth ? `${mm}월 ${nth} 주` : "";
 }

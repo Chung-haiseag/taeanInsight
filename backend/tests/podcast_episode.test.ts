@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, it, expect } from "vitest";
-import { durationFromBytes, parseScript, parseIdxnos } from "@/reports/episode";
+import { durationFromBytes, parseScript, parseIdxnos, throwbackRanges, yearsAgoLabel } from "@/reports/episode";
 
 // 팟캐스트 mp3는 tools/lib/wav-to-mp3.mjs가 **128kbps CBR**로 굽는다 → 길이가 파일 크기에 그대로 비례한다.
 //   실측(2026-11-06): 3,106,947바이트, ffprobe 194.11초. 16,000바이트/초로 나누면 194.18초 — 오차 0.04%.
@@ -91,5 +91,46 @@ describe("저장된 대본이 없는 환경에서도 회차 화면은 뜬다", (
     expect(i).toBeGreaterThan(-1);
     // 질의 앞 400자 안에 try 가 있어야 한다(같은 블록).
     expect(src.slice(Math.max(0, i - 400), i)).toMatch(/try\s*\{/);
+  });
+});
+
+// ── 옛 기사(throwback) 한 줄 ──────────────────────────────────────────────
+//   당진의 기억은 기사 목록 아래 '33년 · 가을에-김정환 1993' 한 줄을 둔다 — 33년 전 같은 주의 기사다.
+//   우리 전자북은 1990~2001(49,449건)이라 같은 걸 할 수 있다.
+//
+//   ⚠ 쿼리 모양을 여기서 정하는 이유: substr(published_at,6,5) 로 거르면 인덱스를 못 타
+//     50,522행을 읽는다. 연도별 날짜 구간을 OR 로 묶으면 idx_archive_published 를 타고
+//     2,158행이다(실측). 그래서 구간을 만드는 일을 순수 함수로 꺼냈다.
+describe("throwbackRanges — 옛 기사를 찾을 연도별 날짜 구간", () => {
+  it("2026-W45(11/2~11/8)는 1990~2001 열두 해의 같은 날짜 구간을 만든다", () => {
+    const rs = throwbackRanges("2026-W45");
+    expect(rs).toHaveLength(12);
+    expect(rs[0]).toEqual({ start: "1990-11-02", end: "1990-11-09" }); // end 는 **열린 끝**
+    expect(rs[11]).toEqual({ start: "2001-11-02", end: "2001-11-09" });
+  });
+  it("해를 넘는 주차도 구간이 끊기지 않는다 — 2026-W01 은 12/29~1/4", () => {
+    const rs = throwbackRanges("2026-W01");
+    expect(rs[0]).toEqual({ start: "1990-12-29", end: "1991-01-05" });
+  });
+  it("회차보다 나중 해는 넣지 않는다", () => {
+    for (const r of throwbackRanges("2026-W45")) expect(r.start < "2026").toBe(true);
+  });
+  it("모르는 주차면 빈 배열 — 아무 기사나 끌어오지 않는다", () => {
+    expect(throwbackRanges("2025-W53")).toEqual([]);
+    expect(throwbackRanges("헛소리")).toEqual([]);
+    expect(throwbackRanges("")).toEqual([]);
+  });
+});
+
+describe("yearsAgoLabel — 몇 년 전인가", () => {
+  it("1990년 기사를 2026년 회차에서 보면 36년", () => {
+    expect(yearsAgoLabel("1990-11-05T00:00:00+09:00", "2026-W45")).toBe("36년");
+  });
+  it("같은 해면 빈 문자열 — '0년 전'이라고 적지 않는다", () => {
+    expect(yearsAgoLabel("2026-01-02", "2026-W45")).toBe("");
+  });
+  it("날짜를 못 읽으면 빈 문자열", () => {
+    expect(yearsAgoLabel("", "2026-W45")).toBe("");
+    expect(yearsAgoLabel("1990-11-05", "헛소리")).toBe("");
   });
 });

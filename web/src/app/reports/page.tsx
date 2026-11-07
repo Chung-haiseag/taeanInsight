@@ -14,17 +14,19 @@ import {
   fetchCardNews,
   fetchReportMetrics,
 } from "@/lib/api/reports";
-import { episodeNoLabel, episodeRangeLabel } from "@/lib/podcast-episode";
+import { episodeRangeLabel, monthWeekLabel } from "@/lib/podcast-episode";
 
 // 공유 미리보기(카톡·SNS) — 이 화면의 머리가 곧 팟캐스트 회차이므로 제목도 회차로 적는다.
 //   '주간 인사이트 리포트'만 적던 때는 링크를 받은 사람이 **무엇을 듣게 되는지** 알 수 없었다.
 export async function generateMetadata(): Promise<Metadata> {
   const report = await fetchLatestReport().catch(() => null);
   const episode = report ? await fetchEpisode(report.weekId).catch(() => null) : null;
-  const no = episodeNoLabel(episode?.no);
+  // 탭·공유 제목은 **화면의 h1 과 같은 말**이어야 한다 — 화면엔 '11월 둘째 주의 태안'이라 적혀
+  //   있는데 탭엔 '제21화'라고 뜨면, 검색 결과에서 눌러 들어온 사람이 다른 글을 본 줄 안다.
+  const week = monthWeekLabel(report?.weekId ?? "");
   const range = episodeRangeLabel(report?.weekId ?? "");
-  const title = no
-    ? `태안 주간 팟캐스트 ${no}${range ? ` · ${range}` : ""}`
+  const title = week
+    ? `${week}의 태안${range ? ` · ${range}` : ""} | 태안 주간 팟캐스트`
     : "태안 주간 팟캐스트";
   const description =
     report?.summary?.replace(/\s+/g, " ").trim().slice(0, 140) ||
