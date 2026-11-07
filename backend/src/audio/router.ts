@@ -4,7 +4,8 @@
 
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { aggregateManifest, podcastWeekIds } from "./manifest";
+import { aggregateManifest, podcastWeekIds, podcastWeekSizes } from "./manifest";
+import { durationFromBytes } from "../reports/episode";
 
 export const audioRouter = new Hono<{ Bindings: Env }>();
 
@@ -50,21 +51,38 @@ audioRouter.get("/podcast", async (c) => {
 //   R2 audio/podcast/ 목록에서 주차 집합을 뽑아 발행 리포트와 교집합. (:weekId 라우트보다 먼저 등록)
 audioRouter.get("/podcast/episodes", async (c) => {
   if (!c.env.ARCHIVE_PHOTOS || !c.env.ARCHIVE_DB) return c.json({ episodes: [] });
-  const keys: string[] = [];
+  const objects: { key: string; size?: number }[] = [];
   let cursor: string | undefined;
   for (let i = 0; i < 10; i++) {
     const res = await c.env.ARCHIVE_PHOTOS.list({ prefix: "audio/podcast/", cursor, limit: 1000 });
-    for (const o of res.objects) keys.push(o.key);
+    for (const o of res.objects) objects.push({ key: o.key, size: o.size });
     if (!res.truncated) break;
     cursor = res.cursor;
   }
-  const have = podcastWeekIds(keys);
+  const have = podcastWeekIds(objects.map((o) => o.key));
+  const sizes = podcastWeekSizes(objects);
+
+  // 회차 번호는 **발행 리포트 전체**를 세어 매긴다 — 오디오가 있는 주차만 세면,
+  //   지난 주차 오디오를 하나 더 만들었을 때 그 뒤 번호가 전부 밀린다(회차 번호는 변하면 안 된다).
+  //   아래 rows 는 week_id DESC 이므로 i번째 회차 번호 = 전체 발행 수 - i.
+  const totalRow = await c.env.ARCHIVE_DB
+    .prepare("SELECT COUNT(*) AS n FROM weekly_reports WHERE status='published'")
+    .first<{ n: number }>();
+  const total = Number(totalRow?.n) || 0;
+
   const rows = await c.env.ARCHIVE_DB
     .prepare("SELECT week_id, published_at, summary FROM weekly_reports WHERE status='published' ORDER BY week_id DESC LIMIT 40")
     .all<{ week_id: string; published_at: string; summary: string }>();
   const episodes = (rows.results ?? [])
+    .map((r, i) => ({ ...r, no: total ? total - i : null }))
     .filter((r) => have.has(r.week_id))
-    .map((r) => ({ weekId: r.week_id, publishedAt: r.published_at, summary: r.summary ?? "" }));
+    .map((r) => ({
+      weekId: r.week_id,
+      publishedAt: r.published_at,
+      summary: r.summary ?? "",
+      no: r.no,
+      durationSec: durationFromBytes(sizes.get(r.week_id) ?? null),
+    }));
   c.header("Cache-Control", "public, max-age=300");
   return c.json({ episodes });
 });

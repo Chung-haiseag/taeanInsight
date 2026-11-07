@@ -13,8 +13,6 @@ import { AirQualityTrend, WeatherCards, RealEstatePanel, FestivalList, DemandGau
 import { ReportPushButton } from "@/components/reports/report-push";
 import { EmailSignup } from "@/components/reports/email_signup";
 import { RegionDataPanel } from "@/components/reports/region-data-panel";
-import { PodcastAudio } from "@/components/reports/podcast-audio";
-import { PodcastEpisodes } from "@/components/reports/podcast-episodes";
 import { fetchLatestReport, type WeeklyReportView, type WeeklyNewsItem, type GovNoticeItem, type ReportMetrics } from "@/lib/api/reports";
 import { getUid } from "@/lib/uid";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -124,11 +122,6 @@ export function ReportReader({
 
       <div className="no-print mt-4 flex flex-wrap justify-end gap-1">
         <ReportPushButton />
-      </div>
-
-      <div className="mt-6 space-y-4">
-        <PodcastAudio weekId={report.weekId} publishedAt={report.publishedAt} />
-        <PodcastEpisodes excludeWeekId={report.weekId} />
       </div>
 
       {report.personalized && report.interests?.length ? (
@@ -522,13 +515,15 @@ function Masthead({
   aiLabel: "human" | "ai_assisted" | "ai_generated";
   gated: boolean;
 }) {
+  // ⚠ 제목은 h2 다. 이 화면의 h1 은 맨 위의 팟캐스트 회차(app/reports/page.tsx → EpisodeHead)이고
+  //   이 블록은 그 아래 '분석' 묶음의 머리다. h1 을 둘 두면 화면 읽기 프로그램이 두 문서로 읽는다.
   return (
     <div className="border-b-2 border-brand/15 pb-6">
       <p className="eyebrow">
         <span className="inline-block h-px w-6 bg-accent" aria-hidden />
         WEEKLY INSIGHT REPORT
       </p>
-      <h1 className="mt-2 font-display text-3xl font-bold text-brand md:text-4xl">주간 인사이트 리포트</h1>
+      <h2 className="mt-2 font-display text-3xl font-bold text-brand md:text-4xl">주간 인사이트 리포트</h2>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-foreground-muted">
         관광·기상·환경·부동산, 태안의 다음 주를 한 페이지로.
       </p>

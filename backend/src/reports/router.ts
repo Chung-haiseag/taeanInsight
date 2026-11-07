@@ -24,6 +24,7 @@ import { loadReportMetrics } from "./metrics";
 import { notifyReportPublished } from "./notify";
 import type { ReportSection, ReportSectionKey } from "./types";
 import { getIsoWeekId } from "./types";
+import { durationFromBytes, parseScript, parseIdxnos } from "./episode";
 import { D1PreferencesRepo } from "../preferences/repository_d1";
 import { decideVisibility, type VisibilityTier } from "../preferences/content_filter";
 import type { InterestCategory, UserPreferences } from "../preferences/types";
@@ -189,6 +190,95 @@ reportsRouter.get("/forecast-accuracy", async (c) => {
   const { getForecastAccuracy } = await import("./forecast_accuracy");
   c.header("Cache-Control", "public, max-age=1800");
   return c.json(await getForecastAccuracy(c.env));
+});
+
+// GET /api/reports/:weekId/episode — 팟캐스트 회차 한 편(**공개**: 로그인 없이 듣고 읽는다).
+//   회차 번호·다루는 날들·길이·대본·그 회차가 다룬 기사. 분석 리포트만 회원 전용이고 이쪽은 열어 둔다.
+//   (:weekId 보다 먼저 등록해야 한다 — 아니면 'episode'가 주차 이름으로 먹힌다.)
+reportsRouter.get("/:weekId/episode", async (c) => {
+  if (!c.env.ARCHIVE_DB) return c.json({ error: "no_db" }, 503);
+  const weekId = c.req.param("weekId");
+  const repo = new WeeklyReportRepo(c.env.ARCHIVE_DB);
+  const report = await repo.get(weekId);
+  if (!report || report.status !== "published") return c.json({ error: "not_found" }, 404);
+
+  // 회차 번호 = 이 주차까지 발행된 리포트 수. 주차 순서로 세므로 **과거 회차 번호가 나중에 바뀌지 않는다**
+  //   (R2에 오디오가 있는 주차만 세면, 지난 회차를 하나 더 만들 때 그 뒤 번호가 전부 밀린다).
+  const noRow = await c.env.ARCHIVE_DB
+    .prepare(`SELECT COUNT(*) AS n FROM weekly_reports WHERE status='published' AND week_id <= ?1`)
+    .bind(weekId)
+    .first<{ n: number }>();
+  const no = Number(noRow?.n) || null;
+
+  // 저장된 대본 — 077 적용 뒤 만든 회차만 있다. 테이블이 없거나 그 회차가 없으면 조용히 폴백한다
+  //   (지난 20회차는 생성 스크립트가 대본을 버렸다 — 없는 것을 있다고 하지 않는다).
+  let saved: { script: string; article_idxnos: string; duration_sec: number | null; bytes: number | null } | null = null;
+  try {
+    saved = await c.env.ARCHIVE_DB
+      .prepare(`SELECT script, article_idxnos, duration_sec, bytes FROM podcast_scripts WHERE week_id = ?1`)
+      .bind(weekId)
+      .first();
+  } catch {
+    /* podcast_scripts 없음(077 미적용) — 폴백 */
+  }
+
+  const script = parseScript(saved?.script);
+  const idxnos = parseIdxnos(saved?.article_idxnos);
+
+  // 오디오 유무와 길이는 **결과물을 직접 보고** 판단한다(status.json은 건강 신호가 아니다 — 2026-09-05 교훈).
+  const head = c.env.ARCHIVE_PHOTOS
+    ? await c.env.ARCHIVE_PHOTOS.head(`audio/podcast/${weekId}-gem.mp3`).catch(() => null)
+    : null;
+  const durationSec = saved?.duration_sec ?? durationFromBytes(head?.size ?? saved?.bytes ?? null);
+
+  // 다룬 기사: 대본이 적어 둔 것이 있으면 그것, 없으면 '그 주 주요 기사'로 폴백.
+  //   폴백 질의는 생성기(tools/podcast/gen-podcast.mjs weeklyNews)가 실제로 먹인 것과 같은 모양이다
+  //   — 발행 시점에서 본문 있는 최신 8건. 화면 제목도 scripted=false 로 바꿔 적는다.
+  const cols = "idxno, title, published_at, category, lead_image";
+  let rows: { idxno: number; title: string; published_at: string; category: string; lead_image: string | null }[] = [];
+  if (idxnos.length) {
+    const ph = idxnos.map((_, i) => `?${i + 1}`).join(",");
+    const r = await c.env.ARCHIVE_DB
+      .prepare(`SELECT ${cols} FROM archive_articles WHERE idxno IN (${ph})`)
+      .bind(...idxnos)
+      .all<(typeof rows)[number]>();
+    // 대본이 다룬 순서대로 되돌린다 — D1은 IN 절 순서를 지켜 주지 않는다.
+    const order = new Map(idxnos.map((n, i) => [n, i]));
+    rows = (r.results ?? []).sort((a, b) => (order.get(a.idxno) ?? 0) - (order.get(b.idxno) ?? 0));
+  } else {
+    const until = (report.publishedAt || new Date().toISOString()).slice(0, 10);
+    const r = await c.env.ARCHIVE_DB
+      .prepare(
+        `SELECT ${cols} FROM archive_articles
+          WHERE published_at <= ?1 || 'T23:59:59' AND length(COALESCE(body,'')) > 300
+          ORDER BY published_at DESC LIMIT 8`,
+      )
+      .bind(until)
+      .all<(typeof rows)[number]>();
+    rows = r.results ?? [];
+  }
+
+  const res = c.json({
+    episode: {
+      weekId,
+      no,
+      publishedAt: report.publishedAt,
+      summary: report.summary,
+      durationSec,
+      hasAudio: !!head,
+      scripted: idxnos.length > 0,
+      script,
+      articles: rows.map((x) => ({
+        idxno: x.idxno,
+        title: x.title,
+        publishedAt: x.published_at,
+        category: x.category,
+        leadImage: x.lead_image,
+      })),
+    },
+  });
+  res.headers.set("Cache-Control", "public, s-maxage=300");
+  return res;
 });
 
 // 리포트 주차의 태안신문 주요 뉴스(아카이브 기반 링크 목록) — AI 생성 아님

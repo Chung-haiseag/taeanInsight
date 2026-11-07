@@ -2,6 +2,9 @@
 //   2026-11-06 사용자 화면: '오늘의 브리핑' 카드의 단추가 "기사 듣기"라고 적혀 있었다.
 //   브리핑 카드는 title="브리핑 듣기" 를 넘기고 있었지만 줄 안(inline) 모양이 그 값을 버리고
 //   늘 "기사 듣기"를 찍었다 — 기사가 아닌 것을 기사라고 부르고 있었다.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { listenLabel } from "./listen-label";
@@ -18,4 +21,25 @@ describe("listenLabel — 듣기 단추에 적을 말", () => {
     expect(listenLabel("card", "브리핑 듣기")).toBe("듣기");
     expect(listenLabel("card")).toBe("듣기");
   });
+});
+
+// 2026-11-07: 같은 사고가 **다른 자리에서** 또 났다. '지난 회차 다시 듣기' 목록의 줄 안 단추가
+//   전부 "기사 듣기"였다 — title 을 안 넘겼기 때문이다. 팟캐스트 회차는 기사가 아니다.
+//   listenLabel 자체는 멀쩡했다(폴백이 "기사 듣기"인 게 당연하다). 문제는 **부르는 쪽**이라
+//   함수 시험으로는 영영 안 잡힌다. 부르는 쪽을 읽어 박제한다.
+describe("기사가 아닌 것을 듣는 단추는 title 을 넘긴다", () => {
+  const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+  // 줄 안(inline) WebAudio 는 title 이 없으면 "기사 듣기"가 된다 → 기사 화면 밖에서는 반드시 넘긴다.
+  const nonArticle = [
+    "src/components/reports/podcast-episodes.tsx",
+    "src/components/reports/episode-head.tsx",
+  ];
+  for (const f of nonArticle) {
+    it(`${f.split("/").pop()} 의 모든 WebAudio 가 title 을 갖는다`, () => {
+      const src = read(f);
+      for (const m of src.matchAll(/<WebAudio\b[\s\S]*?\/>/g)) {
+        expect(m[0]).toMatch(/\btitle=/);
+      }
+    });
+  }
 });

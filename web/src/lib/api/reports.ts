@@ -642,6 +642,10 @@ export interface PodcastEpisode {
   weekId: string;
   publishedAt: string;
   summary: string;
+  /** 몇 번째 이야기인가(발행 리포트 전체 기준). 모르면 null */
+  no?: number | null;
+  /** 길이(초) — R2 파일 크기에서 환산. 모르면 null */
+  durationSec?: number | null;
 }
 export async function listPodcastEpisodes(): Promise<PodcastEpisode[]> {
   try {
@@ -651,5 +655,35 @@ export async function listPodcastEpisodes(): Promise<PodcastEpisode[]> {
     return data.episodes ?? [];
   } catch {
     return [];
+  }
+}
+
+// ── 팟캐스트 회차 한 편 ──────────────────────────────────────────────────────
+// backend GET /api/reports/:weekId/episode (공개 — 로그인 없이 듣고 읽는다).
+export interface EpisodeScriptLine { sp: "A" | "B"; text: string }
+export interface EpisodeArticle { idxno: number; title: string; publishedAt: string; category?: string; leadImage?: string | null }
+export interface PodcastEpisodeView {
+  weekId: string;
+  /** 몇 번째 이야기인가. 모르면 null */
+  no: number | null;
+  publishedAt: string;
+  summary: string;
+  /** 길이(초). 모르면 null — '0분'이라 적지 않는다 */
+  durationSec: number | null;
+  hasAudio: boolean;
+  /** 대본과 '다룬 기사'가 저장돼 있는가. false면 articles는 그 주 주요 기사 폴백이다 */
+  scripted: boolean;
+  script: EpisodeScriptLine[];
+  articles: EpisodeArticle[];
+}
+
+export async function fetchEpisode(weekId: string): Promise<PodcastEpisodeView | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/reports/${encodeURIComponent(weekId)}/episode`, { next: { revalidate: 300 } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { episode?: PodcastEpisodeView };
+    return data.episode ?? null;
+  } catch {
+    return null;
   }
 }

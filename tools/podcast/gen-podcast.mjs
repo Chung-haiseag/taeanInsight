@@ -7,7 +7,7 @@
 //   업로드 키: audio/podcast/<주차>-gem.wav  (Worker가 있으면 우선 서빙)
 
 import { execFileSync } from "node:child_process";
-import { writeFileSync, rmSync } from "node:fs";
+import { writeFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ttsClean } from "../lib/tts-normalize.mjs";
@@ -43,8 +43,38 @@ function latestReport() {
 function recentGov(n = 8) {
   return d1(`SELECT title, dept FROM gov_notices ORDER BY published_at DESC LIMIT ${n};`);
 }
+// ⚠ idxno 를 함께 가져온다 — 이 회차가 무엇을 바탕으로 만들어졌는지 D1 에 남기기 위해서다.
+//   예전에는 title 만 뽑아 Gemini 에 먹이고 버렸다 → 지난 20회차는 무엇을 다뤘는지 알 수 없다.
 function weeklyNews(n = 8) {
-  return d1(`SELECT title FROM archive_articles WHERE length(COALESCE(body,''))>300 ORDER BY published_at DESC LIMIT ${n};`);
+  return d1(`SELECT idxno, title FROM archive_articles WHERE length(COALESCE(body,''))>300 ORDER BY published_at DESC LIMIT ${n};`);
+}
+
+// SQLite 문자열 리터럴 — 홑따옴표는 두 번 적어 탈출한다.
+//   왜 --command 가 아니라 파일인가: 대본에는 줄바꿈·따옴표·한글이 섞여 있어 셸을 거치면 깨진다.
+const sq = (v) => `'${String(v).replace(/'/g, "''")}'`;
+
+/** 이 회차의 대본·바탕 기사·길이를 D1 에 남긴다. 테이블이 없으면(077 미적용) 경고만 하고 넘어간다. */
+function saveScript({ weekId, dialogue, idxnos, bytes, durationSec }) {
+  const sql = `INSERT INTO podcast_scripts
+      (week_id, script, article_idxnos, duration_sec, bytes, text_model, tts_model, updated_at)
+    VALUES (${sq(weekId)}, ${sq(JSON.stringify(dialogue))}, ${sq(JSON.stringify(idxnos))},
+            ${durationSec ?? "NULL"}, ${bytes ?? "NULL"}, ${sq(TEXT_MODEL)}, ${sq(TTS_MODEL)}, datetime('now'))
+    ON CONFLICT(week_id) DO UPDATE SET
+      script = excluded.script, article_idxnos = excluded.article_idxnos,
+      duration_sec = excluded.duration_sec, bytes = excluded.bytes,
+      text_model = excluded.text_model, tts_model = excluded.tts_model,
+      updated_at = datetime('now');`;
+  const f = join(tmpdir(), `podcast-script-${weekId}.sql`);
+  writeFileSync(f, sql);
+  try {
+    wrangler(["d1", "execute", "taean-archive", "--remote", "--file", f]);
+    console.log(`  📝 대본 ${dialogue.length}줄 · 바탕 기사 ${idxnos.length}건 · 길이 ${durationSec ?? "?"}초 저장`);
+  } catch (e) {
+    // 업로드는 이미 끝났다 — 여기서 죽이면 오디오는 올라갔는데 실패로 보인다.
+    console.warn("  ⚠ 대본 저장 실패(077 마이그레이션 적용 여부 확인):", e.message.slice(0, 200));
+  } finally {
+    rmSync(f, { force: true });
+  }
 }
 
 async function gemini(model, body, attempt = 0) {
@@ -129,6 +159,8 @@ async function main() {
   const secText = sections.map((s) => `[${s.title || s.key}]\n${s.content || ""}`).join("\n\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").slice(0, 6000);
   const govText = gov.length ? `\n\n[군정 소식·카드뉴스·행사일정]\n${gov.map((g) => `- ${g.title}${g.dept ? ` (${g.dept})` : ""}`).join("\n")}` : "";
   const newsText = news.length ? `\n\n[한 주간 주요 뉴스]\n${news.map((n) => `- ${n.title}`).join("\n")}` : "";
+  // 대본에 먹인 기사 번호 — 프롬프트가 '모든 섹션을 빠짐없이' 다루라 지시하므로 이 회차의 바탕이다.
+  const idxnos = news.map((n) => Number(n.idxno)).filter((n) => Number.isInteger(n) && n > 0);
   const src = `${rep.summary}\n\n${secText}${govText}${newsText}`;
   console.log(`  소스: 섹션 ${sections.length} · 군정 ${gov.length} · 뉴스 ${news.length}`);
 
@@ -152,6 +184,12 @@ async function main() {
     console.log(`▸ R2 업로드 → ${key}`);
     wrangler(["r2", "object", "put", `${BUCKET}/${key}`, "--file", mixed ? finalFile : tmp, "--content-type", "audio/mpeg", "--remote"]);
     console.log("✅ 완료 — /reports 팟캐스트가 NotebookLM급으로 교체됩니다.");
+
+    // 대본·바탕 기사·길이를 남긴다. 길이는 128kbps CBR 이라 **올린 파일 크기**에서 정확히 나온다
+    //   (16,000바이트/초 — backend/src/reports/episode.ts durationFromBytes 와 같은 상수).
+    //   ⚠ 업로드한 파일을 재야 한다 — 음악을 섞으면 mp3.length 보다 길어진다.
+    const bytes = statSync(mixed ? finalFile : tmp).size;
+    saveScript({ weekId: rep.week_id, dialogue, idxnos, bytes, durationSec: Math.round(bytes / 16000) || null });
     // 현황 기록(Worker /api/audio/status)
     try {
       let cur = {};
