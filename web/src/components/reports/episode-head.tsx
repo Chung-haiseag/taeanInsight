@@ -10,6 +10,10 @@
 //   색·글꼴은 태안 토큰(ti-*)을 쓴다 — 크림+명조를 그대로 가져오면 네이비 머리띠·꼬리와
 //   이 화면만 다른 세상이 되고, 고대비 모드도 따로 손봐야 한다.
 //
+//   2026-11-09: 지난 회차도 **같은 머리**를 쓴다(/reports/<주차>). 그전엔 지난 회차가 '다시 듣기'
+//   목록의 한 줄 + 재생 단추뿐이어서, 제목도 다룬 기사도 옛 기사도 대본도 볼 데가 없었다.
+//   latest=false 면 '최신 회' 표지와 '이번 주'라는 말만 그 회차의 것으로 바뀐다.
+//
 //   정직하게 적는 것들:
 //   - 길이를 모르면 적지 않는다('0분'은 거짓말이다).
 //   - 제목이 '다룬 기사'가 아니라 **'바탕이 된 기사'**인 이유: D1 에 남는 번호는 대본 작성기에
@@ -43,8 +47,12 @@ function decodeEntities(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
-export function EpisodeHead({ episode }: { episode: PodcastEpisodeView }) {
+export function EpisodeHead({ episode, latest = true }: { episode: PodcastEpisodeView; latest?: boolean }) {
   const week = monthWeekLabel(episode.weekId);
+  // 이 회차가 사는 주소. 듣다가 기사로 넘어가도 아래 띠의 제목이 **여기로** 돌아오게 한다.
+  const home = latest ? "/reports" : `/reports/${episode.weekId}`;
+  // 주차 이름을 못 구하는 꼴(알 수 없는 weekId)일 때의 대비책. 지난 회차를 '이번 주'라 부르면 거짓말이다.
+  const name = week ? `${week}의 태안` : latest ? "이번 주 팟캐스트" : "지난 회차";
   const range = episodeRangeLabel(episode.weekId);
   // 길이는 **들을 수 있는 음성**을 설명하는 값이다. 재생할 게 없으면 적지 않는다 —
   //   안 그러면 "음성은 아직 준비 중입니다" 바로 위에 "3분 14초"가 적힌다.
@@ -78,12 +86,11 @@ export function EpisodeHead({ episode }: { episode: PodcastEpisodeView }) {
             휴대폰 독자가 제목까지 스크롤해야 한다 — 고령 독자가 많은 사이트에서 그건 고장과 같다.
             사진 번호가 바로 아래 기사 목록의 번호와 이어지므로 자리도 자연스럽다. */}
       <div className="order-2 lg:order-none lg:col-start-1 lg:row-span-2 lg:row-start-1">
-        {/* 이 화면은 **늘 최신 회**다(/reports 는 fetchLatestReport 로 받는다).
-            숫자는 읽는 글이 아니라 표지다. 마루부리(명조)로 세우면 신문 1면의 호수(號數) 같은
+        {/* 숫자는 읽는 글이 아니라 표지다. 마루부리(명조)로 세우면 신문 1면의 호수(號數) 같은
             결이 난다 — 본문 Pretendard 와 대비된다. */}
         {episode.no != null && (
           <div aria-hidden>
-            <p className="text-center font-head text-lg font-bold text-ti-ink lg:text-left">최신 회</p>
+            <p className="text-center font-head text-lg font-bold text-ti-ink lg:text-left">{latest ? "최신 회" : "지난 회"}</p>
             <p className="mt-3 flex items-start justify-center gap-1.5 lg:justify-start">
               <span className="font-head text-[clamp(5rem,13vw,9.5rem)] font-semibold leading-[0.82] tracking-[-0.04em] text-ti-ink">
                 {String(episode.no).padStart(2, "0")}
@@ -120,7 +127,7 @@ export function EpisodeHead({ episode }: { episode: PodcastEpisodeView }) {
             크기는 프로젝트가 이미 가진 에디토리얼 스케일(text-display: clamp 2.5~4.5rem)을 쓴다 —
             손으로 집은 치수를 또 만들면 다른 화면의 큰 제목과 어긋난다. */}
         <h1 id="episode-title" className="mt-3 break-keep font-head text-display text-ti-ink">
-          {week ? `${week}의 태안` : "이번 주 팟캐스트"}
+          {name}
         </h1>
 
         {/* 언제 것이고 얼마나 긴가 — 주차 번호(2026-W45)는 우리 내부 이름이라 적지 않는다. */}
@@ -150,14 +157,18 @@ export function EpisodeHead({ episode }: { episode: PodcastEpisodeView }) {
               variant="card"
               title="🎙 이 회차 듣기"
               // 길이는 WebAudio 가 durationHint 로 직접 적는다 — 부제에 또 쓰면 같은 말이 두 번 보인다.
-              subtitle="진행자 두 명이 이번 주 태안 소식을 대담으로 들려드립니다"
+              subtitle={`진행자 두 명이 ${latest ? "이번 주" : "그 주"} 태안 소식을 대담으로 들려드립니다`}
               durationHint={episode.durationSec ?? undefined}
+              // 기사로 넘어가도 아래 띠가 따라온다. 거기엔 '이 회차 듣기'가 아니라
+              //   **무엇이 나오는지**를 적어야 한다 — 단추 이름과 들리는 것의 이름은 다르다.
+              nowPlaying={name}
+              href={home}
             />
           ) : (
             // 오디오가 없는 회차를 '준비 중'이라 적는다. 재생 단추를 띄워 놓고 눌렀을 때
             //   실패하게 두면 독자는 자기 탓이라 여긴다(2026-09-05 '기사 듣기' 사고와 같은 종류).
             <p className="card px-5 py-4 text-sm text-ti-ink2">
-              이 회차의 음성은 아직 준비 중입니다. 아래 다룬 기사와 분석은 지금 보실 수 있어요.
+              이 회차의 음성은 아직 준비 중입니다. 아래 다룬 기사는 지금 보실 수 있어요.
             </p>
           )}
         </div>
@@ -181,13 +192,16 @@ export function EpisodeHead({ episode }: { episode: PodcastEpisodeView }) {
               </p>
             )}
             {/* 줄 사이를 넉넉히 둔다. 제목이 길어 두 줄이 되는 기사가 섞이는데, 줄이 붙어 있으면
-                어디까지가 한 기사인지 눈으로 끊기지 않는다(고령 독자에게 특히). */}
+                어디까지가 한 기사인지 눈으로 끊기지 않는다(고령 독자에게 특히).
+                ⚠ 2026-11-09 사용자: "주요기사 들 간의 폭이 넓으니 조금만 더 좁히자" → py-6(24px) → py-4(16px).
+                  한 줄 76px 중 글자가 27px 뿐이라 **칸의 3분의 2가 빈자리**였다. 16px 로도 위아래 여백이
+                  글자 높이의 절반을 넘어 기사끼리 붙지 않는다(한 줄 76 → 59px). 더 줄이면 그 결이 깨진다. */}
             <ol className="mt-5 border-t border-ti-line">
               {episode.articles.map((a, i) => (
                 <li key={a.idxno} className="border-b border-ti-line">
                   <Link
                     href={`/news/${a.idxno}`}
-                    className="group flex items-baseline gap-6 py-5 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--ti-focus)] md:py-6"
+                    className="group flex items-baseline gap-6 py-3.5 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--ti-focus)] md:py-4"
                   >
                     <span className="w-10 shrink-0 text-right text-[0.95rem] tabular-nums text-ti-muted" aria-hidden>
                       {i + 1}
@@ -205,7 +219,7 @@ export function EpisodeHead({ episode }: { episode: PodcastEpisodeView }) {
                 <li className="border-b border-ti-line">
                   <Link
                     href={`/news/${episode.throwback.idxno}`}
-                    className="group flex items-baseline gap-6 py-5 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--ti-focus)] md:py-6"
+                    className="group flex items-baseline gap-6 py-3.5 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--ti-focus)] md:py-4"
                   >
                     <span className="w-10 shrink-0 whitespace-nowrap text-right text-[0.95rem] font-bold tabular-nums text-ti-gold-ink">
                       {episode.throwback.yearsAgo}

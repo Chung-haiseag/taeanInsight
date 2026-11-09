@@ -5,7 +5,12 @@
 //
 //   적는 순서가 곧 독자의 질문 순서다: 몇 번째 이야기인가 → 언제 것인가 → 얼마나 긴가 → 무슨 내용인가.
 //   ⚠ '33주차'는 우리가 파일을 가르는 이름이지 독자의 말이 아니다 — 날짜로 적는다.
+//
+//   2026-11-09: 줄을 누르면 **그 회차 화면**(/reports/<주차>)으로 간다. 그전엔 재생 단추뿐이라
+//   지난 회차는 들을 수만 있고 무엇을 다뤘는지 볼 수가 없었다. 단추는 그대로 둔다 —
+//   목록에서 바로 틀고 싶은 사람을 화면 한 번 더 거치게 만들 이유가 없다.
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { WebAudio } from "@/components/web-audio";
@@ -44,18 +49,21 @@ export function PodcastEpisodes({ excludeWeekId }: { excludeWeekId?: string } = 
               key={e.weekId}
               className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-ti-line py-5 md:py-6"
             >
-              <div className="flex min-w-0 flex-1 items-baseline gap-6">
+              <Link
+                href={`/reports/${e.weekId}`}
+                className="group flex min-w-0 flex-1 items-baseline gap-6 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--ti-focus)]"
+              >
                 {/* 번호 칸 너비는 회차 머리의 기사 목록과 같다(w-10) — 두 목록이 같은 세로선에 선다. */}
                 <span className="w-10 shrink-0 whitespace-nowrap text-right font-head text-[1.05rem] font-bold tabular-nums text-ti-ink">
                   {no}
                 </span>
                 <div className="min-w-0 flex-1">
-                  {when && <p className="text-[1.05rem] text-ti-ink md:text-[1.12rem]">{when}</p>}
+                  {when && <p className="text-[1.05rem] text-ti-ink group-hover:text-ti-petrol-ink group-hover:underline md:text-[1.12rem]">{when}</p>}
                   {e.summary && (
                     <p className="mt-1.5 line-clamp-1 text-[0.95rem] leading-relaxed text-ti-muted">{e.summary}</p>
                   )}
                 </div>
-              </div>
+              </Link>
               {/* ⚠ title 을 꼭 넘긴다. 줄 안(inline) 단추는 title 이 없으면 **"기사 듣기"**로 적힌다
                   — 팟캐스트 회차는 기사가 아니다(lib/listen-label.ts 가 기록한 2026-11-06 사고와 같은 자리). */}
               <WebAudio
@@ -64,6 +72,8 @@ export function PodcastEpisodes({ excludeWeekId }: { excludeWeekId?: string } = 
                 variant="inline"
                 title="듣기"
                 durationHint={e.durationSec ?? undefined}
+                nowPlaying={[no, when].filter(Boolean).join(" · ") || "지난 회차"}
+                href={`/reports/${e.weekId}`}
               />
             </li>
           );

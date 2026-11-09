@@ -122,9 +122,37 @@ describe("회차 머리 — 당진 구조에서 되돌아가지 않는다", () =
 
   it("제목은 사람 말이다 — 번호(제N화)를 제목으로 쓰지 않는다", () => {
     // 번호는 왼쪽에 크게 선다. h1 은 '11월 둘째 주의 태안'처럼 읽혀야 한다.
+    //   2026-11-09: h1 이 쓰는 말을 `name` 한 군데로 모았다(지난 회차 화면과 같은 머리를 쓰면서
+    //   '이번 주'라는 기본값이 지난 회차에도 붙지 않게). 그래서 h1 이 아니라 그 `name` 을 본다.
     const h1 = /<h1[\s\S]*?<\/h1>/.exec(head())?.[0] ?? "";
-    expect(h1).toMatch(/monthWeekLabel|week\b/);
+    expect(h1, "h1 이 name 을 쓴다").toMatch(/\{name\}/);
     expect(h1).not.toMatch(/episodeNoLabel/);
+    const name = /const name = .*/.exec(head())?.[0] ?? "";
+    expect(name, "name 은 주차 이름에서 온다").toMatch(/monthWeekLabel|week\b/);
+    expect(name).not.toMatch(/episodeNoLabel/);
+  });
+
+  it("지난 회차를 '이번 주'라 부르지 않는다", () => {
+    // 같은 머리를 /reports/<주차> 에서도 쓴다. 기본값이 '이번 주 팟캐스트'라 latest 를 안 보면 거짓말이 된다.
+    const name = /const name = .*/.exec(head())?.[0] ?? "";
+    expect(name, "주차 이름을 못 구할 때의 대비책이 latest 를 본다").toMatch(/latest/);
+    expect(head(), "'최신 회' 표지도 latest 를 본다").toMatch(/latest \? "최신 회"/);
+  });
+
+  it("지난 회차 화면이 같은 머리를 쓴다 — 복사하지 않는다", () => {
+    const raw = readFileSync(join(process.cwd(), "src/app/reports/[weekId]/page.tsx"), "utf8");
+    // 주석에도 ReportReader 를 언급해 뒀으니 주석을 털고 본다.
+    const page = raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    expect(page).toMatch(/<EpisodeHead[^>]*latest=\{false\}/);
+    // 분석은 최신 주차 기준이라 지난 회차에 붙이면 그 주의 분석인 척하게 된다.
+    expect(page, "지난 회차엔 데이터 분석을 붙이지 않는다").not.toMatch(/ReportReader|RequireRole/);
+  });
+
+  it("'다시 듣기' 목록의 줄이 그 회차 화면으로 간다", () => {
+    const list = readFileSync(join(process.cwd(), "src/components/reports/podcast-episodes.tsx"), "utf8");
+    expect(list).toMatch(/href=\{`\/reports\/\$\{e\.weekId\}`\}/);
+    // 단추는 남는다 — 목록에서 바로 틀고 싶은 사람을 화면 한 번 더 거치게 하지 않는다.
+    expect(list).toMatch(/<WebAudio/);
   });
 
   it("옛 기사 줄은 있을 때만 그린다", () => {
