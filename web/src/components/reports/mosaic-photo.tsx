@@ -8,20 +8,12 @@
 //   서버에서는 그 주소가 살아 있는지 알 수 없다 — 받아 보는 브라우저만 안다.
 //   그래서 onError 때 칸을 통째로 접는다. 번호는 오른쪽 목록에 그대로 있으니 정보는 안 잃는다.
 
-import { useEffect, useRef, useState } from "react";
+import { useBrokenImage } from "@/components/use-broken-image";
 
 export function MosaicPhoto({ src, n, className }: { src: string; n: number; className?: string }) {
-  const [broken, setBroken] = useState(false);
-  const ref = useRef<HTMLImageElement>(null);
-
-  // ⚠ onError 만으로는 못 잡는다. 서버가 그린 <img> 는 **React 가 하이드레이트하기 전에**
-  //   이미 받아 보고 실패할 수 있다 — 그 error 이벤트는 핸들러가 붙기 전에 지나가 버린다.
-  //   실제로 그랬다(2026-11-07: complete=true, naturalWidth=0 인데 칸이 그대로 남아 있었다).
-  //   마운트 때 한 번 직접 묻는다: 다 받았는데(complete) 폭이 0이면 깨진 것이다.
-  useEffect(() => {
-    const img = ref.current;
-    if (img?.complete && img.naturalWidth === 0) setBroken(true);
-  }, []);
+  // 하이드레이트 전에 실패한 사진까지 잡는 일은 use-broken-image.ts 한 군데에 모아 뒀다
+  // (기사 화면의 사진도 같은 것을 쓴다 — 복사하면 한쪽만 고쳐진다).
+  const { ref, broken, onError } = useBrokenImage();
 
   if (broken) return null;
 
@@ -34,7 +26,7 @@ export function MosaicPhoto({ src, n, className }: { src: string; n: number; cla
         alt=""
         loading="lazy"
         decoding="async"
-        onError={() => setBroken(true)}
+        onError={onError}
         className="block aspect-[4/3] w-full object-cover"
       />
       <span

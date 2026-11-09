@@ -1,29 +1,50 @@
-// 기본 OG 공유 이미지 1200x630 — 외부 의존 없이 zlib PNG. 브랜드 네이비+골드 링/바.
-import zlib from "node:zlib";
-import { writeFileSync } from "node:fs";
+// 기본 공유 카드 1200x630 — 카카오톡·페이스북에 주소를 붙일 때 뜨는 그림.
+//   기사에 사진이 있으면 그 사진이 뜨고, 없을 때 이 카드가 대신 선다(layout.tsx openGraph.images).
+//
+//   2026-11-09 교체. 그전에는 네이비 바탕에 금색 고리 — 아이콘과 같던 '자리 지킴이' 마크였다.
+//   아이콘을 태안신문 마크로 바꾸면서 여기만 남으면, 탭에는 신문 마크가 뜨는데 카톡에는 고리가 떠서
+//   같은 사이트로 보이지 않는다.
+//
+//   글씨를 그리지 않는 이유: 제목·설명은 카카오·페이스북이 메타데이터로 직접 적는다. 여기 또 적으면
+//   같은 말이 두 번 보이고, 글꼴을 심지 않는 한 한글이 깨진다.
 
-const NAVY = [26, 43, 74], GOLD = [201, 162, 39], LIGHT = [240, 240, 235];
+import { writeFileSync, mkdirSync } from "node:fs";
+
+import { readMark, stamp, encodePNG, BLUE, WHITE, GOLD } from "./lib/mark.mjs";
+
 const W = 1200, H = 630;
+const mark = readMark(new URL("./assets/taean-mark.png", import.meta.url));
 
-const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-function crc32(b) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
-function chunk(type, data) { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type, "ascii"), data]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); }
+const rgba = Buffer.alloc(W * H * 4);
+for (let i = 0; i < W * H; i++) {
+  rgba[i * 4] = WHITE[0]; rgba[i * 4 + 1] = WHITE[1]; rgba[i * 4 + 2] = WHITE[2]; rgba[i * 4 + 3] = 255;
+}
 
-const raw = Buffer.alloc(H * (W * 4 + 1));
-const cx = W * 0.5, cy = H * 0.42, rO = 150, rI = 92;
-let p = 0;
+// 왼쪽 금색 띠 — 옛 카드에서 유일하게 남기는 것. 작은 미리보기에서도 '우리 것'으로 읽히는 가장자리다.
+const BAR = 18;
 for (let y = 0; y < H; y++) {
-  raw[p++] = 0;
-  for (let x = 0; x < W; x++) {
-    let col = NAVY;
-    if (x < 24) col = GOLD;                                   // 좌측 골드 바
-    else { const d = Math.hypot(x - cx, y - cy); if (d < rO && d > rI) col = GOLD; else if (y > H - 90 && y < H - 84) col = GOLD; } // 골드 링 + 하단 라인
-    raw[p++] = col[0]; raw[p++] = col[1]; raw[p++] = col[2]; raw[p++] = 255;
+  for (let x = 0; x < BAR; x++) {
+    const i = (y * W + x) * 4;
+    rgba[i] = GOLD[0]; rgba[i + 1] = GOLD[1]; rgba[i + 2] = GOLD[2]; rgba[i + 3] = 255;
   }
 }
-const ihdr = Buffer.alloc(13);
-ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 6;
-const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0))]);
+
+// 마크 — 가로 2.1:1 이라 폭을 기준으로 잡는다. 가운데보다 조금 위에 둔다(아래 금색 선과 한 덩어리로 보이게).
+const markW = 520;
+const cx = BAR + (W - BAR) / 2;
+const { h: markH } = stamp(rgba, W, mark, { width: markW, cx, cy: H * 0.46, fg: BLUE });
+
+// 마크 아래 금색 선 — 로고 묶음처럼 보이게 하는 받침.
+const ruleW = 150, ruleH = 5;
+const ruleY = Math.round(H * 0.46 + markH / 2 + 54);
+for (let y = ruleY; y < ruleY + ruleH; y++) {
+  for (let x = Math.round(cx - ruleW / 2); x < Math.round(cx + ruleW / 2); x++) {
+    const i = (y * W + x) * 4;
+    rgba[i] = GOLD[0]; rgba[i + 1] = GOLD[1]; rgba[i + 2] = GOLD[2]; rgba[i + 3] = 255;
+  }
+}
+
+mkdirSync("public", { recursive: true });
+const png = encodePNG(W, H, rgba);
 writeFileSync("public/og.png", png);
-console.log("wrote public/og.png (1200x630,", png.length, "bytes)");
-void LIGHT;
+console.log(`wrote public/og.png (${W}x${H}, ${png.length} bytes)`);

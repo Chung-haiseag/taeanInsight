@@ -17,92 +17,13 @@
 //   32px 부터 — 온전한 마크. 즐겨찾기·앱 아이콘에서는 로고를 자르지 않는다.
 //   ⚠ 날개는 **조각 단위로** 떼어낸 것이다. 네모로 잘라내면 띠가 중간에서 잘린 단면이 보인다.
 
-import zlib from "node:zlib";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 
-const BLUE = [58, 105, 178];     // #3a69b2 — 태안신문 로고 파랑
-const WHITE = [255, 255, 255];
+import { readMark as readMarkFile, shrink, encodePNG as encode, BLUE, WHITE } from "./lib/mark.mjs";
 
-// ──────────────────────────────── PNG 쓰기 ────────────────────────────────
-
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
-  return t;
-})();
-function crc32(buf) { let c = 0xffffffff; for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
-function chunk(type, data) {
-  const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
-  const td = Buffer.concat([Buffer.from(type, "ascii"), data]);
-  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td));
-  return Buffer.concat([len, td, crc]);
-}
-/** RGBA 바이트를 PNG 한 장으로. */
-function encodePNG(size, rgba) {
-  const raw = Buffer.alloc(size * (size * 4 + 1));
-  for (let y = 0, p = 0; y < size; y++) {
-    raw[p++] = 0; // 행 필터 0(none)
-    rgba.copy(raw, p, y * size * 4, (y + 1) * size * 4);
-    p += size * 4;
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0)),
-  ]);
-}
-
-// ──────────────────────────────── 마크 읽기 ────────────────────────────────
-
-/**
- * 8비트 회색조 PNG → { w, h, a }. a 는 화소당 0~255 한 바이트(=마크의 불투명도).
- * 우리가 쓴 파일이라 행 필터는 전부 0 이다 — 아니면 바로 세운다(조용히 망가진 그림보다 낫다).
- */
-function readMark(name) {
-  const png = readFileSync(new URL(`./assets/${name}`, import.meta.url));
-  if (png.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") throw new Error("PNG 가 아니다: " + name);
-  let p = 8, w = 0, h = 0;
-  const idat = [];
-  while (p < png.length) {
-    const len = png.readUInt32BE(p);
-    const type = png.subarray(p + 4, p + 8).toString("ascii");
-    const data = png.subarray(p + 8, p + 8 + len);
-    if (type === "IHDR") {
-      w = data.readUInt32BE(0); h = data.readUInt32BE(4);
-      if (data[8] !== 8 || data[9] !== 0) throw new Error("8비트 회색조가 아니다: " + name);
-    }
-    if (type === "IDAT") idat.push(data);
-    p += len + 12;
-  }
-  const raw = zlib.inflateSync(Buffer.concat(idat));
-  const a = Buffer.alloc(w * h);
-  for (let y = 0; y < h; y++) {
-    const row = y * (w + 1);
-    if (raw[row] !== 0) throw new Error(`${name} 의 행 ${y} 필터가 0 이 아니다`);
-    raw.copy(a, y * w, row + 1, row + 1 + w);
-  }
-  return { w, h, a };
-}
-
-/**
- * 마크를 tw×th 로 줄인다. 목표 화소 하나가 덮는 원본 사각형의 **평균**을 낸다
- * (크게 줄일 때 가장 깨끗하다 — 수백 화소를 한 점으로 모으므로 가장자리가 부드럽다).
- */
-function shrink(mark, tw, th) {
-  const out = new Float32Array(tw * th);
-  for (let ty = 0; ty < th; ty++) {
-    const ya = Math.floor((ty * mark.h) / th), yb = Math.max(ya + 1, Math.floor(((ty + 1) * mark.h) / th));
-    for (let tx = 0; tx < tw; tx++) {
-      const xa = Math.floor((tx * mark.w) / tw), xb = Math.max(xa + 1, Math.floor(((tx + 1) * mark.w) / tw));
-      let sum = 0, n = 0;
-      for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) { sum += mark.a[y * mark.w + x]; n++; }
-      out[ty * tw + tx] = sum / n / 255;
-    }
-  }
-  return out;
-}
+// PNG 쓰기·마크 읽기·줄이기는 scripts/lib/mark.mjs 로 옮겼다 — 공유 카드(gen-og.mjs)도 같은 것을 쓴다.
+const encodePNG = (size, rgba) => encode(size, size, rgba);
+const readMark = (name) => readMarkFile(new URL(`./assets/${name}`, import.meta.url));
 
 // ──────────────────────────────── 아이콘 한 장 ────────────────────────────────
 

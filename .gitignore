@@ -77,6 +77,10 @@ tools/podcast/.gemini_key
 tools/podcast/podcast.log
 
 tools/news-audio/.gemini_keys
+tools/news-audio/.gemini_keys.*
+
+# 한 번 쓰고 남은 검수 백업 덤프(루트). 깃에 넣을 물건이 아니다 — 1.4MB 짜리가 둘 있었다.
+backups-*.json
 tools/news-audio/news-audio.log
 
 # 로컬 오디오 실험 산출물(생성물, 커밋 제외)

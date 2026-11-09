@@ -50,6 +50,7 @@ import {
 } from "@/lib/api/admin-reports";
 import { CorrectionsSection } from "./corrections-tab";
 import { MembershipSection } from "./membership-tab";
+import { AudioHealthBanner } from "./audio-health-banner";
 import { ZoomPanImage } from "@/components/zoom-pan-image";
 import { PageViewer } from "@/components/page-viewer";
 import {
@@ -186,6 +187,10 @@ export default function AdminPage() {
             className="text-xs underline hover:text-brand">로그아웃</button>
         </div>
       </header>
+
+      {/* 소리가 멈추면 여기서 먼저 알린다 — 멀쩡하면 아무것도 그리지 않는다.
+          탭 안에 넣지 않는 이유: 그 탭을 열어 보는 사람만 보게 되면 로그에만 남던 때와 똑같다. */}
+      <AudioHealthBanner />
 
       {/* 탭바 — 메뉴별 전환 (헤더 메뉴와 동기화) */}
       <div className="flex flex-wrap gap-1.5 border-b border-brand/15 pb-2">

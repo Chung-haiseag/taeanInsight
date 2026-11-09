@@ -157,6 +157,33 @@ describe("푸시 배지", () => {
   });
 });
 
+// 카카오톡·페이스북에 주소를 붙일 때 뜨는 기본 그림. 아이콘과 **같은 마크**여야 한다 —
+//   탭에는 신문 마크가 뜨는데 카톡에는 다른 그림이 뜨면 같은 사이트로 보이지 않는다.
+describe("공유 카드 og.png", () => {
+  const img = decode(pub("og.png"));
+
+  it("1200x630 이다 — 미리보기 규격", () => {
+    expect([img.w, img.h]).toEqual([1200, 630]);
+  });
+
+  it("흰 바탕에 왼쪽 금색 띠", () => {
+    expect(near(img.px(4, 300), [201, 162, 39]), "왼쪽 가장자리는 금색").toBe(true);
+    expect(near(img.px(600, 40), WHITE), "위쪽 여백은 흰 바탕").toBe(true);
+  });
+
+  it("가운데에 태안신문 파랑 마크가 있다", () => {
+    let blue = 0;
+    for (let y = 150; y < 430; y += 3) for (let x = 300; x < 900; x += 3) {
+      if (near(img.px(x, y), BLUE)) blue++;
+    }
+    expect(blue, "#3a69b2 화소가 충분히 있어야").toBeGreaterThan(200);
+  });
+
+  it("가볍다 — 미리보기마다 받아 간다", () => {
+    expect(pub("og.png").length).toBeLessThan(200_000);
+  });
+});
+
 describe("선언", () => {
   it("layout 이 /favicon.ico 를 함께 알린다", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");

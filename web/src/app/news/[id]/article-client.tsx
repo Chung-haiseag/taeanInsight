@@ -26,6 +26,7 @@ import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
 import { READ_COL, ARTICLE_SHELL, LEAD_IMAGE_MAX, INLINE_IMAGE_MAX } from "./read-width";
+import { ArticlePhoto, ThumbPhoto } from "@/components/article-photo";
 import ArticleGraph from "./article-graph";
 import { MembershipNudge } from "@/components/membership-nudge";
 import { SecHead } from "@/components/editorial";
@@ -262,8 +263,7 @@ function RelatedArticles({ idxno }: { idxno: number }) {
                 className="group flex h-full gap-3 rounded-xl border border-ti-line bg-ti-surface p-3.5 hover:border-ti-petrol"
               >
                 {it.lead_image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={it.lead_image} alt="" className="h-16 w-20 shrink-0 rounded-lg bg-ti-sunk object-cover" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  <ThumbPhoto src={it.lead_image} className="h-16 w-20 shrink-0 rounded-lg bg-ti-sunk object-cover" />
                 )}
                 <div className="min-w-0">
                   {d && <time dateTime={d} className="block text-[0.88rem] tabular-nums text-ti-muted">{d.replace(/-/g, ".")}</time>}
@@ -392,11 +392,13 @@ function FullBody({ article, idxno, loggedIn, active, hasWords, sentences, onSee
     <div className="space-y-8">
       {/* 리드 사진 — 맨 위 + 사진설명(가운데) */}
       {leadImg && (
-        <figure className="m-0 space-y-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={leadImg} alt={hasCaption ? allParas[0] : article.title} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: LEAD_IMAGE_MAX, maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-          {hasCaption && <figcaption className={`${READ_COL} text-center text-[0.95rem] text-ti-ink2`}>{allParas[0]}</figcaption>}
-        </figure>
+        <ArticlePhoto
+          src={leadImg}
+          alt={hasCaption ? allParas[0] : article.title}
+          maxWidth={LEAD_IMAGE_MAX}
+          caption={hasCaption ? allParas[0] : undefined}
+          captionClassName={`${READ_COL} text-center text-[0.95rem] text-ti-ink2`}
+        />
       )}
 
       {/* 본문 — 읽는 칸(read-width.ts)·글자 1.08rem·줄간격 1.85: 줄을 놓치지 않는 폭과 숨 */}
@@ -423,9 +425,7 @@ function FullBody({ article, idxno, loggedIn, active, hasWords, sentences, onSee
       {restImages.length > 0 && (
         <div className="space-y-5">
           {restImages.map((src) => (
-            // 자연 크기 표시(작으면 작게), 단 본문 폭·높이 상한만 둠 — 작은 사진이 흐릿하게 늘어나지 않게
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt={`${article.title} 본문 사진`} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: INLINE_IMAGE_MAX, maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <ArticlePhoto key={src} src={src} alt={`${article.title} 본문 사진`} maxWidth={INLINE_IMAGE_MAX} />
           ))}
         </div>
       )}

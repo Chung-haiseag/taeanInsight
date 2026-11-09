@@ -379,6 +379,29 @@ export default {
       if (h.ok === true) console.log(`[cron] 기사 듣기: 정상 (최신 ${h.checked}건 확인, 대기 ${h.pending})`);
       else if (h.ok === false) console.warn(`[cron] ⚠ 기사 듣기 죽음 — 하루 넘은 기사 ${h.missing}건에 오디오 없음, 최장 ${h.oldestMissingDays}일째. 로컬 생성기(launchd com.taean.newsaudio) 로그를 볼 것`);
       else console.warn("[cron] 기사 듣기: 검사할 기사 없음");
+
+      // ⚠ 2026-11-09: 위 경고는 **Worker 로그에만** 남는다. 열흘 동안 매일 정확히 찍혔는데
+      //   아무에게도 닿지 않았다 — 감지와 통보는 다른 일이다. 여기서 사람을 부른다.
+      //   고장 나자마자 한 번, 그 뒤로는 사흘에 한 번. 고쳐지면 한 번 더(audio/alert.ts).
+      try {
+        const { alertKind, alertPayload, notifyAdmins } = await import("./audio/alert");
+        const row = await db.prepare("SELECT v FROM kv_cache WHERE k='audio_alert'").first<{ v: string }>().catch(() => null);
+        let memo: { at: number; broken: boolean } | null = null;
+        try { memo = row?.v ? JSON.parse(row.v) : null; } catch { /* 깨진 기억은 없는 셈 친다 */ }
+        const now = Date.now();
+        const kind = alertKind(h, memo, now);
+        if (kind) {
+          const r = await notifyAdmins(env, alertPayload(kind, h));
+          await db.prepare(
+            "INSERT INTO kv_cache(k, v, ts) VALUES('audio_alert', ?, ?) " +
+            "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
+          ).bind(JSON.stringify({ at: now, broken: kind === "broken" }), now).run();
+          // 못 보낸 이유도 남긴다 — '보냈다'고만 적으면 구독이 0명일 때 이 알림이 또 조용히 죽는다.
+          console.warn(`[cron] 기사 듣기 알림(${kind}) — 발송 ${r.sent}건 / 관리자 ${r.admins}명 · 구독 ${r.subs}개${r.skipped ? ` · 못 보냄: ${r.skipped}` : ""}`);
+        }
+      } catch (e) {
+        console.warn("[cron] 기사 듣기 알림 실패:", e instanceof Error ? e.message : e);
+      }
     } catch (e) {
       console.warn("[cron] 기사 듣기 건강 검사 실패:", e instanceof Error ? e.message : e);
     }

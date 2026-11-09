@@ -186,9 +186,17 @@ describe("깨진 사진은 칸째로 접는다", () => {
 //   있고, 그 이벤트는 핸들러가 붙기 전에 지나간다. 실측으로 확인했다(complete=true·naturalWidth=0
 //   인데 빈 칸이 그대로 남았다). 마운트 때 직접 묻는 길이 반드시 있어야 한다.
 describe("하이드레이션 전에 깨진 사진도 잡는다", () => {
-  it("MosaicPhoto 가 마운트 때 complete·naturalWidth 를 직접 확인한다", () => {
+  // 2026-11-09: 같은 판정을 기사 화면에도 써야 해서 use-broken-image.ts 한 군데로 옮겼다.
+  //   MosaicPhoto 가 '직접' 확인하는지가 아니라 **그 판정을 거치는지**를 본다.
+  //   판정 내용 자체는 src/components/__tests__/broken-image.test.ts 가 지킨다.
+  it("MosaicPhoto 가 공용 판정을 거친다", () => {
     const m = readFileSync(join(process.cwd(), "src/components/reports/mosaic-photo.tsx"), "utf8");
-    expect(m).toMatch(/useEffect\(/);
-    expect(m).toMatch(/complete[\s\S]{0,40}naturalWidth === 0/);
+    expect(m).toMatch(/useBrokenImage/);
+  });
+
+  it("공용 판정은 마운트 때 complete·naturalWidth 를 직접 묻는다", () => {
+    const h = readFileSync(join(process.cwd(), "src/components/use-broken-image.ts"), "utf8");
+    expect(h).toMatch(/useEffect\(/);
+    expect(h).toMatch(/complete[\s\S]{0,40}naturalWidth === 0/);
   });
 });
