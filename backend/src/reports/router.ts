@@ -232,8 +232,11 @@ reportsRouter.get("/:weekId/episode", async (c) => {
   const durationSec = saved?.duration_sec ?? durationFromBytes(head?.size ?? saved?.bytes ?? null);
 
   // 다룬 기사: 대본이 적어 둔 것이 있으면 그것, 없으면 '그 주 주요 기사'로 폴백.
-  //   폴백 질의는 생성기(tools/podcast/gen-podcast.mjs weeklyNews)가 실제로 먹인 것과 같은 모양이다
-  //   — 발행 시점에서 본문 있는 최신 8건. 화면 제목도 scripted=false 로 바꿔 적는다.
+  //   폴백 질의는 **그 회차를 만들던 때의 생성기와 같은 모양**이다 — 발행 시점에서 본문 있는 최신 8건.
+  //   ⚠ 2026-11-09 에 생성기는 6건으로 줄었다(사용자 요청). 그래도 이 폴백은 **8 로 둔다** —
+  //     폴백이 닿는 것은 대본을 저장하기 전에 만들어진 지난 회차뿐이고, 그것들은 8건으로 만들어졌다.
+  //     여기만 6으로 줄이면 그 회차가 실제로 바탕 삼은 기사 둘이 화면에서 사라진다.
+  //   화면 제목도 scripted=false 로 바꿔 적는다.
   const cols = "idxno, title, published_at, category, lead_image";
   let rows: { idxno: number; title: string; published_at: string; category: string; lead_image: string | null }[] = [];
   if (idxnos.length) {

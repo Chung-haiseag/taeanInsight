@@ -45,7 +45,13 @@ function recentGov(n = 8) {
 }
 // ⚠ idxno 를 함께 가져온다 — 이 회차가 무엇을 바탕으로 만들어졌는지 D1 에 남기기 위해서다.
 //   예전에는 title 만 뽑아 Gemini 에 먹이고 버렸다 → 지난 20회차는 무엇을 다뤘는지 알 수 없다.
-function weeklyNews(n = 8) {
+//
+// 몇 건을 먹일 것인가 = 회차 화면의 '기사' 줄 수이기도 하다(저장한 idxno 를 그대로 보여 준다).
+//   2026-11-09 사용자: "새롭게 만드는 리포트는 주요 뉴스 기사 갯수를 6개로 하면 좋겠어" → 8 → 6.
+//   ⚠ 이미 만들어진 회차는 그대로다 — 저장된 idxno 를 바꾸지 않는다. 지난 회차를 6개로 보이게
+//     하려면 저장분을 손대야 하고, 그러면 '그 회차가 실제로 무엇을 바탕으로 만들어졌나'라는
+//     기록이 거짓이 된다. 새로 만드는 것부터 6건이다.
+function weeklyNews(n = 6) {
   return d1(`SELECT idxno, title FROM archive_articles WHERE length(COALESCE(body,''))>300 ORDER BY published_at DESC LIMIT ${n};`);
 }
 
