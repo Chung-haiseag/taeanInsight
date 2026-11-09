@@ -67,8 +67,9 @@ async function audioProbe(idxno) {
   return "unknown";
 }
 
-const exhausted = new Set(); // 429/한도 도달 키
-const keyAvail = (i) => !exhausted.has(i) && used[i] < PER_KEY;
+const exhausted = new Set(); // 429 한도 도달 — 내일이면 풀린다
+const dead = new Set();      // 401/403 — 구글이 막은 키. 사람이 갈기 전엔 영영 안 된다
+const keyAvail = (i) => !exhausted.has(i) && !dead.has(i) && used[i] < PER_KEY;
 const allExhausted = () => KEYS.every((_, i) => !keyAvail(i));
 
 async function ttsOnce(key, text) {
@@ -85,8 +86,14 @@ async function ttsOnce(key, text) {
 }
 
 // 키 로테이션 단일화자 TTS. 반환: {audio} | {skip} (이 기사만 실패) | {exhausted} (전 키 소진)
+//
+//   ⚠ 2026-11-09: 키를 바꾸는 것과 같은 키로 다시 보내는 것은 **다른 일**이다. 예전엔 둘 다
+//     같은 `attempt` 를 깎아서, 죽은 키 하나만 만나도 멀쩡한 뒷 키에 닿기 전에 기사를 버렸다.
+//     `attempt` 는 '같은 키로 다시' 만 센다. 키를 넘기는 횟수는 `hops` 로 따로 묶는다.
 async function geminiTts(text) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let attempt = 0, hops = 0;
+  const maxHops = KEYS.length * 2 + 2;
+  while (attempt < 3 && hops < maxHops) {
     // 사용 가능한 키 선택
     let hop = 0;
     while (hop < KEYS.length && !keyAvail(ki)) { ki = (ki + 1) % KEYS.length; hop++; }
@@ -98,18 +105,24 @@ async function geminiTts(text) {
         //   키·모델·기사 전문을 손으로 다시 쳐 봐야 했다. 상태 코드만 있는 로그는 진단이 아니다.
         let why = ""; try { why = (JSON.parse(await res.text()).error?.message ?? "").slice(0, 200); } catch { /* 본문 없음 */ }
         const kind = classifyTtsFailure(res.status, why);
-        if (kind === "exhausted") { console.warn(`  키#${ki + 1} 429 일일한도 도달`); exhausted.add(ki); ki = (ki + 1) % KEYS.length; continue; }
+        if (kind === "exhausted") { console.warn(`  키#${ki + 1} 429 일일한도 도달`); exhausted.add(ki); ki = (ki + 1) % KEYS.length; hops++; continue; }
+        // 401·403 은 이 요청이 아니라 **이 키**가 막힌 것이다. 기사를 버리지 말고 키를 뺀다 —
+        //   예전엔 이걸 'skip'(기사 실패)으로 처리해, 정지된 키 하나가 그날 치 기사를 전부 먹었다.
+        if (kind === "deadkey") {
+          console.warn(`  ⚠ 키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} → 이 키를 빼고 다음 키로(기사는 버리지 않는다)`);
+          dead.add(ki); ki = (ki + 1) % KEYS.length; hops++; continue;
+        }
         if (kind === "skip") { console.warn(`  키#${ki + 1} ${res.status} — ${why || "(본문 없음)"} → 이 기사 건너뜀`); return { skip: true, why: `${res.status} ${why}` }; }
-        console.warn(`  키#${ki + 1} ${res.status} — ${why.slice(0, 60) || "(본문 없음)"} 재시도 ${attempt + 1}/3`); await sleep(1200); continue;
+        attempt++; console.warn(`  키#${ki + 1} ${res.status} — ${why.slice(0, 60) || "(본문 없음)"} 재시도 ${attempt}/3`); await sleep(1200); continue;
       }
       const j = await res.json();
       const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-      if (!part) { console.warn(`  키#${ki + 1} 오디오 없음 재시도`); await sleep(1200); continue; }
+      if (!part) { attempt++; console.warn(`  키#${ki + 1} 오디오 없음 재시도 ${attempt}/3`); await sleep(1200); continue; }
       used[ki]++;
       const pcm = Buffer.from(part.inlineData.data, "base64");
       const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType || "")?.[1] ?? 24000);
       return { audio: pcmToWav(pcm, rate) };
-    } catch (e) { console.warn(`  키#${ki + 1} 오류: ${e.message} 재시도`); await sleep(1200); }
+    } catch (e) { attempt++; console.warn(`  키#${ki + 1} 오류: ${e.message} 재시도 ${attempt}/3`); await sleep(1200); }
   }
   return { skip: true }; // 3회 실패 → 이 기사만 스킵(키는 유지)
 }
@@ -215,7 +228,10 @@ async function main() {
     console.log(`  ✅ ${a.idxno} ${a.title.slice(0, 24)} (${(r.audio.length / 1024).toFixed(0)}KB wav)`);
     await sleep(1500); // rate 여유
   }
-  console.log(`완료 — 생성 ${done} · 건너뜀 ${fail} · 키사용 ${used.join("/")}`);
-  writeStatus({ news: { generated: done, failed: fail, target: picked.length, missing: picked.length - done - fail, exhausted: exhaustedRun, at: new Date().toISOString() } });
+  // 죽은 키는 **반드시 밖으로 드러낸다.** 로그에만 적히면 아무도 안 본다 —
+  //   2026-11-09 에 꼭 그래서 열흘을 하루 0~7건으로 돌았다. 서버 상태(/api/audio/status)에도 싣는다.
+  const deadKeys = [...dead].map((i) => i + 1);
+  console.log(`완료 — 생성 ${done} · 건너뜀 ${fail} · 키사용 ${used.join("/")}${deadKeys.length ? ` · ⚠ 죽은 키 ${deadKeys.map((n) => `#${n}`).join(",")} (사람이 갈아야 함)` : ""}`);
+  writeStatus({ news: { generated: done, failed: fail, target: picked.length, missing: picked.length - done - fail, exhausted: exhaustedRun, deadKeys, keyCount: KEYS.length, at: new Date().toISOString() } });
 }
 main().catch((e) => { console.error("실패:", e.message); process.exit(1); });

@@ -37,13 +37,17 @@ if (TEXT && !OUT) { console.error("--text 는 --out 과 함께만 쓴다 — R2�
 //   (tools/lib/tts-failure.mjs 에 그 사고 기록이 있다).
 const PROMPT = "다음 글을 한국어로, 라디오 아나운서처럼 차분하고 또렷하게 읽어 주세요:\n\n";
 
-function loadKey() {
+// ⚠ 2026-11-09: 예전엔 **첫 줄 키 하나만** 썼다. 그 키가 한도(429)에 걸리거나 구글이 막으면(403)
+//   브리핑 낭독이 그날 통째로 없어졌다 — 뒤에 멀쩡한 키가 있어도 쳐다보지 않았다.
+//   기사 낭독 쪽이 같은 이유로 열흘을 죽어 있었고(기사는 키#2 가 403 인데도 계속 그 키만 집었다),
+//   같은 열쇠 꾸러미를 쓰는 여기도 같은 병이었다. 이제 순서대로 다 꺼내 본다.
+function loadKeys() {
   const f = join(process.cwd(), "tools/news-audio/.gemini_keys");
   if (existsSync(f)) {
     const k = readFileSync(f, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
-    if (k.length) return k[0];
+    if (k.length) return k;
   }
-  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+  if (process.env.GEMINI_API_KEY) return [process.env.GEMINI_API_KEY];
   throw new Error("키 없음: tools/news-audio/.gemini_keys 또는 GEMINI_API_KEY");
 }
 
@@ -82,7 +86,9 @@ async function tts(key, text) {
       let why = ""; try { why = (JSON.parse(await res.text()).error?.message ?? "").slice(0, 200); } catch { /* 본문 없음 */ }
       const kind = classifyTtsFailure(res.status, why);
       console.warn(`  ${res.status} ${kind} — ${why || "(본문 없음)"}`);
-      if (kind === "skip" || kind === "exhausted") return null;
+      // deadkey(401·403)·exhausted(429)는 이 키의 문제다 — 같은 키로 다시 보내 봐야 같다.
+      //   skip 은 이 요청의 문제라 키를 바꿔도 같다. 셋 다 이 키로는 끝 — 부르는 쪽이 다음 키를 준다.
+      if (kind !== "retry") return { giveUpKey: kind !== "skip" };
       await sleep(1500); continue;
     }
     const j = await res.json();
@@ -90,9 +96,11 @@ async function tts(key, text) {
     if (!part) { console.warn("  오디오 없음 재시도"); await sleep(1500); continue; }
     const pcm = Buffer.from(part.inlineData.data, "base64");
     const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType || "")?.[1] ?? 24000);
-    return pcmToWav(pcm, rate);
+    return { wav: pcmToWav(pcm, rate) };
   }
-  return null;
+  // 3번 다시 보내도 안 됐다. 확률 오류일 수 있으니 **다른 키로 한 번 더** 가 본다 —
+  //   하루 한 번 도는 일이고, 조용히 없어지는 것보다 몇 분 더 쓰는 쪽이 낫다.
+  return { giveUpKey: true };
 }
 
 async function main() {
@@ -115,8 +123,16 @@ async function main() {
     if (probe?.ok) { console.log("오늘 것 이미 있음 — --force 로 다시 만들 수 있다"); return; }
   }
 
-  const wav = await tts(loadKey(), spoken);
-  if (!wav) { console.error("생성 실패 — 오늘 음성 없음(듣기 단추는 '준비 중'으로 표시된다)"); process.exit(1); }
+  // 키를 순서대로 꺼내 본다. 한 키가 막히면(429·403) 다음 키로 — 꾸러미가 빌 때까지.
+  let wav = null;
+  const keys = loadKeys();
+  for (let i = 0; i < keys.length && !wav; i++) {
+    if (i > 0) console.warn(`  키#${i} 로는 안 됐다 → 키#${i + 1} 로 다시`);
+    const r = await tts(keys[i], spoken);
+    if (r.wav) { wav = r.wav; break; }
+    if (!r.giveUpKey) break;   // 이 요청 자체가 틀렸다면 키를 바꿔도 같다
+  }
+  if (!wav) { console.error(`생성 실패 — 오늘 음성 없음(키 ${keys.length}개 모두 막힘). 듣기 단추는 '준비 중'으로 표시된다`); process.exit(1); }
   const mp3 = wavToMp3(wav);
   console.log(`  mp3 ${(mp3.length / 1024).toFixed(0)}KB`);
 

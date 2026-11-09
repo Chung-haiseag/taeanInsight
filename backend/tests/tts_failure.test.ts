@@ -18,8 +18,25 @@ describe("TTS 실패 분류", () => {
 
   it("그 밖의 4xx는 요청 오류 — 다시 보내도 같으니 건너뜀", () => {
     expect(classifyTtsFailure(400, "Invalid JSON payload received")).toBe("skip");
-    expect(classifyTtsFailure(403, "API key not valid")).toBe("skip");
     expect(classifyTtsFailure(404, "model not found")).toBe("skip");
+  });
+
+  // 2026-11-09 확정 — 생성기가 **열흘 가까이 하루 0~7건**만 만들고 있었다. 이유:
+  //   키#1 이 일일한도(429)로 빠지면 키#2 로 넘어가는데, 키#2 는 구글이 정지시킨 키라 403 을 냈다.
+  //   그런데 403 이 'skip'(=이 기사만 실패)이어서 **키는 살아 있는 것으로 남고** 기사만 버려졌다.
+  //   다음 기사도 같은 키#2 를 집어 또 403 → 또 skip. 멀쩡한 키#3 은 **한 번도 쓰이지 않았다**
+  //   (매일 로그의 '키사용 N/0/0' 이 그 증거다). 죽은 키 하나가 그날 치 기사를 전부 먹었다.
+  //   403·401 은 이 요청이 아니라 **이 키**가 문제다 — 기사를 버릴 게 아니라 키를 빼야 한다.
+  it("401·403 은 키가 죽은 것 — 기사를 버리지 말고 그 키를 뺀다", () => {
+    expect(classifyTtsFailure(403, "Permission denied on the service.")).toBe("deadkey");
+    expect(classifyTtsFailure(403, "Permission denied: Consumer 'projects/216847174493' has been suspended.")).toBe("deadkey");
+    expect(classifyTtsFailure(403, "API key not valid")).toBe("deadkey");
+    expect(classifyTtsFailure(401, "Request had invalid authentication credentials")).toBe("deadkey");
+  });
+
+  it("죽은 키와 한도 소진을 섞지 않는다 — 한도는 내일 풀리고, 죽은 키는 사람이 갈아야 한다", () => {
+    expect(classifyTtsFailure(429, "quota exceeded")).not.toBe("deadkey");
+    expect(classifyTtsFailure(403, "")).not.toBe("exhausted");
   });
 
   it("5xx는 일시 오류 — 재시도", () => {

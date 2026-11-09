@@ -9,8 +9,9 @@
 export const TTS_PROMPT = "다음 뉴스 기사를 아나운서처럼 차분하고 또렷하게 읽어 주세요:\n\n";
 
 /**
- * 실패 응답을 셋으로 가른다.
- *   exhausted — 키 소진(429). 다음 키로.
+ * 실패 응답을 넷으로 가른다.
+ *   exhausted — 키 소진(429). 오늘은 이 키를 쉬게 하고 다음 키로. 내일 풀린다.
+ *   deadkey   — 이 **키**가 죽었다(401·403). 키를 빼고 **같은 기사를 다음 키로** 다시 보낸다.
  *   retry     — 확률·일시 오류. 같은 키로 다시(5xx, '글을 쓰려 했다' 400).
  *   skip      — 요청 오류. 다시 보내도 같다 — 재시도로 키만 태운다. 이 기사만 건너뛴다.
  *   ⚠ 400을 전부 skip으로 두면(2026-09-05 오전에 그랬다) 확률 오류까지 한 번에 포기해 생성률이 떨어진다.
@@ -20,6 +21,11 @@ export function classifyTtsFailure(status, message) {
   if (status === 429) return "exhausted";
   if (status >= 500) return "retry";
   if (status === 400 && /tried to generate text|only be used for TTS/i.test(m)) return "retry";
+  // ⚠ 2026-11-09: 401·403 을 'skip' 으로 두면 **죽은 키가 그날 기사를 전부 먹는다.**
+  //   정지된 키가 403 을 낼 때마다 '이 기사 실패'로 처리돼 기사만 버려지고 키는 살아 있는 것으로 남았다.
+  //   다음 기사도 같은 키를 집어 또 403 — 멀쩡한 뒷 키는 한 번도 쓰이지 않았다(로그 '키사용 N/0/0').
+  //   403 은 요청이 아니라 **열쇠**가 틀렸다는 말이다. 기사가 아니라 키를 뺀다.
+  if (status === 401 || status === 403) return "deadkey";
   return "skip";
 }
 
