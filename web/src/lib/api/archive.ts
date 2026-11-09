@@ -35,6 +35,8 @@ export interface ArchiveArticle extends ArchiveHit {
   region?: { boxes: Array<{ x: number; y: number; w: number; h: number }>; matched: number } | null;
   /** 지면 광고인가. 기사 검색에서는 빠지고 '옛 광고'에서 찾는다. */
   isAd?: boolean;
+  /** 낭독이 **이미 만들어져 있는가**(R2 에 파일이 있는가). 없으면 듣기 단추를 아예 안 그린다. */
+  hasAudio?: boolean;
 }
 
 export async function searchArchive(params: {

@@ -1,7 +1,7 @@
 "use client";
 
 // 자체 기사 리더 — 태안신문으로 나가지 않고 우리 사이트에서 기사를 보여준다.
-// 전문은 D1 아카이브에서(우리 쪽 회원 게이트 뒤), 없으면 RSS 발췌로 폴백.
+// 전문은 D1 아카이브에서 — **로그인 없이 누구나**(2026-11-08), 없으면 RSS 발췌로 폴백.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -25,6 +25,7 @@ import { useReadAlong, useActiveRange, useSentenceTimes, ReadAlongParagraph, use
 import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
+import { READ_COL, ARTICLE_SHELL, LEAD_IMAGE_MAX, INLINE_IMAGE_MAX } from "./read-width";
 import ArticleGraph from "./article-graph";
 import { MembershipNudge } from "@/components/membership-nudge";
 import { SecHead } from "@/components/editorial";
@@ -34,9 +35,12 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
   const [article, setArticle] = useState<Reader | null>(initialArticle ?? null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!initialArticle);
-  // 아카이브 기사는 **무료로 유지**한다(유입·검색). 여기 문턱은 결제가 아니라 로그인이다.
-  //   예전엔 localStorage가 이 값을 정했고, '로그인하고 전문 보기' 단추가 로그인 없이
-  //   그 값을 켰다 — 이제 서버 세션이 정한다.
+  // 아카이브 기사는 **무료로 유지**한다(유입·검색) — 2026-11-08부터 로그인 문턱도 없앴다.
+  //   왜: 그 문턱은 막지 못했다. `/api/archive/:idxno` 는 인증을 보지 않고 page.tsx 가 그
+  //   응답을 initialArticle 로 넘기므로 본문은 이미 누구에게나 내려가 있었다 — 소스 보기로
+  //   다 읽혔다. 가린 건 사람 눈뿐이고, 덤으로 1990~2001년 49,449편이 검색에서 사라져 있었다.
+  //   (예전엔 localStorage가 로그인 여부를 정했고 단추가 그 값을 켰다 — 지금은 서버 세션이 정한다.)
+  //   `loggedIn` 은 이제 **쓰기**(오탈자 수정 요청)에만 쓴다.
   const { state: memberState } = useMembership();
   const loggedIn = memberState === "member" || memberState === "preview";
   // 낭독 재생 위치(초) — 따라읽기 하이라이트가 쓴다. 재생 안 하면 0으로 남아 하이라이트도 없다.
@@ -76,6 +80,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
             url: n.url,
             source: "rss",
             hasFullText: false,
+            hasAudio: false,   // 낭독은 아카이브 기사만 만든다 — RSS 발췌만 있는 기사엔 없다
           });
         } catch (e) {
           setError(e instanceof Error ? e.message : "기사를 불러오지 못했습니다");
@@ -86,10 +91,10 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
     })();
   }, [params.id, initialArticle]);
 
-  if (loading) return <p role="status" className="mx-auto max-w-[48rem] text-ti-ink2">기사를 불러오는 중입니다…</p>;
+  if (loading) return <p role="status" className={`${ARTICLE_SHELL} text-ti-ink2`}>기사를 불러오는 중입니다…</p>;
   if (error || !article)
     return (
-      <div className="mx-auto max-w-[48rem] space-y-4">
+      <div className={`${ARTICLE_SHELL} space-y-4`}>
         <p role="alert" className="rounded-xl border border-[#8A1C14]/30 bg-[#FAD4D1] p-4 text-[#8A1C14]">
           <strong className="mr-1">기사를 불러오지 못했습니다.</strong>{error ?? ""}
         </p>
@@ -101,9 +106,9 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
 
   const date = (article.publishedAt ?? "").slice(0, 10);
 
-  // 2026-10 리디자인: 읽는 폭을 한 줄 40em 안팎으로 묶는다(어르신 눈이 줄 끝에서 다음 줄을 잃지 않게).
+  // 읽는 폭·사진 상한은 read-width.ts 한 군데서 정한다(왜 rem 인지도 거기 적어 뒀다).
   return (
-    <article className="mx-auto max-w-[48rem] space-y-8">
+    <article className={`${ARTICLE_SHELL} space-y-8`}>
       {/* 읽기 행동 추적(초개인화) — 렌더 영향 없음 */}
       <ReadingTracker idxno={Number(params.id)} category={article.category} />
       <nav aria-label="이전 목록" className="no-print">
@@ -126,9 +131,11 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
           {article.author && <span><span className="sr-only">기자 </span>{article.author}</span>}
           <span className="text-ti-muted">주간태안신문</span>
         </p>
+        {/* 듣기는 **미리 만들어 둔 음성이 있을 때만** 나온다. 없는 기사에 단추를 띄워 놓고
+            눌러서야 "곧 자동 생성됩니다"라고 하지 않는다 — 옛 기사는 만들어 주지 않는다. */}
         <div className="no-print flex flex-wrap items-center gap-2 pt-1">
-          <NewsAudio idxno={Number(params.id)} onPos={setPlayPos} controlsRef={audioCtl} durationHint={raWords?.duration} />
-          <ShareBar idxno={Number(params.id)} title={article.title} />
+          {article.hasAudio && <NewsAudio idxno={Number(params.id)} title={article.title} onPos={setPlayPos} controlsRef={audioCtl} durationHint={raWords?.duration} />}
+          <ShareBar idxno={Number(params.id)} title={article.title} hasAudio={article.hasAudio} />
           <button type="button" onClick={() => window.print()} className={TOOL_PILL}>
             <Icon name="print" /> PDF로 저장
           </button>
@@ -141,24 +148,22 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
         )}
       </header>
 
-      {loggedIn && article.hasFullText ? (
-        <FullBody article={article} idxno={Number(params.id)} active={raActive} hasWords={!!raWords} sentences={raSentences} onSeek={seekTo} />
+      {/* 전문이 있으면 누구에게나 보여 준다. 아래 갈래는 '아직 아카이브로 안 옮겨진 최근 기사'
+          (RSS 발췌만)다 — 로그인해도 더 나올 게 없으니 모두에게 같은 안내를 준다. */}
+      {article.hasFullText ? (
+        <FullBody article={article} idxno={Number(params.id)} loggedIn={loggedIn} active={raActive} hasWords={!!raWords} sentences={raSentences} onSeek={seekTo} />
       ) : (
-        <div className="mx-auto max-w-[40em] space-y-6">
+        <div className={`${READ_COL} space-y-6`}>
           {/* 리드(발췌) */}
           <p className="text-[1.12rem] leading-[1.85] text-ti-ink"><QuotedText text={article.excerpt} /></p>
-          {loggedIn ? (
-            <div className="rounded-xl border border-ti-line bg-ti-sunk p-4 text-ti-ink2">
-              <Icon name="books" /> 전체 본문은 아카이브에 옮겨지면 이 자리에 나옵니다. 지금은 앞부분만 보여 드립니다.
-              {article.url && (
-                <a href={article.url} target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-ti-petrol-ink underline underline-offset-4">
-                  태안신문 원문 보기<span className="sr-only"> (새 창)</span>
-                </a>
-              )}
-            </div>
-          ) : (
-            <MemberGate hasFullText={article.hasFullText} idxno={Number(params.id)} />
-          )}
+          <div className="rounded-xl border border-ti-line bg-ti-sunk p-4 text-ti-ink2">
+            <Icon name="books" /> 전체 본문은 아카이브에 옮겨지면 이 자리에 나옵니다. 지금은 앞부분만 보여 드립니다.
+            {article.url && (
+              <a href={article.url} target="_blank" rel="noopener noreferrer" className="ml-1 font-bold text-ti-petrol-ink underline underline-offset-4">
+                태안신문 원문 보기<span className="sr-only"> (새 창)</span>
+              </a>
+            )}
+          </div>
         </div>
       )}
 
@@ -180,7 +185,7 @@ export default function ArticleClient({ initialArticle }: { initialArticle?: Rea
 const TOOL_PILL = "inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ti-line bg-ti-surface px-4 text-[0.95rem] font-semibold text-ti-ink hover:border-ti-petrol";
 
 // 공유 + 오디오(나레이션) 링크·임베드 복사. 나레이션 URL은 공개·CORS 전면개방이라 어디서든 재생/임베드 가능.
-function ShareBar({ idxno, title }: { idxno: number; title: string }) {
+function ShareBar({ idxno, title, hasAudio }: { idxno: number; title: string; hasAudio: boolean }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const audioUrl = `${API_BASE_URL}/api/audio/news/${idxno}`;
@@ -200,12 +205,17 @@ function ShareBar({ idxno, title }: { idxno: number; title: string }) {
   return (
     <div className="relative inline-flex flex-wrap items-center gap-2">
       <button type="button" onClick={share} className={pill}><Icon name="link" /> 공유</button>
-      <button type="button" onClick={() => setMenu((v) => !v)} aria-expanded={menu} aria-haspopup="menu" className={pill}><Icon name="speaker" /> 오디오</button>
-      {menu && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-60 overflow-hidden rounded-xl border border-ti-line bg-ti-surface py-1 shadow-lift" role="menu">
-          <button type="button" role="menuitem" onClick={() => copy(audioUrl, "오디오 링크 복사됨")} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[0.95rem] text-ti-ink hover:bg-ti-sunk"><Icon name="link" /> 오디오 링크 복사</button>
-          <button type="button" role="menuitem" onClick={() => copy(embed, "임베드 코드 복사됨")} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[0.95rem] text-ti-ink hover:bg-ti-sunk"><Icon name="doc" /> 임베드 코드 복사</button>
-        </div>
+      {/* 음성이 없으면 이 칸 자체를 안 낸다 — 없는 음성의 주소를 복사해 주면 붙여 넣은 곳에서 503 이 난다. */}
+      {hasAudio && (
+        <>
+          <button type="button" onClick={() => setMenu((v) => !v)} aria-expanded={menu} aria-haspopup="menu" className={pill}><Icon name="speaker" /> 오디오</button>
+          {menu && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-60 overflow-hidden rounded-xl border border-ti-line bg-ti-surface py-1 shadow-lift" role="menu">
+              <button type="button" role="menuitem" onClick={() => copy(audioUrl, "오디오 링크 복사됨")} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[0.95rem] text-ti-ink hover:bg-ti-sunk"><Icon name="link" /> 오디오 링크 복사</button>
+              <button type="button" role="menuitem" onClick={() => copy(embed, "임베드 코드 복사됨")} className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-[0.95rem] text-ti-ink hover:bg-ti-sunk"><Icon name="doc" /> 임베드 코드 복사</button>
+            </div>
+          )}
+        </>
       )}
       {msg && <span role="status" className="whitespace-nowrap text-[0.9rem] font-bold text-ti-petrol-ink">{msg}</span>}
     </div>
@@ -361,9 +371,10 @@ function QuotedText({ text }: { text: string }) {
   );
 }
 
-function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
+function FullBody({ article, idxno, loggedIn, active, hasWords, sentences, onSeek }: {
   article: Reader;
   idxno: number;
+  loggedIn: boolean;                               // 읽기는 누구나 / 쓰기(수정 요청)만 로그인
   active: { start: number; end: number } | null;   // 따라읽기 활성 구간(부모에서 계산 — 제목과 공유)
   hasWords: boolean;
   sentences: Array<{ start: number; end: number; t: number }>;
@@ -383,14 +394,14 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
       {leadImg && (
         <figure className="m-0 space-y-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={leadImg} alt={hasCaption ? allParas[0] : article.title} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: "min(100%, 720px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-          {hasCaption && <figcaption className="mx-auto max-w-[40em] text-center text-[0.95rem] text-ti-ink2">{allParas[0]}</figcaption>}
+          <img src={leadImg} alt={hasCaption ? allParas[0] : article.title} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: LEAD_IMAGE_MAX, maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          {hasCaption && <figcaption className={`${READ_COL} text-center text-[0.95rem] text-ti-ink2`}>{allParas[0]}</figcaption>}
         </figure>
       )}
 
-      {/* 본문 — 한 줄 40em·글자 1.08rem·줄간격 1.85: 어르신이 줄을 놓치지 않는 폭과 숨 */}
+      {/* 본문 — 읽는 칸(read-width.ts)·글자 1.08rem·줄간격 1.85: 줄을 놓치지 않는 폭과 숨 */}
       {/*   따라읽기: 정렬 원문이 `제목.\n본문`이라 본문 문단의 순번은 제목 글자 수부터 시작한다. */}
-      <div ref={bodyRef as React.RefObject<HTMLDivElement>} className="mx-auto max-w-[40em] space-y-[1.1em] break-keep text-[1.08rem] leading-[1.85] text-ti-ink">
+      <div ref={bodyRef as React.RefObject<HTMLDivElement>} className={`${READ_COL} space-y-[1.1em] break-keep text-[1.08rem] leading-[1.85] text-ti-ink`}>
         {(() => {
           let off = nsLen(`${article.title}.`);
           if (hasCaption) off += nsLen(allParas[0]);
@@ -414,7 +425,7 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
           {restImages.map((src) => (
             // 자연 크기 표시(작으면 작게), 단 본문 폭·높이 상한만 둠 — 작은 사진이 흐릿하게 늘어나지 않게
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt={`${article.title} 본문 사진`} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: "min(100%, 640px)", maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img key={src} src={src} alt={`${article.title} 본문 사진`} className="mx-auto block h-auto rounded-xl bg-ti-sunk" style={{ maxWidth: INLINE_IMAGE_MAX, maxHeight: "34rem" }} loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
       )}
@@ -424,19 +435,22 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
         (typeof article.faithfulness === "number" && article.faithfulness < LOW_FAITH) ||
         Number((article.publishedAt || "").slice(0, 4)) <= OLD_PRINT_UNTIL
       ) && (
-        <p className="mx-auto max-w-[40em] rounded-xl border-l-4 border-[#6B3F00] bg-[#FCE3B5] px-4 py-3 font-semibold text-[#6B3F00]">
+        <p className={`${READ_COL} rounded-xl border-l-4 border-[#6B3F00] bg-[#FCE3B5] px-4 py-3 font-semibold text-[#6B3F00]`}>
           <strong className="mr-1 font-black">알림</strong>옛 지면을 글자로 옮기는 과정이 완벽하지 않습니다. 정확한 내용은 아래 <span className="underline underline-offset-4">원본 지면</span>에서 확인하세요.
         </p>
       )}
 
-      {/* 전자북: 오탈자 수정 요청(회원) — 본문 드래그 → 요청 폼 */}
-      {isEbook && <CorrectionRequest idxno={idxno} />}
+      {/* 전자북: 오탈자 수정 요청 — 본문 드래그 → 요청 폼.
+          읽기는 열어 뒀지만 이건 로그인한 독자만이다. 관리자 검토 큐로 들어가는 **쓰기**이고,
+          접수 안내가 '내 페이지 → 내 수정 요청에서 보세요'라 비로그인에겐 갈 곳이 없다.
+          (서버는 익명 기기 id(X-Taean-Uid)로도 받아 주므로 화면에서 막는다.) */}
+      {isEbook && loggedIn && <CorrectionRequest idxno={idxno} />}
 
       {/* 전자북: 원본 지면 스캔 (디지털화 본문과 대조 가능) */}
       {article.pageImage && <OriginalPage src={article.pageImage} label={article.pageLabel ?? ""} boxes={article.pageBoxes ?? undefined} date={(article.publishedAt ?? "").slice(0, 10)} />}
 
       {/* 출처 표기 */}
-      <div className="mx-auto flex max-w-[40em] flex-wrap items-center justify-between gap-2 border-t border-ti-line pt-4">
+      <div className={`${READ_COL} flex flex-wrap items-center justify-between gap-2 border-t border-ti-line pt-4`}>
         <span className="text-[0.95rem] text-ti-muted">출처: 주간태안신문</span>
         {article.url && (
           <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-bold text-ti-petrol-ink underline underline-offset-4">
@@ -448,31 +462,18 @@ function FullBody({ article, idxno, active, hasWords, sentences, onSeek }: {
   );
 }
 
-function MemberGate({ hasFullText, idxno }: { hasFullText: boolean; idxno: number }) {
-  return (
-    <div aria-labelledby="member-gate-title" role="region" className="space-y-4 rounded-[18px] border-2 border-ti-petrol bg-ti-petrol-soft p-6 text-center md:p-8">
-      <p className="eyebrow justify-center"><Icon name="lock" /> 로그인하면 보입니다</p>
-      <h2 id="member-gate-title" className="break-keep font-head text-[1.35rem] font-bold leading-snug text-ti-ink">
-        {hasFullText ? "이 기사의 전문은 로그인하시면 보실 수 있습니다" : "로그인하시면 더 많은 기능을 이용하실 수 있어요"}
-      </h2>
-      <p className="text-ti-ink2">
-        아카이브 기사는 회원가입만 하시면 무료입니다. 결제는 필요하지 않습니다.
-      </p>
-      <div className="flex flex-wrap justify-center gap-3 pt-1">
-        <Link href={`/login?redirect=${encodeURIComponent(`/news/${idxno}`)}`} className="btn-accent">
-          로그인하기
-        </Link>
-        <Link href="/me/onboarding" className="btn-ghost">
-          회원가입
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// 전자북 원본 지면 — 토글로 열 때만 로드, 클릭하면 전용 뷰어(확대·이동)로 열람
+// 전자북 원본 지면 — 처음부터 펴 둔다. 클릭하면 전용 뷰어(확대·이동)로 열람.
+//
+//   ⚠ 예전엔 접어 두고 '펼치기'를 눌러야 했다. 그런데 바로 위에 "옛 지면을 글자로 옮기는
+//     과정이 완벽하지 않습니다. 정확한 내용은 **아래 원본 지면에서** 확인하세요"라고 적어
+//     두고 그 지면을 숨겨 놓은 꼴이었다(2026-11-08 사용자 지적). OCR 본문이 틀릴 수 있다는
+//     걸 아는 화면에서 원본은 기본값이어야 한다.
+//   ⚠ 접어 둔 이유였던 '열 때만 받는다'는 `ZoomPanImage` 의 `loading="lazy"` 가 대신한다 —
+//     이 칸은 본문 아래라 화면에 들어오기 전엔 안 받는다. 지면 스캔은 634KB(1081×1600),
+//     확대본은 1.4MB 로 '크게 보기' 때만 받는다. lazy 가 빠지면 모든 옛 기사 화면이
+//     열자마자 634KB 를 받는다 — original-page.test.ts 가 둘을 같이 박아 둔다.
 function OriginalPage({ src, label, boxes, date }: { src: string; label: string; boxes?: Array<{ x: number; y: number; w: number; h: number }>; date?: string }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [viewer, setViewer] = useState(false);
   const fullSrc = src.replace(/\.jpg(\?|$)/, "full.jpg$1"); // page_03.jpg → page_03full.jpg
   return (

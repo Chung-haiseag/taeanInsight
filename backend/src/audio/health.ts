@@ -5,6 +5,8 @@
 //     "실패했다"는 기록이 어디에도 안 남으니, 서버가 결과물(최신 기사에 오디오가 있는가)을 직접 본다.
 //   ⚠ 발행 후 하루는 봐준다 — 생성기는 07시 배치라 자정에 수집된 기사는 아직 없는 게 정상이다.
 
+import { hasNewsAudio } from "./has_audio";
+
 export interface AudioHealthInput { publishedAt: string; hasAudio: boolean }
 
 export interface AudioHealth {
@@ -51,8 +53,8 @@ export async function checkAudioHealth(
     "ORDER BY published_at DESC, idxno DESC LIMIT ?",
   ).bind(since, limit).all<{ idxno: number; published_at: string }>()).results ?? [];
   const sample = await Promise.all(rows.map(async (r) => {
-    const has = !!(await r2.head(`audio/news/${r.idxno}-gem2.mp3`)) || !!(await r2.head(`audio/news/${r.idxno}-gem2.wav`));
-    return { idxno: r.idxno, publishedAt: r.published_at, hasAudio: has };
+    // 독자 화면이 쓰는 판정과 **같은 함수**를 쓴다 — 갈라지면 '단추는 없는데 건강은 정상'이 된다.
+    return { idxno: r.idxno, publishedAt: r.published_at, hasAudio: await hasNewsAudio(r2, r.idxno) };
   }));
   return { ...judgeAudioHealth(sample, now), sample };
 }

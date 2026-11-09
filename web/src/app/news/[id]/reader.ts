@@ -23,6 +23,12 @@ export interface Reader {
   pageBoxes?: Array<{ x: number; y: number; w: number; h: number }> | null;
   /** 지면 광고인가 — 돌아가는 길이 '옛 광고'라야 맞다. */
   isAd?: boolean;
+  /**
+   * 낭독이 **이미 있는가**. 서버가 R2 를 보고 알려준 값이다 — 화면이 추측하지 않는다.
+   *   ⚠ 없으면 '기사 듣기'를 그리지 않는다. 예전엔 늘 그려 놓고 누른 뒤에야 "곧 자동
+   *     생성됩니다"라 했는데, 생성기는 최신 기사만 만든다 — 옛 기사엔 거짓말이었다.
+   */
+  hasAudio: boolean;
 }
 
 // 이 값 미만이면 "OCR 불완전 — 원본 지면 확인" 안내. 1990~1994 옛 신문은 수치 무관 항상 안내.
@@ -71,6 +77,7 @@ export function archiveToReader(a: ArchiveArticle, idxno: number): Reader {
     faithfulness: typeof a.faithfulness === "number" ? a.faithfulness : null,
     pageBoxes: Array.isArray(a.region?.boxes) && a.region.boxes.length ? a.region.boxes : null,
     isAd: a.isAd === true,
+    hasAudio: a.hasAudio === true,   // 서버가 R2 를 본 값. 모르면 false(없는 걸 있다고 하지 않는다)
     ...ebookPageImage(idxno, a.section, a.published_at),
   };
 }

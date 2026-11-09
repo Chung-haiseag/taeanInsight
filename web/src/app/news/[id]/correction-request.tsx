@@ -4,6 +4,7 @@
 // 선택 문구가 폼에 자동 입력. 제출하면 관리자 검토 큐(/admin 수정요청 탭)로.
 
 import { useEffect, useState } from "react";
+import { READ_COL } from "./read-width";
 
 import { submitCorrection } from "@/lib/api/corrections";
 
@@ -61,7 +62,7 @@ export function CorrectionRequest({ idxno }: { idxno: number }) {
   return (
     <>
       {/* 안내 + 단추를 떼어 둔다 — 문장 속 작은 글자 단추는 어르신이 누르기 어렵다 */}
-      <div className="no-print mx-auto flex max-w-[40em] flex-wrap items-center justify-between gap-3 rounded-xl border border-ti-line bg-ti-sunk px-4 py-3">
+      <div className={`no-print ${READ_COL} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ti-line bg-ti-sunk px-4 py-3`}>
         <p className="min-w-0 flex-1 text-[0.95rem] text-ti-ink2">
           옛 지면을 자동으로 글자로 옮긴(OCR) 본문이라 틀린 글자가 있을 수 있습니다. 틀린 부분을 끌어서 고른 뒤 단추를 눌러 알려주세요.
         </p>

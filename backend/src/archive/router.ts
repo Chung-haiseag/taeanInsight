@@ -12,6 +12,7 @@ import { PRICE_LABELS } from "./ad_prices";
 import type { Env } from "../types";
 import { FTS_MIN, relatedKeywords, titleMatchQuery } from "./related";
 import { cacheRule } from "../lib/cache_headers";
+import { hasNewsAudio } from "../audio/has_audio";
 
 export const archiveRouter = new Hono<{ Bindings: Env }>();
 
@@ -356,7 +357,10 @@ archiveRouter.get("/:idxno{[0-9]+}", async (c) => {
       .catch(() => null);                      // 표가 아직 없어도 기사는 열려야 한다
     if (g) region = { boxes: safeJson(g.boxes_json), matched: Number(g.matched) || 0 };
   }
-  return c.json({ ...row, images: safeJson(row.images), region, isAd: Number(row.is_ad) === 1 });
+  // 낭독이 **이미 있는가**. 화면은 이 값으로 '기사 듣기'를 그릴지 정한다 — 없는 기사에
+  //   단추를 띄우고 눌러서야 503 을 보여 주던 걸 없앴다(만들어 주지도 않으면서 그랬다).
+  const hasAudio = await hasNewsAudio(c.env.ARCHIVE_PHOTOS, idxno);
+  return c.json({ ...row, images: safeJson(row.images), region, isAd: Number(row.is_ad) === 1, hasAudio });
 });
 
 // ── 지면 광고 훑어보기 ────────────────────────────────────────────────────
