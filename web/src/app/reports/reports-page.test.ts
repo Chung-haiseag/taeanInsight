@@ -103,6 +103,7 @@ describe("회차 머리 — 당진 구조에서 되돌아가지 않는다", () =
       .replace(/\/\*[\s\S]*?\*\//g, " ")
       .replace(/(^|[^:])\/\/.*$/gm, "$1");
   const head = () => code("src/components/reports/episode-head.tsx");
+  const list = () => code("src/components/reports/episode-articles.tsx");
 
   it("대본은 접는 칸이 아니라 제 주소를 가진 화면으로 간다", () => {
     // <details> 안의 글은 공유할 주소가 없고 검색 결과로도 서지 못한다 —
@@ -157,7 +158,17 @@ describe("회차 머리 — 당진 구조에서 되돌아가지 않는다", () =
 
   it("옛 기사 줄은 있을 때만 그린다", () => {
     // 없는 주차에 '0년 전'이나 빈 줄을 그리면 아카이브가 비어 보인다.
-    expect(head()).toMatch(/episode\.throwback &&/);
+    //   2026-11-09: 기사 목록이 읽기 패널을 갖느라 episode-articles.tsx 로 옮겨 갔다.
+    //   지키는 것은 그대로다 — 옛 기사가 있을 때만 그 줄을 그린다.
+    expect(list()).toMatch(/\{throwback &&/);
+  });
+
+  it("옛 기사는 읽기 패널에 섞이지 않는다", () => {
+    // '이 회의 기사 N/M' 의 M 에 끼면, 이 회차가 다루지 않은 것을 다룬 것처럼 센다.
+    const l = list();
+    const panel = l.slice(l.indexOf("<ArticlePanel"));
+    expect(panel).not.toMatch(/throwback/);
+    expect(l).toMatch(/articles=\{articles\}/);
   });
 
   it("사진 번호는 목록 순번에서 온다 — 사진 순번이 아니다", () => {

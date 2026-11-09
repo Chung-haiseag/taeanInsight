@@ -26,6 +26,8 @@ import { Icon } from "@/components/icon";
 import { API_BASE_URL } from "@/lib/api/client";
 import { CorrectionRequest } from "./correction-request";
 import { READ_COL, ARTICLE_SHELL, LEAD_IMAGE_MAX, INLINE_IMAGE_MAX } from "./read-width";
+import { readBody } from "@/lib/article-body";
+import { QuotedText } from "@/components/quoted-text";
 import { ArticlePhoto, ThumbPhoto } from "@/components/article-photo";
 import ArticleGraph from "./article-graph";
 import { MembershipNudge } from "@/components/membership-nudge";
@@ -345,31 +347,6 @@ function PagerBtn({
 /** 공백 제외 글자 수 — 따라읽기 순번 계산의 기준(정렬 데이터와 동일 규칙). */
 const nsLen = (s: string) => s.replace(/\s/g, "").length;
 
-function splitParagraphs(text: string): string[] {
-  const t = (text || "").trim();
-  if (!t) return [];
-  // 백필이 문단(\n)을 보존했으면 그대로, 아니면(한 덩어리) 문장 단위로 묶어 문단화
-  if (t.includes("\n")) return t.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-  const sentences = t.split(/(?<=[.?!”"’])\s+/).filter(Boolean);
-  const paras: string[] = [];
-  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join(" "));
-  return paras.length ? paras : [t];
-}
-
-// 인용부호("…") 구간을 강조색으로 렌더 — 발언·인용을 눈에 띄게.
-function QuotedText({ text }: { text: string }) {
-  return (
-    <>
-      {segmentQuotes(text).map((s, i) =>
-        s.quote ? (
-          <span key={i} className="font-semibold text-ti-petrol-ink">{s.t}</span>
-        ) : (
-          <span key={i}>{s.t}</span>
-        ),
-      )}
-    </>
-  );
-}
 
 function FullBody({ article, idxno, loggedIn, active, hasWords, sentences, onSeek }: {
   article: Reader;
@@ -380,23 +357,20 @@ function FullBody({ article, idxno, loggedIn, active, hasWords, sentences, onSee
   sentences: Array<{ start: number; end: number; t: number }>;
   onSeek?: (sec: number) => void;
 }) {
-  const allParas = splitParagraphs(article.body || "");
+  // 문단·사진설명 가르기는 lib/article-body.ts 한 군데에 있다 — 회차 화면의 읽기 패널이
+  //   같은 기사를 같은 모습으로 보여 줘야 한다(복사하면 한쪽만 고쳐진다).
+  const { caption, paras, leadImage: leadImg, restImages } = readBody(article.body || "", article.images);
   const bodyRef = useAutoScroll(active, hasWords);
   const isEbook = idxno >= 90000001 && idxno <= 90099999;
-  const leadImg = article.images[0] ?? null;
-  // 사진설명: 사진이 있고 첫 문단이 짧으면(≤45자 = 캡션) 본문에서 분리해 사진 아래 중앙에 배치.
-  const hasCaption = !!leadImg && allParas.length > 1 && allParas[0].length <= 45;
-  const paras = hasCaption ? allParas.slice(1) : allParas;
-  const restImages = leadImg ? article.images.slice(1) : article.images;
   return (
     <div className="space-y-8">
       {/* 리드 사진 — 맨 위 + 사진설명(가운데) */}
       {leadImg && (
         <ArticlePhoto
           src={leadImg}
-          alt={hasCaption ? allParas[0] : article.title}
+          alt={caption ?? article.title}
           maxWidth={LEAD_IMAGE_MAX}
-          caption={hasCaption ? allParas[0] : undefined}
+          caption={caption ?? undefined}
           captionClassName={`${READ_COL} text-center text-[0.95rem] text-ti-ink2`}
         />
       )}
@@ -406,7 +380,7 @@ function FullBody({ article, idxno, loggedIn, active, hasWords, sentences, onSee
       <div ref={bodyRef as React.RefObject<HTMLDivElement>} className={`${READ_COL} space-y-[1.1em] break-keep text-[1.08rem] leading-[1.85] text-ti-ink`}>
         {(() => {
           let off = nsLen(`${article.title}.`);
-          if (hasCaption) off += nsLen(allParas[0]);
+          if (caption) off += nsLen(caption);
           return paras.map((p, i) => {
             const start = off;
             off += nsLen(p);
