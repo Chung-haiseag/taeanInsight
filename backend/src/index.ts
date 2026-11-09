@@ -320,6 +320,85 @@ export default {
       }
       return;
     }
+    // 기사 듣기 파수꾼 — **제 크론 호출**로 돈다(13:00 KST).
+    //   ⚠ 파수꾼을 무거운 작업 뒤에 세우지 않는다. 이 블록은 꼬리의 끝에서 두 번째였고
+    //     5일 동안 한 번도 돌지 않았다. 조용히 죽지 않게 만든 것이 조용히 죽어 있었다.
+    //     꼬리로 되돌리는 변경은 tests/cron_watchdog.test.ts 에서 막힌다.
+    if (_event.cron === "0 4 * * *") {
+      // 기사 듣기 건강 — 최신 기사에 오디오가 붙어 있는지 서버가 직접 센다.
+      //   두 번 죽었고 두 번 다 독자가 먼저 알았다(08-08~19 11일 · 08-29~09-04 6일). 생성기는
+      //   로컬 launchd라 로그가 서버에 없고 status.json은 마지막 성공만 남긴다. 결과물을 본다.
+      try {
+        const db = env.ARCHIVE_DB, r2 = env.ARCHIVE_PHOTOS;
+        if (!db || !r2) throw new Error("ARCHIVE_DB/ARCHIVE_PHOTOS 없음");
+        const { checkAudioHealth } = await import("./audio/health");
+        const h = await checkAudioHealth(db, r2);
+        await db.prepare(
+          "INSERT INTO kv_cache(k, v, ts) VALUES('audio_health', ?, ?) " +
+          "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
+        ).bind(JSON.stringify(h), Date.now()).run();
+        if (h.ok === true) console.log(`[cron] 기사 듣기: 정상 (최신 ${h.checked}건 확인, 대기 ${h.pending})`);
+        else if (h.ok === false) console.warn(`[cron] ⚠ 기사 듣기 죽음 — 하루 넘은 기사 ${h.missing}건에 오디오 없음, 최장 ${h.oldestMissingDays}일째. 로컬 생성기(launchd com.taean.newsaudio) 로그를 볼 것`);
+        else console.warn("[cron] 기사 듣기: 검사할 기사 없음");
+
+        // ⚠ 2026-11-09: 위 경고는 **Worker 로그에만** 남는다. 열흘 동안 매일 정확히 찍혔는데
+        //   아무에게도 닿지 않았다 — 감지와 통보는 다른 일이다. 여기서 사람을 부른다.
+        //   고장 나자마자 한 번, 그 뒤로는 사흘에 한 번. 고쳐지면 한 번 더(audio/alert.ts).
+        try {
+          const { alertKind, alertPayload, notifyAdmins } = await import("./audio/alert");
+          const row = await db.prepare("SELECT v FROM kv_cache WHERE k='audio_alert'").first<{ v: string }>().catch(() => null);
+          let memo: { at: number; broken: boolean } | null = null;
+          try { memo = row?.v ? JSON.parse(row.v) : null; } catch { /* 깨진 기억은 없는 셈 친다 */ }
+          const now = Date.now();
+          const kind = alertKind(h, memo, now);
+          if (kind) {
+            const r = await notifyAdmins(env, alertPayload(kind, h));
+            await db.prepare(
+              "INSERT INTO kv_cache(k, v, ts) VALUES('audio_alert', ?, ?) " +
+              "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
+            ).bind(JSON.stringify({ at: now, broken: kind === "broken" }), now).run();
+            // 못 보낸 이유도 남긴다 — '보냈다'고만 적으면 구독이 0명일 때 이 알림이 또 조용히 죽는다.
+            console.warn(`[cron] 기사 듣기 알림(${kind}) — 발송 ${r.sent}건 / 관리자 ${r.admins}명 · 구독 ${r.subs}개${r.skipped ? ` · 못 보냄: ${r.skipped}` : ""}`);
+          }
+        } catch (e) {
+          console.warn("[cron] 기사 듣기 알림 실패:", e instanceof Error ? e.message : e);
+        }
+      } catch (e) {
+        console.warn("[cron] 기사 듣기 건강 검사 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
+    // 지식그래프 논리 감사 — **제 크론 호출**로 돈다(14:00 KST).
+    //   2026-11-09: 이 블록은 자정 크론 꼬리의 중간에 있었고, 11-04부터 닷새 동안 여기서
+    //   실행이 끊겼다. 바로 앞(예보 적중률)은 그날도 돌았는데 이 블록부터 **뒤 8개가 전부**
+    //   아무것도 쓰지 않았다 — try/catch 로 잡히는 예외가 아니라 한 호출의 CPU·시간 예산이
+    //   여기서 바닥난 것이다. 감사 질의가 그래프와 함께 무거워졌다.
+    //   혼자 돌게 떼어 내면 이 감사도 살고 뒤의 블록들도 예산을 되찾는다.
+    if (_event.cron === "0 5 * * *") {
+      // 지식그래프 논리 감사 — **논리적으로 불가능한 것**만 세어 kv_cache에 남긴다.
+      //   2026-08-28에 부군수 23명이 '태안군수'로 8일간 떠 있었다. 추출 코드는 이미 고쳐졌는데
+      //   데이터가 안 따라온 것이었다 — 사람이 생각날 때만 도는 감사로는 이런 어긋남을 못 잡는다.
+      //   결과는 /admin 지식그래프 화면이 읽는다. 위반이 있으면 로그에 크게 남긴다.
+      try {
+        const db = env.ARCHIVE_DB;
+        if (!db) throw new Error("ARCHIVE_DB 없음");
+        const { runLogicAudit } = await import("./kg/logic_audit");
+        const a = await runLogicAudit(db);
+        await db.prepare(
+          "INSERT INTO kv_cache(k, v, ts) VALUES('kg_logic_audit', ?, ?) " +
+          "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
+        ).bind(JSON.stringify(a), Date.now()).run();
+        if (a.ok) console.log("[cron] 지식그래프 논리 감사: 이상 없음");
+        else console.warn(`[cron] ⚠ 지식그래프 논리 위반 ${a.total}건 — ` +
+          a.failed.map((f) => `${f.label} ${f.count}`).join(" · ") +
+          (a.errored.length ? ` (질의 실패 ${a.errored.length}건)` : ""));
+      } catch (e) {
+        console.warn("[cron] 논리 감사 실패:", e instanceof Error ? e.message : e);
+      }
+      return;
+    }
+
 
     try {
       const { ingestToArchive } = await import("./news/ingest");
@@ -343,67 +422,6 @@ export default {
       if (rec.recorded || res.resolved) console.log(`[cron] 예보 적중률: 기록 ${rec.recorded}·해소 ${res.resolved}`);
     } catch (e) {
       console.warn("[cron] 예보 적중률 실패:", e instanceof Error ? e.message : e);
-    }
-    // 지식그래프 논리 감사 — **논리적으로 불가능한 것**만 세어 kv_cache에 남긴다.
-    //   2026-08-28에 부군수 23명이 '태안군수'로 8일간 떠 있었다. 추출 코드는 이미 고쳐졌는데
-    //   데이터가 안 따라온 것이었다 — 사람이 생각날 때만 도는 감사로는 이런 어긋남을 못 잡는다.
-    //   결과는 /admin 지식그래프 화면이 읽는다. 위반이 있으면 로그에 크게 남긴다.
-    try {
-      const db = env.ARCHIVE_DB;
-      if (!db) throw new Error("ARCHIVE_DB 없음");
-      const { runLogicAudit } = await import("./kg/logic_audit");
-      const a = await runLogicAudit(db);
-      await db.prepare(
-        "INSERT INTO kv_cache(k, v, ts) VALUES('kg_logic_audit', ?, ?) " +
-        "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
-      ).bind(JSON.stringify(a), Date.now()).run();
-      if (a.ok) console.log("[cron] 지식그래프 논리 감사: 이상 없음");
-      else console.warn(`[cron] ⚠ 지식그래프 논리 위반 ${a.total}건 — ` +
-        a.failed.map((f) => `${f.label} ${f.count}`).join(" · ") +
-        (a.errored.length ? ` (질의 실패 ${a.errored.length}건)` : ""));
-    } catch (e) {
-      console.warn("[cron] 논리 감사 실패:", e instanceof Error ? e.message : e);
-    }
-    // 기사 듣기 건강 — 최신 기사에 오디오가 붙어 있는지 서버가 직접 센다.
-    //   두 번 죽었고 두 번 다 독자가 먼저 알았다(08-08~19 11일 · 08-29~09-04 6일). 생성기는
-    //   로컬 launchd라 로그가 서버에 없고 status.json은 마지막 성공만 남긴다. 결과물을 본다.
-    try {
-      const db = env.ARCHIVE_DB, r2 = env.ARCHIVE_PHOTOS;
-      if (!db || !r2) throw new Error("ARCHIVE_DB/ARCHIVE_PHOTOS 없음");
-      const { checkAudioHealth } = await import("./audio/health");
-      const h = await checkAudioHealth(db, r2);
-      await db.prepare(
-        "INSERT INTO kv_cache(k, v, ts) VALUES('audio_health', ?, ?) " +
-        "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
-      ).bind(JSON.stringify(h), Date.now()).run();
-      if (h.ok === true) console.log(`[cron] 기사 듣기: 정상 (최신 ${h.checked}건 확인, 대기 ${h.pending})`);
-      else if (h.ok === false) console.warn(`[cron] ⚠ 기사 듣기 죽음 — 하루 넘은 기사 ${h.missing}건에 오디오 없음, 최장 ${h.oldestMissingDays}일째. 로컬 생성기(launchd com.taean.newsaudio) 로그를 볼 것`);
-      else console.warn("[cron] 기사 듣기: 검사할 기사 없음");
-
-      // ⚠ 2026-11-09: 위 경고는 **Worker 로그에만** 남는다. 열흘 동안 매일 정확히 찍혔는데
-      //   아무에게도 닿지 않았다 — 감지와 통보는 다른 일이다. 여기서 사람을 부른다.
-      //   고장 나자마자 한 번, 그 뒤로는 사흘에 한 번. 고쳐지면 한 번 더(audio/alert.ts).
-      try {
-        const { alertKind, alertPayload, notifyAdmins } = await import("./audio/alert");
-        const row = await db.prepare("SELECT v FROM kv_cache WHERE k='audio_alert'").first<{ v: string }>().catch(() => null);
-        let memo: { at: number; broken: boolean } | null = null;
-        try { memo = row?.v ? JSON.parse(row.v) : null; } catch { /* 깨진 기억은 없는 셈 친다 */ }
-        const now = Date.now();
-        const kind = alertKind(h, memo, now);
-        if (kind) {
-          const r = await notifyAdmins(env, alertPayload(kind, h));
-          await db.prepare(
-            "INSERT INTO kv_cache(k, v, ts) VALUES('audio_alert', ?, ?) " +
-            "ON CONFLICT(k) DO UPDATE SET v=excluded.v, ts=excluded.ts",
-          ).bind(JSON.stringify({ at: now, broken: kind === "broken" }), now).run();
-          // 못 보낸 이유도 남긴다 — '보냈다'고만 적으면 구독이 0명일 때 이 알림이 또 조용히 죽는다.
-          console.warn(`[cron] 기사 듣기 알림(${kind}) — 발송 ${r.sent}건 / 관리자 ${r.admins}명 · 구독 ${r.subs}개${r.skipped ? ` · 못 보냄: ${r.skipped}` : ""}`);
-        }
-      } catch (e) {
-        console.warn("[cron] 기사 듣기 알림 실패:", e instanceof Error ? e.message : e);
-      }
-    } catch (e) {
-      console.warn("[cron] 기사 듣기 건강 검사 실패:", e instanceof Error ? e.message : e);
     }
     // 관광 수요지수 로그 — 다가오는 주말 지수를 누적 저장(예보 갱신 추적·백테스트 기반)
     try {
