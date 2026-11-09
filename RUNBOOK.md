@@ -72,6 +72,12 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-11-09 · **고장이 사람에게 닿는다 — /admin 경보 띠 + 관리자 Web Push** · `backend/src/audio/alert.ts`·`backend/src/index.ts`·`web/src/app/admin/{page,audio-health-banner}.tsx` (백엔드 `ad519a4e-8cd2-48a6-91ea-f1b68b0063b6` · 웹 `2bcd66f4-8861-4158-a768-f8034b68392a`)
+  크론이 매일 `⚠ 기사 듣기 죽음` 을 정확히 찍고 있었는데 Worker 로그에만 남았다. 감지와 통보는 다른 일이다.
+  고장 즉시 1회 → **사흘에 한 번** → 고쳐지면 1회(매일 부르면 알림을 끄고, 1회만 부르면 놓친 날 영영 모른다). 판단은 순수 함수 `alertKind`.
+  ⚠ 지금 **관리자 푸시 구독이 0명**이다(admin 2·superadmin 1 전원). 당장 닿는 길은 `/admin` 맨 위 띠뿐 — 못 보낸 이유를 크론 로그에 남긴다.
+  ⚠ 띠를 탭 안에 넣지 않았다. 그 탭을 여는 사람만 보면 로그와 다를 바 없다. 멀쩡하면 아무것도 안 그린다.
+  곁들여: 공유카드 `og.png` 를 태안신문 마크로(아이콘과 `web/scripts/lib/mark.mjs` 공유) · 깨진 사진·사진설명 접기(`web/src/components/{use-broken-image.ts,article-photo.tsx}`) · 로컬 `next dev` 는 기계 문제가 아니라 `127.0.0.1`/`localhost` 교차출처 차단이었다(`allowedDevOrigins`).
 - 2026-11-09 · **기사 낭독이 열흘째 죽어 있던 이유 — 죽은 키 하나가 그날 기사를 전부 먹었다** · `tools/lib/tts-failure.mjs`·`tools/news-audio/{gen-news-audio,gen-brief-audio}.mjs`·`backend/tests/tts_failure.test.ts` (배포 없음 — 로컬 생성기만)
   증상: 10-31~11-09 매일 생성 0~7건. 11-09 아침 실행은 **35건 전부 실패**. 최근 60건 중 19건 음성 없음.
   원인: 키#2 를 구글이 정지시켜(403 `Consumer 'projects/…' has been suspended`) 403 이 쏟아졌는데, 분류기가 403 을 **`skip`(이 기사만 실패)** 으로 봤다. 키는 살아 있는 것으로 남아 다음 기사도 또 키#2 를 집고 또 403. **멀쩡한 키#3 은 한 번도 쓰이지 않았다** — 매일 로그 끝줄 `키사용 5/0/0`·`7/0/0`·`0/0/0` 의 셋째 자리가 열흘 내내 0 인 것이 증거다.
