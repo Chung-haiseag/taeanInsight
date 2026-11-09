@@ -27,17 +27,25 @@ type Load = { st: "loading" } | { st: "ok"; episode: PodcastEpisodeView } | { st
 
 export function EpisodeInline({
   weekId,
-  /** 같은 줄을 또 눌렀다 — 주차가 그대로여도 다시 그리 데려가라는 눈금. */
+  /** 같은 줄을 또 눌렀다 — 주차가 그대로여도 다시 그리 데려가라는 눈금. 0 은 '아직 아무도 안 눌렀다'. */
   focusKey,
+  /**
+   * 서버가 이미 받아 둔 회차(/reports/<주차> 로 들어왔을 때).
+   *   이걸 넘겨야 **서버가 그린 HTML 에 본문이 실린다**. 브라우저에서 받아 오게 두면
+   *   검색엔진이 읽는 줄은 '회차를 불러오는 중입니다…' 뿐이다 — 회차마다 제 주소를 준 이유가 무너진다.
+   */
+  initial,
   onClose,
 }: {
   weekId: string;
   focusKey: number;
+  initial?: PodcastEpisodeView;
   onClose: () => void;
 }) {
-  const [load, setLoad] = useState<Load>({ st: "loading" });
+  const [load, setLoad] = useState<Load>(initial ? { st: "ok", episode: initial } : { st: "loading" });
   // 한 번 받은 회차는 들고 있는다 — 앞뒤로 오가며 보는 자리라 매번 다시 받으면 깜빡인다.
-  const cache = useRef(new Map<string, PodcastEpisodeView>());
+  //   서버가 준 회차는 처음부터 넣어 둔다 — 안 그러면 바로 다시 받아 화면이 한 번 깜빡인다.
+  const cache = useRef(new Map<string, PodcastEpisodeView>(initial ? [[initial.weekId, initial]] : []));
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -59,6 +67,10 @@ export function EpisodeInline({
   //   안 일어난 줄 안다 — 목록이 긴 화면에서 실제로 그랬다.
   //   움직임을 줄여 달라는 설정은 지킨다(스크롤은 하되 미끄러지지 않는다).
   useEffect(() => {
+    // 주소로 들어와 **처음부터 펼쳐져 있는** 회차는 데려가지 않는다(focusKey 0).
+    //   그러면 맨 위에 열려 있는 최신호를 지나쳐 내려가 버려 —
+    //   최신호를 보이게 하려고 한 일이 헛일이 된다.
+    if (focusKey === 0) return;
     const el = ref.current;
     if (!el) return;
     const still = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;

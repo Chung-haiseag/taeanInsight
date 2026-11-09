@@ -142,11 +142,13 @@ describe("회차 머리 — 당진 구조에서 되돌아가지 않는다", () =
 
   it("지난 회차 화면이 같은 머리를 쓴다 — 복사하지 않는다", () => {
     const raw = readFileSync(join(process.cwd(), "src/app/reports/[weekId]/page.tsx"), "utf8");
-    // 주석에도 ReportReader 를 언급해 뒀으니 주석을 털고 본다.
     const page = raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
-    expect(page).toMatch(/<EpisodeHead[^>]*latest=\{false\}/);
-    // 분석은 최신 주차 기준이라 지난 회차에 붙이면 그 주의 분석인 척하게 된다.
-    expect(page, "지난 회차엔 데이터 분석을 붙이지 않는다").not.toMatch(/ReportReader|RequireRole/);
+    // 2026-11-10: 이 화면은 이제 **최신호를 맨 위에** 열어 둔다(latest={false} 는 사라졌다).
+    //   지키는 것은 그대로다 — 머리를 베끼지 않고, 분석을 붙이지 않는다.
+    expect(page).toMatch(/<EpisodeHead\b/);
+    expect(page, "머리를 직접 그리기 시작하면 두 화면이 서서히 달라진다").not.toMatch(/<h1[\s>]/);
+    // 분석은 회원 전용 읽을거리고 이 화면은 '무슨 이야기를 했나'까지다. 분석은 /reports 에 있다.
+    expect(page, "지난 회차얼 데이터 분석을 붙이지 않는다").not.toMatch(/ReportReader|RequireRole/);
   });
 
   it("'다시 듣기' 목록의 줄이 그 회차 화면으로 간다", () => {
@@ -228,10 +230,49 @@ describe("지난 회차는 이번 주를 지우지 않고 아래에 펼친다", 
     expect(strip("src/app/reports/page.tsx")).toMatch(/<PodcastEpisodes[^>]*\binline\b/);
   });
 
-  it("지난 회차 화면에서는 끈다 — 위에 둘 '이번 주'가 거기엔 없다", () => {
-    const m = /<PodcastEpisodes[^>]*>/.exec(strip("src/app/reports/[weekId]/page.tsx"));
-    expect(m, "지난 회차 화면에 목록이 없다").not.toBeNull();
-    expect(m![0]).not.toMatch(/\binline\b/);
+  it("지난 회차 화면도 켜다 — 맨 위엔 늘 최신호가 선다", () => {
+    // 2026-11-10 사용자: "주간리포트에 최신호가 오픈되어 있어야 하고,
+    //   과거 팟캐스트는 하나만 열리도록 하자". 그전엔 이 화면에 그 회차만 서 있어
+    //   **최신호가 통째로 사라졌다**.
+    const page = strip("src/app/reports/[weekId]/page.tsx");
+    expect(page).toMatch(/<PodcastEpisodes[\s\S]*?\binline\b/);
+    expect(page, "맨 위는 최신호다").toMatch(/latest \? <EpisodeHead episode=\{latest\}/);
+    expect(page, "최신호를 못 구해도 이 회차가 그 자리에 선다(h1 은 하나 있어야 한다)")
+      .toMatch(/: <EpisodeHead episode=\{episode\} latest=\{isLatest\}/);
+  });
+
+  it("이 주소가 곰 최신호면 같은 회차를 두 번 그리지 않는다", () => {
+    const page = strip("src/app/reports/[weekId]/page.tsx");
+    expect(page).toMatch(/const isLatest = !!report && report\.weekId === weekId;/);
+    expect(page).toMatch(/initialWeekId=\{latest \? weekId : undefined\}/);
+  });
+
+  it("보려던 회차는 **서버가** 그려 내려보낸다 — 검색엔진이 읽는 건 그쪽이다", () => {
+    // 브라우저에서 받아 오게 두면 서버 HTML 에는 '회차를 불러오는 중입니다…' 만 남는다 —
+    //   회차마다 제 주소를 준 이유(검색·공유)가 통째로 무너진다.
+    expect(strip("src/app/reports/[weekId]/page.tsx"))
+      .toMatch(/initialEpisode=\{latest \? episode : undefined\}/);
+    expect(rows()).toMatch(/initial=\{open === initialWeekId \? initialEpisode : undefined\}/);
+    expect(inline(), "넘거받은 회차를 첫 그림에 바로 쓴다")
+      .toMatch(/useState<Load>\(initial \? \{ st: "ok", episode: initial \}/);
+  });
+
+  it("목록이 아직 안 왔어도 펼쳐 둔 회차는 그린다", () => {
+    // 목록은 브라우저가 받아 오지만 펼쳐 둔 회차는 서버가 이미 그려 둔다.
+    //   같이 숨기면 주소로 들어온 사람이 빈 화면을 본다.
+    const l = rows();
+    expect(l).not.toMatch(/if \(!eps \|\| list\.length === 0\) return null;/);
+    expect(l).toMatch(/const showList = !!eps && list\.length > 0;/);
+  });
+
+  it("주소로 들어와 처음부터 펼쳐진 회차는 데려가지 않는다", () => {
+    // 데려가면 맨 위에 열려 있는 최신호를 지나쳐 내려가 버린다 —
+    //   최신호를 보이게 하려고 한 일이 헛일이 된다.
+    const i = inline();
+    const scroll = i.indexOf("scrollIntoView");
+    const skip = i.indexOf("if (focusKey === 0) return;");
+    expect(skip, "focusKey 0 가드가 없다").toBeGreaterThan(-1);
+    expect(skip).toBeLessThan(scroll);
   });
 
   it("링크는 살려 두고 왼쪽 클릭만 가로챈다", () => {

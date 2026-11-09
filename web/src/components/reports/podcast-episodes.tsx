@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WebAudio } from "@/components/web-audio";
 import { EpisodeInline } from "@/components/reports/episode-inline";
-import { listPodcastEpisodes, type PodcastEpisode } from "@/lib/api/reports";
+import { listPodcastEpisodes, type PodcastEpisode, type PodcastEpisodeView } from "@/lib/api/reports";
 import { wantsNewTab } from "@/lib/plain-click";
 import { publishedLabel } from "@/lib/report-date";
 import { episodeNoLabel, episodeRangeLabel } from "@/lib/podcast-episode";
@@ -30,11 +30,20 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-
 
 export function PodcastEpisodes({
   excludeWeekId,
-  /** 누르면 떠나지 않고 **목록 아래에** 펼친다. /reports 에서만 켠다. */
+  /** 누르면 떠나지 않고 **목록 아래에** 펼친다. */
   inline = false,
-}: { excludeWeekId?: string; inline?: boolean } = {}) {
+  /** 주소로 들어오자마자 펼쳐 둘 회차(/reports/<주차>). */
+  initialWeekId,
+  /** 그 회차를 서버가 이미 받아 왔으면 그대로 넘긴다 — 서버 HTML 에 본문이 실린다(검색). */
+  initialEpisode,
+}: {
+  excludeWeekId?: string;
+  inline?: boolean;
+  initialWeekId?: string;
+  initialEpisode?: PodcastEpisodeView;
+} = {}) {
   const [eps, setEps] = useState<PodcastEpisode[] | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(initialWeekId ?? null);
   // 같은 줄을 또 눌러도 그리로 데려가게 하는 눈금. 이게 없으면 이미 펼친 줄을 다시 누를 때
   //   state 가 그대로라 아무 일도 안 일어나고, 누른 사람은 화면이 죽은 줄 안다.
   const [bump, setBump] = useState(0);
@@ -53,12 +62,16 @@ export function PodcastEpisodes({
   }, []);
 
   const list = (eps ?? []).filter((e) => e.weekId !== excludeWeekId);
-  if (!eps || list.length === 0) return null;
+  // ⚠ 예전엔 목록이 비면 통째로 null 을 돌려줬다. 이제는 그러면 안 된다 —
+  //   목록은 브라우저가 받아 오지만 **펼쳐 둔 회차는 서버가 이미 그려 둔다**.
+  //   같이 숨기면 /reports/<주차> 로 들어온 사람과 검색엔진이 빈 화면을 본다.
+  const showList = !!eps && list.length > 0;
 
   return (
     <>
     {/* 회차 머리와 같은 활자 리듬. 카드(둥근 상자)에 담지 않고 **굵은 가로선 아래 목록**으로 둔다 —
         위의 회차가 선으로 끊어 읽히는데 여기만 상자에 담기면 한 화면에 두 가지 문법이 섞인다. */}
+    {showList && (
     <section aria-labelledby="past-episodes" className="no-print border-t-2 border-ti-ink pt-8">
       <h2 id="past-episodes" className="font-head text-2xl font-bold text-ti-ink md:text-[1.75rem]">다시 듣기</h2>
       <p className="mt-2 text-[0.95rem] text-ti-muted">{list.length}개 회차를 다시 들으실 수 있어요. · AI 생성</p>
@@ -116,10 +129,18 @@ export function PodcastEpisodes({
         })}
       </ul>
     </section>
+    )}
 
     {/* 펼친 회차는 목록 **밖·아래**에 선다. 목록 안에 끼우면 '다시 듣기'라는 제목 밑에
         회차 한 편이 통째로 들어가 목록의 결이 끊긴다. */}
-    {open && <EpisodeInline weekId={open} focusKey={bump} onClose={close} />}
+    {open && (
+      <EpisodeInline
+        weekId={open}
+        focusKey={bump}
+        initial={open === initialWeekId ? initialEpisode : undefined}
+        onClose={close}
+      />
+    )}
     </>
   );
 }
