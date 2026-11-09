@@ -72,6 +72,11 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-11-10 · **지난 회차 주소로 들어와도 최신호가 맨 위에 열려 있다** · `web/src/app/reports/[weekId]/page.tsx`·`web/src/components/reports/{podcast-episodes,episode-inline}.tsx` (웹 `f107fc9d-5195-45a6-aa00-c4723fda651a`)
+  /reports/<주차> 는 그 회차만 세워 놓아 **최신호가 통째로 사라졌다**. 이제 /reports 와 같은 모양이다 — 맨 위에 최신호, 보려던 회차는 목록 아래에 펼쳐진 채로. 과거 회차는 한 번에 하나만.
+  ⚠ 보려던 회차는 **서버가 받아 넘긴다**(initialEpisode). 브라우저에서 받아 오게 두면 검색엔진이 읽는 HTML 에 '회차를 불러오는 중입니다…' 만 남아 회차마다 제 주소를 준 이유가 무너진다. 라이브 실측: /reports/2026-W33 서버 HTML 에 그 회차 기사가 실리고 '불러오는 중' 은 0건.
+  ⚠ 주소로 들어와 처음부터 펼쳐진 회차로는 **화면을 끄고 내려가지 않는다**(focusKey 0). 내려가면 맨 위 최신호를 지나쳐 보이게 하려던 일이 헛일이 된다.
+  맞바꿈: 이 주소의 공유 제목은 그 회차인데 화면 맨 위 큰 제목은 최신호다(사용자가 알고 고른 쪽). 그 회차 본문은 서버 HTML 에 그대로 실려 검색은 여전히 찾는다.
 - 2026-11-10 · **지난 회차를 보려고 이번 주를 닫지 않는다** · `web/src/components/reports/{episode-inline,podcast-episodes,episode-head}.tsx`·`web/src/lib/plain-click.ts` (웹 `8817d3a9-3744-4bbc-bd31-7fa2560895a8`)
   '다시 듣기'의 줄을 누르면 /reports/<주차> 로 떠나 **이번 주 회차가 화면에서 사라졌다**. 이제 위는 그대로 두고 목록 아래에 그 회차를 통째로 펼친다.
   머리는 **같은 EpisodeHead** — `embedded` 면 h1 을 h2 로 내리고 DOM id 를 주차로 가른다(한 화면에 h1 이 둘이면 화면 읽기 프로그램이 두 문서로 읽고, 같은 id 가 둘이면 aria-labelledby 가 앞에 나온 것만 짚는다).
