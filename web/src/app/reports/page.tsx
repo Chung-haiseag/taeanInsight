@@ -112,9 +112,12 @@ export default async function ReportsPage({
         </div>
       )}
 
-      {/* 2) 지난 회차 다시 듣기 — 공개. */}
+      {/* 2) 지난 회차 다시 듣기 — 공개.
+          inline: 누르면 떠나지 않고 **이 목록 아래에** 그 회차를 펼친다.
+          위의 이번 주 회차는 그대로 서 있다 — 지난 회차를 들추는 일이
+          이번 주를 닫는 일이 되지 않게(2026-11-10). */}
       <div className="mt-10">
-        <PodcastEpisodes excludeWeekId={report.weekId} />
+        <PodcastEpisodes excludeWeekId={report.weekId} inline />
       </div>
 
       {/* 3) 데이터 분석 — 회원 전용. 잠겨도 위의 팟캐스트는 그대로 보인다. */}

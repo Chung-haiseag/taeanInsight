@@ -14,6 +14,7 @@ import { useCallback, useState } from "react";
 
 import { ArticlePanel } from "@/components/reports/article-panel";
 import type { EpisodeArticle, EpisodeThrowback } from "@/lib/api/reports";
+import { wantsNewTab } from "@/lib/plain-click";
 
 /** 제목에 남은 HTML 엔티티 풀기(&#039; 등) — 아카이브 제목에 그대로 들어 있는 경우가 있다. */
 function decodeEntities(s: string): string {
@@ -28,10 +29,6 @@ function decodeEntities(s: string): string {
 }
 
 const ROW = "group flex items-baseline gap-6 py-3.5 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--ti-focus)] md:py-4";
-
-/** 새 탭·새 창으로 열려는 클릭인가 — 그런 클릭은 가로채지 않는다. */
-const wantsNewTab = (e: React.MouseEvent) =>
-  e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
 
 export function EpisodeArticles({
   articles, throwback,

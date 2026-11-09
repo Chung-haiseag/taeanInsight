@@ -36,11 +36,29 @@ import type { PodcastEpisodeView } from "@/lib/api/reports";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://taean-insight-api.chs9182.workers.dev";
 
+// 제목 생김새는 h1 이든 h2 이든 같다 — 단계만 다르고 보이는 것은 같은 회차의 머리다.
+const TITLE = "mt-3 break-keep font-head text-display text-ti-ink";
 
-export function EpisodeHead({ episode, latest = true }: { episode: PodcastEpisodeView; latest?: boolean }) {
+
+export function EpisodeHead({
+  episode,
+  latest = true,
+  /** 다른 화면 안에 끼워 넣는가(/reports 에서 지난 회차를 아래에 펼칠 때). */
+  embedded = false,
+}: {
+  episode: PodcastEpisodeView;
+  latest?: boolean;
+  embedded?: boolean;
+}) {
   const week = monthWeekLabel(episode.weekId);
   // 이 회차가 사는 주소. 듣다가 기사로 넘어가도 아래 띠의 제목이 **여기로** 돌아오게 한다.
   const home = latest ? "/reports" : `/reports/${episode.weekId}`;
+  // 한 화면에 회차가 둘 설 수 있다(/reports 에서 지난 회차를 아래에 펼친다).
+  //   같은 id 가 둘이면 aria-labelledby 가 먼저 나온 것만 짚어 — 아래 회차가 위 회차의 제목으로
+  //   읽힌다. 끼워 넣은 쪽만 주차로 갈라 둔다(제자리 회차는 짧은 id 를 그대로 쓴다).
+  const uid = embedded ? `-${episode.weekId}` : "";
+  const titleId = `episode-title${uid}`;
+  const listId = `episode-articles${uid}`;
   // 주차 이름을 못 구하는 꼴(알 수 없는 weekId)일 때의 대비책. 지난 회차를 '이번 주'라 부르면 거짓말이다.
   const name = week ? `${week}의 태안` : latest ? "이번 주 팟캐스트" : "지난 회차";
   const range = episodeRangeLabel(episode.weekId);
@@ -66,7 +84,7 @@ export function EpisodeHead({ episode, latest = true }: { episode: PodcastEpisod
     //     화면이 고장난 것과 같다. 그래서 DOM 순서를 '좁은 화면 기준'으로 두고,
     //     넓은 화면에서만 row/col 을 집어 제자리에 보낸다.
     <article
-      aria-labelledby="episode-title"
+      aria-labelledby={titleId}
       className="grid gap-x-16 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:items-start"
     >
       {/* 왼쪽 단: 회차 숫자 + 사진. **두 행에 걸친 한 칸**이라 사진이 숫자 바로 밑에 붙는다 —
@@ -116,9 +134,15 @@ export function EpisodeHead({ episode, latest = true }: { episode: PodcastEpisod
             '11월 둘째 주의 태안'처럼 읽으면 그 주가 바로 떠오른다.
             크기는 프로젝트가 이미 가진 에디토리얼 스케일(text-display: clamp 2.5~4.5rem)을 쓴다 —
             손으로 집은 치수를 또 만들면 다른 화면의 큰 제목과 어긋난다. */}
-        <h1 id="episode-title" className="mt-3 break-keep font-head text-display text-ti-ink">
-          {name}
-        </h1>
+        {/* 끼워 넣은 회차는 h2 로 내려간다 — /reports 엔 이미 최신 회의 h1 이 서 있고,
+            한 화면에 h1 이 둘이면 화면 읽기 프로그램이 두 문서로 읽는다.
+            ⚠ 삼항으로 두 태그를 **그대로** 적는다. {H} 같은 변수 태그로 줄이면
+              "h1 은 하나다" 를 지키는 가드가 글자를 못 찾아 헛돌다. */}
+        {embedded ? (
+          <h2 id={titleId} className={TITLE}>{name}</h2>
+        ) : (
+          <h1 id={titleId} className={TITLE}>{name}</h1>
+        )}
 
         {/* 언제 것이고 얼마나 긴가 — 주차 번호(2026-W45)는 우리 내부 이름이라 적지 않는다. */}
         <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-[1.05rem] text-ti-ink2">
@@ -168,9 +192,9 @@ export function EpisodeHead({ episode, latest = true }: { episode: PodcastEpisod
       <div className="order-3 lg:order-none lg:col-start-2 lg:row-start-2">
         {/* ── 이 회차가 다룬 기사 ────────────────────────────────── */}
         {episode.articles.length > 0 && (
-          <section aria-labelledby="episode-articles" className="mt-14 lg:mt-10">
+          <section aria-labelledby={listId} className="mt-14 lg:mt-10">
             <h2
-              id="episode-articles"
+              id={listId}
               className="text-[0.9rem] font-bold tracking-[0.25em] text-ti-muted"
             >
               {episode.scripted ? "이 회차의 바탕이 된 기사" : "이 주의 주요 기사"}

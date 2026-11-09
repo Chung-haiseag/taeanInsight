@@ -211,3 +211,71 @@ describe("하이드레이션 전에 깨진 사진도 잡는다", () => {
     expect(h).toMatch(/complete[\s\S]{0,40}naturalWidth === 0/);
   });
 });
+
+// 2026-11-10 사용자: "현재 최근 것은 보이는 상태에서 하단에 과거 것을 보이면 되게 해".
+//   그전엔 '다시 듣기'의 줄을 누르면 /reports/<주차> 로 떠나 **이번 주 회차가 화면에서 사라졌다**.
+//   지난 회차 한 편을 들춰 보는 일이 이번 주를 닫는 일이 되는 게 이상했다.
+describe("지난 회차는 이번 주를 지우지 않고 아래에 펼친다", () => {
+  const strip = (p: string) =>
+    readFileSync(join(process.cwd(), p), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const rows = () => strip("src/components/reports/podcast-episodes.tsx");
+  const inline = () => strip("src/components/reports/episode-inline.tsx");
+  const head = () => strip("src/components/reports/episode-head.tsx");
+
+  it("/reports 는 펼치기를 켠다", () => {
+    expect(strip("src/app/reports/page.tsx")).toMatch(/<PodcastEpisodes[^>]*\binline\b/);
+  });
+
+  it("지난 회차 화면에서는 끈다 — 위에 둘 '이번 주'가 거기엔 없다", () => {
+    const m = /<PodcastEpisodes[^>]*>/.exec(strip("src/app/reports/[weekId]/page.tsx"));
+    expect(m, "지난 회차 화면에 목록이 없다").not.toBeNull();
+    expect(m![0]).not.toMatch(/\binline\b/);
+  });
+
+  it("링크는 살려 두고 왼쪽 클릭만 가로챈다", () => {
+    // href 를 지우면 검색엔진이 길을 잃고 ⌘클릭으로 새 탭에 여는 사람도 막힌다.
+    expect(rows()).toMatch(/href=\{`\/reports\/\$\{e\.weekId\}`\}/);
+    expect(rows()).toMatch(/if \(!inline \|\| wantsNewTab\(ev\)\) return;/);
+  });
+
+  it("펼친 회차는 '다시 듣기' 목록 밖·아래에 선다", () => {
+    // 목록 안에 끼우면 '다시 듣기'라는 제목 밑에 회차 한 편이 통째로 들어가 목록의 결이 끊긴다.
+    const l = rows();
+    expect(l.indexOf("<EpisodeInline")).toBeGreaterThan(l.indexOf("</section>"));
+  });
+
+  it("머리를 베끼지 않는다 — 같은 EpisodeHead 를 쓴다", () => {
+    expect(inline()).toMatch(/<EpisodeHead[^>]*embedded/);
+    expect(inline()).not.toMatch(/<h1[\s>]/);
+  });
+
+  it("끼워 넣은 회차는 h2 로 내려간다 — 한 화면에 h1 이 둘이 되지 않게", () => {
+    const h = head();
+    expect(h.match(/<h1[\s>]/g) ?? []).toHaveLength(1);
+    expect(h).toMatch(/embedded \?[\s\S]{0,160}<h2 id=\{titleId\}/);
+  });
+
+  it("id 를 주차로 갈라 둔다 — 같은 id 가 둘이면 제목을 잘못 짚는다", () => {
+    const h = head();
+    expect(h).not.toMatch(/id="episode-title"/);
+    expect(h).not.toMatch(/id="episode-articles"/);
+    expect(h).toMatch(/const uid = embedded \? `-\$\{episode\.weekId\}`/);
+  });
+
+  it("ESC 를 듣지 않는다 — 읽기 패널의 ESC 까지 삼킨다", () => {
+    // 이 안의 기사 목록은 article-panel 을 연다. 둘 다 ESC 를 들으면
+    //   패널을 닫으려 누른 ESC 가 회차까지 접어 버린다.
+    expect(inline()).not.toMatch(/Escape/);
+  });
+
+  it("못 불러오면 그렇게 적는다 — 빈 칸을 펼쳐 놓지 않는다", () => {
+    expect(inline()).toMatch(/불러오지 못했습니다/);
+  });
+
+  it("펼친 지난 회차에 데이터 분석을 붙이지 않는다", () => {
+    // 분석은 최신 주차 기준이라 지난 주차에 붙으면 그 주의 분석인 척하게 된다.
+    expect(inline()).not.toMatch(/ReportReader|RequireRole/);
+  });
+});

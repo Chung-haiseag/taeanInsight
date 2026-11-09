@@ -20,10 +20,30 @@ describe("읽기 패널 — 목록에서 바로 연다", () => {
   });
 
   it("새 탭으로 열려는 클릭은 가로채지 않는다", () => {
-    const l = list();
-    expect(l).toMatch(/metaKey/);
-    expect(l).toMatch(/ctrlKey/);
-    expect(l).toMatch(/if \(wantsNewTab\(e\)\) return;/);
+    // 2026-11-10: 같은 판정을 '다시 듣기' 목록도 쓰게 돼서 lib/plain-click.ts 로 모았다.
+    //   그래서 목록이 그 판정을 **거치는지**를 보고, 판정 내용은 한 군데서 지킨다.
+    expect(list()).toMatch(/if \(wantsNewTab\(e\)\) return;/);
+  });
+});
+
+// 한 군데로 모은 판정 자체. 넣는 것을 빼면 어떤 목록은 ⌘클릭이 먹고 어떤 목록은
+//   안 먹는 — 독자가 설명할 수 없는 차이가 생긴다.
+describe("가로채도 되는 클릭인가 — 판정은 한 군데", () => {
+  it("새 탭·새 창·내려받기·가운데 단추를 모두 본다", () => {
+    const c = code("src/lib/plain-click.ts");
+    for (const k of ["metaKey", "ctrlKey", "shiftKey", "altKey", "button !== 0"]) {
+      expect(c, `plain-click 이 ${k} 를 안 본다`).toContain(k);
+    }
+  });
+
+  it("길을 두 번 적지 않는다 — 붙여넣기한 사본이 없다", () => {
+    for (const p of [
+      "src/components/reports/episode-articles.tsx",
+      "src/components/reports/podcast-episodes.tsx",
+    ]) {
+      expect(code(p), `${p} 가 판정을 직접 적었다`).not.toMatch(/metaKey/);
+      expect(code(p)).toMatch(/wantsNewTab/);
+    }
   });
 });
 
