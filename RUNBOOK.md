@@ -72,6 +72,13 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-11-10 · **지난 회차를 보려고 이번 주를 닫지 않는다** · `web/src/components/reports/{episode-inline,podcast-episodes,episode-head}.tsx`·`web/src/lib/plain-click.ts` (웹 `8817d3a9-3744-4bbc-bd31-7fa2560895a8`)
+  '다시 듣기'의 줄을 누르면 /reports/<주차> 로 떠나 **이번 주 회차가 화면에서 사라졌다**. 이제 위는 그대로 두고 목록 아래에 그 회차를 통째로 펼친다.
+  머리는 **같은 EpisodeHead** — `embedded` 면 h1 을 h2 로 내리고 DOM id 를 주차로 가른다(한 화면에 h1 이 둘이면 화면 읽기 프로그램이 두 문서로 읽고, 같은 id 가 둘이면 aria-labelledby 가 앞에 나온 것만 짚는다).
+  **ESC 는 안 듣는다.** 이 안의 기사 목록은 읽기 패널을 여는데 그쪽도 ESC 를 듣는다 — 둘 다 들으면 패널 닫으려 누른 ESC 가 회차까지 접는다. 접는 길은 '닫기' 단추 하나다.
+  펼친 회차는 **선으로 끝을 닫는다** — 아래엔 이번 주 기준 데이터 분석이 와서, 끝나는 줄이 없으면 그 분석이 방금 본 지난 주의 것처럼 읽힙다.
+  지난 회차 화면(/reports/<주차>)은 그대로 — 공유·검색이 쓰는 주소다. 거긴 펼치기를 끔다.
+  ⌘클릭 판정은 `lib/plain-click.ts` 한 군데로 모았다(읽기 패널과 공용) — 복사하면 어떤 목록은 ⌘클릭이 먹고 어떤 목록은 안 먹는다.
 - 2026-11-09 · **회차 화면을 떠나지 않고 옆에서 기사를 읽는다** · `web/src/components/reports/{article-panel,episode-articles}.tsx`·`web/src/components/quoted-text.tsx`·`web/src/lib/article-body.ts` (웹 `801255d1-e1bf-42a4-9094-1b6aeb11fc8e`)
   '당진의 기억'처럼 목록을 누르면 옆 패널에서 열고 `이 회의 기사 2/8` 로 넘긴다. 전에는 /news/<번호> 로 나가 버려 하나 읽고 뒤로 가기를 반복해야 했다.
   소리는 안 끊긴다 — 패널이 떠 있는 재생기를 덮으므로 **지금 나오는 것**의 조작 줄을 패널 머리에 둔다(같은 singleton, `<audio>` 는 여전히 0개). 나오는 게 없으면 그 줄을 안 그린다.
