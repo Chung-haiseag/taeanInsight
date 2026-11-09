@@ -72,6 +72,19 @@ curl -X POST https://taean-insight-api.chs9182.workers.dev/api/news/ingest
 - 원칙: 자동추출은 verified=0 → AI 답변 미주입. 파일럿 연도로 먼저 검증 후 확대. 동명이인 분리는 4단계 검수 콘솔.
 
 ## 5. 기능 로그 (새 기능 = 한 줄 추가)
+- 2026-11-09 · **회차 화면을 떠나지 않고 옆에서 기사를 읽는다** · `web/src/components/reports/{article-panel,episode-articles}.tsx`·`web/src/components/quoted-text.tsx`·`web/src/lib/article-body.ts` (웹 `801255d1-e1bf-42a4-9094-1b6aeb11fc8e`)
+  '당진의 기억'처럼 목록을 누르면 옆 패널에서 열고 `이 회의 기사 2/8` 로 넘긴다. 전에는 /news/<번호> 로 나가 버려 하나 읽고 뒤로 가기를 반복해야 했다.
+  소리는 안 끊긴다 — 패널이 떠 있는 재생기를 덮으므로 **지금 나오는 것**의 조작 줄을 패널 머리에 둔다(같은 singleton, `<audio>` 는 여전히 0개). 나오는 게 없으면 그 줄을 안 그린다.
+  링크를 단추로 바꾸지 않았다. `href` 를 지우면 검색엔진이 길을 잃고 ⌘클릭도 막힌다 — **왼쪽 클릭만** 가로챈다.
+  ⚠ **이 프로젝트의 `sm` 은 320px 다**(PRD §7.6). `sm:w-[48vw]` 로 썼더니 휴대폰에서 패널이 240px 짜리 쪽지가 됐다(제목 여섯 줄, '−15 초'·'닫 기' 로 갈라짐). 나란히 두는 배치는 **md(768px)** 부터다.
+  본문을 문단·사진설명·사진으로 가르는 규칙을 `lib/article-body.ts` 로 빼고 단위 시험 11건(사진이 없으면 짧은 첫 줄도 본문 / 문단이 하나뿐이면 떼지 않는다). 기사 화면도 같은 것을 쓴다.
+- 2026-11-09 · **고침 · 파수꾼이 무거운 작업 뒤에 서 있다 죽었다 — 제 크론 호출을 준다** · `backend/src/index.ts`·`backend/wrangler.jsonc`·`backend/tests/cron_watchdog.test.ts` (백엔드 `c21f97d7-e3db-4c19-ba00-cfa11af216cd`)
+  전날 배포한 기사 듣기 알림이 **돌지 않는 자리**에 있었다. `audio_health` 가 2026-11-04 00:01 KST 에서 멈춰 있었다.
+  짚은 방법: `kv_cache` 에서 `audio_health` 와 `kg_logic_audit` 가 **같은 순간**에 멈췄고, 바로 앞 블록(예보 적중률)은 그날도 돌았다(`forecast_log` 최신 대상일 2026-11-18). try/catch 가 다 있는데 둘 다 아무것도 안 썼다 → 예외가 아니라 **한 호출의 CPU·시간 예산이 그 자리에서 바닥난 것**.
+  범위: 자정 크론 꼬리 12블록 중 **뒤 9개가 닷새째** — 논리감사·기사듣기건강·기사듣기알림·관광수요지수·백테스트·방문자·군청목록·리포트·**비용집계**.
+  → 기사 듣기 파수꾼 `0 4 * * *`(13:00 KST), 논리 감사 `0 5 * * *`(14:00 KST) 로 **각자의 호출**. 감사를 꼬리에서 빼니 뒤 7개도 예산을 되찾는다. 되돌리는 변경은 `tests/cron_watchdog.test.ts`(6건)가 막는다.
+  배포 직후 `wrangler dev --remote --test-scheduled` 로 한 번 돌려 확인: `⚠ 기사 듣기 죽음 — 2건, 최장 2일째` + `알림(broken) 발송 0건 / 관리자 3명 · 구독 0개 · 못 보냄: no_subscription`. `health.ageHours` 132 → 0.
+  ⚠ 교훈: 조용히 죽지 않게 만든 장치가 감시하려던 고장과 **똑같은 방식**으로 죽어 있었다. 파수꾼은 혼자 돌아야 한다.
 - 2026-11-09 · **고장이 사람에게 닿는다 — /admin 경보 띠 + 관리자 Web Push** · `backend/src/audio/alert.ts`·`backend/src/index.ts`·`web/src/app/admin/{page,audio-health-banner}.tsx` (백엔드 `ad519a4e-8cd2-48a6-91ea-f1b68b0063b6` · 웹 `2bcd66f4-8861-4158-a768-f8034b68392a`)
   크론이 매일 `⚠ 기사 듣기 죽음` 을 정확히 찍고 있었는데 Worker 로그에만 남았다. 감지와 통보는 다른 일이다.
   고장 즉시 1회 → **사흘에 한 번** → 고쳐지면 1회(매일 부르면 알림을 끄고, 1회만 부르면 놓친 날 영영 모른다). 판단은 순수 함수 `alertKind`.
