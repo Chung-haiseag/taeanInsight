@@ -41,7 +41,7 @@ export function BriefingCard({ brief }: { brief: TodayBriefView }) {
         {items.map((t, i) => <li key={i}>{t}</li>)}
       </ol>
       <div className="mt-4">
-        <WebAudio url={`${API_BASE}/api/audio/brief`} event="today-brief" variant="inline" title="브리핑 듣기" />
+        <WebAudio url={`${API_BASE}/api/audio/brief`} event="today-brief" variant="inline" title="브리핑 듣기" nowPlaying="오늘의 브리핑" href="/" />
       </div>
       <p className="mt-3 text-[0.8rem] text-ti-muted">근거: 기상청 예보·대기질 측정·국립해양조사원 물때·태안신문 최신 기사(매일 아침 갱신)</p>
     </section>

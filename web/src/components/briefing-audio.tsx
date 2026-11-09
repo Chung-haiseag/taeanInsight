@@ -22,6 +22,7 @@ export function BriefingAudio() {
       variant="card"
       title={`${ctx.emoji} ${ctx.label}`}
       subtitle="오늘의 주요 소식을 두 진행자가 대담으로 · AI 생성"
+      nowPlaying={ctx.label}
     />
   );
 }

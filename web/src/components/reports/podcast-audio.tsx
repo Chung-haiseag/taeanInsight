@@ -20,6 +20,8 @@ export function PodcastAudio({ weekId, publishedAt }: { weekId?: string; publish
       event="podcast"
       variant="card"
       title="🎙 이번 주 팟캐스트"
+      nowPlaying="이번 주 팟캐스트"
+      href="/reports"
       subtitle={`${day ? `${day} 발행 · ` : ""}진행자 두 명이 이번 주 태안 소식을 대담으로 · AI 생성`}
     />
   );

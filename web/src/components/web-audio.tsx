@@ -1,121 +1,73 @@
 "use client";
 
-// <audio> 요소가 이 환경에서 원격 mp3 스트리밍 로드에 멈추는(stalled) 문제를 우회 —
-// fetch → decodeAudioData → Web Audio(AudioBufferSourceNode)로 재생. 커스텀 재생/일시정지/진행바.
-// (fetch·decodeAudioData는 실환경에서 정상 동작 확인됨. <audio> 요소 경로만 회피.)
+// 듣기 단추 한 벌 — 소리는 **떠 있는 재생기**가 낸다(components/audio/player.ts).
+//
+//   ⚠ 2026-11-08 이전엔 이 조각이 소리까지 직접 냈다(AudioContext·버퍼를 제 안에 들고). 그래서
+//     화면이 바뀌면 조각이 사라지며 소리도 끊겼다 — 회차를 틀고 기사 제목을 누르면 조용해졌다.
+//     이제 이 조각은 **리모컨**이다: 지금 나오는 게 '내 소리'인지(주소가 같은지) 보고
+//     단추 모양만 바꾼다. 같은 소리를 가리키는 리모컨이 여러 개여도(본문 단추 + 아래 띠)
+//     상태는 한 군데(player)뿐이라 어긋나지 않는다.
+//
+//   왜 <audio> 요소가 아닌가 / 왜 AudioContext 하나인가는 audio/web-audio-loader.ts 에 적었다.
+//   보이는 모양(인라인·카드)은 예전과 같다 — 바뀐 것은 소리를 누가 들고 있느냐다.
 
-import { useRef, useState, useEffect, useCallback, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, type MouseEvent } from "react";
+
+import { clock, spoken } from "@/components/audio/clock";
+import type { Track } from "@/components/audio/player";
+import { getPlayer } from "@/components/audio/singleton";
+import { usePlayerSnapshot } from "@/components/audio/use-player";
 import { Icon } from "@/components/icon";
-import { trackEvent } from "@/lib/api/reading";
 import { listenLabel } from "@/lib/listen-label";
 
-type St = "idle" | "loading" | "playing" | "paused" | "error" | "unavailable";
-
-function fmt(s: number): string {
-  if (!isFinite(s) || s < 0) return "0:00";
-  const m = Math.floor(s / 60), x = Math.floor(s % 60);
-  return `${m}:${String(x).padStart(2, "0")}`;
-}
-
-/** 사람이 읽는 길이 표기 — "2분 23초". 고령 독자 기준이라 콜론(2:23)보다 말로 쓴다. */
-function human(s: number): string {
-  const m = Math.floor(s / 60), x = Math.round(s % 60);
-  return m ? (x ? `${m}분 ${x}초` : `${m}분`) : `${x}초`;
-}
-
-export function WebAudio({ url, event, variant = "inline", title, subtitle, onPos, controlsRef, durationHint }: {
+export function WebAudio({
+  url, event, variant = "inline", title, subtitle, onPos, controlsRef, durationHint, nowPlaying, href,
+}: {
   url: string; event: string; variant?: "inline" | "card"; title?: string; subtitle?: string;
-  /** 재생 위치(초) — 본문 따라읽기 하이라이트가 구독한다. 재생 중 rAF마다 호출된다. */
+  /** 재생 위치(초) — 본문 따라읽기 하이라이트가 구독한다. **내 소리일 때만** 알린다. */
   onPos?: (sec: number) => void;
   /** 외부에서 재생을 제어할 수 있게 내부 함수를 실어 보낸다(본문 문장 클릭 → 그 지점부터 듣기). */
   controlsRef?: { current: { seekAndPlay: (sec: number) => void } | null };
   /** 재생 전 길이 안내(초). 음성은 다 받아야 길이를 알 수 있어, 자막이 잰 값을 미리 받아 쓴다. */
   durationHint?: number;
+  /** 아래 띠에 적을 이름 — **무엇이 나오는지**. 없으면 단추 제목을 쓴다. */
+  nowPlaying?: string;
+  /** 이 소리가 딸린 화면. 띠에서 제목을 누르면 여기로 돌아온다. */
+  href?: string;
 }) {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const bufRef = useRef<AudioBuffer | null>(null);
-  const srcRef = useRef<AudioBufferSourceNode | null>(null);
-  const startAtRef = useRef(0);   // ctx.currentTime 기준 재생 시작 시각(offset 반영)
-  const offsetRef = useRef(0);    // 일시정지/seek 지점(초)
-  const rafRef = useRef(0);
-  const [st, setSt] = useState<St>("idle");
-  const [pos, setPosState] = useState(0);
-  // 위치 갱신은 항상 이 함수로 — 화면 표시와 따라읽기 하이라이트가 어긋나지 않게 한 곳에서 통지.
-  const onPosRef = useRef(onPos); onPosRef.current = onPos;
-  const setPos = (v: number) => { setPosState(v); onPosRef.current?.(v); };
-  const [dur, setDur] = useState(0);
+  const snap = usePlayerSnapshot();
+  const player = getPlayer();
 
-  const stopRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; } };
+  // 지금 나오는 소리가 내 것인가 — 주소로 가린다. 남의 소리가 날 때 내 단추가
+  //   '일시정지'로 보이면 안 되고, 내 진행바가 남의 위치를 그려도 안 된다.
+  const mine = snap.track?.url === url;
+  const st = mine ? snap.st : "idle";
+  const pos = mine ? snap.pos : 0;
+  const dur = mine ? snap.dur : 0;
 
-  const tick = useCallback(() => {
-    const ctx = ctxRef.current;
-    if (ctx && srcRef.current) {
-      setPos(Math.min(ctx.currentTime - startAtRef.current, bufRef.current?.duration ?? 0));
-      rafRef.current = requestAnimationFrame(tick);
-    }
-  }, []);
+  const track = useMemo<Track>(
+    () => ({ url, event, title: nowPlaying ?? title ?? "태안 인사이트 듣기", subtitle, href }),
+    [url, event, nowPlaying, title, subtitle, href],
+  );
+  const trackRef = useRef(track);
+  trackRef.current = track;
 
-  // BufferSource는 pause 불가(stop만) → offset 기록 후 새 source를 offset부터 start.
-  const startFrom = useCallback((off: number) => {
-    const ctx = ctxRef.current!, buf = bufRef.current!;
-    const s = ctx.createBufferSource();
-    s.buffer = buf; s.connect(ctx.destination);
-    s.onended = () => { if (srcRef.current === s) { srcRef.current = null; stopRaf(); offsetRef.current = 0; setPos(0); setSt("idle"); } };
-    s.start(0, Math.max(0, Math.min(off, buf.duration)));
-    srcRef.current = s; startAtRef.current = ctx.currentTime - off; setSt("playing"); stopRaf(); tick();
-  }, [tick]);
+  // 본문 따라읽기에 자리를 알린다 — 내 소리가 아니면 0을 알려 하이라이트를 거둔다.
+  //   (회차를 듣는 중에 기사 문장이 엉뚱하게 빛나면 안 된다. 그 자리는 이 기사의 자리가 아니다.)
+  const onPosRef = useRef(onPos);
+  onPosRef.current = onPos;
+  useEffect(() => { onPosRef.current?.(mine ? pos : 0); }, [mine, pos]);
 
-  const play = useCallback(async () => {
-    try {
-      if (!ctxRef.current) {
-        const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        ctxRef.current = new AC();
-      }
-      await ctxRef.current.resume();
-      if (!bufRef.current) {
-        setSt("loading");
-        const r = await fetch(url);
-        if (r.status === 503) { setSt("unavailable"); return; }
-        if (!r.ok) { setSt("error"); return; }
-        bufRef.current = await ctxRef.current.decodeAudioData(await r.arrayBuffer());
-        setDur(bufRef.current.duration);
-      }
-      trackEvent("audio_play", event);
-      startFrom(offsetRef.current);
-    } catch { setSt("error"); }
-  }, [url, event, startFrom]);
-
-  const pause = useCallback(() => {
-    const ctx = ctxRef.current, s = srcRef.current;
-    if (ctx && s) { offsetRef.current = ctx.currentTime - startAtRef.current; s.onended = null; try { s.stop(); } catch { /* */ } srcRef.current = null; }
-    stopRaf(); setSt("paused");
-  }, []);
-
-  const seek = useCallback((t: number) => {
-    const d = bufRef.current?.duration ?? 0;
-    const nt = Math.max(0, Math.min(t, d));
-    offsetRef.current = nt; setPos(nt);
-    if (srcRef.current) { const s = srcRef.current; s.onended = null; try { s.stop(); } catch { /* */ } srcRef.current = null; startFrom(nt); }
-  }, [startFrom]);
-
-  // 본문 문장 클릭 → 아직 안 틀었으면 재생부터 시작하고, 틀었으면 그 지점으로 이동한다.
+  // 본문 문장 클릭 → 아직 안 틀었으면 그 지점부터 받아 틀고, 틀었으면 그 지점으로 옮긴다.
   useEffect(() => {
     if (!controlsRef) return;
-    controlsRef.current = {
-      seekAndPlay: (sec: number) => {
-        if (!bufRef.current) { offsetRef.current = sec; setPos(sec); void play(); return; }
-        seek(sec);
-        if (st !== "playing") void play();
-      },
-    };
+    controlsRef.current = { seekAndPlay: (sec: number) => void player.seekAndPlay(trackRef.current, sec) };
     return () => { if (controlsRef) controlsRef.current = null; };
-  }, [controlsRef, seek, play, st]);
-
-  useEffect(() => () => { stopRaf(); try { srcRef.current?.stop(); } catch { /* */ } try { ctxRef.current?.close(); } catch { /* */ } }, []);
+  }, [controlsRef, player]);
 
   const onBar = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    if (dur > 0) seek(((e.clientX - rect.left) / rect.width) * dur);
+    if (dur > 0) player.seek(((e.clientX - rect.left) / rect.width) * dur);
   };
 
   const playing = st === "playing";
@@ -127,9 +79,9 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle, onPo
     : "inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-subtle/20 px-3 py-1.5 text-sm font-semibold text-brand hover:bg-accent-subtle/40 disabled:opacity-60";
 
   const button = (
-    <button type="button" onClick={playing ? pause : play} disabled={loadingFirst} className={btnClass}>
+    <button type="button" onClick={() => (playing ? player.pause() : void player.play(track))} disabled={loadingFirst} className={btnClass}>
       {loadingFirst ? "여는 중…"
-        : playing ? <span className="inline-flex items-center gap-1.5"><span aria-hidden>❙❙</span> 일시정지</span>
+        : playing ? <span className="inline-flex items-center gap-1.5"><Icon name="pause" weight="fill" /> 일시정지</span>
         : st === "paused" ? <><Icon name="play" /> 이어 듣기</>
         : st === "error" ? <><Icon name="refresh" /> 다시 듣기</>
         : <><Icon name="speaker" /> {listenLabel(variant, title)}</>}
@@ -138,21 +90,23 @@ export function WebAudio({ url, event, variant = "inline", title, subtitle, onPo
 
   const bar = showBar ? (
     <div className="flex items-center gap-2 min-w-[160px] flex-1">
-      <span className="text-xs tabular-nums text-foreground-muted">{fmt(pos)}</span>
+      <span className="text-xs tabular-nums text-foreground-muted">{clock(pos)}</span>
       <div onClick={onBar} className="h-1.5 flex-1 rounded-full bg-brand/15 cursor-pointer" role="slider" aria-label="재생 위치" aria-valuenow={Math.round(pos)} aria-valuemax={Math.round(dur)}>
         <div className="h-full rounded-full bg-brand" style={{ width: `${dur ? Math.min(100, (pos / dur) * 100) : 0}%` }} />
       </div>
-      <span className="text-xs tabular-nums text-foreground-muted">{fmt(dur)}</span>
+      <span className="text-xs tabular-nums text-foreground-muted">{clock(dur)}</span>
     </div>
   ) : null;
 
   const hint = !showBar && st !== "unavailable" && st !== "error" && durationHint
-    ? <span className="text-xs text-foreground-muted">{human(durationHint)}</span>
+    ? <span className="text-xs text-foreground-muted">{spoken(durationHint)}</span>
     : null;
 
   const notes = (
     <>
-      {st === "unavailable" && <span className="text-xs text-foreground-muted">🎧 음성 준비 중 — 곧 자동 생성됩니다</span>}
+      {/* 없는 음성을 '곧 자동 생성됩니다'라고 적지 않는다 — 옛 기사엔 끝내 안 생긴다
+          (생성기는 최신분만 만든다). 약속 대신 사실만 적는다. */}
+      {st === "unavailable" && <span className="text-xs text-foreground-muted">🎧 이 음성은 아직 없습니다</span>}
       {st === "error" && <span className="text-xs text-red-600">재생 실패 — 잠시 후 다시 시도하세요.</span>}
     </>
   );

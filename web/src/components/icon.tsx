@@ -9,7 +9,7 @@ import {
   DownloadSimple, BookOpen, Books, Play, Headphones, SpeakerHigh, Microphone, CalendarBlank,
   Compass, MapPin, Lock, User, Crown, ChartBar, LinkSimple, EnvelopeSimple, ChatCircle,
   Paperclip, Image as ImageIcon, ArrowsClockwise, Printer, VideoCamera, Broadcast, Confetti,
-  ArrowsOut, Wrench, Eye, Star,
+  ArrowsOut, Wrench, Eye, Star, Pause, X,
 } from "@phosphor-icons/react/dist/ssr";
 
 type PhosphorProps = { size?: number | string; weight?: "thin" | "light" | "regular" | "bold" | "fill" | "duotone"; className?: string; color?: string };
@@ -25,6 +25,7 @@ const MAP: Record<string, ComponentType<PhosphorProps>> = {
   chat: ChatCircle, clip: Paperclip, image: ImageIcon, refresh: ArrowsClockwise,
   print: Printer, camera: VideoCamera, signal: Broadcast, party: Confetti,
   expand: ArrowsOut, wrench: Wrench, eye: Eye, star: Star,
+  pause: Pause, close: X,
 };
 
 export type IconName = keyof typeof MAP;

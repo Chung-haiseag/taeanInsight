@@ -12,6 +12,7 @@ const pretendard = localFont({
 });
 import { SiteFooter } from "@/components/site-footer";
 import { AccessibilityProvider } from "@/components/accessibility-provider";
+import { AudioDock } from "@/components/audio/audio-dock";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://axtaeannews.co.kr"),
@@ -41,8 +42,17 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "태안인사이트" },
+  // 그림은 태안신문 마크다(scripts/gen-icons.mjs 가 public/ 아래 한 벌을 만든다). 선언이 두 벌인 건 쓰는 쪽이 달라서다.
+  //   .ico — 탭·즐겨찾기. 바깥 프로그램(RSS 리더·링크 미리보기·모니터링)은 이 <link> 를 읽지 않고
+  //     /favicon.ico 를 바로 찍는 것이 많아 **파일이 그 자리에 있는 것 자체가 핵심**이다(public/favicon.ico).
+  //     여기 적어 두는 건 읽는 쪽에도 숨기지 않기 위해서다. 16·32·48px 세 장이 한 파일에 들어 있다
+  //     (16px 만 날개 한 쪽 — 전체 마크는 가로 2.1:1 이라 그 크기에선 납작하게 눌린다).
+  //   .png — 고해상도 화면이 더 큰 그림을 쓸 수 있게.
   icons: {
-    icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48", type: "image/x-icon" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
     apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
@@ -109,6 +119,11 @@ export default function RootLayout({
               </table>
             </main>
             <SiteFooter />
+            {/* 듣는 중 띠 — 화면이 바뀌어도 소리와 함께 남는다(2026-11-08).
+                레이아웃 **마지막 칸**에 sticky 로 둔 이유: fixed 면 바닥글을 덮어 여백을
+                따로 밀어 줘야 하는데, sticky 는 맨 아래에서 제 칸에 앉는다.
+                틀어 둔 소리가 없으면 아무것도 그리지 않는다. */}
+            <AudioDock />
           </div>
           {/* AI 코파일럿(화면 옆 대화창)은 **꺼 둔다**(2026-08-27, 사용자 판단).
               되살리려면 이 자리에 <Copilot /> 한 줄을 다시 넣으면 된다 —
